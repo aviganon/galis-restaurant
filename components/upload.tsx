@@ -78,7 +78,7 @@ const uploadTypes = [
   { id: "inventory", label: "ספירת מלאי", icon: FileSpreadsheet, description: "עדכון כמויות מלאי מקובץ" },
 ]
 
-const AI_ACCEPT = ".xlsx,.xls,.csv,.pdf,image/*"
+const AI_ACCEPT = ".xlsx,.xls,.csv,.pdf,.rtf,image/*"
 const VAT_RATE = 1.17
 
 const isOwnerRole = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner"
@@ -150,7 +150,7 @@ export function Upload() {
 
   const openFpm = useCallback((file: File, forceType?: "p" | "d" | "s") => {
     const ext = file.name.split(".").pop()?.toLowerCase()
-    const isAiCapable = ["xlsx", "xls", "csv", "pdf", "png", "jpg", "jpeg", "gif", "webp"].includes(ext ?? "")
+    const isAiCapable = ["xlsx", "xls", "csv", "pdf", "png", "jpg", "jpeg", "gif", "webp", "rtf"].includes(ext ?? "")
     const explicitType = selectedType === "prices" || selectedType === "invoice" ? "p" : selectedType === "recipe" ? "d" : selectedType === "sales" ? "s" : null
     const typeToUse = forceType ?? (explicitType ?? (isAiCapable ? "p" : null))
     if (isAiCapable && typeToUse) {
@@ -170,7 +170,7 @@ export function Upload() {
       if (!first) return
       try {
         const ext = first.name.split(".").pop()?.toLowerCase()
-        const isAiCapable = ["xlsx", "xls", "csv", "pdf", "png", "jpg", "jpeg", "gif", "webp"].includes(ext ?? "")
+        const isAiCapable = ["xlsx", "xls", "csv", "pdf", "png", "jpg", "jpeg", "gif", "webp", "rtf"].includes(ext ?? "")
         const hasExplicitType = selectedType === "prices" || selectedType === "invoice" || selectedType === "recipe" || selectedType === "sales"
 
         if (isAiCapable) {
@@ -558,6 +558,7 @@ export function Upload() {
                   <Badge variant="outline">Excel (.xlsx)</Badge>
                   <Badge variant="outline">CSV</Badge>
                   <Badge variant="outline">PDF</Badge>
+                  <Badge variant="outline">RTF</Badge>
                   <Badge variant="outline">תמונות</Badge>
                 </div>
                 <input
