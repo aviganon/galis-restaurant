@@ -1,0 +1,99 @@
+rules_version = '2';
+
+// Restaurant Pro — מערכת חדשה (פרויקט Firebase נפרד)
+// Collections: config, users, restaurants, inviteCodes, ingredients, invoiceLog
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // helper: האם המשתמש ב־config/admins (בעלים/מנהל מערכת)
+    function isConfigAdmin() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && exists(/databases/$(database)/documents/config/admins)
+        && request.auth.token.email in get(/databases/$(database)/documents/config/admins).data.emails;
+    }
+
+    // config — admins (רשימת מנהלים), anthropic (מפתח API)
+    match /config/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // users — משתמשים לפי uid
+    // list: בעלים או מנהל רואה משתמשים באותה מסעדה
+    // update: מנהל יכול לעדכן הרשאות של משתמשים באותה מסעדה
+    match /users/{userId} {
+      allow get: if request.auth != null && (
+        request.auth.uid == userId
+        || isConfigAdmin()
+        || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && resource.data.restaurantId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId)
+      );
+      allow list: if request.auth != null && (
+        isConfigAdmin()
+        || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && resource.data.restaurantId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId)
+      );
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && (
+        request.auth.uid == userId
+        || isConfigAdmin()
+        || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && resource.data.restaurantId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['manager', 'admin'])
+      );
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // restaurants — מסעדות (get מותר ללא auth — לאימות בהרשמה עם קוד קיים)
+    match /restaurants/{restaurantId} {
+      allow get: if true;
+      allow list, create, update, delete: if request.auth != null;
+
+      // appState — invitedEmails וכו' (משתמש מוזמן יכול לקרוא אם האימייל שלו ברשימה)
+      match /appState/{docId} {
+        allow read: if request.auth != null && (
+          isConfigAdmin()
+          || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId == restaurantId)
+          || (docId == 'invitedEmails' && request.auth.token.email in resource.data.get('list', []))
+        );
+        allow write: if request.auth != null && (isConfigAdmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId == restaurantId));
+      }
+
+      // Subcollections: recipes, ingredients — רק לבעלים/מנהל/משתמש של המסעדה
+      match /{subcollection}/{docId} {
+        allow read, write: if request.auth != null && (isConfigAdmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId == restaurantId));
+      }
+    }
+
+    // inviteCodes — קודי הזמנה (get מותר גם ללא התחברות — לאימות בהרשמה)
+    match /inviteCodes/{codeId} {
+      allow get: if true;
+      allow list, create, update, delete: if request.auth != null;
+    }
+
+    // ingredients — רכיבים גלובליים
+    match /ingredients/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // suppliers — ספקים גלובליים (פאנל מנהל)
+    match /suppliers/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // invoiceLog — לוג חשבוניות
+    match /invoiceLog/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // purchaseOrders — הזמנות ספקים (לפי restaurantId) — כל משתמש רואה רק של מסעדתו
+    match /purchaseOrders/{docId} {
+      allow read, update, delete: if request.auth != null && (
+        isConfigAdmin()
+        || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && resource.data.restaurantId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId)
+      );
+      allow create: if request.auth != null && (
+        isConfigAdmin()
+        || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && request.resource.data.restaurantId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId)
+      );
+    }
+  }
+}

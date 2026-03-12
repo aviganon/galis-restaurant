@@ -1,0 +1,713 @@
+====================================================
+קובץ עיצוב מסך פתיחה - העתק לפרויקט שלך
+====================================================
+
+דרישות npm להוסיף:
+  framer-motion
+  lucide-react
+  next/font/google (Heebo)
+
+====================================================
+קובץ 1: app/globals.css  (הוסף/עדכן את הטוקנים)
+====================================================
+
+הוסף לתחילת הקובץ (אחרי @import):
+
+@theme inline {
+  --font-sans: var(--font-heebo), 'Heebo', sans-serif;
+}
+
+:root {
+  --background: oklch(0.985 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.145 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.96 0.005 240);
+  --muted-foreground: oklch(0.45 0 0);
+  --accent: oklch(0.55 0.15 250);
+  --accent-foreground: oklch(0.985 0 0);
+  --border: oklch(0.90 0 0);
+  --input: oklch(0.96 0 0);
+  --radius: 0.75rem;
+}
+
+הוסף לתחתית הקובץ:
+
+/* Safe area for iPhone */
+.pb-safe {
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+}
+button, a, [role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+input, select, textarea {
+  font-size: 16px !important;
+}
+html[dir="rtl"] { text-align: right; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+
+====================================================
+קובץ 2: app/layout.tsx  (עדכן RTL ופונט עברי)
+====================================================
+
+import type { Metadata, Viewport } from 'next'
+import { Heebo } from 'next/font/google'
+import './globals.css'
+
+const heebo = Heebo({
+  subsets: ['latin', 'hebrew'],
+  variable: '--font-heebo'
+})
+
+export const metadata: Metadata = {
+  title: 'Restaurant Pro | מערכת ניהול מסעדות',
+  description: 'מערכת ניהול מסעדות מתקדמת',
+}
+
+export const viewport: Viewport = {
+  themeColor: '#0a0a0f',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+}
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="he" dir="rtl">
+      <body className={`${heebo.variable} font-sans antialiased`}>
+        {children}
+      </body>
+    </html>
+  )
+}
+
+====================================================
+קובץ 3: components/login-screen.tsx  (המסך המלא)
+====================================================
+
+"use client"
+
+import { useState, useRef } from "react"
+import Image from "next/image"
+import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
+import {
+  ChefHat,
+  UtensilsCrossed,
+  Star,
+  TrendingUp,
+  Users,
+  BarChart3,
+  Lock,
+  Mail,
+  Building2,
+  MapPin,
+  Phone,
+  ArrowLeft,
+  Sparkles,
+  Quote,
+  CheckCircle2,
+  Play,
+  Volume2,
+  VolumeX
+} from "lucide-react"
+
+interface LoginScreenProps {
+  onLogin: () => void
+}
+
+const recommendedRestaurants = [
+  {
+    name: "מסעדת הים",
+    location: "תל אביב - נמל",
+    rating: 4.9,
+    reviews: 1250,
+    image: "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=400&h=300&fit=crop",
+    badge: "הכי פופולרי"
+  },
+  {
+    name: "פיצה נאפולי",
+    location: "ירושלים - מרכז",
+    rating: 4.8,
+    reviews: 890,
+    image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=300&fit=crop",
+    badge: "חדש"
+  },
+  {
+    name: "סושי טוקיו",
+    location: "רמת גן",
+    rating: 4.7,
+    reviews: 650,
+    image: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=400&h=300&fit=crop",
+    badge: "מומלץ"
+  },
+  {
+    name: "בורגר האוס",
+    location: "חיפה - כרמל",
+    rating: 4.6,
+    reviews: 1100,
+    image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop",
+    badge: "טרנדי"
+  }
+]
+
+const features = [
+  { icon: BarChart3, title: "דשבורד חי", desc: "ניתוח נתונים בזמן אמת" },
+  { icon: ChefHat, title: "ניהול מתכונים", desc: "עץ מוצר מתקדם" },
+  { icon: Users, title: "ספקים", desc: "ניהול ומעקב הזמנות" },
+  { icon: TrendingUp, title: "רווחיות", desc: "מעקב עלויות והכנסות" }
+]
+
+const testimonials = [
+  {
+    quote: "המערכת חסכה לנו 30% בעלויות המזון תוך חודשיים",
+    author: "דני לוי",
+    role: "בעלים, מסעדת הים",
+    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop"
+  },
+  {
+    quote: "סוף סוף אני יודע בדיוק כמה עולה כל מנה",
+    author: "מיכל כהן",
+    role: "שפית ראשית, קפה פריז",
+    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop"
+  }
+]
+
+const fadeInUp = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
+}
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.15 } }
+}
+
+export function LoginScreen({ onLogin }: LoginScreenProps) {
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState("login")
+  const [isMuted, setIsMuted] = useState(true)
+  const [showVideo, setShowVideo] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const heroRef = useRef<HTMLDivElement>(null)
+
+  const { scrollYProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"]
+  })
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.5], [1, 0])
+  const heroScale = useTransform(scrollYProgress, [0, 0.5], [1, 1.1])
+  const heroY = useTransform(scrollYProgress, [0, 0.5], [0, 100])
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    // *** כאן תחבר את הלוגיקה שלך מ-Firebase ***
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    setIsLoading(false)
+    onLogin()
+  }
+
+  const toggleMute = () => {
+    if (videoRef.current) {
+      videoRef.current.muted = !isMuted
+      setIsMuted(!isMuted)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-background overflow-x-hidden">
+
+      {/* ===== HEADER ===== */}
+      <motion.header
+        initial={{ y: -100 }}
+        animate={{ y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="fixed top-0 inset-x-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border"
+      >
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <motion.div className="flex items-center gap-3" whileHover={{ scale: 1.02 }}>
+            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+              <UtensilsCrossed className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <span className="font-bold text-lg">Restaurant Pro</span>
+          </motion.div>
+          <nav className="hidden md:flex items-center gap-6 text-sm">
+            {["תכונות", "מסעדות", "אודות", "צור קשר"].map((item, i) => (
+              <motion.a
+                key={item}
+                href={`#${["features", "restaurants", "about", "contact"][i]}`}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                whileHover={{ y: -2 }}
+              >
+                {item}
+              </motion.a>
+            ))}
+          </nav>
+          <Button
+            variant="outline"
+            className="hidden md:flex rounded-full"
+            onClick={() => document.getElementById('auth-section')?.scrollIntoView({ behavior: 'smooth' })}
+          >
+            כניסה למערכת
+          </Button>
+        </div>
+      </motion.header>
+
+      {/* ===== HERO + VIDEO ===== */}
+      <section ref={heroRef} className="relative min-h-[90vh] pt-24 pb-16 md:pt-32 md:pb-24 overflow-hidden flex items-center">
+        <motion.div
+          className="absolute inset-0 z-0"
+          style={{ opacity: heroOpacity, scale: heroScale, y: heroY }}
+        >
+          <video
+            ref={videoRef}
+            autoPlay
+            loop
+            muted
+            playsInline
+            poster="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1920&q=80"
+            className="absolute inset-0 w-full h-full object-cover"
+          >
+            <source src="https://videos.pexels.com/video-files/4253242/4253242-uhd_2560_1440_24fps.mp4" type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/50 to-background" />
+        </motion.div>
+
+        <motion.button
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 1 }}
+          onClick={toggleMute}
+          className="absolute bottom-8 left-8 z-30 p-3 rounded-full bg-background/50 backdrop-blur-md border border-border hover:bg-background/80 transition-colors"
+        >
+          {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+        </motion.button>
+
+        <div className="container mx-auto px-4 relative z-20">
+          <motion.div
+            className="max-w-3xl mx-auto text-center"
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+          >
+            <motion.div variants={fadeInUp}>
+              <Badge className="mb-6 rounded-full px-4 py-1.5 text-sm font-medium bg-secondary/80 backdrop-blur-sm text-secondary-foreground">
+                <Sparkles className="w-4 h-4 ml-2 animate-pulse" />
+                מערכת ניהול מסעדות מתקדמת
+              </Badge>
+            </motion.div>
+
+            <motion.h1
+              variants={fadeInUp}
+              className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 text-balance"
+            >
+              ניהול מסעדות
+              <br />
+              <span className="text-muted-foreground">ברמה אחרת</span>
+            </motion.h1>
+
+            <motion.p
+              variants={fadeInUp}
+              className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto text-pretty"
+            >
+              עלויות · מתכונים · ספקים · ניתוח פיננסי בזמן אמת
+              <br />
+              הכל במקום אחד, נגיש מכל מכשיר
+            </motion.p>
+
+            <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button
+                size="lg"
+                className="rounded-full px-8 text-base shadow-lg shadow-primary/25"
+                onClick={() => document.getElementById('auth-section')?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                התחל עכשיו
+                <ArrowLeft className="w-4 h-4 mr-2" />
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="rounded-full px-8 text-base bg-background/50 backdrop-blur-md"
+                onClick={() => setShowVideo(true)}
+              >
+                <Play className="w-4 h-4 ml-2" />
+                צפה בהדגמה
+              </Button>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.5 }}
+              className="absolute bottom-8 left-1/2 -translate-x-1/2"
+            >
+              <motion.div
+                animate={{ y: [0, 10, 0] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                className="w-6 h-10 rounded-full border-2 border-foreground/30 flex items-start justify-center p-2"
+              >
+                <motion.div className="w-1.5 h-1.5 rounded-full bg-foreground/50" />
+              </motion.div>
+            </motion.div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ===== VIDEO MODAL ===== */}
+      <AnimatePresence>
+        {showVideo && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowVideo(false)}
+            className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-xl flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className="relative w-full max-w-4xl aspect-video rounded-2xl overflow-hidden shadow-2xl"
+            >
+              <video autoPlay controls className="w-full h-full">
+                <source src="https://videos.pexels.com/video-files/4253242/4253242-uhd_2560_1440_24fps.mp4" type="video/mp4" />
+              </video>
+              <button
+                onClick={() => setShowVideo(false)}
+                className="absolute top-4 left-4 p-2 rounded-full bg-background/80 hover:bg-background transition-colors"
+              >
+                <span className="text-xl">✕</span>
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ===== FEATURES ===== */}
+      <section id="features" className="py-16 md:py-24 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl md:text-3xl font-bold mb-4">הכלים שיעזרו לך להצליח</h2>
+            <p className="text-muted-foreground max-w-xl mx-auto">מערכת מקיפה לניהול כל היבטי המסעדה שלך</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+            {features.map((feature, i) => (
+              <Card key={i} className="border-0 shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-6 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                    <feature.icon className="w-6 h-6 text-primary" />
+                  </div>
+                  <h3 className="font-semibold mb-1">{feature.title}</h3>
+                  <p className="text-sm text-muted-foreground">{feature.desc}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ===== RECOMMENDED RESTAURANTS ===== */}
+      <section id="restaurants" className="py-16 md:py-24">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl md:text-3xl font-bold mb-4">מסעדות ממליצות</h2>
+            <p className="text-muted-foreground max-w-xl mx-auto">מאות מסעדות כבר משתמשות במערכת שלנו</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {recommendedRestaurants.map((restaurant, i) => (
+              <Card key={i} className="overflow-hidden border-0 shadow-sm hover:shadow-lg transition-all group cursor-pointer">
+                <div className="relative h-48 overflow-hidden">
+                  <Image
+                    src={restaurant.image}
+                    alt={restaurant.name}
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  <Badge className="absolute top-3 right-3 rounded-full bg-background/90 text-foreground backdrop-blur-sm">
+                    {restaurant.badge}
+                  </Badge>
+                </div>
+                <CardContent className="p-4">
+                  <h3 className="font-semibold text-lg mb-1">{restaurant.name}</h3>
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
+                    <MapPin className="w-3.5 h-3.5" />
+                    {restaurant.location}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                      <span className="font-medium">{restaurant.rating}</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">({restaurant.reviews.toLocaleString()} ביקורות)</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ===== TESTIMONIALS ===== */}
+      <section className="py-16 md:py-24 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-12">
+              <Quote className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+              <h2 className="text-2xl md:text-3xl font-bold">מה הלקוחות אומרים</h2>
+            </div>
+            <div className="grid md:grid-cols-2 gap-6">
+              {testimonials.map((t, i) => (
+                <Card key={i} className="border-0 shadow-sm">
+                  <CardContent className="p-6">
+                    <p className="text-lg mb-6 leading-relaxed">{'"'}{t.quote}{'"'}</p>
+                    <div className="flex items-center gap-4">
+                      <Image src={t.avatar} alt={t.author} width={48} height={48} className="rounded-full object-cover" />
+                      <div>
+                        <p className="font-semibold">{t.author}</p>
+                        <p className="text-sm text-muted-foreground">{t.role}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ===== ABOUT ===== */}
+      <section id="about" className="py-16 md:py-24">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="grid md:grid-cols-2 gap-12 items-center">
+              <div>
+                <h2 className="text-2xl md:text-3xl font-bold mb-6">אודות Restaurant Pro</h2>
+                <p className="text-muted-foreground mb-6 leading-relaxed">
+                  Restaurant Pro הוקמה ב-2020 מתוך הבנה עמוקה של הצרכים הייחודיים של תעשיית המסעדנות בישראל.
+                  המערכת פותחה על ידי צוות של מומחים בתחום הקולינריה והטכנולוגיה.
+                </p>
+                <ul className="space-y-3">
+                  {[
+                    "ניסיון של מעל 15 שנה בתעשיית המזון",
+                    "למעלה מ-500 מסעדות פעילות",
+                    "תמיכה טכנית 24/7",
+                    "עדכונים ושיפורים שוטפים"
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-center gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="relative h-80 md:h-96 rounded-2xl overflow-hidden">
+                <Image
+                  src="https://images.unsplash.com/photo-1600565193348-f74bd3c7ccdf?w=600&h=800&fit=crop"
+                  alt="Restaurant kitchen"
+                  fill
+                  className="object-cover"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ===== AUTH / LOGIN FORM ===== */}
+      <section id="auth-section" className="py-16 md:py-24 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="max-w-md mx-auto">
+            <Card className="border-0 shadow-xl">
+              <CardContent className="p-6 md:p-8">
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-4">
+                    <UtensilsCrossed className="w-8 h-8 text-primary-foreground" />
+                  </div>
+                  <h2 className="text-2xl font-bold">Restaurant Pro</h2>
+                  <p className="text-sm text-muted-foreground mt-1">מערכת ניהול מסעדות מתקדמת</p>
+                </div>
+
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                  <TabsList className="grid grid-cols-2 mb-6 w-full">
+                    <TabsTrigger value="login" className="rounded-lg">
+                      <Lock className="w-4 h-4 ml-2" />
+                      כניסה
+                    </TabsTrigger>
+                    <TabsTrigger value="register" className="rounded-lg">
+                      <Building2 className="w-4 h-4 ml-2" />
+                      הרשמה
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="login" className="space-y-4 mt-0">
+                    <form onSubmit={handleLogin} className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">אימייל</label>
+                        <div className="relative">
+                          <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            type="email"
+                            placeholder="your@email.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="pr-10 h-12 rounded-xl"
+                            dir="ltr"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">סיסמה</label>
+                        <div className="relative">
+                          <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            type="password"
+                            placeholder="••••••••"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="pr-10 h-12 rounded-xl"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input type="checkbox" id="remember" className="rounded" />
+                        <label htmlFor="remember" className="text-sm text-muted-foreground">השאר אותי מחובר</label>
+                      </div>
+                      <Button type="submit" className="w-full h-12 rounded-xl text-base" disabled={isLoading}>
+                        {isLoading ? "מתחבר..." : "כניסה למערכת"}
+                        {!isLoading && <ArrowLeft className="w-4 h-4 mr-2" />}
+                      </Button>
+                      <button type="button" className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors">
+                        שכחתי סיסמה
+                      </button>
+                    </form>
+                  </TabsContent>
+
+                  <TabsContent value="register" className="space-y-4 mt-0">
+                    <form onSubmit={handleLogin} className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">קוד הזמנה</label>
+                        <Input placeholder="XXXX-XXXX" className="h-12 rounded-xl text-center tracking-widest font-mono" dir="ltr" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">שם המסעדה</label>
+                        <div className="relative">
+                          <Building2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input placeholder="מסעדת הים" className="pr-10 h-12 rounded-xl" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">סניף / כתובת</label>
+                        <div className="relative">
+                          <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input placeholder="תל אביב - הנמל" className="pr-10 h-12 rounded-xl" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">אימייל</label>
+                        <div className="relative">
+                          <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input type="email" placeholder="owner@restaurant.com" className="pr-10 h-12 rounded-xl" dir="ltr" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">סיסמה</label>
+                        <div className="relative">
+                          <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input type="password" placeholder="לפחות 6 תווים" className="pr-10 h-12 rounded-xl" />
+                        </div>
+                      </div>
+                      <Button type="submit" className="w-full h-12 rounded-xl text-base" disabled={isLoading}>
+                        {isLoading ? "יוצר חשבון..." : "הקמת מסעדה חדשה"}
+                        <ArrowLeft className="w-4 h-4 mr-2" />
+                      </Button>
+                    </form>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* ===== CONTACT ===== */}
+      <section id="contact" className="py-16 md:py-24">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto text-center">
+            <h2 className="text-2xl md:text-3xl font-bold mb-4">צור קשר</h2>
+            <p className="text-muted-foreground mb-8">יש לך שאלות? נשמח לעזור!</p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button variant="outline" size="lg" className="rounded-full">
+                <Phone className="w-4 h-4 ml-2" />
+                03-1234567
+              </Button>
+              <Button variant="outline" size="lg" className="rounded-full">
+                <Mail className="w-4 h-4 ml-2" />
+                info@restaurantpro.co.il
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ===== FOOTER ===== */}
+      <footer className="py-8 border-t border-border">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+                <UtensilsCrossed className="w-4 h-4 text-primary-foreground" />
+              </div>
+              <span className="font-semibold">Restaurant Pro</span>
+            </div>
+            <p className="text-sm text-muted-foreground">© 2026 Restaurant Pro. כל הזכויות שמורות.</p>
+          </div>
+        </div>
+      </footer>
+
+    </div>
+  )
+}
+
+====================================================
+הוראות שימוש ל-Claude:
+====================================================
+
+1. הוסף את החבילה framer-motion:
+   npm install framer-motion
+
+2. עדכן את app/layout.tsx - הוסף פונט Heebo ו-dir="rtl" לפי הקוד למעלה
+
+3. עדכן את app/globals.css - הוסף את הטוקנים ואת safe-area
+
+4. צור קובץ חדש: components/login-screen.tsx
+   הדבק את הקוד של קובץ 3 למעלה
+
+5. בקובץ הראשי שלך (שם שמציג את מסך הכניסה),
+   החלף את הקומפוננט הקיים:
+
+   import { LoginScreen } from "@/components/login-screen"
+
+   ובמקום מסך הכניסה הישן שים:
+   <LoginScreen onLogin={() => { /* הלוגיקה שלך אחרי כניסה */ }} />
+
+6. ה-handleLogin בקומפוננט מכיל הערה:
+   // *** כאן תחבר את הלוגיקה שלך מ-Firebase ***
+   החלף את השורה עם ה-await המדומה בקוד ה-Firebase שלך
+
+====================================================
