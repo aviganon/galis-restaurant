@@ -1933,7 +1933,7 @@ export function AdminPanel() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right text-sm">
-                            <div className="space-y-1">
+                            <div className="space-y-2 min-w-[160px]">
                               {ing.globalCheapest && (
                                 <div className="text-muted-foreground">
                                   <span className="text-xs">מהמערכת:</span> ₪{ing.globalCheapest.price.toFixed(1)}/{ing.globalCheapest.unit}

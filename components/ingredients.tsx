@@ -1159,7 +1159,7 @@ export function Ingredients() {
                         {isOwner && (
                           <TableCell className="text-right text-sm">
                             {isCompound ? "—" : (
-                              <div className="space-y-1 min-w-[140px]">
+                              <div className="space-y-2 min-w-[160px]">
                                 {ingredient.globalCheapest && (
                                   <div className={cn(
                                     ingredient.priceSource === "mine" &&
