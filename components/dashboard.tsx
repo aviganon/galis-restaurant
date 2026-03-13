@@ -20,12 +20,14 @@ import {
   Upload,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useTranslations } from "@/lib/use-translations"
 
 const VAT_RATE = 1.17
 
 const isOwnerRole = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner"
 
 export function Dashboard() {
+  const t = useTranslations()
   const { currentRestaurantId, userRole, isSystemOwner, setCurrentPage, restaurants, isImpersonating, onImpersonate } = useApp()
   const isOwner = isOwnerRole(userRole, isSystemOwner)
   const isOwnerDashboard = isSystemOwner && !isImpersonating
@@ -173,7 +175,7 @@ export function Dashboard() {
           setInventoryValue(0)
           setSuppliersCount(0)
           const alertList: { type: string; message: string; time: string; id?: string }[] = []
-          if (overTargetAll > 0) alertList.push({ type: "info", message: `${overTargetAll} מנות מעל יעד עלות מזון (30%)`, time: "עכשיו" })
+          if (overTargetAll > 0) alertList.push({ type: "info", message: `${overTargetAll} ${t("pages.dashboard.dishesOverTargetMsg")}`, time: t("pages.now") })
           try {
             const notifSnap = await getDocs(
               query(
@@ -188,7 +190,7 @@ export function Dashboard() {
               .forEach((d) => {
                 const data = d.data()
                 const msg = `מסעדה "${data.restaurantName || data.restaurantId}" הסירה את הספק "${data.supplierName || ""}" ששויך על ידך`
-                alertList.unshift({ type: "warning", message: msg, time: "עכשיו", id: d.id })
+                alertList.unshift({ type: "warning", message: msg, time: t("pages.now"), id: d.id })
               })
           } catch (_) {}
           setAlerts(alertList)
@@ -330,10 +332,10 @@ export function Dashboard() {
         setProfitabilityDishes(withFoodCost.sort((a, b) => b.margin - a.margin).slice(0, 5))
 
         const alertList: { type: string; message: string; time: string }[] = []
-        if (outOfStock > 0) alertList.push({ type: "warning", message: `${outOfStock} מוצרים אזלו מהמלאי`, time: "עכשיו" })
-        if (lowStock > 0) alertList.push({ type: "warning", message: `${lowStock} מוצרים במלאי נמוך`, time: "עכשיו" })
-        if (overTarget > 0) alertList.push({ type: "info", message: `${overTarget} מנות מעל יעד עלות מזון (30%)`, time: "עכשיו" })
-        if (delivered.length > 0) alertList.push({ type: "success", message: `${delivered.length} הזמנות ספקים נמסרו לאחרונה`, time: "עכשיו" })
+        if (outOfStock > 0) alertList.push({ type: "warning", message: `${outOfStock} ${t("pages.dashboard.outOfStockMsg")}`, time: t("pages.now") })
+        if (lowStock > 0) alertList.push({ type: "warning", message: `${lowStock} ${t("pages.dashboard.lowStockMsg")}`, time: t("pages.now") })
+        if (overTarget > 0) alertList.push({ type: "info", message: `${overTarget} ${t("pages.dashboard.dishesOverTargetMsg")}`, time: t("pages.now") })
+        if (delivered.length > 0) alertList.push({ type: "success", message: `${delivered.length} ${t("pages.dashboard.deliveredMsg")}`, time: t("pages.now") })
         setAlerts(alertList)
       } catch (e) {
         console.error("load dashboard:", e)
@@ -342,7 +344,7 @@ export function Dashboard() {
       }
     }
     load()
-  }, [currentRestaurantId, isOwner, refreshKey, isOwnerDashboard, restaurants])
+  }, [currentRestaurantId, isOwner, refreshKey, isOwnerDashboard, restaurants, t])
 
   if (loading) {
     return (
@@ -355,8 +357,8 @@ export function Dashboard() {
   if (!isOwnerDashboard && !currentRestaurantId) {
     return (
       <div className="container mx-auto px-4 py-6">
-        <h1 className="text-2xl font-bold mb-1">לוח בקרה</h1>
-        <p className="text-muted-foreground">בחר מסעדה כדי לראות את הנתונים</p>
+        <h1 className="text-2xl font-bold mb-1">{t("pages.dashboard.title")}</h1>
+        <p className="text-muted-foreground">{t("pages.dashboard.selectRestaurant")}</p>
       </div>
     )
   }
@@ -369,39 +371,39 @@ export function Dashboard() {
 
   if (isOwnerDashboard) {
     const ownerKpis = [
-      { label: "הכנסות החודש", value: `₪${totalRevenue.toLocaleString()}`, icon: TrendingUp, color: "bg-green-50 text-green-700" },
-      { label: "מנות שנמכרו", value: String(totalDishesSold), icon: Utensils, color: "bg-amber-50 text-amber-700" },
-      { label: "ממוצע לעסקה", value: `₪${ownerAvgTicket.toFixed(0)}`, icon: DollarSign, color: "bg-blue-50 text-blue-700" },
-      { label: "רווח גולמי", value: `₪${ownerGrossProfit.toLocaleString()}`, icon: ArrowUpLeft, color: "bg-emerald-50 text-emerald-700" },
-      { label: "% עלות מזון", value: `${avgFoodCost.toFixed(1)}%`, icon: DollarSign, color: "bg-blue-50 text-blue-700" },
+      { label: t("pages.dashboard.monthlyRevenue"), value: `₪${totalRevenue.toLocaleString()}`, icon: TrendingUp, color: "bg-green-50 text-green-700" },
+      { label: t("pages.dashboard.dishesSold"), value: String(totalDishesSold), icon: Utensils, color: "bg-amber-50 text-amber-700" },
+      { label: t("pages.dashboard.avgPerOrder"), value: `₪${ownerAvgTicket.toFixed(0)}`, icon: DollarSign, color: "bg-blue-50 text-blue-700" },
+      { label: t("pages.dashboard.grossProfit"), value: `₪${ownerGrossProfit.toLocaleString()}`, icon: ArrowUpLeft, color: "bg-emerald-50 text-emerald-700" },
+      { label: t("pages.dashboard.foodCostPct"), value: `${avgFoodCost.toFixed(1)}%`, icon: DollarSign, color: "bg-blue-50 text-blue-700" },
       { label: "COGS", value: `₪${totalCost.toLocaleString()}`, icon: ShoppingCart, color: "bg-purple-50 text-purple-700" },
-      { label: "מנות מעל יעד", value: String(dishesOverTarget), icon: AlertTriangle, color: "bg-orange-50 text-orange-700" },
-      { label: "הזמנות ספקים", value: String(purchaseOrdersCount), icon: ShoppingCart, color: "bg-slate-50 text-slate-700" },
+      { label: t("pages.dashboard.dishesOverTarget"), value: String(dishesOverTarget), icon: AlertTriangle, color: "bg-orange-50 text-orange-700" },
+      { label: t("pages.dashboard.purchaseOrders"), value: String(purchaseOrdersCount), icon: ShoppingCart, color: "bg-slate-50 text-slate-700" },
     ]
 
     return (
       <div className="container mx-auto px-4 py-6">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold mb-1">לוח בקרה — סקירת מסעדות</h1>
-            <p className="text-muted-foreground">{restaurants?.length || 0} מסעדות פעילות במערכת</p>
+            <h1 className="text-2xl md:text-3xl font-bold mb-1">{t("pages.dashboard.ownerTitle")}</h1>
+            <p className="text-muted-foreground">{restaurants?.length || 0} {t("pages.dashboard.activeRestaurants")}</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
               <RefreshCw className={cn("w-4 h-4 ml-1.5", loading && "animate-spin")} />
-              רענן
+              {t("pages.refresh")}
             </Button>
             {setCurrentPage && (
               <Button variant="outline" size="sm" onClick={() => setCurrentPage("admin-panel")}>
-                פאנל מנהל
+                {t("pages.dashboard.adminPanel")}
               </Button>
             )}
           </div>
         </div>
 
         <div className="mb-6">
-          <h2 className="text-lg font-semibold mb-3">מסעדות</h2>
-          <p className="text-sm text-muted-foreground mb-4">לחץ על מסעדה כדי לראות את הנתונים שלה</p>
+          <h2 className="text-lg font-semibold mb-3">{t("pages.dashboard.restaurants")}</h2>
+          <p className="text-sm text-muted-foreground mb-4">{t("pages.dashboard.clickToView")}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {restaurantCards.map((card) => (
               <Card
@@ -420,13 +422,13 @@ export function Dashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold truncate">{card.name}</p>
-                    <p className="text-xs text-muted-foreground">{card.branch || "סניף ראשי"}</p>
+                    <p className="text-xs text-muted-foreground">{card.branch || t("pages.mainBranch")}</p>
                   </div>
                   <div className="text-left">
                     <p className={cn("font-bold text-sm", card.avgFoodCost > 30 ? "text-orange-600" : "text-green-600")}>
                       {card.avgFoodCost > 0 ? `${card.avgFoodCost.toFixed(1)}%` : "—"}
                     </p>
-                    <p className="text-xs text-muted-foreground">{card.dishes} מנות{card.overTarget > 0 ? ` · ${card.overTarget} ⚠️` : ""}</p>
+                    <p className="text-xs text-muted-foreground">{card.dishes} {t("pages.dishes")}{card.overTarget > 0 ? ` · ${card.overTarget} ⚠️` : ""}</p>
                   </div>
                   <span className="text-muted-foreground">›</span>
                 </CardContent>
@@ -454,21 +456,21 @@ export function Dashboard() {
             <CardHeader className="pb-3">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
                 <Utensils className="w-5 h-5 text-muted-foreground" />
-                מנות מובילות
+                {t("pages.dashboard.topDishes")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {topDishes.length === 0 ? (
-                <p className="text-muted-foreground text-sm">אין נתוני מכירות</p>
+                <p className="text-muted-foreground text-sm">{t("pages.dashboard.noSalesData")}</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="text-xs text-muted-foreground border-b">
-                        <th className="text-right pb-3 font-medium">מנה</th>
-                        <th className="text-center pb-3 font-medium">מכירות</th>
-                        <th className="text-center pb-3 font-medium">הכנסה</th>
-                        <th className="text-center pb-3 font-medium">מרווח</th>
+                        <th className="text-right pb-3 font-medium">{t("pages.dish")}</th>
+                        <th className="text-center pb-3 font-medium">{t("pages.dashboard.sales")}</th>
+                        <th className="text-center pb-3 font-medium">{t("pages.dashboard.revenue")}</th>
+                        <th className="text-center pb-3 font-medium">{t("pages.dashboard.margin")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -495,20 +497,20 @@ export function Dashboard() {
             <CardHeader className="pb-3">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-muted-foreground" />
-                רווחיות מנות
+                {t("pages.dashboard.dishProfitability")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {profitabilityDishes.length === 0 ? (
-                <p className="text-muted-foreground text-sm">אין נתוני מכירות</p>
+                <p className="text-muted-foreground text-sm">{t("pages.dashboard.noSalesData")}</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="text-xs text-muted-foreground border-b">
-                        <th className="text-right pb-3 font-medium">מנה</th>
-                        <th className="text-center pb-3 font-medium">מרווח</th>
-                        <th className="text-center pb-3 font-medium">עלות מזון</th>
+                        <th className="text-right pb-3 font-medium">{t("pages.dish")}</th>
+                        <th className="text-center pb-3 font-medium">{t("pages.dashboard.margin")}</th>
+                        <th className="text-center pb-3 font-medium">{t("pages.dashboard.foodCost")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -536,12 +538,12 @@ export function Dashboard() {
             <CardHeader className="pb-3">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-muted-foreground" />
-                התראות
+                {t("pages.dashboard.alerts")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {alerts.length === 0 ? (
-                <p className="text-muted-foreground text-sm py-2">אין התראות</p>
+                <p className="text-muted-foreground text-sm py-2">{t("pages.dashboard.noAlerts")}</p>
               ) : (
                 alerts.map((alert, i) => (
                   <div
@@ -564,7 +566,7 @@ export function Dashboard() {
                         className="shrink-0 h-8 px-2 text-xs"
                         onClick={() => markNotificationRead(alert.id!)}
                       >
-                        סגור
+                        {t("pages.close")}
                       </Button>
                     )}
                   </div>
@@ -580,7 +582,7 @@ export function Dashboard() {
                 </div>
                 <div>
                   <p className="text-xl font-bold">{restaurants?.length || 0}</p>
-                  <p className="text-xs text-muted-foreground">מסעדות</p>
+                  <p className="text-xs text-muted-foreground">{t("login.restaurants")}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -589,7 +591,7 @@ export function Dashboard() {
                 </div>
                 <div>
                   <p className="text-xl font-bold">{recipesCount}</p>
-                  <p className="text-xs text-muted-foreground">מנות בתפריט</p>
+                  <p className="text-xs text-muted-foreground">{t("pages.dashboard.menuItems")}</p>
                 </div>
               </div>
             </CardContent>
@@ -604,7 +606,7 @@ export function Dashboard() {
               </div>
               <div>
                 <p className="text-xl font-bold">{suppliersCount}</p>
-                <p className="text-xs text-muted-foreground">ספקים</p>
+                <p className="text-xs text-muted-foreground">{t("nav.suppliers")}</p>
               </div>
             </CardContent>
           </Card>
@@ -615,7 +617,7 @@ export function Dashboard() {
               </div>
               <div>
                 <p className="text-xl font-bold">{recipesCount}</p>
-                <p className="text-xs text-muted-foreground">מנות בתפריט</p>
+                <p className="text-xs text-muted-foreground">{t("pages.dashboard.menuItems")}</p>
               </div>
             </CardContent>
           </Card>
@@ -626,7 +628,7 @@ export function Dashboard() {
               </div>
               <div>
                 <p className="text-xl font-bold">{ingredientsCount}</p>
-                <p className="text-xs text-muted-foreground">רכיבים</p>
+                <p className="text-xs text-muted-foreground">{t("nav.ingredients")}</p>
               </div>
             </CardContent>
           </Card>
@@ -637,7 +639,7 @@ export function Dashboard() {
               </div>
               <div>
                 <p className="text-xl font-bold">₪{inventoryValue.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">שווי מלאי</p>
+                <p className="text-xs text-muted-foreground">{t("pages.dashboard.inventoryValue")}</p>
               </div>
             </CardContent>
           </Card>
@@ -647,32 +649,32 @@ export function Dashboard() {
   }
 
   const kpis = [
-    { label: "הכנסות החודש", value: `₪${totalRevenue.toLocaleString()}`, target: "", change: 0, trend: "up" as const, icon: TrendingUp, color: "bg-green-50 text-green-700" },
-    { label: "מנות שנמכרו", value: String(totalDishesSold), target: "", change: 0, trend: "up" as const, icon: Utensils, color: "bg-amber-50 text-amber-700" },
-    { label: "ממוצע לעסקה", value: `₪${avgTicket.toFixed(0)}`, target: "", change: 0, trend: "up" as const, icon: DollarSign, color: "bg-blue-50 text-blue-700" },
-    { label: "רווח גולמי", value: `₪${grossProfit.toLocaleString()}`, target: "", change: 0, trend: "up" as const, icon: ArrowUpLeft, color: "bg-emerald-50 text-emerald-700" },
-    { label: "% עלות מזון", value: `${avgFoodCost.toFixed(1)}%`, target: "30%", change: 0, trend: avgFoodCost > 30 ? ("down" as const) : ("up" as const), icon: DollarSign, color: "bg-blue-50 text-blue-700" },
+    { label: t("pages.dashboard.monthlyRevenue"), value: `₪${totalRevenue.toLocaleString()}`, target: "", change: 0, trend: "up" as const, icon: TrendingUp, color: "bg-green-50 text-green-700" },
+    { label: t("pages.dashboard.dishesSold"), value: String(totalDishesSold), target: "", change: 0, trend: "up" as const, icon: Utensils, color: "bg-amber-50 text-amber-700" },
+    { label: t("pages.dashboard.avgPerOrder"), value: `₪${avgTicket.toFixed(0)}`, target: "", change: 0, trend: "up" as const, icon: DollarSign, color: "bg-blue-50 text-blue-700" },
+    { label: t("pages.dashboard.grossProfit"), value: `₪${grossProfit.toLocaleString()}`, target: "", change: 0, trend: "up" as const, icon: ArrowUpLeft, color: "bg-emerald-50 text-emerald-700" },
+    { label: t("pages.dashboard.foodCostPct"), value: `${avgFoodCost.toFixed(1)}%`, target: "30%", change: 0, trend: avgFoodCost > 30 ? ("down" as const) : ("up" as const), icon: DollarSign, color: "bg-blue-50 text-blue-700" },
     { label: "COGS", value: `₪${totalCost.toLocaleString()}`, target: "", change: 0, trend: "up" as const, icon: ShoppingCart, color: "bg-purple-50 text-purple-700" },
-    { label: "מנות מעל יעד", value: String(dishesOverTarget), target: "30%", change: 0, trend: "down" as const, icon: AlertTriangle, color: "bg-orange-50 text-orange-700" },
-    { label: "הזמנות ספקים", value: String(purchaseOrdersCount), target: "", change: 0, trend: "up" as const, icon: ShoppingCart, color: "bg-slate-50 text-slate-700" },
+    { label: t("pages.dashboard.dishesOverTarget"), value: String(dishesOverTarget), target: "30%", change: 0, trend: "down" as const, icon: AlertTriangle, color: "bg-orange-50 text-orange-700" },
+    { label: t("pages.dashboard.purchaseOrders"), value: String(purchaseOrdersCount), target: "", change: 0, trend: "up" as const, icon: ShoppingCart, color: "bg-slate-50 text-slate-700" },
   ]
 
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold mb-1">לוח בקרה</h1>
-          <p className="text-muted-foreground">סקירה כללית של הביצועים</p>
+          <h1 className="text-2xl md:text-3xl font-bold mb-1">{t("pages.dashboard.title")}</h1>
+          <p className="text-muted-foreground">{t("pages.dashboard.overview")}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
             <RefreshCw className={cn("w-4 h-4 ml-1.5", loading && "animate-spin")} />
-            רענן
+            {t("pages.refresh")}
           </Button>
           {setCurrentPage && (
             <Button variant="outline" size="sm" onClick={() => setCurrentPage("upload")}>
               <Upload className="w-4 h-4 ml-1.5" />
-              העלה דוח
+              {t("pages.dashboard.uploadReport")}
             </Button>
           )}
         </div>

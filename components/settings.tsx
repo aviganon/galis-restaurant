@@ -31,8 +31,10 @@ import {
   ChevronLeft,
 } from "lucide-react"
 import { toast } from "sonner"
+import { useTranslations } from "@/lib/use-translations"
 
 export function Settings() {
+  const t = useTranslations()
   const { userRole, currentRestaurantId, refreshIngredients } = useApp()
   const [email, setEmail] = useState("")
   const [displayName, setDisplayName] = useState("")
@@ -102,30 +104,30 @@ export function Settings() {
       const next = { ...current, [key]: value }
       await setDoc(path, { notificationSettings: next }, { merge: true })
     } catch (e) {
-      toast.error("שגיאה בשמירה")
+      toast.error(t("pages.settings.saveError"))
     } finally {
       setSavingNotification(null)
     }
   }
 
-  const roleLabel = userRole === "owner" ? "בעלים" : userRole === "manager" ? "מנהל" : userRole === "user" ? "משתמש" : "מנהל"
+  const roleLabel = userRole === "owner" ? t("pages.settings.owner") : userRole === "manager" ? t("pages.settings.manager") : userRole === "user" ? t("pages.settings.user") : t("pages.settings.manager")
 
   const handleChangePassword = async () => {
     if (!email) {
-      toast.error("אין אימייל לשינוי סיסמה")
+      toast.error(t("pages.settings.noEmailForReset"))
       return
     }
     try {
       await sendPasswordResetEmail(auth, email)
-      toast.success("נשלח אימייל לאיפוס סיסמה. בדוק את תיבת הדואר.")
+      toast.success(t("pages.settings.resetEmailSent"))
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "שגיאה בשליחת אימייל")
+      toast.error(e instanceof Error ? e.message : t("authErrors.resetError"))
     }
   }
 
   const handleExportData = async () => {
     if (!currentRestaurantId) {
-      toast.error("בחר מסעדה")
+      toast.error(t("pages.settings.selectRestaurant"))
       return
     }
     setExporting(true)
@@ -147,10 +149,10 @@ export function Settings() {
       a.download = `גיבוי_${currentRestaurantId}_${new Date().toISOString().slice(0, 10)}.json`
       a.click()
       URL.revokeObjectURL(url)
-      toast.success("הנתונים יוצאו בהצלחה")
+      toast.success(t("pages.settings.exportSuccess"))
     } catch (e) {
       console.error(e)
-      toast.error("שגיאה בייצוא נתונים")
+      toast.error(t("pages.settings.exportError"))
     } finally {
       setExporting(false)
     }
@@ -183,11 +185,11 @@ export function Settings() {
         chunk.forEach(({ col, id, data: d }) => batch.set(doc(db, "restaurants", currentRestaurantId, col, id), d))
         await batch.commit()
       }
-      toast.success("הנתונים יובאו בהצלחה")
+      toast.success(t("pages.settings.importSuccess"))
       refreshIngredients?.()
     } catch (err) {
       console.error(err)
-      toast.error("שגיאה בייבוא — ודא שזה קובץ גיבוי תקין")
+      toast.error(t("pages.settings.importError"))
     } finally {
       setImporting(false)
       e.target.value = ""
@@ -213,11 +215,11 @@ export function Settings() {
         chunk.forEach(({ col, id }) => batch.delete(doc(db, "restaurants", currentRestaurantId, col, id)))
         await batch.commit()
       }
-      toast.success("כל הנתונים נמחקו")
+      toast.success(t("pages.settings.deleteSuccess"))
       setDeleteDialogOpen(false)
     } catch (err) {
       console.error(err)
-      toast.error("שגיאה במחיקה")
+      toast.error(t("pages.settings.deleteError"))
     } finally {
       setDeleting(false)
     }
@@ -226,8 +228,8 @@ export function Settings() {
   return (
     <div className="container mx-auto px-4 py-6 max-w-4xl">
       <div className="mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold mb-1">הגדרות</h1>
-        <p className="text-muted-foreground">ניהול החשבון והמערכת</p>
+        <h1 className="text-2xl md:text-3xl font-bold mb-1">{t("pages.settings.title")}</h1>
+        <p className="text-muted-foreground">{t("pages.settings.subtitle")}</p>
       </div>
 
       <div className="space-y-6">
@@ -235,7 +237,7 @@ export function Settings() {
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
               <User className="w-5 h-5 text-muted-foreground" />
-              פרטי משתמש
+              {t("pages.settings.userDetails")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -244,17 +246,17 @@ export function Settings() {
                 👨‍🍳
               </div>
               <div>
-                <p className="font-semibold">{displayName || email || "משתמש"}</p>
+                <p className="font-semibold">{displayName || email || t("pages.settings.user")}</p>
                 <p className="text-sm text-muted-foreground">{roleLabel}</p>
               </div>
             </div>
             <div className="grid sm:grid-cols-2 gap-4 pt-4">
               <div className="space-y-2">
-                <label htmlFor="settings-email" className="text-sm font-medium">אימייל</label>
+                <label htmlFor="settings-email" className="text-sm font-medium">{t("pages.settings.email")}</label>
                 <Input id="settings-email" value={email} readOnly className="h-11 rounded-xl bg-muted" dir="ltr" />
               </div>
               <div className="space-y-2">
-                <label htmlFor="settings-role" className="text-sm font-medium">תפקיד</label>
+                <label htmlFor="settings-role" className="text-sm font-medium">{t("pages.settings.role")}</label>
                 <Input id="settings-role" value={roleLabel} readOnly className="h-11 rounded-xl bg-muted" />
               </div>
             </div>
@@ -266,11 +268,11 @@ export function Settings() {
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
               <Building2 className="w-5 h-5 text-muted-foreground" />
-              הגדרות מסעדה
+              {t("pages.settings.restaurantSettings")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">הגדרות מסעדה ניהוליות — ערוך בפאנל מנהל.</p>
+            <p className="text-sm text-muted-foreground">{t("pages.settings.restaurantSettingsHint")}</p>
           </CardContent>
         </Card>
         )}
@@ -280,21 +282,21 @@ export function Settings() {
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
               <Bell className="w-5 h-5 text-muted-foreground" />
-              התראות
+              {t("pages.settings.notifications")}
             </CardTitle>
             <p className="text-sm text-muted-foreground font-normal">
-              {currentRestaurantId ? "ההגדרות נשמרות לפי מסעדה" : "ההגדרות נשמרות לפי משתמש"}
+              {currentRestaurantId ? t("pages.settings.savedPerRestaurant") : t("pages.settings.savedPerUser")}
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
             {loadingNotifications ? (
-              <p className="text-sm text-muted-foreground py-4">טוען הגדרות...</p>
+              <p className="text-sm text-muted-foreground py-4">{t("pages.settings.loadingSettings")}</p>
             ) : (
               <>
                 <label htmlFor="settings-notify-low-stock" className="flex items-center justify-between cursor-pointer">
                   <div>
-                    <p className="font-medium">התראות מלאי נמוך</p>
-                    <p className="text-sm text-muted-foreground">קבל התראה כשמוצר יורד מתחת לסף</p>
+                    <p className="font-medium">{t("pages.settings.lowStockAlert")}</p>
+                    <p className="text-sm text-muted-foreground">{t("pages.settings.lowStockAlertDesc")}</p>
                   </div>
                   <Switch
                     id="settings-notify-low-stock"
@@ -308,8 +310,8 @@ export function Settings() {
                 </label>
                 <label htmlFor="settings-daily-summary" className="flex items-center justify-between cursor-pointer">
                   <div>
-                    <p className="font-medium">סיכום יומי</p>
-                    <p className="text-sm text-muted-foreground">קבל דוח יומי במייל</p>
+                    <p className="font-medium">{t("pages.settings.dailySummary")}</p>
+                    <p className="text-sm text-muted-foreground">{t("pages.settings.dailySummaryDesc")}</p>
                   </div>
                   <Switch
                     id="settings-daily-summary"
@@ -323,8 +325,8 @@ export function Settings() {
                 </label>
                 <label htmlFor="settings-supplier-alerts" className="flex items-center justify-between cursor-pointer">
                   <div>
-                    <p className="font-medium">התראות ספקים</p>
-                    <p className="text-sm text-muted-foreground">עדכונים על הזמנות ומשלוחים</p>
+                    <p className="font-medium">{t("pages.settings.supplierAlerts")}</p>
+                    <p className="text-sm text-muted-foreground">{t("pages.settings.supplierAlertsDesc")}</p>
                   </div>
                   <Switch
                     id="settings-supplier-alerts"
@@ -338,8 +340,8 @@ export function Settings() {
                 </label>
                 <label htmlFor="settings-weekly-report" className="flex items-center justify-between cursor-pointer">
                   <div>
-                    <p className="font-medium">דוח שבועי</p>
-                    <p className="text-sm text-muted-foreground">סיכום ביצועים שבועי</p>
+                    <p className="font-medium">{t("pages.settings.weeklyReport")}</p>
+                    <p className="text-sm text-muted-foreground">{t("pages.settings.weeklyReportDesc")}</p>
                   </div>
                   <Switch
                     id="settings-weekly-report"
@@ -361,12 +363,12 @@ export function Settings() {
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
               <Lock className="w-5 h-5 text-muted-foreground" />
-              אבטחה
+              {t("pages.settings.security")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <Button variant="outline" className="w-full justify-between h-12 rounded-xl" onClick={handleChangePassword}>
-              <span>שינוי סיסמה</span>
+              <span>{t("pages.settings.changePassword")}</span>
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <Button
@@ -374,15 +376,15 @@ export function Settings() {
               className="w-full justify-between h-12 rounded-xl"
               onClick={() => toast.info("אימות דו-שלבי יהיה זמין בגרסה הבאה")}
             >
-              <span>אימות דו-שלבי</span>
-              <Badge variant="secondary">לא פעיל</Badge>
+              <span>{t("pages.settings.twoFactor")}</span>
+              <Badge variant="secondary">{t("pages.settings.twoFactorInactive")}</Badge>
             </Button>
             <Button
               variant="outline"
               className="w-full justify-between h-12 rounded-xl"
               onClick={() => toast.info("היסטוריית התחברויות תהיה זמינה בגרסה הבאה")}
             >
-              <span>היסטוריית התחברויות</span>
+              <span>{t("pages.settings.loginHistory")}</span>
               <ChevronLeft className="w-4 h-4" />
             </Button>
           </CardContent>
@@ -394,7 +396,7 @@ export function Settings() {
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
               <Database className="w-5 h-5 text-muted-foreground" />
-              ניהול נתונים
+              {t("pages.settings.dataManagement")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -406,7 +408,7 @@ export function Settings() {
                 disabled={!currentRestaurantId || exporting}
               >
                 <Download className="w-4 h-4" />
-                {exporting ? "מייצא..." : "ייצוא נתונים"}
+                {exporting ? t("pages.settings.exporting") : t("pages.settings.exportData")}
               </Button>
               <Button
                 variant="outline"
@@ -415,7 +417,7 @@ export function Settings() {
                 disabled={!currentRestaurantId || importing}
               >
                 <Upload className="w-4 h-4" />
-                {importing ? "מייבא..." : "ייבוא נתונים"}
+                {importing ? t("pages.settings.importing") : t("pages.settings.importData")}
               </Button>
               <input
                 ref={importInputRef}
@@ -432,16 +434,16 @@ export function Settings() {
               disabled={!currentRestaurantId || deleting}
             >
               <Trash2 className="w-4 h-4" />
-              מחיקת כל הנתונים
+              {t("pages.settings.deleteAllData")}
             </Button>
             <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
               <AlertDialogContent>
-                <AlertDialogTitle>מחיקת כל הנתונים</AlertDialogTitle>
+                <AlertDialogTitle>{t("pages.settings.deleteAllData")}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  פעולה זו תמחק את כל המתכונים והרכיבים של המסעדה. לא ניתן לשחזר. להמשיך?
+                  {t("pages.settings.deleteAllConfirm")}
                 </AlertDialogDescription>
                 <AlertDialogFooter>
-                  <AlertDialogCancel disabled={deleting}>ביטול</AlertDialogCancel>
+                  <AlertDialogCancel disabled={deleting}>{t("pages.settings.cancel")}</AlertDialogCancel>
                   <Button
                     variant="destructive"
                     onClick={async () => {
@@ -449,7 +451,7 @@ export function Settings() {
                     }}
                     disabled={deleting}
                   >
-                    {deleting ? "מוחק..." : "מחק הכל"}
+                    {deleting ? t("pages.settings.deleting") : t("pages.settings.deleteAll")}
                   </Button>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -463,8 +465,8 @@ export function Settings() {
           <CardContent className="p-6">
             <div className="text-center text-sm text-muted-foreground">
               <p className="font-medium text-foreground mb-1">Restaurant Pro</p>
-              <p>גרסה 2.0.0</p>
-              <p className="mt-2">© 2026 Restaurant Pro. כל הזכויות שמורות.</p>
+              <p>{t("pages.settings.version")}</p>
+              <p className="mt-2">{t("login.footerRights")}</p>
             </div>
           </CardContent>
         </Card>
