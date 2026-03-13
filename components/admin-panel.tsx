@@ -660,14 +660,17 @@ export function AdminPanel() {
 
   const filteredAndSortedIngredients = (() => {
     let list = [...(ingredientsList || [])]
-    const q = ingredientsSearchText.trim().toLowerCase()
+    const q = ingredientsSearchText.trim().toLowerCase().replace(/\s+/g, " ")
     if (q) {
-      list = list.filter(
-        (i) =>
-          i.name.toLowerCase().includes(q) ||
-          (i.supplier || "").toLowerCase().includes(q) ||
-          (i.sku || "").toLowerCase().includes(q)
-      )
+      const terms = q.split(/\s+/).filter(Boolean)
+      list = list.filter((i) => {
+        const name = (i.name || "").toLowerCase()
+        const supplier = (i.supplier || "").toLowerCase()
+        const sku = (i.sku || "").toLowerCase()
+        const status = (i.status || "").toLowerCase()
+        const searchable = `${name} ${supplier} ${sku} ${status}`
+        return terms.every((t) => searchable.includes(t))
+      })
     }
     if (ingredientsSortBy) {
       const key = ingredientsSortBy
@@ -1939,17 +1942,6 @@ export function AdminPanel() {
               <Card>
                 <CardHeader>
                   <CardTitle>רכיבים</CardTitle>
-                  <div className="flex flex-wrap gap-2 items-center mt-2">
-                    <Button
-                      onClick={() => {
-                        setAddIngredientSupplier("")
-                        setAddIngredientOpen(true)
-                      }}
-                    >
-                      <Plus className="w-4 h-4 ml-2" />
-                      הוסף רכיב
-                    </Button>
-                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="w-full overflow-x-hidden overflow-y-auto max-h-[min(60vh,600px)] rounded-lg border" dir="rtl">
@@ -1970,13 +1962,13 @@ export function AdminPanel() {
                     </colgroup>
                     <TableHeader className="sticky top-0 z-10 bg-background [&_tr]:bg-background [&_tr]:border-b">
                       <TableRow className="bg-muted/50 hover:bg-muted/50 border-b">
-                        <TableHead className="text-right p-2 align-middle w-[14%]">
+                        <TableHead className="text-right p-2 align-middle">
                           <div className="flex items-center gap-2">
                             <Search className="w-4 h-4 text-muted-foreground shrink-0" />
                             <Input
                               value={ingredientsSearchText}
                               onChange={(e) => setIngredientsSearchText(e.target.value)}
-                              placeholder="חיפוש רכיב..."
+                              placeholder="חיפוש לפי שם, ספק, מק״ט..."
                               className="h-9 text-right flex-1 min-w-0"
                             />
                             {ingredientsSearchText && (
@@ -1984,15 +1976,24 @@ export function AdminPanel() {
                                 נקה
                               </Button>
                             )}
+                            <Button
+                              size="sm"
+                              className="h-9 shrink-0"
+                              onClick={() => { setAddIngredientSupplier(""); setAddIngredientOpen(true) }}
+                            >
+                              <Plus className="w-4 h-4 ml-1" />
+                              הוסף רכיב
+                            </Button>
                           </div>
                         </TableHead>
-                        <TableHead colSpan={11} className="text-right p-2 align-middle">
+                        <TableHead className="text-right p-2 align-middle">
                           <span className="text-muted-foreground text-xs">
                             {filteredAndSortedIngredients.length === (ingredientsList?.length ?? 0)
                               ? `${ingredientsList?.length ?? 0} רכיבים`
                               : `מציג ${filteredAndSortedIngredients.length} מתוך ${ingredientsList?.length ?? 0}`}
                           </span>
                         </TableHead>
+                        <TableHead colSpan={10} className="text-right p-2 align-middle" />
                       </TableRow>
                       <TableRow>
                         {(["name", "price", "cheapest", "sku", "status", "source", "supplier", "minStock", "stock", "waste", "unit"] as const).map((key) => {
