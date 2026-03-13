@@ -1973,7 +1973,7 @@ export function AdminPanel() {
                         : `מציג ${filteredAndSortedIngredients.length} מתוך ${ingredientsList?.length ?? 0}`}
                     </span>
                   </div>
-                  <div className="w-full overflow-x-hidden overflow-y-auto max-h-[min(60vh,600px)] rounded-lg border">
+                  <div className="w-full overflow-x-hidden overflow-y-auto max-h-[min(60vh,600px)] rounded-lg border" dir="rtl">
                   <Table className="table-fixed w-full text-sm" style={{ tableLayout: "fixed" }}>
                     <colgroup>
                       <col style={{ width: "14%" }} />
