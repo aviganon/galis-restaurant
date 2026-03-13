@@ -1357,17 +1357,17 @@ export function Ingredients() {
                     const StatusIcon = stockStatus.icon
                     const colSpan = displayColumnOrder.length
                     const cellByKey: Record<string, React.ReactNode> = {
-                      name: <TableCell key="name" className={cn("font-medium", textAlign, densityCellClass, isRtl && "pr-0")}>{isCompound && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded ml-1">🧪 מתכון</span>}{ingredient.name}</TableCell>,
-                      price: <TableCell key="price" className={cn(textAlign, "font-semibold", densityCellClass, isRtl && "pr-0")}>{isCompound ? "—" : `${ingredient.price} ש"ח`}</TableCell>,
-                      source: <TableCell key="source" className={cn(textAlign, densityCellClass, isRtl && "pr-0")}>{isCompound ? "—" : (ingredient.priceSource === "market" ? <Badge variant="secondary" className="text-xs whitespace-nowrap">מחיר שוק</Badge> : <Badge variant="outline" className="text-xs whitespace-nowrap">מחיר שלי</Badge>)}</TableCell>,
-                      unit: <TableCell key="unit" className={cn(textAlign, densityCellClass, isRtl && "pr-0")}>{ingredient.unit}</TableCell>,
-                      waste: <TableCell key="waste" className={cn(textAlign, densityCellClass, isRtl && "pr-0")}>{isCompound ? "—" : `${ingredient.waste}%`}</TableCell>,
-                      stock: <TableCell key="stock" className={cn(textAlign, "font-semibold", densityCellClass, isRtl && "pr-0")}>{isCompound ? "—" : ingredient.stock}</TableCell>,
-                      minStock: <TableCell key="minStock" className={cn(textAlign, "text-muted-foreground", densityCellClass, isRtl && "pr-0")}>{isCompound ? "—" : ingredient.minStock}</TableCell>,
-                      supplier: <TableCell key="supplier" className={cn(textAlign, densityCellClass, isRtl && "pr-0")}><Badge variant="outline">{ingredient.supplier || "—"}</Badge></TableCell>,
-                      sku: <TableCell key="sku" className={cn(textAlign, "text-muted-foreground text-sm", densityCellClass, isRtl && "pr-0")}>{ingredient.sku || "—"}</TableCell>,
-                      status: <TableCell key="status" className={cn(textAlign, densityCellClass, isRtl && "pr-0")}><Badge className={stockStatus.color}><StatusIcon className="w-3 h-3 ml-1" />{stockStatus.status}</Badge></TableCell>,
-                      actions: <TableCell key="actions" className={cn(textAlign, densityCellClass, isRtl && "pr-0")}>
+                      name: <TableCell key="name" className={cn("font-medium", textAlign, densityCellClass)}>{isCompound && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded ml-1">🧪 מתכון</span>}{ingredient.name}</TableCell>,
+                      price: <TableCell key="price" className={cn(textAlign, "font-semibold", densityCellClass)}>{isCompound ? "—" : `${ingredient.price} ש"ח`}</TableCell>,
+                      source: <TableCell key="source" className={cn(textAlign, densityCellClass)}>{isCompound ? "—" : (ingredient.priceSource === "market" ? <Badge variant="secondary" className="text-xs whitespace-nowrap">מחיר שוק</Badge> : <Badge variant="outline" className="text-xs whitespace-nowrap">מחיר שלי</Badge>)}</TableCell>,
+                      unit: <TableCell key="unit" className={cn(textAlign, densityCellClass)}>{ingredient.unit}</TableCell>,
+                      waste: <TableCell key="waste" className={cn(textAlign, densityCellClass)}>{isCompound ? "—" : `${ingredient.waste}%`}</TableCell>,
+                      stock: <TableCell key="stock" className={cn(textAlign, "font-semibold", densityCellClass)}>{isCompound ? "—" : ingredient.stock}</TableCell>,
+                      minStock: <TableCell key="minStock" className={cn(textAlign, "text-muted-foreground", densityCellClass)}>{isCompound ? "—" : ingredient.minStock}</TableCell>,
+                      supplier: <TableCell key="supplier" className={cn(textAlign, densityCellClass)}><Badge variant="outline">{ingredient.supplier || "—"}</Badge></TableCell>,
+                      sku: <TableCell key="sku" className={cn(textAlign, "text-muted-foreground text-sm", densityCellClass)}>{ingredient.sku || "—"}</TableCell>,
+                      status: <TableCell key="status" className={cn(textAlign, densityCellClass)}><Badge className={stockStatus.color}><StatusIcon className="w-3 h-3 ml-1" />{stockStatus.status}</Badge></TableCell>,
+                      actions: <TableCell key="actions" className={cn(textAlign, densityCellClass)}>
                         <div className={cn("flex gap-1", justify)}>
                           {!isCompound && (
                             <Button size="sm" variant="ghost" onClick={() => openEditIngredient(ingredient)} className="h-8 w-8 p-0" title="ערוך רכיב">
@@ -1393,7 +1393,7 @@ export function Ingredients() {
                       </motion.tr>
                       {isOwner && !isCompound && (
                         <TableRow className="bg-muted/30 hover:bg-muted/40">
-                          <TableCell colSpan={displayColumnOrder.length} className={cn("py-1.5", isRtl ? "pr-0 pl-4" : "pr-4", textAlign)}>
+                          <TableCell colSpan={displayColumnOrder.length} className={cn("py-1.5 pr-4 pl-4", textAlign)}>
                             <CheapestPricePopover
                               ingredient={ingredient}
                               webPrice={webPriceByIngredient[ingredient.name]}
