@@ -40,7 +40,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu"
@@ -324,53 +323,6 @@ export function AdminPanel() {
     try { localStorage.setItem(INGREDIENTS_ROW_DENSITY_KEY, d) } catch (_) {}
   }, [])
   const densityCellClass = ingredientsRowDensity === "compact" ? "py-1 px-1.5" : ingredientsRowDensity === "expanded" ? "py-3 px-3" : "py-2 px-2"
-
-  const INGREDIENTS_COLUMN_WIDTHS_KEY = "admin-ingredients-column-widths"
-  const defaultAdminColumnWidths: Record<string, number> = { name: 14, price: 6, cheapest: 8, sku: 7, status: 6, source: 7, supplier: 9, minStock: 5, stock: 5, waste: 5, unit: 6, actions: 4 }
-  const [ingredientsColumnWidths, setIngredientsColumnWidths] = useState<Record<string, number>>(() => {
-    if (typeof window === "undefined") return { ...defaultAdminColumnWidths }
-    try {
-      const stored = localStorage.getItem(INGREDIENTS_COLUMN_WIDTHS_KEY)
-      if (stored) return { ...defaultAdminColumnWidths, ...JSON.parse(stored) }
-    } catch (_) {}
-    return { ...defaultAdminColumnWidths }
-  })
-  const getAdminColumnWidthPercent = useCallback((key: string) => {
-    const w = ingredientsColumnWidths[key] ?? defaultAdminColumnWidths[key] ?? 8
-    return Math.max(4, Math.min(35, w))
-  }, [ingredientsColumnWidths])
-  const adminResizeRef = React.useRef<{ key: string; nextKey: string; startX: number; startW: number; startW2: number } | null>(null)
-  const handleAdminResizeStart = useCallback((key: string, nextKey: string, e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    adminResizeRef.current = { key, nextKey, startX: e.clientX, startW: getAdminColumnWidthPercent(key), startW2: getAdminColumnWidthPercent(nextKey) }
-    const onMove = (ev: MouseEvent) => {
-      if (!adminResizeRef.current) return
-      const { key: k, nextKey: nk, startX, startW, startW2 } = adminResizeRef.current
-      const delta = (ev.clientX - startX) / (typeof window !== "undefined" ? window.innerWidth : 800) * 100
-      const newW = Math.max(4, Math.min(35, startW + delta))
-      const newW2 = Math.max(4, Math.min(35, startW2 - delta))
-      if (newW + newW2 > 4) {
-        setIngredientsColumnWidths((prev) => {
-          const next = { ...prev, [k]: newW, [nk]: newW2 }
-          try { localStorage.setItem(INGREDIENTS_COLUMN_WIDTHS_KEY, JSON.stringify(next)) } catch (_) {}
-          return next
-        })
-        adminResizeRef.current = { ...adminResizeRef.current, startX: ev.clientX, startW: newW, startW2: newW2 }
-      }
-    }
-    const onUp = () => {
-      adminResizeRef.current = null
-      document.removeEventListener("mousemove", onMove)
-      document.removeEventListener("mouseup", onUp)
-    }
-    document.addEventListener("mousemove", onMove)
-    document.addEventListener("mouseup", onUp)
-  }, [getAdminColumnWidthPercent])
-  const resetAdminColumnWidths = useCallback(() => {
-    setIngredientsColumnWidths({ ...defaultAdminColumnWidths })
-    try { localStorage.removeItem(INGREDIENTS_COLUMN_WIDTHS_KEY) } catch (_) {}
-  }, [])
 
   const [suppliersSearchText, setSuppliersSearchText] = useState("")
   const [suppliersFilterAssigned, setSuppliersFilterAssigned] = useState<string>("__all__")
@@ -2080,12 +2032,18 @@ export function AdminPanel() {
                   <div className="w-full overflow-x-hidden overflow-y-auto max-h-[min(60vh,600px)] rounded-lg border">
                   <Table className="table-fixed w-full text-sm" style={{ tableLayout: "fixed" }}>
                     <colgroup>
-                      <col style={{ width: "min(18%, 200px)" }} />
+                      <col style={{ width: "14%" }} />
                       <col style={{ width: "6%" }} />
-                      {visibleColumnOrder.map((key) => (
-                        <col key={key} style={{ width: `${getAdminColumnWidthPercent(key)}%` }} />
-                      ))}
-                      <col style={{ width: `${getAdminColumnWidthPercent("actions")}%` }} />
+                      <col style={{ width: "8%" }} />
+                      <col style={{ width: "7%" }} />
+                      <col style={{ width: "6%" }} />
+                      <col style={{ width: "7%" }} />
+                      <col style={{ width: "9%" }} />
+                      <col style={{ width: "5%" }} />
+                      <col style={{ width: "5%" }} />
+                      <col style={{ width: "5%" }} />
+                      <col style={{ width: "6%" }} />
+                      <col style={{ width: "4%" }} />
                     </colgroup>
                     <TableHeader className="sticky top-0 z-10 bg-background [&_tr]:bg-background [&_tr]:border-b">
                       <TableRow className="bg-muted/50 hover:bg-muted/50 border-b">
@@ -2127,9 +2085,6 @@ export function AdminPanel() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align={isRtl ? "start" : "end"} className="min-w-[180px]">
-                                <DropdownMenuItem onClick={resetAdminColumnWidths}>
-                                  {t("pages.adminPanel.resetColumnWidths")}
-                                </DropdownMenuItem>
                                 <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{t("pages.adminPanel.rowDensity")}</div>
                                 {(["compact", "normal", "expanded"] as RowDensity[]).map((d) => (
                                   <DropdownMenuCheckboxItem key={d} checked={ingredientsRowDensity === d} onCheckedChange={() => setIngredientsRowDensityAndStore(d)}>
@@ -2161,16 +2116,15 @@ export function AdminPanel() {
                             ? `${ingredientsList?.length ?? 0} ${t("pages.adminPanel.ingredientsCount")}`
                             : `${t("pages.adminPanel.showingCount")} ${filteredAndSortedIngredients.length} ${t("pages.adminPanel.of")} ${ingredientsList?.length ?? 0}`}
                         </TableHead>
-                        <TableHead colSpan={visibleColumnOrder.length + 1} className="p-0" />
+                        <TableHead colSpan={10} className="p-0" />
                       </TableRow>
                       <TableRow>
                         {visibleColumnOrder.map((key, colIndex) => {
                           if (key === "cheapest") {
-                            const nextKey = visibleColumnOrder[colIndex + 1] || "actions"
                             return (
                               <TableHead
                                 key="cheapest"
-                                className={`${textAlign} ${densityCellClass} select-none relative`}
+                                className={`${textAlign} ${densityCellClass} select-none`}
                                 draggable
                                 title={t("pages.adminPanel.dragToReorderColumns")}
                                 onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(colIndex)); e.dataTransfer.effectAllowed = "move" }}
@@ -2188,19 +2142,15 @@ export function AdminPanel() {
                                     <EyeOff className="w-3 h-3" />
                                   </Button>
                                 </span>
-                                {nextKey && (
-                                  <div role="separator" aria-orientation="vertical" className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/30 transition-colors z-10" title={t("pages.adminPanel.resizeColumn")} onMouseDown={(e) => handleAdminResizeStart("cheapest", nextKey, e)} />
-                                )}
                               </TableHead>
                             )
                           }
                           const labels: Record<string, string> = { name: t("pages.adminPanel.ingredientLabel"), price: t("pages.adminPanel.priceLabel"), unit: t("pages.adminPanel.unitUnit"), waste: t("pages.adminPanel.wasteLabel"), stock: t("pages.adminPanel.inventory"), minStock: t("pages.adminPanel.minStockLabel"), supplier: t("pages.adminPanel.supplierLabel"), sku: t("pages.adminPanel.skuLabel"), source: t("pages.adminPanel.sourceLabel"), status: t("pages.adminPanel.statusLabel") }
                           const isSortable = ["name", "price", "unit", "waste", "stock", "minStock", "supplier", "sku", "source", "status"].includes(key)
-                          const nextKey = visibleColumnOrder[colIndex + 1] || "actions"
                           return (
                             <TableHead
                               key={key}
-                              className={`${textAlign} ${densityCellClass} relative ${isSortable ? "cursor-pointer hover:bg-muted/50 select-none" : ""}`}
+                              className={`${textAlign} ${densityCellClass} ${isSortable ? "cursor-pointer hover:bg-muted/50 select-none" : ""}`}
                               draggable
                               title={t("pages.adminPanel.dragToReorderColumns")}
                               onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(colIndex)); e.dataTransfer.effectAllowed = "move" }}
@@ -2232,9 +2182,6 @@ export function AdminPanel() {
                                   <EyeOff className="w-3 h-3" />
                                 </Button>
                               </span>
-                              {nextKey && (
-                                <div role="separator" aria-orientation="vertical" className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/30 transition-colors z-10" title={t("pages.adminPanel.resizeColumn")} onMouseDown={(e) => handleAdminResizeStart(key, nextKey, e)} />
-                              )}
                             </TableHead>
                           )
                         })}

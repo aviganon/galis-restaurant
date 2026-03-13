@@ -62,7 +62,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
-  DropdownMenuItem,
   DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
@@ -314,53 +313,6 @@ export function Ingredients() {
     try { localStorage.setItem(INGREDIENTS_ROW_DENSITY_KEY, d) } catch (_) {}
   }, [])
   const densityCellClass = rowDensity === "compact" ? "py-1 px-1.5" : rowDensity === "expanded" ? "py-3 px-3" : "py-2 px-2"
-
-  const INGREDIENTS_COLUMN_WIDTHS_KEY = "ingredients-column-widths"
-  const defaultColumnWidths: Record<string, number> = { name: 20, price: 9, source: 9, unit: 7, waste: 6, stock: 6, minStock: 6, supplier: 12, sku: 9, status: 8, actions: 8 }
-  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
-    if (typeof window === "undefined") return { ...defaultColumnWidths }
-    try {
-      const stored = localStorage.getItem(INGREDIENTS_COLUMN_WIDTHS_KEY)
-      if (stored) return { ...defaultColumnWidths, ...JSON.parse(stored) }
-    } catch (_) {}
-    return { ...defaultColumnWidths }
-  })
-  const getColumnWidthPercent = useCallback((key: string) => {
-    const w = columnWidths[key] ?? defaultColumnWidths[key] ?? 10
-    return Math.max(5, Math.min(40, w))
-  }, [columnWidths])
-  const resizeRef = React.useRef<{ key: string; nextKey: string; startX: number; startW: number; startW2: number } | null>(null)
-  const handleResizeStart = useCallback((key: string, nextKey: string, e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    resizeRef.current = { key, nextKey, startX: e.clientX, startW: getColumnWidthPercent(key), startW2: getColumnWidthPercent(nextKey) }
-    const onMove = (ev: MouseEvent) => {
-      if (!resizeRef.current) return
-      const { key: k, nextKey: nk, startX, startW, startW2 } = resizeRef.current
-      const delta = (ev.clientX - startX) / (typeof window !== "undefined" ? window.innerWidth : 800) * 100
-      const newW = Math.max(5, Math.min(40, startW + delta))
-      const newW2 = Math.max(5, Math.min(40, startW2 - delta))
-      if (newW + newW2 > 5) {
-        setColumnWidths((prev) => {
-          const next = { ...prev, [k]: newW, [nk]: newW2 }
-          try { localStorage.setItem(INGREDIENTS_COLUMN_WIDTHS_KEY, JSON.stringify(next)) } catch (_) {}
-          return next
-        })
-        resizeRef.current = { ...resizeRef.current, startX: ev.clientX, startW: newW, startW2: newW2 }
-      }
-    }
-    const onUp = () => {
-      resizeRef.current = null
-      document.removeEventListener("mousemove", onMove)
-      document.removeEventListener("mouseup", onUp)
-    }
-    document.addEventListener("mousemove", onMove)
-    document.addEventListener("mouseup", onUp)
-  }, [getColumnWidthPercent])
-  const resetColumnWidths = useCallback(() => {
-    setColumnWidths({ ...defaultColumnWidths })
-    try { localStorage.removeItem(INGREDIENTS_COLUMN_WIDTHS_KEY) } catch (_) {}
-  }, [])
 
   const loadIngredients = useCallback(async () => {
     if (!currentRestaurantId) {
@@ -1300,10 +1252,6 @@ export function Ingredients() {
                   </DropdownMenuCheckboxItem>
                 ))}
                 <div className="border-t my-1" />
-                <DropdownMenuItem onClick={resetColumnWidths}>
-                  {t("pages.ingredients.resetColumnWidths")}
-                </DropdownMenuItem>
-                <div className="border-t my-1" />
                 <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{t("pages.ingredients.showHideColumns")}</div>
                 {defaultColumnOrder.filter((k) => (k !== "source" && k !== "actions") || isOwner).map((k) => {
                   const isVisible = columnVisibility[k] !== false
@@ -1336,12 +1284,7 @@ export function Ingredients() {
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto" dir="rtl">
-            <Table className="table-fixed w-full" style={{ tableLayout: "fixed" }}>
-              <colgroup>
-                {displayColumnOrder.map((key) => (
-                  <col key={key} style={{ width: `${getColumnWidthPercent(key)}%` }} />
-                ))}
-              </colgroup>
+            <Table>
               <TableHeader>
                 <TableRow>
                   {displayColumnOrder.map((key, colIndex) => {
@@ -1371,11 +1314,10 @@ export function Ingredients() {
                     }
                     const isSortable = key in sortKeys
                     const sortKey = sortKeys[key]
-                    const nextKey = displayColumnOrder[colIndex + 1]
                     return (
                       <TableHead
                         key={key}
-                        className={cn("text-right relative", densityCellClass, isSortable && "cursor-pointer hover:bg-muted/50 select-none")}
+                        className={cn("text-right", densityCellClass, isSortable && "cursor-pointer hover:bg-muted/50 select-none")}
                         draggable
                         title={t("pages.ingredients.dragToReorderColumns")}
                         onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(colIndex)); e.dataTransfer.effectAllowed = "move" }}
@@ -1407,15 +1349,6 @@ export function Ingredients() {
                             <EyeOff className="w-3 h-3" />
                           </Button>
                         </span>
-                        {nextKey && (
-                          <div
-                            role="separator"
-                            aria-orientation="vertical"
-                            className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/30 transition-colors z-10"
-                            title={t("pages.ingredients.resizeColumn")}
-                            onMouseDown={(e) => handleResizeStart(key, nextKey, e)}
-                          />
-                        )}
                       </TableHead>
                     )
                   })}
