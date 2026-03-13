@@ -27,14 +27,29 @@
 7. **Output Directory:** השאר ריק
 
 #### שלב 3: משתני סביבה
-לפני ה-Deploy, לחץ **Environment Variables** והוסף:
+לפני ה-Deploy, לחץ **Environment Variables** והוסף. **חובה** — בלי משתני Firebase ה-build ייכשל:
+
+**Firebase (חובה — העתק מ־`.env.local` או מ־Firebase Console):**
+
+| שם | ערך | איפה למצוא |
+|----|-----|------------|
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | המפתח | Firebase Console → Project Settings → Your apps |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | `galis-6ebbc.firebaseapp.com` | או מהפרויקט שלך |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | `galis-6ebbc` | מזהה הפרויקט |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | `galis-6ebbc.firebasestorage.app` | |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | מספר | Firebase Console |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | מזהה האפליקציה | Firebase Console |
+
+**Serper + AI (לבדוק באינטרנט):**
 
 | שם | ערך | סביבה |
 |----|-----|-------|
 | `SERPER_API_KEY` | המפתח מ-serper.dev | Production, Preview, Development |
 | `ANTHROPIC_API_KEY` | המפתח מ-console.anthropic.com | Production, Preview, Development |
 
-לחץ **Add** לכל אחד.
+**אופציונלי:** `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `NEXT_PUBLIC_APP_URL`
+
+לחץ **Add** לכל משתנה. סמן Production, Preview, Development.
 
 #### שלב 4: Deploy
 לחץ **Deploy**. Vercel יבנה ויפרוס. תקבל כתובת כמו `your-project.vercel.app`.
