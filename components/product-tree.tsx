@@ -26,6 +26,7 @@ import { useApp } from "@/contexts/app-context"
 import { FilePreviewModal } from "@/components/file-preview-modal"
 import { suggestDishFromIngredients, type ExtractedDishItem } from "@/lib/ai-extract"
 import { toast } from "sonner"
+import { useTranslations } from "@/lib/use-translations"
 
 // Types
 interface Ingredient {
@@ -69,7 +70,17 @@ const normalizeUnit = (u: string | undefined): string => {
 }
 
 const isOwnerRole = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner"
+const CATEGORY_TO_KEY: Record<string, string> = {
+  "עיקריות": "mainDishes",
+  "ראשונות": "starters",
+  "סלטים": "salads",
+  "קינוחים": "desserts",
+  "משקאות": "drinks",
+  "תוספות": "sides",
+  "אחר": "other",
+}
 export default function ProductTree() {
+  const t = useTranslations()
   const { currentRestaurantId, userRole, userPermissions, isSystemOwner, refreshIngredientsKey, refreshIngredients } = useApp()
   const canSeeCosts = userRole === "owner" || userRole === "admin" || userRole === "manager" || !!userPermissions?.canSeeCosts
   const isOwner = isOwnerRole(userRole, isSystemOwner)
@@ -200,7 +211,7 @@ export default function ProductTree() {
         }
         refreshIngredients?.()
       } catch (e) {
-        toast.error("שגיאה בשמירה: " + (e as Error).message)
+        toast.error(t("pages.productTree.saveError") + ": " + (e as Error).message)
       }
     },
     [currentRestaurantId, refreshIngredients]
@@ -460,7 +471,7 @@ export default function ProductTree() {
         setIsAiSuggestOpen(false)
       }
     } catch (e) {
-      toast.error((e as Error)?.message || "שגיאה בהצעת מנה")
+      toast.error((e as Error)?.message || t("pages.productTree.suggestError"))
       setIsAiSuggestOpen(false)
     } finally {
       setAiSuggestLoading(false)
@@ -581,10 +592,10 @@ export default function ProductTree() {
           return `${n} | ${d?.category || ""} | ₪${p.toFixed(2)}`
         }).join("\n")
     if (!toCopy) {
-      toast.error("אין מנות להעתקה")
+      toast.error(t("pages.productTree.noDishesToCopy"))
       return
     }
-    navigator.clipboard.writeText(toCopy).then(() => toast.success("הועתק ללוח"))
+    navigator.clipboard.writeText(toCopy).then(() => toast.success(t("pages.productTree.copiedToClipboard")))
   }
 
   return (
@@ -593,7 +604,7 @@ export default function ProductTree() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-3">
             <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-muted-foreground">טוען מתכונים ורכיבים...</p>
+            <p className="text-sm text-muted-foreground">{t("pages.productTree.loading")}</p>
           </div>
         </div>
       )}
@@ -628,7 +639,7 @@ export default function ProductTree() {
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <div className="flex items-center gap-2">
               <Utensils className="w-5 h-5 text-primary" />
-              <h2 className="font-bold text-lg">מנות</h2>
+              <h2 className="font-bold text-lg">{t("pages.dishes")}</h2>
               <Badge variant="secondary" className="text-xs">
                 {filteredDishes.length}
               </Badge>
@@ -639,39 +650,39 @@ export default function ProductTree() {
                 <DialogTrigger asChild>
                   <Button size="sm" className="gap-1.5">
                     <Plus className="w-4 h-4" />
-                    <span className="hidden sm:inline">מנה חדשה</span>
+                    <span className="hidden sm:inline">{t("pages.productTree.addDish")}</span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-md">
                   <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                       <Plus className="w-5 h-5" />
-                      מנה חדשה
+                      {t("pages.productTree.addDish")}
                     </DialogTitle>
                   </DialogHeader>
                   
                   <div className="space-y-4 py-4">
                     <div>
-                      <Label htmlFor="new-dish-name">שם המנה</Label>
+                      <Label htmlFor="new-dish-name">{t("pages.productTree.dishName")}</Label>
                       <Input 
                         id="new-dish-name"
                         name="dishName"
                         value={newDishName}
                         onChange={e => setNewDishName(e.target.value)}
-                        placeholder="שם המנה"
+                        placeholder={t("pages.productTree.dishName")}
                         className="mt-1.5"
                       />
                     </div>
                     
                     <div>
-                      <Label htmlFor="new-dish-category">קטגוריה</Label>
+                      <Label htmlFor="new-dish-category">{t("pages.productTree.category")}</Label>
                       <Select value={newDishCategory} onValueChange={setNewDishCategory}>
-                        <SelectTrigger id="new-dish-category" aria-label="קטגוריה" className="mt-1.5">
+                        <SelectTrigger id="new-dish-category" aria-label={t("pages.productTree.category")} className="mt-1.5">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {CATEGORIES.map(cat => (
-                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                            <SelectItem key={cat} value={cat}>{t(`pages.productTree.${CATEGORY_TO_KEY[cat] || "other"}`)}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -862,26 +873,26 @@ export default function ProductTree() {
                 name="productSearch"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="חפש מנה..."
+                placeholder={t("pages.productTree.searchPlaceholder")}
                 className="pr-9"
               />
             </div>
             
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger id="product-tree-category" aria-label="קטגוריה" className="w-[140px]">
+              <SelectTrigger id="product-tree-category" aria-label={t("pages.productTree.category")} className="w-[140px]">
                 <Filter className="w-4 h-4 ml-2" />
-                <SelectValue placeholder="כל הקטגוריות" />
+                <SelectValue placeholder={t("pages.productTree.allCategories")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">כל הקטגוריות</SelectItem>
+                <SelectItem value="all">{t("pages.productTree.allCategories")}</SelectItem>
                 {CATEGORIES.map(cat => (
-                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  <SelectItem key={cat} value={cat}>{t(`pages.productTree.${CATEGORY_TO_KEY[cat] || "other"}`)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             
             <Select value={sortMode} onValueChange={v => setSortMode(v as typeof sortMode)}>
-              <SelectTrigger id="product-tree-sort" aria-label="מיון" className="w-[140px]">
+              <SelectTrigger id="product-tree-sort" aria-label={t("pages.productTree.sort")} className="w-[140px]">
                 <SortAsc className="w-4 h-4 ml-2" />
                 <SelectValue />
               </SelectTrigger>
@@ -1091,7 +1102,7 @@ export default function ProductTree() {
                                   )}
                                 </div>
                                 <p className="text-[10px] text-muted-foreground">
-                                  {isCompound ? "מחושב" : (sp ? `לפי ${sp.unit}` : "")}
+                                  {isCompound ? t("pages.productTree.calculated") : (sp ? `${t("pages.productTree.by")} ${sp.unit}` : "")}
                                 </p>
                               </td>
                               )}
@@ -1133,7 +1144,7 @@ export default function ProductTree() {
                                     variant="ghost"
                                     size="icon"
                                     className="w-7 h-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                    title="הסר"
+                                    title={t("pages.productTree.remove")}
                                     onClick={() => removeIngredient(idx)}
                                   >
                                     <X className="w-4 h-4" />

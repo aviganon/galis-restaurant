@@ -39,6 +39,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { getClaudeApiKey, setClaudeApiKey, testClaudeConnection } from "@/lib/claude"
 import { toast } from "sonner"
+import { useTranslations } from "@/lib/use-translations"
 import { doc, setDoc, getDoc, getDocFromServer, collection, collectionGroup, query, where, getDocs, getDocsFromServer, deleteDoc, writeBatch } from "firebase/firestore"
 import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplier-ingredients"
 import { firestoreConfig } from "@/lib/firestore-config"
@@ -98,10 +99,12 @@ function AdminCheapestPopover({
   ing,
   webPrice,
   onWebPriceSaved,
+  t,
 }: {
   ing: { name: string; globalCheapest?: { price: number; supplier?: string; unit: string } }
   webPrice?: { price: number; store: string; unit: string }
   onWebPriceSaved?: (data: { price: number; store: string; unit: string }) => void
+  t: (key: string) => string
 }) {
   const gc = ing.globalCheapest
   const wp = webPrice
@@ -131,16 +134,17 @@ function AdminCheapestPopover({
         <div className="space-y-2">
           {gc ? (
             <div className="text-sm text-muted-foreground">
-              <span className="text-muted-foreground">מהספקים:</span> ₪{gc.price.toFixed(1)}/{gc.unit}
-              {gc.supplier && <span className="text-primary font-medium"> אצל {gc.supplier}</span>}
+              <span className="text-muted-foreground">{t("pages.adminPanel.fromSuppliers")}:</span> ₪{gc.price.toFixed(1)}/{gc.unit}
+              {gc.supplier && <span className="text-primary font-medium"> {t("pages.ingredients.at")} {gc.supplier}</span>}
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground">מהספקים: —</div>
+            <div className="text-sm text-muted-foreground">{t("pages.adminPanel.fromSuppliers")}: —</div>
           )}
           <WebPriceCell
             ingredientName={ing.name}
             cached={webPrice}
             onSaved={onWebPriceSaved}
+            t={t}
           />
         </div>
       </PopoverContent>
@@ -152,10 +156,12 @@ function WebPriceCell({
   ingredientName,
   cached,
   onSaved,
+  t,
 }: {
   ingredientName: string
   cached?: { price: number; store: string; unit: string } | null
   onSaved?: (data: { price: number; store: string; unit: string }) => void
+  t: (key: string) => string
 }) {
   const [data, setData] = useState<{ price: number; store: string; unit: string } | null>(cached ?? null)
   const [loading, setLoading] = useState(false)
@@ -196,9 +202,9 @@ function WebPriceCell({
         } catch {
           //
         }
-      } else toast.error("לא הצלחתי למצוא מחיר")
+      } else toast.error(t("pages.adminPanel.priceNotFound"))
     } catch (e) {
-      toast.error((e as Error)?.message || "שגיאה")
+      toast.error((e as Error)?.message || t("pages.adminPanel.error"))
     } finally {
       setLoading(false)
     }
@@ -207,7 +213,7 @@ function WebPriceCell({
     return (
       <div className="text-blue-600 dark:text-blue-400 text-xs space-y-1">
         <div>
-          <span className="text-muted-foreground">מהאינטרנט:</span> ₪{data.price.toFixed(1)}/{data.unit} אצל {data.store}
+          <span className="text-muted-foreground">{t("pages.adminPanel.fromInternet")}:</span> ₪{data.price.toFixed(1)}/{data.unit} {t("pages.ingredients.at")} {data.store}
         </div>
         <div className="flex gap-2 items-center">
           <Button
@@ -216,11 +222,11 @@ function WebPriceCell({
             className="h-auto p-0 text-xs text-primary"
             onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(ingredientName + " " + data.store + " מחיר קנייה")}`, "_blank")}
           >
-            לקנייה באינטרנט →
+            {t("pages.adminPanel.buyOnline")} →
           </Button>
           <Button variant="ghost" size="sm" className="h-6 px-1 text-xs" onClick={fetchWebPrice} disabled={loading}>
             {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3 ml-1" />}
-            בדוק שוב
+            {t("pages.adminPanel.checkAgain")}
           </Button>
         </div>
       </div>
@@ -229,12 +235,13 @@ function WebPriceCell({
   return (
     <Button variant="ghost" size="sm" className="h-6 px-1 text-xs" onClick={fetchWebPrice} disabled={loading}>
       {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Globe className="w-3 h-3 ml-1" />}
-      בדוק באינטרנט
+      {t("pages.adminPanel.checkOnline")}
     </Button>
   )
 }
 
 export function AdminPanel() {
+  const t = useTranslations()
   const { userRole, isSystemOwner, currentRestaurantId, restaurants, onImpersonate, refreshRestaurants, refreshIngredients } = useApp()
   const [apiKey, setApiKey] = useState("")
   const [loading, setLoading] = useState(true)
@@ -1507,15 +1514,15 @@ export function AdminPanel() {
           <TabsList className="w-full justify-start flex-wrap h-auto gap-1">
             <TabsTrigger value="restaurants" className="gap-1.5">
               <UtensilsCrossed className="w-4 h-4" />
-              מסעדות
+              {t("pages.adminPanel.restaurants")}
             </TabsTrigger>
             <TabsTrigger value="suppliers" className="gap-1.5">
               <Truck className="w-4 h-4" />
-              ספקים
+              {t("pages.adminPanel.suppliers")}
             </TabsTrigger>
             <TabsTrigger value="ingredients" className="gap-1.5">
               <Package className="w-4 h-4" />
-              רכיבים
+              {t("pages.adminPanel.globalIngredients")}
             </TabsTrigger>
           </TabsList>
 
@@ -1524,13 +1531,13 @@ export function AdminPanel() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Building2 className="w-5 h-5" />
-                  הוסף מסעדה
+                  {t("pages.adminPanel.addRestaurant")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {(!restaurants || restaurants.length === 0) && (
                   <p className="text-sm text-amber-600 dark:text-amber-500 mb-3 flex items-center gap-2">
-                    לא נטענו מסעדות. אם יש לך מסעדות במערכת —{" "}
+                    {t("pages.adminPanel.noRestaurantsLoaded")}{" "}
                     <Button variant="link" className="p-0 h-auto font-semibold" onClick={() => window.location.reload()}>
                       לחץ לרענון
                     </Button>
@@ -1546,7 +1553,7 @@ export function AdminPanel() {
                       id="new-rest-name"
                       value={newRestName}
                       onChange={(e) => setNewRestName(e.target.value)}
-                      placeholder="הזן שם מסעדה"
+                      placeholder={t("pages.adminPanel.enterRestaurantName")}
                       className="mt-1"
                     />
                   </div>
@@ -1757,7 +1764,7 @@ export function AdminPanel() {
                     </div>
                     <Select value={suppliersFilterAssigned} onValueChange={setSuppliersFilterAssigned}>
                       <SelectTrigger className="w-[140px] h-9">
-                        <SelectValue placeholder="שיוך" />
+                        <SelectValue placeholder={t("pages.adminPanel.assign")} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__all__">הכל</SelectItem>
@@ -1852,7 +1859,7 @@ export function AdminPanel() {
                             <p className="text-muted-foreground mb-0.5">משויך למסעדות</p>
                             <p className="font-medium">
                               {(s.restaurantIds?.length ?? 0) === 0 ? (
-                                "לא משויך"
+                                t("pages.adminPanel.notAssigned")
                               ) : (
                                 (s.restaurantIds || [])
                                   .map((rid) => restsWithDetails.find((r) => r.id === rid)?.name || rid)
@@ -1924,7 +1931,7 @@ export function AdminPanel() {
                   })()}
                   {filteredAndSortedSuppliers.length === 0 && !loadingSystemOwner && (
                     <p className="text-muted-foreground py-4">
-                      {(suppliersWithRests?.length ?? 0) === 0 ? "אין ספקים ברשימה הגלובלית" : "אין תוצאות — נסה לשנות את הסינון"}
+                      {(suppliersWithRests?.length ?? 0) === 0 ? t("pages.adminPanel.noSuppliers") : t("pages.adminPanel.noResults")}
                     </p>
                   )}
                 </CardContent>
@@ -2038,13 +2045,14 @@ export function AdminPanel() {
                               ing={ing}
                               webPrice={webPriceByIngredient[ing.name]}
                               onWebPriceSaved={(d) => setWebPriceByIngredient((prev) => ({ ...prev, [ing.name]: d }))}
+                              t={t}
                             />
                           </TableCell>
                           <TableCell className="text-right truncate" title={ing.sku || undefined}>{ing.sku || "—"}</TableCell>
                           <TableCell className="text-right">
-                            <Badge variant={ing.status === "שויך" ? "default" : "secondary"}>{ing.status}</Badge>
+                            <Badge variant={ing.status === "שויך" ? "default" : "secondary"}>{ing.status === "שויך" ? t("pages.adminPanel.assigned") : t("pages.adminPanel.pending")}</Badge>
                           </TableCell>
-                          <TableCell className="text-right">{ing.source === "global" ? "גלובלי" : "מסעדה"}</TableCell>
+                          <TableCell className="text-right">{ing.source === "global" ? t("pages.adminPanel.global") : t("pages.adminPanel.restaurant")}</TableCell>
                           <TableCell className="text-right truncate" title={ing.supplier || undefined}>{ing.supplier || "—"}</TableCell>
                           <TableCell className="text-right">{ing.minStock}</TableCell>
                           <TableCell className="text-right">{ing.stock}</TableCell>
@@ -2078,7 +2086,7 @@ export function AdminPanel() {
                   </div>
                   {filteredAndSortedIngredients.length === 0 && !loadingSystemOwner && (
                     <p className="text-muted-foreground py-4">
-                      {(ingredientsList?.length ?? 0) === 0 ? "אין רכיבים להצגה" : "אין תוצאות — נסה לשנות את הסינון"}
+                      {(ingredientsList?.length ?? 0) === 0 ? t("pages.adminPanel.noIngredients") : t("pages.adminPanel.noResults")}
                     </p>
                   )}
                 </CardContent>
