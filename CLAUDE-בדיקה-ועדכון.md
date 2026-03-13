@@ -21,11 +21,29 @@
 
 ---
 
+## עדכון: GitHub Actions + Secrets (13.3)
+
+**בוצע (Claude בדפדפן):**
+- נוסף `SERPER_API_KEY` ל־GitHub Secrets
+- ה-deploy ב־GitHub Actions הצליח ✅
+
+**GitHub Secrets קיימים:**
+| Secret | שימוש |
+|--------|-------|
+| `ANTHROPIC_API_KEY` | API Claude |
+| `FIREBASE_SERVICE_ACCOUNT_GALIS_6EBBC` | פריסה ל-Firebase |
+| `SERPER_API_KEY` | חיפוש מחירים באינטרנט |
+
+**המערכת מוכנה** — תכונת "בדוק באינטרנט" אמורה לעבוד.
+
+---
+
 ## 1. סיכום שינויים שבוצעו
 
 ### פריסה (Deploy)
 - **Firebase Hosting:** האתר פרוס ב־https://galis-6ebbc.web.app
-- **Vercel:** הפרויקט מחובר ל־GitHub; ה-build נכשל בלי משתני סביבה (ראה סעיף 3)
+- **GitHub Actions:** deploy.yml — build + Firebase Hosting על כל push ל-main ✅
+- **Vercel:** הפרויקט מחובר ל־GitHub; דורש משתני Firebase (ראה סעיף 3)
 
 ### תלויות (Dependencies)
 - הוסר `pnpm-lock.yaml` — הפרויקט משתמש ב־npm
@@ -101,6 +119,10 @@
 - `.env.example` — העתק מ־SERPER-SETUP.md או צור לפי הרשימה בסעיף 3
 - `vercel.json` — חייב להכיל `{"installCommand": "npm install"}`
 
+### אם GitHub Actions נכשל
+- ודא ש־`deploy.yml` מקבל את משתני Firebase ב-build (או הוסף אותם כ־Repository Variables)
+- ודא ש־`SERPER_API_KEY` ב־Secrets (לשימוש ב־ingredient-web-price)
+
 ---
 
 ## 5. פקודות שימושיות
@@ -119,3 +141,4 @@ git push           # דחיפה ל־GitHub (מפעיל build ב־Vercel)
 - **Vercel:** (בדוק ב־vercel.com את כתובת הפרויקט)
 - **Firebase Console:** https://console.firebase.google.com/project/galis-6ebbc
 - **GitHub:** aviganon/galis-restaurant
+- **GitHub Actions:** aviganon/galis-restaurant/actions
