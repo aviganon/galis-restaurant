@@ -123,7 +123,7 @@ function WebPriceCell({ ingredientName }: { ingredientName: string }) {
   }, [ingredientName])
   if (data) {
     return (
-      <div className="text-blue-600 dark:text-blue-400 text-xs">
+      <div className="text-blue-600 dark:text-blue-400 text-xs block">
         <span className="text-muted-foreground">מהאינטרנט:</span> ₪{data.price.toFixed(1)}/{data.unit} אצל {data.store}
       </div>
     )
@@ -1933,9 +1933,9 @@ export function AdminPanel() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right text-sm">
-                            <div className="space-y-1">
+                            <div className="flex flex-col gap-1.5 min-w-[160px]">
                               {ing.globalCheapest && (
-                                <div className="text-muted-foreground">
+                                <div className="text-muted-foreground block">
                                   <span className="text-xs">מהמערכת:</span> ₪{ing.globalCheapest.price.toFixed(1)}/{ing.globalCheapest.unit}
                                   {ing.globalCheapest.supplier && (
                                     <span className="text-primary font-medium"> אצל {ing.globalCheapest.supplier}</span>
