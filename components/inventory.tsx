@@ -61,12 +61,13 @@ export function Inventory() {
     setLoading(true)
     const load = async () => {
       try {
-        const [restSnap, asDoc, globalSnap] = await Promise.all([
+        const [restSnap, asDoc] = await Promise.all([
           getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients")),
           getDoc(doc(db, "restaurants", currentRestaurantId, "appState", "assignedSuppliers")),
-          isOwner ? getDocs(collection(db, "ingredients")) : Promise.resolve(null),
         ])
         const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
+        // טוענים קטלוג גלובלי רק אם יש ספקים משויכים — מסעדה חדשה לא תראה רכיבים גלובליים
+        const globalSnap = isOwner && assignedList.length > 0 ? await getDocs(collection(db, "ingredients")) : null
         const byId = new Map<string, InventoryItem>()
         restSnap.forEach((d) => {
           const data = d.data()
@@ -80,21 +81,22 @@ export function Inventory() {
             supplier: (data.supplier as string) || "",
           })
         })
+        // מסעדה חדשה בלי ספקים משויכים — לא מוצגים רכיבים מהקטלוג הגלובלי
         globalSnap?.forEach((d) => {
           if (!byId.has(d.id) && assignedList.length > 0) {
             const data = d.data()
             const sup = (data.supplier as string) || ""
-            if (sup && assignedList.includes(sup)) {
-              byId.set(d.id, {
-                id: d.id,
-                name: d.id,
-                currentStock: typeof data.stock === "number" ? data.stock : 0,
-                unit: (data.unit as string) || "ק\"ג",
-                minStock: typeof data.minStock === "number" ? data.minStock : 0,
-                maxStock: typeof data.maxStock === "number" ? data.maxStock : 100,
-                supplier: sup,
-              })
-            }
+            // רכיבים ללא ספק — לא מוצגים במסעדות
+            if (!sup || !assignedList.includes(sup)) return
+            byId.set(d.id, {
+              id: d.id,
+              name: d.id,
+              currentStock: typeof data.stock === "number" ? data.stock : 0,
+              unit: (data.unit as string) || "ק\"ג",
+              minStock: typeof data.minStock === "number" ? data.minStock : 0,
+              maxStock: typeof data.maxStock === "number" ? data.maxStock : 100,
+              supplier: sup,
+            })
           }
         })
         setItems(Array.from(byId.values()))
