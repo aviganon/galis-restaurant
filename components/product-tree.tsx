@@ -456,7 +456,7 @@ export default function ProductTree() {
       stock: ingredientStock[name],
     }))
     if (list.length === 0) {
-      toast.error("אין רכיבים במסעדה — הוסף רכיבים מדף ספקים")
+      toast.error(t("pages.productTree.noIngredientsAddFromSuppliers"))
       return
     }
     setAiSuggestLoading(true)
@@ -628,7 +628,7 @@ export default function ProductTree() {
       >
         <TrendingUp className="w-4 h-4 text-primary shrink-0" />
         <p className="text-xs text-foreground/80">
-          המחירים מסונכרנים עם הספקים בזמן אמת
+          {t("pages.productTree.pricesSynced")}
         </p>
       </motion.div>
 
@@ -689,7 +689,7 @@ export default function ProductTree() {
                     </div>
                     
                     <div>
-                      <Label htmlFor="new-dish-price">מחיר מכירה (כולל מע"מ)</Label>
+                      <Label htmlFor="new-dish-price">{t("pages.productTree.sellingPriceLabel")}</Label>
                       <div className="flex items-center gap-2 mt-1.5">
                         <span className="text-lg font-semibold">&#8362;</span>
                         <Input 
@@ -706,11 +706,11 @@ export default function ProductTree() {
                   
                   <div className="flex justify-end gap-2">
                     <DialogClose asChild>
-                      <Button variant="outline">ביטול</Button>
+                      <Button variant="outline">{t("pages.productTree.cancel")}</Button>
                     </DialogClose>
                     <Button onClick={addNewDish}>
                       <Plus className="w-4 h-4 ml-1.5" />
-                      הוסף
+                      {t("pages.productTree.add")}
                     </Button>
                   </div>
                 </DialogContent>
@@ -741,7 +741,7 @@ export default function ProductTree() {
                         <p className="text-sm text-muted-foreground">{aiSuggestedDish.category} • ₪{(aiSuggestedDish.price || 0).toFixed(0)}</p>
                       </div>
                       <div>
-                        <p className="text-sm font-medium mb-2">רכיבים במנה:</p>
+                        <p className="text-sm font-medium mb-2">{t("pages.productTree.ingredientsInDishLabel")}</p>
                         <ul className="space-y-1 text-sm">
                           {(aiSuggestedDish.ingredients || []).map((ing, i) => (
                             <li key={i}>{ing.name} — {ing.qty} {ing.unit}</li>
@@ -749,7 +749,7 @@ export default function ProductTree() {
                         </ul>
                       </div>
                       <details className="text-sm border rounded-lg p-3 bg-muted/30">
-                        <summary className="cursor-pointer font-medium">רכיבים קיימים במערכת ({Object.keys(supplierPrices).length})</summary>
+                        <summary className="cursor-pointer font-medium">{t("pages.productTree.existingIngredientsLabel")} ({Object.keys(supplierPrices).length})</summary>
                         <ul className="mt-2 space-y-1 max-h-40 overflow-y-auto text-muted-foreground">
                           {Object.entries(supplierPrices).map(([name, sp]) => (
                             <li key={name}>
@@ -761,10 +761,10 @@ export default function ProductTree() {
                         </ul>
                       </details>
                       <div className="flex gap-2 justify-end">
-                        <Button variant="outline" onClick={() => { setAiSuggestedDish(null); setIsAiSuggestOpen(false) }}>ביטול</Button>
+                        <Button variant="outline" onClick={() => { setAiSuggestedDish(null); setIsAiSuggestOpen(false) }}>{t("pages.productTree.cancel")}</Button>
                         <Button onClick={handleAddAiSuggestedDish}>
                           <Plus className="w-4 h-4 ml-1" />
-                          הוסף מנה
+                          {t("pages.productTree.add")} מנה
                         </Button>
                       </div>
                     </div>
@@ -772,10 +772,10 @@ export default function ProductTree() {
                     <div className="space-y-4 py-2">
                       <div className="py-4 flex flex-col items-center gap-2 text-muted-foreground">
                         <Loader2 className="w-8 h-8 animate-spin" />
-                        <p>מנתח רכיבים ומציע מנה...</p>
+                        <p>{t("pages.productTree.aiAnalyzing")}</p>
                       </div>
                       <details open className="text-sm border rounded-lg p-3 bg-muted/30">
-                        <summary className="cursor-pointer font-medium">רכיבים במערכת ({Object.keys(supplierPrices).length})</summary>
+                        <summary className="cursor-pointer font-medium">{t("pages.productTree.existingIngredientsLabel")} ({Object.keys(supplierPrices).length})</summary>
                         <ul className="mt-2 space-y-1 max-h-40 overflow-y-auto text-muted-foreground">
                           {Object.entries(supplierPrices).map(([name, sp]) => (
                             <li key={name}>
@@ -794,14 +794,14 @@ export default function ProductTree() {
                 <DialogTrigger asChild>
                   <Button size="sm" variant="outline" className="gap-1.5">
                     <FileSpreadsheet className="w-4 h-4" />
-                    <span className="hidden sm:inline">ייבוא</span>
+                    <span className="hidden sm:inline">{t("pages.productTree.import")}</span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                       <FileSpreadsheet className="w-5 h-5" />
-                      ייבוא מנות
+                      {t("pages.productTree.importDishes")}
                     </DialogTitle>
                   </DialogHeader>
                   
@@ -823,11 +823,11 @@ export default function ProductTree() {
                       onClick={() => importFileInputRef.current?.click()}
                     >
                       <Package className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-                      <p className="font-medium mb-2">גרור קובץ תפריט או לחץ לבחירה</p>
+                      <p className="font-medium mb-2">{t("pages.productTree.dragFile")}</p>
                       <div className="flex justify-center gap-2 flex-wrap mb-4">
                         <Badge variant="secondary">Excel</Badge>
                         <Badge variant="secondary">Word</Badge>
-                        <Badge variant="secondary">תמונה</Badge>
+                        <Badge variant="secondary">{t("pages.productTree.image")}</Badge>
                         <Badge variant="secondary">PDF</Badge>
                       </div>
                       <Button
@@ -840,7 +840,7 @@ export default function ProductTree() {
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground text-center mt-3">
-                      AI מנתח ומחלץ אוטומטית את המנות והמחירים
+                      {t("pages.productTree.aiExtractDesc")}
                     </p>
                   </div>
                 </DialogContent>
@@ -848,7 +848,7 @@ export default function ProductTree() {
               
               <Button size="sm" variant="outline" className="gap-1.5" onClick={handleCopyToClipboard}>
                 <Copy className="w-4 h-4" />
-                <span className="hidden sm:inline">העתק</span>
+                <span className="hidden sm:inline">{t("pages.productTree.copy")}</span>
               </Button>
               
               <Button
@@ -858,7 +858,7 @@ export default function ProductTree() {
                 onClick={() => toast.info("זיהוי AI יהיה זמין בגרסה הבאה")}
               >
                 <Camera className="w-4 h-4" />
-                <span className="hidden sm:inline">זהה</span>
+                <span className="hidden sm:inline">{t("pages.productTree.identify")}</span>
               </Button>
             </div>
           </div>
@@ -897,10 +897,10 @@ export default function ProductTree() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="name">מיון: א-ב</SelectItem>
-                <SelectItem value="cost_asc">FC נמוך-גבוה</SelectItem>
-                <SelectItem value="cost_desc">FC גבוה-נמוך</SelectItem>
-                <SelectItem value="price_desc">מחיר גבוה-נמוך</SelectItem>
+                <SelectItem value="name">{t("pages.productTree.sortAZ")}</SelectItem>
+                <SelectItem value="cost_asc">{t("pages.productTree.sortCostAsc")}</SelectItem>
+                <SelectItem value="cost_desc">{t("pages.productTree.sortCostDesc")}</SelectItem>
+                <SelectItem value="price_desc">{t("pages.productTree.sortPriceDesc")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -945,11 +945,11 @@ export default function ProductTree() {
                       <DropdownMenuContent align="start">
                         <DropdownMenuItem onClick={() => setEditingDish(name)}>
                           <Edit2 className="w-4 h-4 ml-2" />
-                          ערוך פרטים
+                          {t("pages.productTree.editDetails")}
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => duplicateDish(name)}>
                           <Copy className="w-4 h-4 ml-2" />
-                          שכפל מנה
+                          {t("pages.productTree.duplicateDish")}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
@@ -957,7 +957,7 @@ export default function ProductTree() {
                           className="text-destructive focus:text-destructive"
                         >
                           <Trash2 className="w-4 h-4 ml-2" />
-                          מחק מנה
+                          {t("pages.productTree.deleteDish")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -999,12 +999,12 @@ export default function ProductTree() {
                                 : cn(status.bg, status.text)
                             )}
                           >
-                            {pct > 0 ? `${pct.toFixed(1)}%` : `${dish.ingredients.length} רכיבים`}
+                            {pct > 0 ? `${pct.toFixed(1)}%` : `${dish.ingredients.length} ${t("pages.productTree.ingredientsCountShort")}`}
                           </Badge>
                         </>
                       ) : (
                         <span className="text-xs text-muted-foreground">
-                          {dish.ingredients.length} רכיבים
+                          {dish.ingredients.length} {t("pages.productTree.ingredientsCountShort")}
                         </span>
                       )}
                     </div>
@@ -1024,7 +1024,7 @@ export default function ProductTree() {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <ChefHat className="w-5 h-5 text-primary" />
-                <h3 className="font-bold">מתכון</h3>
+                <h3 className="font-bold">{t("pages.productTree.recipe")}</h3>
                 {currentDish && (
                   <Badge variant="outline" className="font-semibold">
                     {selectedDish}
@@ -1032,7 +1032,7 @@ export default function ProductTree() {
                 )}
               </div>
               <p className="text-xs text-muted-foreground hidden sm:block">
-                לחץ על עיפרון לעריכה — או חפש והוסף רכיב חדש
+                {t("pages.productTree.clickPencilToEdit")}
               </p>
             </div>
             
@@ -1043,13 +1043,13 @@ export default function ProductTree() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border">
-                        <th className="text-right py-2 px-2 font-semibold text-muted-foreground">רכיב</th>
-                        <th className="text-right py-2 px-2 font-semibold text-muted-foreground hidden sm:table-cell">ספק</th>
-                        {canSeeCosts && <th className="text-right py-2 px-2 font-semibold text-muted-foreground">מחיר</th>}
-                        <th className="text-right py-2 px-2 font-semibold text-muted-foreground">כמות</th>
-                        <th className="text-right py-2 px-2 font-semibold text-muted-foreground hidden sm:table-cell">יחידה</th>
-                        <th className="text-right py-2 px-2 font-semibold text-muted-foreground hidden md:table-cell">פסולת</th>
-                        {canSeeCosts && <th className="text-right py-2 px-2 font-semibold text-muted-foreground">עלות</th>}
+                        <th className="text-right py-2 px-2 font-semibold text-muted-foreground">{t("pages.productTree.ingredientLabel")}</th>
+                        <th className="text-right py-2 px-2 font-semibold text-muted-foreground hidden sm:table-cell">{t("pages.productTree.supplierLabel")}</th>
+                        {canSeeCosts && <th className="text-right py-2 px-2 font-semibold text-muted-foreground">{t("pages.productTree.priceLabelShort")}</th>}
+                        <th className="text-right py-2 px-2 font-semibold text-muted-foreground">{t("pages.productTree.quantity")}</th>
+                        <th className="text-right py-2 px-2 font-semibold text-muted-foreground hidden sm:table-cell">{t("pages.productTree.unit")}</th>
+                        <th className="text-right py-2 px-2 font-semibold text-muted-foreground hidden md:table-cell">{t("pages.productTree.waste")}</th>
+                        {canSeeCosts && <th className="text-right py-2 px-2 font-semibold text-muted-foreground">{t("pages.productTree.cost")}</th>}
                         <th className="w-16"></th>
                       </tr>
                     </thead>
@@ -1076,7 +1076,7 @@ export default function ProductTree() {
                               )}
                             >
                               <td className="py-2 px-2 font-medium">
-                                {ing.isSubRecipe && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded ml-1">מתכון</span>}
+                                {ing.isSubRecipe && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded ml-1">{t("pages.productTree.subRecipe")}</span>}
                                 {ing.name}
                               </td>
                               <td className="py-2 px-2 text-muted-foreground text-xs hidden sm:table-cell">
@@ -1164,7 +1164,7 @@ export default function ProductTree() {
                   <div className="relative">
                     <div className="flex gap-2">
                       <div className="relative flex-1">
-                        <label htmlFor="add-ingredient-search" className="sr-only">חפש רכיב להוספה</label>
+                        <label htmlFor="add-ingredient-search" className="sr-only">{t("pages.productTree.searchIngredientAria")}</label>
                         <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input
                           id="add-ingredient-search"
@@ -1176,7 +1176,7 @@ export default function ProductTree() {
                             setSelectedIngredient(null)
                           }}
                           onFocus={() => setShowIngredientDropdown(true)}
-                          placeholder={`חפש רכיב או מתכון...`}
+                          placeholder={t("pages.productTree.searchIngredientPlaceholder")}
                           className="pr-9"
                         />
                         
@@ -1215,7 +1215,7 @@ export default function ProductTree() {
                               )}
                               {(filteredIngredients?.simple?.length ?? 0) > 0 && (
                                 <>
-                                  <div className="px-3 py-1.5 text-[10px] font-bold text-muted-foreground bg-muted/50 border-t border-border">🥬 רכיבים</div>
+                                  <div className="px-3 py-1.5 text-[10px] font-bold text-muted-foreground bg-muted/50 border-t border-border">🥬 {t("pages.productTree.ingredientsCountShort")}</div>
                                   {(filteredIngredients.simple || []).map(name => {
                                     const sp = supplierPrices[name]
                                     return (
@@ -1257,33 +1257,33 @@ export default function ProductTree() {
                           <p className="font-semibold text-primary mb-1">{selectedIngredient}</p>
                           {selectedIngredientType === "compound" ? (
                             <p className="text-xs text-muted-foreground mb-2">
-                              מתכון מורכב — עלות: ₪{calcDishCost(selectedIngredient).toFixed(2)}/מנה
+                              {t("pages.productTree.compoundRecipeCost")}: ₪{calcDishCost(selectedIngredient).toFixed(2)}/{t("pages.productTree.perPortion")}
                             </p>
                           ) : (
                             (() => {
                               const sp = supplierPrices[selectedIngredient]
                               return sp ? (
                                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mb-2">
-                                  <span>מחיר: ₪{(sp.price ?? 0).toFixed(2)}</span>
-                                  <span>יחידה: {sp.unit || "—"}</span>
-                                  {sp.supplier && <span>ספק: {sp.supplier}</span>}
+                                  <span>{t("pages.productTree.priceLabelShort")}: ₪{(sp.price ?? 0).toFixed(2)}</span>
+                                  <span>{t("pages.productTree.unitLabelShort")}: {sp.unit || "—"}</span>
+                                  {sp.supplier && <span>{t("pages.productTree.supplierLabelShort")}: {sp.supplier}</span>}
                                 </div>
                               ) : null
                             })()
                           )}
-                          <p className="text-xs text-muted-foreground mb-2">עריכת רכיב — הזן כמות, יחידה ופחת לפני הוספה</p>
+                          <p className="text-xs text-muted-foreground mb-2">{t("pages.productTree.editIngredientHint")}</p>
                           {selectedIngredientType === "compound" ? (
                             <p className="text-sm font-semibold mb-3">
-                              עלות משוערת: ₪{(calcDishCost(selectedIngredient) * addIngredientQty).toFixed(2)}
+                              {t("pages.productTree.estimatedCost")}: ₪{(calcDishCost(selectedIngredient) * addIngredientQty).toFixed(2)}
                             </p>
                           ) : (
                             <p className="text-sm font-semibold mb-3">
-                              עלות משוערת: ₪{calcIngredientCost(selectedIngredient, addIngredientQty ?? 0, addIngredientWaste ?? 0, addIngredientUnit, false).toFixed(2)}
+                              {t("pages.productTree.estimatedCost")}: ₪{calcIngredientCost(selectedIngredient, addIngredientQty ?? 0, addIngredientWaste ?? 0, addIngredientUnit, false).toFixed(2)}
                             </p>
                           )}
                           <div className="flex flex-wrap items-end gap-3">
                             <div>
-                              <Label htmlFor="add-ingredient-qty" className="text-xs">כמות</Label>
+                              <Label htmlFor="add-ingredient-qty" className="text-xs">{t("pages.productTree.quantity")}</Label>
                               <Input
                                 id="add-ingredient-qty"
                                 name="addIngredientQty"
@@ -1294,7 +1294,7 @@ export default function ProductTree() {
                               />
                             </div>
                             <div>
-                              <Label htmlFor="add-ingredient-unit" className="text-xs">יחידה</Label>
+                              <Label htmlFor="add-ingredient-unit" className="text-xs">{t("pages.productTree.unit")}</Label>
                               <Select value={normalizeUnit(addIngredientUnit)} onValueChange={setAddIngredientUnit}>
                                 <SelectTrigger id="add-ingredient-unit" aria-label="יחידה" className="w-24 h-9 mt-1">
                                   <SelectValue />
@@ -1307,7 +1307,7 @@ export default function ProductTree() {
                               </Select>
                             </div>
                             <div>
-                              <Label htmlFor="add-ingredient-waste" className="text-xs">פסולת %</Label>
+                              <Label htmlFor="add-ingredient-waste" className="text-xs">{t("pages.productTree.waste")} %</Label>
                               <Input
                                 id="add-ingredient-waste"
                                 name="addIngredientWaste"
@@ -1322,7 +1322,7 @@ export default function ProductTree() {
                             <div className="flex gap-2">
                               <Button size="sm" onClick={addIngredient}>
                                 <CheckCircle2 className="w-4 h-4 ml-1.5" />
-                                הוסף
+                                {t("pages.productTree.add")}
                               </Button>
                               <Button 
                                 size="sm" 
@@ -1332,7 +1332,7 @@ export default function ProductTree() {
                                   setAddIngredientSearch("")
                                 }}
                               >
-                                ביטול
+                                {t("pages.productTree.cancel")}
                               </Button>
                             </div>
                           </div>
@@ -1345,7 +1345,7 @@ export default function ProductTree() {
             ) : (
               <div className="py-12 text-center text-muted-foreground">
                 <Utensils className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>בחר מנה לעריכת המתכון</p>
+                <p>{t("pages.productTree.selectDishToEdit")}</p>
               </div>
             )}
           </CardContent>
@@ -1365,7 +1365,7 @@ export default function ProductTree() {
             >
               <div className="flex items-center gap-2">
                 <DollarSign className="w-5 h-5 text-primary" />
-                <h3 className="font-bold">סיכום עלויות</h3>
+                <h3 className="font-bold">{t("pages.productTree.costSummary")}</h3>
               </div>
               <div className="flex items-center gap-2">
                 <Badge 
@@ -1397,7 +1397,7 @@ export default function ProductTree() {
                   <div className="px-4 pb-4 space-y-4">
                     {/* Selling Price */}
                     <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                      <Label htmlFor="selling-price" className="text-sm">מחיר מכירה:</Label>
+                      <Label htmlFor="selling-price" className="text-sm">{t("pages.productTree.sellingPriceLabel")}:</Label>
                       <div className="flex items-center gap-1 flex-1">
                         <span className="text-lg font-semibold">&#8362;</span>
                         <Input
@@ -1415,7 +1415,7 @@ export default function ProductTree() {
                     {/* Cost Meter */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">% עלות מזון</span>
+                        <span className="text-sm font-medium">{t("pages.productTree.foodCostPct")}</span>
                         <span className={cn(
                           "font-bold text-lg",
                           getStatusColor(currentPct).text
@@ -1476,7 +1476,7 @@ export default function ProductTree() {
                         <>
                           <CheckCircle2 className="w-6 h-6 text-emerald-600" />
                           <div>
-                            <p className="font-bold text-emerald-600">בתוך היעד</p>
+                            <p className="font-bold text-emerald-600">{t("pages.productTree.withinTarget")}</p>
                             <p className="text-xs text-emerald-600/80">
                               {currentPct.toFixed(1)}% מתוך {targetFoodCost}%
                             </p>
@@ -1486,9 +1486,9 @@ export default function ProductTree() {
                         <>
                           <AlertTriangle className="w-6 h-6 text-amber-600" />
                           <div>
-                            <p className="font-bold text-amber-600">מעל היעד</p>
+                            <p className="font-bold text-amber-600">{t("pages.productTree.overTarget")}</p>
                             <p className="text-xs text-amber-600/80">
-                              חריגה של {(currentPct - targetFoodCost).toFixed(1)}% - בדוק ספקים
+                              {t("pages.productTree.overTargetDeviation")} {(currentPct - targetFoodCost).toFixed(1)}% - {t("pages.productTree.checkSuppliers")}
                             </p>
                           </div>
                         </>
@@ -1496,9 +1496,9 @@ export default function ProductTree() {
                         <>
                           <AlertTriangle className="w-6 h-6 text-red-600" />
                           <div>
-                            <p className="font-bold text-red-600">קריטי</p>
+                            <p className="font-bold text-red-600">{t("pages.productTree.critical")}</p>
                             <p className="text-xs text-red-600/80">
-                              עלות גבוהה מדי ({currentPct.toFixed(1)}%)
+                              {t("pages.productTree.costTooHigh")} ({currentPct.toFixed(1)}%)
                             </p>
                           </div>
                         </>
@@ -1534,17 +1534,17 @@ export default function ProductTree() {
                       {/* Totals */}
                       <div className="pt-3 border-t border-border space-y-2">
                         <div className="flex justify-between font-semibold">
-                          <span>עלות מנה סה"כ</span>
+                          <span>{t("pages.productTree.totalDishCost")}</span>
                           <span>&#8362;{currentCost.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between font-semibold">
-                          <span>רווח גולמי</span>
+                          <span>{t("pages.productTree.grossProfit")}</span>
                           <span className={currentProfit > 0 ? "text-emerald-600" : "text-red-600"}>
                             &#8362;{currentProfit.toFixed(2)}
                           </span>
                         </div>
                         <div className="flex justify-between text-sm text-muted-foreground">
-                          <span>מרווח רווח</span>
+                          <span>{t("pages.productTree.profitMargin")}</span>
                           <span>{currentMargin.toFixed(1)}%</span>
                         </div>
                       </div>

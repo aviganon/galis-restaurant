@@ -1,15 +1,18 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react"
+import { type Locale, SUPPORTED_LOCALES } from "@/lib/translations"
 
-export type Locale = "he" | "en"
+export type { Locale }
 
 const STORAGE_KEY = "restaurant-pro-locale"
+const RTL_LOCALES: Locale[] = ["he"] // עברית, ערבית (ar) וכו'
 
 interface LanguageContextValue {
   locale: Locale
   setLocale: (locale: Locale) => void
   dir: "rtl" | "ltr"
+  supportedLocales: Locale[]
 }
 
 const LanguageContext = createContext<LanguageContextValue | null>(null)
@@ -17,7 +20,8 @@ const LanguageContext = createContext<LanguageContextValue | null>(null)
 function getInitialLocale(): Locale {
   if (typeof window === "undefined") return "he"
   const stored = localStorage.getItem(STORAGE_KEY) as Locale | null
-  return stored === "en" ? "en" : "he"
+  if (stored && SUPPORTED_LOCALES.includes(stored)) return stored
+  return "he"
 }
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
@@ -36,14 +40,20 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!mounted) return
-    const dir = locale === "he" ? "rtl" : "ltr"
-    const lang = locale === "he" ? "he" : "en"
+    const dir = RTL_LOCALES.includes(locale) ? "rtl" : "ltr"
     document.documentElement.dir = dir
-    document.documentElement.lang = lang
+    document.documentElement.lang = locale
   }, [locale, mounted])
 
   return (
-    <LanguageContext.Provider value={{ locale, setLocale, dir: locale === "he" ? "rtl" : "ltr" }}>
+    <LanguageContext.Provider
+      value={{
+        locale,
+        setLocale,
+        dir: RTL_LOCALES.includes(locale) ? "rtl" : "ltr",
+        supportedLocales: SUPPORTED_LOCALES,
+      }}
+    >
       {children}
     </LanguageContext.Provider>
   )
@@ -51,5 +61,12 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
 export function useLanguage() {
   const ctx = useContext(LanguageContext)
-  return ctx ?? { locale: "he" as Locale, setLocale: () => {}, dir: "rtl" as const }
+  return (
+    ctx ?? {
+      locale: "he" as Locale,
+      setLocale: () => {},
+      dir: "rtl" as const,
+      supportedLocales: SUPPORTED_LOCALES,
+    }
+  )
 }

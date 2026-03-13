@@ -621,7 +621,7 @@ export function AdminPanel() {
       setWebPriceByIngredient(webCache)
     } catch (e) {
       console.error("load system owner data:", e)
-      toast.error("שגיאה בטעינת נתונים")
+      toast.error(t("pages.adminPanel.loadError"))
     } finally {
       setLoadingSystemOwner(false)
     }
@@ -713,7 +713,7 @@ export function AdminPanel() {
     const sku = addIngredientSku.trim()
     const supplier = addIngredientSupplier.trim()
     if (!name) {
-      toast.error("הזן שם רכיב")
+      toast.error(t("pages.adminPanel.enterIngredientName"))
       return
     }
     setAddIngredientSaving(true)
@@ -749,7 +749,7 @@ export function AdminPanel() {
       resetAddIngredientModal()
       loadSystemOwnerData()
     } catch (e) {
-      toast.error((e as Error)?.message || "שגיאה")
+      toast.error((e as Error)?.message || t("pages.adminPanel.error"))
     } finally {
       setAddIngredientSaving(false)
     }
@@ -808,7 +808,7 @@ export function AdminPanel() {
       setRefreshAdminIngredientsKey((k) => k + 1)
       loadSystemOwnerData()
     } catch (e) {
-      toast.error((e as Error)?.message || "שגיאה")
+      toast.error((e as Error)?.message || t("pages.adminPanel.error"))
     } finally {
       setEditAdminIngSaving(false)
     }
@@ -829,7 +829,7 @@ export function AdminPanel() {
       setRefreshAdminIngredientsKey((k) => k + 1)
       loadSystemOwnerData()
     } catch (e) {
-      toast.error((e as Error)?.message || "שגיאה במחיקה")
+      toast.error((e as Error)?.message || t("pages.adminPanel.deleteError"))
     } finally {
       setDeletingIngredientId(null)
     }
@@ -840,14 +840,14 @@ export function AdminPanel() {
     try {
       const sn = (supplierName || "").trim()
       if (!sn) {
-        toast.error("שם ספק לא תקין")
+        toast.error(t("pages.adminPanel.invalidSupplierName"))
         return
       }
       const asRef = doc(db, "restaurants", restId, "appState", "assignedSuppliers")
       const asSnap = await getDocFromServer(asRef).catch(() => getDoc(asRef))
       const current: string[] = Array.isArray(asSnap.data()?.list) ? asSnap.data()!.list : []
       if (current.some((s) => (s || "").trim() === sn)) {
-        toast.info("הספק כבר משויך")
+        toast.info(t("pages.adminPanel.supplierAlreadyAssigned"))
         return
       }
       const nextList = [...current, sn]
@@ -929,7 +929,7 @@ export function AdminPanel() {
     const minStock = parseFloat(String(nsmItemMinStock)) || 0
     const sku = nsmItemSku.trim()
     if (!name) {
-      toast.error("הזן שם רכיב")
+      toast.error(t("pages.adminPanel.enterIngredientName"))
       return
     }
     setNsmItems((prev) => [...prev.filter((i) => i.name !== name), { name, price, unit: nsmItemUnit, waste, stock, minStock, sku, pkgSize: 0, pkgPrice: 0 }])
@@ -949,11 +949,11 @@ export function AdminPanel() {
   const handleSaveNewSupplier = async () => {
     const supName = nsmName.trim()
     if (!supName) {
-      toast.error("הזן שם ספק")
+      toast.error(t("pages.adminPanel.enterSupplierName"))
       return
     }
     if (nsmItems.length === 0) {
-      toast.error("הוסף לפחות רכיב אחד")
+      toast.error(t("pages.adminPanel.addAtLeastOne"))
       return
     }
     setAddSupplierSaving(true)
@@ -1073,7 +1073,7 @@ export function AdminPanel() {
     const minStock = parseFloat(String(editNsmItemMinStock)) || 0
     const sku = editNsmItemSku.trim()
     if (!name) {
-      toast.error("הזן שם רכיב")
+      toast.error(t("pages.adminPanel.enterIngredientName"))
       return
     }
     setEditNsmItems((prev) => [...prev.filter((i) => i.name !== name), { name, price, unit: editNsmItemUnit, waste, stock, minStock, sku }])
@@ -1092,7 +1092,7 @@ export function AdminPanel() {
 
   const handleSaveEditSupplier = async () => {
     if (!editSupplierName || editNsmItems.length === 0) {
-      toast.error("הוסף לפחות רכיב אחד")
+      toast.error(t("pages.adminPanel.addAtLeastOne"))
       return
     }
     setEditSupplierSaving(true)
@@ -1128,7 +1128,7 @@ export function AdminPanel() {
       toast.success(
         synced > 0
           ? `רכיבים עודכנו — עודכן ב־${Math.ceil(synced / editNsmItems.length)} מסעדות`
-          : "רכיבים עודכנו בהצלחה"
+          : t("pages.adminPanel.ingredientsUpdated")
       )
       setEditSupplierOpen(false)
       loadSystemOwnerData()
@@ -1272,7 +1272,7 @@ export function AdminPanel() {
       setRestaurantUsers((prev) =>
         prev.map((u) => (u.uid === uid ? { ...u, permissions: perms } : u))
       )
-      toast.success("ההרשאות עודכנו")
+      toast.success(t("pages.adminPanel.permissionsUpdated"))
     } catch (e) {
       toast.error((e as Error).message)
     }
@@ -1301,7 +1301,7 @@ export function AdminPanel() {
     setApiTestResult(null)
     try {
       const res = await testClaudeConnection()
-      setApiTestResult(res.ok ? "✅ חיבור תקין" : `❌ ${res.message || "שגיאה"}`)
+      setApiTestResult(res.ok ? `✅ ${t("pages.adminPanel.connectionOk")}` : `❌ ${res.message || t("pages.adminPanel.error")}`)
     } finally {
       setTestingApi(false)
     }
@@ -1324,7 +1324,7 @@ export function AdminPanel() {
   const handleCreateRestaurant = async () => {
     const name = newRestName.trim()
     if (!name) {
-      toast.error("הזן שם מסעדה")
+      toast.error(t("pages.adminPanel.enterRestaurantName"))
       return
     }
     const codeRaw = newRestInviteCode.trim().toUpperCase().replace(/\s/g, "")
@@ -1332,16 +1332,16 @@ export function AdminPanel() {
       const { inviteCodesCollection, inviteCodeFields } = firestoreConfig
       const codeSnap = await getDoc(doc(db, inviteCodesCollection, codeRaw))
       if (!codeSnap.exists()) {
-        toast.error("קוד הזמנה לא תקין")
+        toast.error(t("pages.adminPanel.invalidCode"))
         return
       }
       const codeData = codeSnap.data()
       if (codeData?.[inviteCodeFields.used]) {
-        toast.error("קוד הזמנה כבר נוצל")
+        toast.error(t("pages.adminPanel.codeUsed"))
         return
       }
       if (codeData?.[inviteCodeFields.type] !== "manager") {
-        toast.error("קוד זה לא מתאים לשיוך מנהל")
+        toast.error(t("pages.adminPanel.codeNotForManager"))
         return
       }
     }
@@ -1425,7 +1425,7 @@ export function AdminPanel() {
   const handleInviteUser = async () => {
     const email = inviteEmail.trim()
     if (!email || !currentRestaurantId) {
-      toast.error("הזן אימייל ובחר מסעדה")
+      toast.error(t("pages.adminPanel.enterEmailAndRestaurant"))
       return
     }
     setInviting(true)
@@ -1434,7 +1434,7 @@ export function AdminPanel() {
       const snap = await getDoc(ref)
       const current: string[] = Array.isArray(snap.data()?.list) ? snap.data()!.list : []
       if (current.includes(email)) {
-        toast.info("המשתמש כבר הוזמן")
+        toast.info(t("pages.adminPanel.userAlreadyInvited"))
         setInviting(false)
         return
       }
@@ -1466,16 +1466,16 @@ export function AdminPanel() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Shield className="w-6 h-6" />
-            פאנל ניהול
+            {t("pages.adminPanel.adminPanelTitle")}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground">
             {isSystemOwner
-              ? "בעלים — ניהול כל המסעדות, משתמשים, התחזה וכו'."
+              ? t("pages.adminPanel.systemOwnerDesc")
               : userRole === "owner" || userRole === "manager"
-                ? "מנהל מסעדה — הרשאות מלאות למסעדה שלך."
-                : "גישה מוגבלת."}
+                ? t("pages.adminPanel.restaurantManagerDesc")
+                : t("pages.adminPanel.limitedAccess")}
           </p>
         </CardContent>
       </Card>
@@ -1485,25 +1485,25 @@ export function AdminPanel() {
           <Card>
             <CardContent className="p-4">
               <p className="text-2xl font-bold">{adminStats.rests}</p>
-              <p className="text-xs text-muted-foreground">מסעדות</p>
+              <p className="text-xs text-muted-foreground">{t("pages.adminPanel.restaurants")}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <p className="text-2xl font-bold">{adminStats.users}</p>
-              <p className="text-xs text-muted-foreground">משתמשים</p>
+              <p className="text-xs text-muted-foreground">{t("pages.adminPanel.users")}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <p className="text-2xl font-bold">{adminStats.dishes}</p>
-              <p className="text-xs text-muted-foreground">מנות</p>
+              <p className="text-xs text-muted-foreground">{t("pages.adminPanel.dishesCount")}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <p className="text-2xl font-bold">{adminStats.ings}</p>
-              <p className="text-xs text-muted-foreground">רכיבים</p>
+              <p className="text-xs text-muted-foreground">{t("pages.adminPanel.globalIngredients")}</p>
             </CardContent>
           </Card>
         </div>
@@ -1539,16 +1539,16 @@ export function AdminPanel() {
                   <p className="text-sm text-amber-600 dark:text-amber-500 mb-3 flex items-center gap-2">
                     {t("pages.adminPanel.noRestaurantsLoaded")}{" "}
                     <Button variant="link" className="p-0 h-auto font-semibold" onClick={() => window.location.reload()}>
-                      לחץ לרענון
+                      {t("pages.adminPanel.clickToRefresh")}
                     </Button>
                   </p>
                 )}
                 <p className="text-sm text-muted-foreground mb-4">
-                  צור מסעדה חדשה — תהיה הבעלים שלה. אפשר לשייך משתמשים אחר כך.
+                  {t("pages.adminPanel.createNewRestaurant")}
                 </p>
                 <div className="flex flex-wrap gap-2 mb-3">
                   <div className="flex-1 min-w-[200px]">
-                    <Label htmlFor="new-rest-name">שם המסעדה</Label>
+                    <Label htmlFor="new-rest-name">{t("pages.adminPanel.restaurantName")}</Label>
                     <Input
                       id="new-rest-name"
                       value={newRestName}
@@ -1558,7 +1558,7 @@ export function AdminPanel() {
                     />
                   </div>
                   <div className="w-24">
-                    <Label htmlFor="new-rest-emoji">אימוג'י</Label>
+                    <Label htmlFor="new-rest-emoji">{t("pages.adminPanel.emoji")}</Label>
                     <Input
                       id="new-rest-emoji"
                       value={newRestEmoji}
@@ -1569,13 +1569,13 @@ export function AdminPanel() {
                   </div>
                 </div>
                 <div className="mb-3">
-                  <Label htmlFor="new-rest-invite-code">קוד הזמנה (אופציונלי)</Label>
+                  <Label htmlFor="new-rest-invite-code">{t("pages.adminPanel.inviteCodeOptional")}</Label>
                   <div className="flex gap-2 items-center mt-1">
                     <Input
                       id="new-rest-invite-code"
                       value={newRestInviteCode}
                       onChange={(e) => setNewRestInviteCode(e.target.value)}
-                      placeholder="XXXX-XXXX — לשיוך מנהל מאוחר יותר"
+                      placeholder={t("pages.adminPanel.inviteCodePlaceholder")}
                       className="max-w-xs font-mono"
                     />
                     <Button
@@ -1601,7 +1601,7 @@ export function AdminPanel() {
                           })
                           setNewRestInviteCode(code)
                           setLastGeneratedCode(code)
-                          toast.success("קוד נוצר והוזן בשדה. צור את המסעדה כדי לשייך.")
+                          toast.success(t("pages.adminPanel.codeCreated"))
                         } catch (e) {
                           toast.error((e as Error).message)
                         } finally {
@@ -1611,23 +1611,23 @@ export function AdminPanel() {
                       disabled={generatingCode}
                     >
                       {generatingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                      צור קוד
+                      {t("pages.adminPanel.createCode")}
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    אופציונלי: צור קוד או הדבק קוד קיים. המנהל יוכל להירשם עם הקוד ולקבל גישה למסעדה.
+                    {t("pages.adminPanel.optionallyCreateCode")}
                   </p>
                 </div>
                 <Button onClick={handleCreateRestaurant} disabled={creatingRest}>
                   {creatingRest ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Building2 className="w-4 h-4 ml-2" />}
-                  צור מסעדה
+                  {t("pages.adminPanel.createRestaurant")}
                 </Button>
               </CardContent>
             </Card>
             {loadingSystemOwner ? (
               <div className="flex items-center gap-2 text-muted-foreground py-8">
                 <Loader2 className="w-5 h-5 animate-spin" />
-                טוען מסעדות...
+                {t("pages.adminPanel.loadingRestaurants")}
               </div>
             ) : (
               <div className="space-y-4">
@@ -1641,7 +1641,7 @@ export function AdminPanel() {
                         </CardTitle>
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-muted-foreground">
-                            {rest.dishesCount} מנות · FC ממוצע {rest.fcAvg}%
+                            {rest.dishesCount} {t("pages.adminPanel.dishesCount")} · {t("pages.adminPanel.fcAvg")} {rest.fcAvg}%
                           </span>
                           {onImpersonate && (
                             <Button
@@ -1649,11 +1649,11 @@ export function AdminPanel() {
                               variant="outline"
                               onClick={() => {
                                 onImpersonate({ id: rest.id, name: rest.name, emoji: rest.emoji })
-                                toast.success(`מתחזה כמסעדה: ${rest.emoji ? `${rest.emoji} ` : ""}${rest.name}`)
+                                toast.success(`${t("pages.adminPanel.impersonatingRest")}: ${rest.emoji ? `${rest.emoji} ` : ""}${rest.name}`)
                               }}
                             >
                               <UserCircle className="w-4 h-4 ml-1" />
-                              התחזה
+                              {t("pages.adminPanel.impersonate")}
                             </Button>
                           )}
                           <Button
@@ -1694,7 +1694,7 @@ export function AdminPanel() {
                         </div>
                       </div>
                       <div>
-                        <p className="text-sm font-medium mb-2">ספקים זמינים לשיוך:</p>
+                        <p className="text-sm font-medium mb-2">{t("pages.adminPanel.suppliersAvailableForAssignment")}:</p>
                         <div className="flex flex-wrap gap-2">
                           {suppliersWithRests
                             .filter((s) => !(rest.assignedSuppliers || []).includes(s.name))
@@ -1711,7 +1711,7 @@ export function AdminPanel() {
                               </Button>
                             ))}
                           {suppliersWithRests.filter((s) => !(rest.assignedSuppliers || []).includes(s.name)).length === 0 && (
-                            <span className="text-sm text-muted-foreground">כל הספקים כבר משויכים</span>
+                            <span className="text-sm text-muted-foreground">{t("pages.adminPanel.allSuppliersAssigned")}</span>
                           )}
                         </div>
                       </div>
@@ -1719,7 +1719,7 @@ export function AdminPanel() {
                   </Card>
                 ))}
                 {restsWithDetails.length === 0 && !loadingSystemOwner && (
-                  <p className="text-muted-foreground py-4">אין מסעדות במערכת</p>
+                  <p className="text-muted-foreground py-4">{t("pages.adminPanel.noRestaurants")}</p>
                 )}
               </div>
             )}
@@ -1729,24 +1729,24 @@ export function AdminPanel() {
             {loadingSystemOwner ? (
               <div className="flex items-center gap-2 text-muted-foreground py-8">
                 <Loader2 className="w-5 h-5 animate-spin" />
-                טוען ספקים...
+                {t("pages.adminPanel.loadingSuppliers")}
               </div>
             ) : (
               <Card>
                 <CardHeader>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <CardTitle>ספקים גלובליים</CardTitle>
-                      <p className="text-sm text-muted-foreground">רשימת כל הספקים מרכיבים גלובליים ומשיכתם למסעדות</p>
+                      <CardTitle>{t("pages.adminPanel.globalSuppliers")}</CardTitle>
+                      <p className="text-sm text-muted-foreground">{t("pages.adminPanel.globalSuppliersDesc")}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" onClick={() => loadSystemOwnerData()} disabled={loadingSystemOwner}>
                         <RefreshCw className={`w-4 h-4 ml-1 ${loadingSystemOwner ? "animate-spin" : ""}`} />
-                        רענן
+                        {t("pages.adminPanel.refresh")}
                       </Button>
                       <Button onClick={() => setAddSupplierOpen(true)}>
                         <Plus className="w-4 h-4 ml-1" />
-                        הוסף ספק
+                        {t("pages.adminPanel.addSupplier")}
                       </Button>
                     </div>
                   </div>
@@ -1758,7 +1758,7 @@ export function AdminPanel() {
                       <Input
                         value={suppliersSearchText}
                         onChange={(e) => setSuppliersSearchText(e.target.value)}
-                        placeholder="חיפוש: ספק, טלפון, אימייל..."
+                        placeholder={t("pages.adminPanel.suppliersSearchPlaceholder")}
                         className="h-9"
                       />
                     </div>
@@ -1767,23 +1767,23 @@ export function AdminPanel() {
                         <SelectValue placeholder={t("pages.adminPanel.assign")} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__all__">הכל</SelectItem>
-                        <SelectItem value="assigned">משויך למסעדות</SelectItem>
-                        <SelectItem value="unassigned">לא משויך</SelectItem>
+                        <SelectItem value="__all__">{t("pages.adminPanel.all")}</SelectItem>
+                        <SelectItem value="assigned">{t("pages.adminPanel.assignedToRestaurants")}</SelectItem>
+                        <SelectItem value="unassigned">{t("pages.adminPanel.unassigned")}</SelectItem>
                       </SelectContent>
                     </Select>
                     {(suppliersSearchText || suppliersFilterAssigned !== "__all__") && (
                       <Button variant="ghost" size="sm" onClick={() => { setSuppliersSearchText(""); setSuppliersFilterAssigned("__all__") }}>
-                        נקה סינון
+                        {t("pages.adminPanel.clearFilter")}
                       </Button>
                     )}
                     <span className="text-sm text-muted-foreground">
                       {filteredAndSortedSuppliers.length === (suppliersWithRests?.length ?? 0)
-                        ? `${suppliersWithRests?.length ?? 0} ספקים`
-                        : `מציג ${filteredAndSortedSuppliers.length} מתוך ${suppliersWithRests?.length ?? 0}`}
+                        ? `${suppliersWithRests?.length ?? 0} ${t("pages.adminPanel.suppliersCount")}`
+                        : `${t("pages.adminPanel.showingCount")} ${filteredAndSortedSuppliers.length} ${t("pages.adminPanel.of")} ${suppliersWithRests?.length ?? 0}`}
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-4">לחץ על ספק כדי לראות את הפרטים והרכיבים שלו</p>
+                  <p className="text-sm text-muted-foreground mb-4">{t("pages.adminPanel.clickForDetails")}</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                     {filteredAndSortedSuppliers.map((s) => {
                       const ingCount = (supplierToIngredients[s.name] || []).length
@@ -1802,7 +1802,7 @@ export function AdminPanel() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="font-semibold truncate">{s.name}</p>
-                              <p className="text-xs text-muted-foreground">{ingCount} רכיבים</p>
+                              <p className="text-xs text-muted-foreground">{ingCount} {t("pages.adminPanel.ingredientsCount")}</p>
                             </div>
                             <span className="text-muted-foreground">›</span>
                           </CardContent>
@@ -1821,11 +1821,11 @@ export function AdminPanel() {
                           <div className="flex gap-2">
                             <Button size="sm" variant="outline" onClick={() => openEditSupplierDetails(s)}>
                               <Edit2 className="w-4 h-4 ml-1" />
-                              ערוך פרטים
+                              {t("pages.adminPanel.editDetails")}
                             </Button>
                             <Button size="sm" onClick={() => openEditSupplier(s.name)}>
                               <Plus className="w-4 h-4 ml-1" />
-                              הוסף רכיב
+                              {t("pages.adminPanel.addIngredient")}
                             </Button>
                             <Button
                               size="sm"
@@ -1834,29 +1834,29 @@ export function AdminPanel() {
                               onClick={(e) => { e.stopPropagation(); setSupplierToDelete(s); setDeleteSupplierDialogOpen(true) }}
                             >
                               <Trash2 className="w-4 h-4 ml-1" />
-                              מחק ספק
+                              {t("pages.adminPanel.deleteSupplier")}
                             </Button>
                           </div>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                           <div>
-                            <p className="text-muted-foreground mb-0.5">טלפון</p>
+                            <p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.phone")}</p>
                             <p className="font-medium">{s.phone || "—"}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground mb-0.5">אימייל</p>
+                            <p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.email")}</p>
                             <p className="font-medium">{s.email || "—"}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground mb-0.5">איש קשר</p>
+                            <p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.contact")}</p>
                             <p className="font-medium">{s.contact || "—"}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground mb-0.5">כתובת</p>
+                            <p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.address")}</p>
                             <p className="font-medium">{s.address || "—"}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground mb-0.5">משויך למסעדות</p>
+                            <p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.assignedToRestaurantsLabel")}</p>
                             <p className="font-medium">
                               {(s.restaurantIds?.length ?? 0) === 0 ? (
                                 t("pages.adminPanel.notAssigned")
@@ -1870,9 +1870,9 @@ export function AdminPanel() {
                           </div>
                         </div>
                         <div>
-                          <p className="text-sm font-medium mb-2">רכיבים ({supplierIngs.length})</p>
+                          <p className="text-sm font-medium mb-2">{t("pages.adminPanel.ingredientsCount")} ({supplierIngs.length})</p>
                           {supplierIngs.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">אין רכיבים — לחץ על &quot;הוסף רכיב&quot;</p>
+                            <p className="text-sm text-muted-foreground">{t("pages.adminPanel.noIngredientsAddFirst")}</p>
                           ) : (
                             <div className="overflow-x-auto rounded-lg border">
                               <table className="w-full text-sm table-fixed">
@@ -1889,13 +1889,13 @@ export function AdminPanel() {
                                 <thead>
                                   <tr className="border-b bg-muted/50">
                                     <th className="text-right py-2 px-2 font-medium w-14"></th>
-                                    <th className="text-right py-2 px-2 font-medium">מק״ט</th>
-                                    <th className="text-right py-2 px-2 font-medium">מינ׳</th>
-                                    <th className="text-right py-2 px-2 font-medium">מלאי</th>
-                                    <th className="text-right py-2 px-2 font-medium">פחת %</th>
-                                    <th className="text-right py-2 px-2 font-medium">יחידה</th>
-                                    <th className="text-right py-2 px-2 font-medium">מחיר</th>
-                                    <th className="text-right py-2 px-2 font-medium">רכיב</th>
+                                    <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.skuLabel")}</th>
+                                    <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.minStockLabel")}</th>
+                                    <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.inventory")}</th>
+                                    <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.wasteLabel")}</th>
+                                    <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.unitUnit")}</th>
+                                    <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.priceLabel")}</th>
+                                    <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.ingredientLabel")}</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -1943,12 +1943,12 @@ export function AdminPanel() {
             {loadingSystemOwner ? (
               <div className="flex items-center gap-2 text-muted-foreground py-8">
                 <Loader2 className="w-5 h-5 animate-spin" />
-                טוען רכיבים...
+                {t("pages.adminPanel.loadingIngredients")}
               </div>
             ) : (
               <Card>
                 <CardHeader>
-                  <CardTitle>רכיבים</CardTitle>
+                  <CardTitle>{t("pages.adminPanel.globalIngredients")}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="w-full overflow-x-hidden overflow-y-auto max-h-[min(60vh,600px)] rounded-lg border">
@@ -1975,11 +1975,11 @@ export function AdminPanel() {
                             <Input
                               value={ingredientsSearchText}
                               onChange={(e) => setIngredientsSearchText(e.target.value)}
-                              placeholder="חיפוש..."
+                              placeholder={t("pages.adminPanel.searchPlaceholder")}
                               className="h-7 text-right flex-1 min-w-0 text-xs"
                             />
                             {ingredientsSearchText && (
-                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0" onClick={() => setIngredientsSearchText("")} title="נקה">
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0" onClick={() => setIngredientsSearchText("")} title={t("pages.adminPanel.clear")}>
                                 <X className="w-3 h-3" />
                               </Button>
                             )}
@@ -1989,23 +1989,23 @@ export function AdminPanel() {
                               onClick={() => { setAddIngredientSupplier(""); setAddIngredientOpen(true) }}
                             >
                               <Plus className="w-3.5 h-3.5 ml-0.5" />
-                              הוסף
+                              {t("pages.adminPanel.addIngredient")}
                             </Button>
                           </div>
                         </TableHead>
                         <TableHead className="text-right p-2 align-middle text-xs text-muted-foreground">
                           {filteredAndSortedIngredients.length === (ingredientsList?.length ?? 0)
-                            ? `${ingredientsList?.length ?? 0} רכיבים`
-                            : `מציג ${filteredAndSortedIngredients.length} מתוך ${ingredientsList?.length ?? 0}`}
+                            ? `${ingredientsList?.length ?? 0} ${t("pages.adminPanel.ingredientsCount")}`
+                            : `${t("pages.adminPanel.showingCount")} ${filteredAndSortedIngredients.length} ${t("pages.adminPanel.of")} ${ingredientsList?.length ?? 0}`}
                         </TableHead>
                         <TableHead colSpan={10} className="p-0" />
                       </TableRow>
                       <TableRow>
                         {(["name", "price", "cheapest", "sku", "status", "source", "supplier", "minStock", "stock", "waste", "unit"] as const).map((key) => {
                           if (key === "cheapest") {
-                            return <TableHead key="cheapest" className="text-right">הכי זול</TableHead>
+                            return <TableHead key="cheapest" className="text-right">{t("pages.adminPanel.cheapest")}</TableHead>
                           }
-                          const labels: Record<string, string> = { name: "רכיב", price: "מחיר", unit: "יחידה", waste: "פחת %", stock: "מלאי", minStock: "מינ׳", supplier: "ספק", sku: "מק״ט", source: "מקור", status: "סטטוס" }
+                          const labels: Record<string, string> = { name: t("pages.adminPanel.ingredientLabel"), price: t("pages.adminPanel.priceLabel"), unit: t("pages.adminPanel.unitUnit"), waste: t("pages.adminPanel.wasteLabel"), stock: t("pages.adminPanel.inventory"), minStock: t("pages.adminPanel.minStockLabel"), supplier: t("pages.adminPanel.supplierLabel"), sku: t("pages.adminPanel.skuLabel"), source: t("pages.adminPanel.sourceLabel"), status: t("pages.adminPanel.statusLabel") }
                           const isSortable = ["name", "price", "unit", "waste", "stock", "minStock", "supplier", "sku", "source", "status"].includes(key)
                           return (
                             <TableHead
@@ -2032,7 +2032,7 @@ export function AdminPanel() {
                             </TableHead>
                           )
                         })}
-                        <TableHead className="text-right w-14">פעולות</TableHead>
+                        <TableHead className="text-right w-14">{t("pages.adminPanel.actions")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -2099,15 +2099,15 @@ export function AdminPanel() {
       <Dialog open={addIngredientOpen} onOpenChange={(o) => { setAddIngredientOpen(o); if (!o) resetAddIngredientModal() }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>הוסף רכיב לקטלוג הגלובלי</DialogTitle>
+            <DialogTitle>{t("pages.adminPanel.addIngredientToGlobal")}</DialogTitle>
             <p className="text-sm text-muted-foreground">
-              הרכיב יתווסף לקטלוג הגלובלי. ישויך אותו לספק — והספק למסעדות — כדי שיופיע אצלן.
+              {t("pages.adminPanel.addToGlobalDesc")}
             </p>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>שם הרכיב *</Label>
-              <Input value={addIngredientName} onChange={(e) => setAddIngredientName(e.target.value)} placeholder="למשל: קמח, שמן" />
+              <Label>{t("pages.adminPanel.ingredientNameLabel")}</Label>
+              <Input value={addIngredientName} onChange={(e) => setAddIngredientName(e.target.value)} placeholder={t("pages.adminPanel.ingredientNamePlaceholder")} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -2115,16 +2115,16 @@ export function AdminPanel() {
                 <Input type="number" value={addIngredientPrice} onChange={(e) => setAddIngredientPrice(e.target.value)} placeholder="0" min={0} step={0.01} />
               </div>
               <div className="space-y-2">
-                <Label>יחידה</Label>
+                <Label>{t("pages.adminPanel.unitUnit")}</Label>
                 <Select value={addIngredientUnit} onValueChange={setAddIngredientUnit}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="גרם">גרם</SelectItem>
+                    <SelectItem value="גרם">{t("pages.adminPanel.unitGram")}</SelectItem>
                     <SelectItem value={'ק"ג'}>ק&quot;ג</SelectItem>
-                    <SelectItem value="מל">מל</SelectItem>
-                    <SelectItem value="ליטר">ליטר</SelectItem>
-                    <SelectItem value="יחידה">יחידה</SelectItem>
-                    <SelectItem value="חבילה">חבילה</SelectItem>
+                    <SelectItem value="מל">{t("pages.adminPanel.unitMl")}</SelectItem>
+                    <SelectItem value="ליטר">{t("pages.adminPanel.unitLiter")}</SelectItem>
+                    <SelectItem value="יחידה">{t("pages.adminPanel.unitUnit")}</SelectItem>
+                    <SelectItem value="חבילה">{t("pages.adminPanel.unitPackage")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -2133,16 +2133,16 @@ export function AdminPanel() {
                 <Input type="number" value={addIngredientWaste} onChange={(e) => setAddIngredientWaste(e.target.value)} placeholder="0" min={0} max={100} step={0.1} />
               </div>
               <div className="space-y-2">
-                <Label>מלאי</Label>
+                <Label>{t("pages.adminPanel.inventory")}</Label>
                 <Input type="number" value={addIngredientStock} onChange={(e) => setAddIngredientStock(e.target.value)} placeholder="0" min={0} />
               </div>
               <div className="space-y-2">
-                <Label>מינ׳ מלאי</Label>
+                <Label>{t("pages.adminPanel.minStock")}</Label>
                 <Input type="number" value={addIngredientMinStock} onChange={(e) => setAddIngredientMinStock(e.target.value)} placeholder="0" min={0} />
               </div>
               <div className="space-y-2">
                 <Label>מק״ט</Label>
-                <Input value={addIngredientSku} onChange={(e) => setAddIngredientSku(e.target.value)} placeholder="קוד מוצר" />
+                <Input value={addIngredientSku} onChange={(e) => setAddIngredientSku(e.target.value)} placeholder={t("pages.adminPanel.skuPlaceholder")} />
               </div>
             </div>
             <div className="space-y-2">
@@ -2154,13 +2154,13 @@ export function AdminPanel() {
                     <Input
                       value={addIngredientSupplier}
                       onChange={(e) => setAddIngredientSupplier(e.target.value)}
-                      placeholder="הזן שם ספק או השאר ריק"
+                      placeholder={t("pages.adminPanel.enterSupplierName")}
                     />
                   )
                 }
                 return (
                   <Select value={addIngredientSupplier || "__none__"} onValueChange={(v) => setAddIngredientSupplier(v === "__none__" ? "" : v)}>
-                    <SelectTrigger><SelectValue placeholder="בחר ספק או השאר ללא ספק" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t("pages.adminPanel.selectSupplier")} /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__none__">ללא ספק</SelectItem>
                       {suppliers.map((name) => (
@@ -2187,7 +2187,7 @@ export function AdminPanel() {
           <DialogHeader>
             <DialogTitle>עריכת רכיב</DialogTitle>
             <p className="text-sm text-muted-foreground">
-              {editAdminIngredient && `${editAdminIngredient.name} (${editAdminIngredient.source === "global" ? "גלובלי" : "מסעדה"})`}
+              {editAdminIngredient && `${editAdminIngredient.name} (${editAdminIngredient.source === "global" ? t("pages.adminPanel.global") : t("pages.adminPanel.restaurant")})`}
             </p>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -2197,16 +2197,16 @@ export function AdminPanel() {
                 <Input type="number" value={editAdminIngPrice} onChange={(e) => setEditAdminIngPrice(e.target.value)} min={0} step={0.01} />
               </div>
               <div className="space-y-2">
-                <Label>יחידה</Label>
+                <Label>{t("pages.adminPanel.unitUnit")}</Label>
                 <Select value={editAdminIngUnit} onValueChange={setEditAdminIngUnit}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="גרם">גרם</SelectItem>
+                    <SelectItem value="גרם">{t("pages.adminPanel.unitGram")}</SelectItem>
                     <SelectItem value={'ק"ג'}>ק&quot;ג</SelectItem>
-                    <SelectItem value="מל">מל</SelectItem>
-                    <SelectItem value="ליטר">ליטר</SelectItem>
-                    <SelectItem value="יחידה">יחידה</SelectItem>
-                    <SelectItem value="חבילה">חבילה</SelectItem>
+                    <SelectItem value="מל">{t("pages.adminPanel.unitMl")}</SelectItem>
+                    <SelectItem value="ליטר">{t("pages.adminPanel.unitLiter")}</SelectItem>
+                    <SelectItem value="יחידה">{t("pages.adminPanel.unitUnit")}</SelectItem>
+                    <SelectItem value="חבילה">{t("pages.adminPanel.unitPackage")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -2215,17 +2215,17 @@ export function AdminPanel() {
                 <Input type="number" value={editAdminIngWaste} onChange={(e) => setEditAdminIngWaste(e.target.value)} min={0} max={100} step={0.1} />
               </div>
               <div className="space-y-2">
-                <Label>מלאי</Label>
+                <Label>{t("pages.adminPanel.inventory")}</Label>
                 <Input type="number" value={editAdminIngStock} onChange={(e) => setEditAdminIngStock(e.target.value)} min={0} />
               </div>
               <div className="space-y-2">
-                <Label>מינ׳ מלאי</Label>
+                <Label>{t("pages.adminPanel.minStock")}</Label>
                 <Input type="number" value={editAdminIngMinStock} onChange={(e) => setEditAdminIngMinStock(e.target.value)} min={0} />
               </div>
             </div>
             <div className="space-y-2">
               <Label>מק״ט</Label>
-              <Input value={editAdminIngSku} onChange={(e) => setEditAdminIngSku(e.target.value)} placeholder="קוד מוצר" />
+              <Input value={editAdminIngSku} onChange={(e) => setEditAdminIngSku(e.target.value)} placeholder={t("pages.adminPanel.skuPlaceholder")} />
             </div>
             <div className="space-y-2">
               <Label>ספק</Label>
