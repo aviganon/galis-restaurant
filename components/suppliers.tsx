@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import dynamic from "next/dynamic"
+import React, { useState, useEffect, useCallback } from "react"
 import { collection, getDocs, doc, getDoc, setDoc, writeBatch, deleteDoc, addDoc } from "firebase/firestore"
 import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplier-ingredients"
 import {
@@ -74,11 +73,6 @@ interface SupplierInfo {
 
 const isOwnerRole = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner"
 
-const SuppliersInvoiceUpload = dynamic(
-  () => import("@/components/suppliers-invoice-upload").then((m) => ({ default: m.SuppliersInvoiceUpload })),
-  { ssr: false }
-)
-
 export default function Suppliers() {
   const t = useTranslations()
   const { currentRestaurantId, userRole, isSystemOwner, refreshIngredients, restaurants } = useApp()
@@ -117,6 +111,18 @@ export default function Suppliers() {
   const [deletingSupplierName, setDeletingSupplierName] = useState<string | null>(null)
 
   const [showInvoiceUploadArea, setShowInvoiceUploadArea] = useState(false)
+  const [InvoiceUploadComponent, setInvoiceUploadComponent] = useState<React.ComponentType<{
+    restaurantName?: string
+    onConfirm: (items: InvoiceItem[], supName: string, saveToGlobal?: boolean) => Promise<void>
+    onClose: () => void
+    onSuccess?: () => void
+  }> | null>(null)
+
+  useEffect(() => {
+    if (showInvoiceUploadArea && !InvoiceUploadComponent) {
+      import("@/components/suppliers-invoice-upload").then((m) => setInvoiceUploadComponent(() => m.SuppliersInvoiceUpload))
+    }
+  }, [showInvoiceUploadArea, InvoiceUploadComponent])
 
   const handleConfirmSupplier = useCallback(
     async (items: InvoiceItem[], supName: string, saveToGlobal?: boolean) => {
@@ -594,12 +600,18 @@ export default function Suppliers() {
 
       {/* העלאת חשבוניות — נטען רק בלחיצה על הכפתור (מונע שגיאת initialization) */}
       {showInvoiceUploadArea && (
-        <SuppliersInvoiceUpload
-          restaurantName={restaurantName}
-          onConfirm={handleConfirmSupplier}
-          onClose={() => setShowInvoiceUploadArea(false)}
-          onSuccess={loadSuppliers}
-        />
+        InvoiceUploadComponent ? (
+          <InvoiceUploadComponent
+            restaurantName={restaurantName}
+            onConfirm={handleConfirmSupplier}
+            onClose={() => setShowInvoiceUploadArea(false)}
+            onSuccess={loadSuppliers}
+          />
+        ) : (
+          <div className="mb-6 flex items-center justify-center py-12">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        )
       )}
 
       {safeFilteredSuppliers.length === 0 ? (
