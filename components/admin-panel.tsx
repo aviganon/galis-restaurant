@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Shield, Key, Loader2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe } from "lucide-react"
+import { Shield, Key, Loader2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -36,6 +36,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { getClaudeApiKey, setClaudeApiKey, testClaudeConnection } from "@/lib/claude"
 import { toast } from "sonner"
 import { doc, setDoc, getDoc, getDocFromServer, collection, collectionGroup, query, where, getDocs, getDocsFromServer, deleteDoc, writeBatch } from "firebase/firestore"
@@ -89,6 +90,37 @@ function pricePerKg(p: number, u: string): number {
   return p
 }
 
+function AdminCheapestPopover({ ing }: { ing: { name: string; globalCheapest?: { price: number; supplier?: string; unit: string } } }) {
+  const gc = ing.globalCheapest
+  const displayPrice = gc ? `₪${gc.price.toFixed(1)}/${gc.unit}` : null
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium transition-colors hover:bg-muted text-muted-foreground"
+        >
+          {displayPrice || "—"}
+          <ChevronDown className="w-3 h-3" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72">
+        <div className="space-y-2">
+          {gc ? (
+            <div className="text-sm text-muted-foreground">
+              <span className="text-muted-foreground">מהמערכת:</span> ₪{gc.price.toFixed(1)}/{gc.unit}
+              {gc.supplier && <span className="text-primary font-medium"> אצל {gc.supplier}</span>}
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">מהמערכת: —</div>
+          )}
+          <WebPriceCell ingredientName={ing.name} />
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 function WebPriceCell({ ingredientName }: { ingredientName: string }) {
   const [data, setData] = useState<{ price: number; store: string; unit: string } | null>(null)
   const [loading, setLoading] = useState(false)
@@ -123,8 +155,18 @@ function WebPriceCell({ ingredientName }: { ingredientName: string }) {
   }, [ingredientName])
   if (data) {
     return (
-      <div className="text-blue-600 dark:text-blue-400 text-xs">
-        <span className="text-muted-foreground">מהאינטרנט:</span> ₪{data.price.toFixed(1)}/{data.unit} אצל {data.store}
+      <div className="text-blue-600 dark:text-blue-400 text-xs space-y-1">
+        <div>
+          <span className="text-muted-foreground">מהאינטרנט:</span> ₪{data.price.toFixed(1)}/{data.unit} אצל {data.store}
+        </div>
+        <Button
+          variant="link"
+          size="sm"
+          className="h-auto p-0 text-xs text-primary"
+          onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(ingredientName + " " + data.store + " מחיר קנייה")}`, "_blank")}
+        >
+          לקנייה באינטרנט →
+        </Button>
       </div>
     )
   }
@@ -1933,17 +1975,7 @@ export function AdminPanel() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right text-sm">
-                            <div className="space-y-2 min-w-[160px]">
-                              {ing.globalCheapest && (
-                                <div className="text-muted-foreground">
-                                  <span className="text-xs">מהמערכת:</span> ₪{ing.globalCheapest.price.toFixed(1)}/{ing.globalCheapest.unit}
-                                  {ing.globalCheapest.supplier && (
-                                    <span className="text-primary font-medium"> אצל {ing.globalCheapest.supplier}</span>
-                                  )}
-                                </div>
-                              )}
-                              <WebPriceCell ingredientName={ing.name} />
-                            </div>
+                            <AdminCheapestPopover ing={ing} />
                           </TableCell>
                           <TableCell className="text-right">{ing.sku || "—"}</TableCell>
                           <TableCell className="text-right">
