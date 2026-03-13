@@ -26,6 +26,7 @@ interface AppContextValue {
   isImpersonating?: boolean
   onImpersonate?: (rest: Restaurant) => void
   onStopImpersonate?: () => void
+  onRestaurantDeleted?: (deletedId: string) => void
   setCurrentPage?: (page: string) => void
   refreshRestaurants?: () => void
   refreshIngredientsKey?: number
@@ -44,6 +45,7 @@ export function AppProvider({
   isImpersonating,
   onImpersonate,
   onStopImpersonate,
+  onRestaurantDeleted,
   setCurrentPage,
   refreshRestaurants,
   refreshIngredientsKey,
@@ -58,13 +60,14 @@ export function AppProvider({
   isImpersonating?: boolean
   onImpersonate?: (rest: Restaurant) => void
   onStopImpersonate?: () => void
+  onRestaurantDeleted?: (deletedId: string) => void
   setCurrentPage?: (page: string) => void
   refreshRestaurants?: () => void
   refreshIngredientsKey?: number
   refreshIngredients?: () => void
 }) {
   return (
-    <AppContext.Provider value={{ currentRestaurantId, userRole, isSystemOwner, userPermissions, restaurants, isImpersonating, onImpersonate, onStopImpersonate, setCurrentPage, refreshRestaurants, refreshIngredientsKey, refreshIngredients }}>
+    <AppContext.Provider value={{ currentRestaurantId, userRole, isSystemOwner, userPermissions, restaurants, isImpersonating, onImpersonate, onStopImpersonate, onRestaurantDeleted, setCurrentPage, refreshRestaurants, refreshIngredientsKey, refreshIngredients }}>
       {children}
     </AppContext.Provider>
   )

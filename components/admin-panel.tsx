@@ -257,7 +257,7 @@ function WebPriceCell({
 export function AdminPanel() {
   const t = useTranslations()
   const { dir } = useLanguage()
-  const { userRole, isSystemOwner, currentRestaurantId, restaurants, onImpersonate, refreshRestaurants, refreshIngredients } = useApp()
+  const { userRole, isSystemOwner, currentRestaurantId, restaurants, onImpersonate, onRestaurantDeleted, refreshRestaurants, refreshIngredients } = useApp()
   const isRtl = dir === "rtl"
   const textAlign = isRtl ? "text-right" : "text-left"
   const justify = isRtl ? "justify-end" : "justify-start"
@@ -1343,7 +1343,7 @@ export function AdminPanel() {
       setDeleteRestDialogOpen(false)
       setRestToDelete(null)
       loadSystemOwnerData()
-      window.location.reload()
+      onRestaurantDeleted?.(rest.id)
     } catch (e) {
       toast.error((e as Error).message)
     } finally {

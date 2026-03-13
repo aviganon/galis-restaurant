@@ -90,6 +90,8 @@ interface Ingredient {
   priceSource?: "mine" | "market"
   /** בעלים: הכי זול גלובלי (מאיפה לקנות) */
   globalCheapest?: GlobalCheapest
+  /** האם הרכיב קיים ב-restaurants/.../ingredients (ניתן למחוק) */
+  inRestaurant?: boolean
 }
 
 const UNITS = ["גרם", "ק\"ג", "מל", "ליטר", "יחידה", "חבילה", "כף", "כפית"]
@@ -393,6 +395,7 @@ export function Ingredients() {
           category: (data.category as string) || "אחר",
           priceSource: isOwner ? "mine" : undefined,
           globalCheapest: isOwner ? globalCheapestByIngredient.get(d.id) : undefined,
+          inRestaurant: true,
         }
         byId.set(d.id, ing)
         if (data.supplier) {
@@ -419,6 +422,7 @@ export function Ingredients() {
           category: (data.category as string) || "אחר",
           priceSource: isOwner ? "market" : undefined,
           globalCheapest: isOwner ? globalCheapestByIngredient.get(d.id) : undefined,
+          inRestaurant: false,
         }
         byId.set(d.id, ing)
         if (data.supplier) supSet.add(data.supplier)
@@ -1381,7 +1385,7 @@ export function Ingredients() {
                               <Edit2 className="w-4 h-4" />
                             </Button>
                           )}
-                          <Button size="sm" variant="ghost" onClick={() => isCompound ? handleDeleteCompoundRecipe(ingredient.name) : handleDeleteIngredient(ingredient)} className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10" title={isCompound ? "מחק מתכון" : "מחק רכיב"} disabled={deletingIngredientId === ingredient.id}>
+                          <Button size="sm" variant="ghost" onClick={() => isCompound ? handleDeleteCompoundRecipe(ingredient.name) : handleDeleteIngredient(ingredient)} className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10" title={isCompound ? "מחק מתכון" : (ingredient.inRestaurant === false ? "רכיב מקטלוג גלובלי — הסר ספק משויך" : "מחק רכיב")} disabled={deletingIngredientId === ingredient.id || (!isCompound && ingredient.inRestaurant === false)}>
                             {deletingIngredientId === ingredient.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                           </Button>
                         </div>

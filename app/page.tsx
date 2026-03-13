@@ -288,6 +288,15 @@ export default function Home() {
     setCurrentPage("dashboard")
   }
   const handleStopImpersonate = () => setImpersonatingRestaurant(null)
+  const handleRestaurantDeleted = useCallback((deletedId: string) => {
+    if (impersonatingRestaurant?.id === deletedId) setImpersonatingRestaurant(null)
+    if (currentRestaurantId === deletedId) {
+      const next = restaurants?.find((r) => r.id !== deletedId)
+      setCurrentRestaurantId(next?.id ?? null)
+      setCurrentRestaurant(next ? (next.emoji ? `${next.emoji} ${next.name}` : next.name) : t("app.noRestaurants"))
+    }
+    refreshRestaurants()
+  }, [impersonatingRestaurant?.id, currentRestaurantId, restaurants, t, refreshRestaurants])
 
   if (authLoading) {
     return (
@@ -395,6 +404,7 @@ export default function Home() {
         isImpersonating={!!impersonatingRestaurant}
         onImpersonate={handleImpersonate}
         onStopImpersonate={handleStopImpersonate}
+        onRestaurantDeleted={handleRestaurantDeleted}
         setCurrentPage={setCurrentPage}
         refreshRestaurants={refreshRestaurants}
         refreshIngredientsKey={refreshIngredientsKey}
