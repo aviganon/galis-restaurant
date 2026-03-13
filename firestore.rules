@@ -88,6 +88,11 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
+    // webPriceCache — מטמון מחירי אינטרנט לרכיבים (חוסך בדיקות API)
+    match /webPriceCache/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
     // purchaseOrders — הזמנות ספקים (לפי restaurantId) — כל משתמש רואה רק של מסעדתו
     match /purchaseOrders/{docId} {
       allow read, update, delete: if request.auth != null && (

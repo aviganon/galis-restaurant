@@ -90,9 +90,32 @@ function pricePerKg(p: number, u: string): number {
   return p
 }
 
-function AdminCheapestPopover({ ing }: { ing: { name: string; globalCheapest?: { price: number; supplier?: string; unit: string } } }) {
+function webPriceCacheDocId(name: string) {
+  return name.replace(/\//g, "_").replace(/\./g, "_") || "unknown"
+}
+
+function AdminCheapestPopover({
+  ing,
+  webPrice,
+  onWebPriceSaved,
+}: {
+  ing: { name: string; globalCheapest?: { price: number; supplier?: string; unit: string } }
+  webPrice?: { price: number; store: string; unit: string }
+  onWebPriceSaved?: (data: { price: number; store: string; unit: string }) => void
+}) {
   const gc = ing.globalCheapest
-  const displayPrice = gc ? `₪${gc.price.toFixed(1)}/${gc.unit}` : null
+  const wp = webPrice
+  const cheapest =
+    gc && wp
+      ? pricePerKg(gc.price, gc.unit) <= pricePerKg(wp.price, wp.unit)
+        ? { price: gc.price, unit: gc.unit, from: "system" as const, supplier: gc.supplier }
+        : { price: wp.price, unit: wp.unit, from: "web" as const, store: wp.store }
+      : gc
+        ? { price: gc.price, unit: gc.unit, from: "system" as const, supplier: gc.supplier }
+        : wp
+          ? { price: wp.price, unit: wp.unit, from: "web" as const, store: wp.store }
+          : null
+  const displayPrice = cheapest ? `₪${cheapest.price.toFixed(1)}/${cheapest.unit}` : null
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -108,22 +131,37 @@ function AdminCheapestPopover({ ing }: { ing: { name: string; globalCheapest?: {
         <div className="space-y-2">
           {gc ? (
             <div className="text-sm text-muted-foreground">
-              <span className="text-muted-foreground">מהמערכת:</span> ₪{gc.price.toFixed(1)}/{gc.unit}
+              <span className="text-muted-foreground">מהספקים:</span> ₪{gc.price.toFixed(1)}/{gc.unit}
               {gc.supplier && <span className="text-primary font-medium"> אצל {gc.supplier}</span>}
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground">מהמערכת: —</div>
+            <div className="text-sm text-muted-foreground">מהספקים: —</div>
           )}
-          <WebPriceCell ingredientName={ing.name} />
+          <WebPriceCell
+            ingredientName={ing.name}
+            cached={webPrice}
+            onSaved={onWebPriceSaved}
+          />
         </div>
       </PopoverContent>
     </Popover>
   )
 }
 
-function WebPriceCell({ ingredientName }: { ingredientName: string }) {
-  const [data, setData] = useState<{ price: number; store: string; unit: string } | null>(null)
+function WebPriceCell({
+  ingredientName,
+  cached,
+  onSaved,
+}: {
+  ingredientName: string
+  cached?: { price: number; store: string; unit: string } | null
+  onSaved?: (data: { price: number; store: string; unit: string }) => void
+}) {
+  const [data, setData] = useState<{ price: number; store: string; unit: string } | null>(cached ?? null)
   const [loading, setLoading] = useState(false)
+  useEffect(() => {
+    if (cached) setData(cached)
+  }, [cached])
   const fetchWebPrice = useCallback(async () => {
     setLoading(true)
     try {
@@ -145,28 +183,46 @@ function WebPriceCell({ ingredientName }: { ingredientName: string }) {
         const { fetchWebPriceForIngredient } = await import("@/lib/ai-extract")
         d = await fetchWebPriceForIngredient(ingredientName)
       }
-      if (d) setData({ price: d.price, store: d.store, unit: d.unit })
-      else toast.error("לא הצלחתי למצוא מחיר")
+      if (d) {
+        setData(d)
+        onSaved?.(d)
+        try {
+          await setDoc(doc(db, "webPriceCache", webPriceCacheDocId(ingredientName)), {
+            price: d.price,
+            store: d.store,
+            unit: d.unit,
+            checkedAt: new Date().toISOString(),
+          })
+        } catch {
+          //
+        }
+      } else toast.error("לא הצלחתי למצוא מחיר")
     } catch (e) {
       toast.error((e as Error)?.message || "שגיאה")
     } finally {
       setLoading(false)
     }
-  }, [ingredientName])
+  }, [ingredientName, onSaved])
   if (data) {
     return (
       <div className="text-blue-600 dark:text-blue-400 text-xs space-y-1">
         <div>
           <span className="text-muted-foreground">מהאינטרנט:</span> ₪{data.price.toFixed(1)}/{data.unit} אצל {data.store}
         </div>
-        <Button
-          variant="link"
-          size="sm"
-          className="h-auto p-0 text-xs text-primary"
-          onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(ingredientName + " " + data.store + " מחיר קנייה")}`, "_blank")}
-        >
-          לקנייה באינטרנט →
-        </Button>
+        <div className="flex gap-2 items-center">
+          <Button
+            variant="link"
+            size="sm"
+            className="h-auto p-0 text-xs text-primary"
+            onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(ingredientName + " " + data.store + " מחיר קנייה")}`, "_blank")}
+          >
+            לקנייה באינטרנט →
+          </Button>
+          <Button variant="ghost" size="sm" className="h-6 px-1 text-xs" onClick={fetchWebPrice} disabled={loading}>
+            {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3 ml-1" />}
+            בדוק שוב
+          </Button>
+        </div>
       </div>
     )
   }
@@ -245,6 +301,7 @@ export function AdminPanel() {
   const [deleteSupplierDialogOpen, setDeleteSupplierDialogOpen] = useState(false)
   const [supplierToDelete, setSupplierToDelete] = useState<SupplierWithRests | null>(null)
   const [deletingSupplierName, setDeletingSupplierName] = useState<string | null>(null)
+  const [webPriceByIngredient, setWebPriceByIngredient] = useState<Record<string, { price: number; store: string; unit: string }>>({})
 
   // Add supplier modal (owner)
   const [addSupplierOpen, setAddSupplierOpen] = useState(false)
@@ -540,6 +597,21 @@ export function AdminPanel() {
         }
       })
       setIngredientsList(allIngredients)
+      const webCache: Record<string, { price: number; store: string; unit: string }> = {}
+      await Promise.all(
+        allIngredients.map(async (ing) => {
+          try {
+            const snap = await getDoc(doc(db, "webPriceCache", webPriceCacheDocId(ing.name)))
+            const d = snap.data()
+            if (d && typeof d.price === "number") {
+              webCache[ing.name] = { price: d.price, store: (d.store as string) || "—", unit: (d.unit as string) || "קג" }
+            }
+          } catch {
+            //
+          }
+        })
+      )
+      setWebPriceByIngredient(webCache)
     } catch (e) {
       console.error("load system owner data:", e)
       toast.error("שגיאה בטעינת נתונים")
@@ -1901,25 +1973,26 @@ export function AdminPanel() {
                         : `מציג ${filteredAndSortedIngredients.length} מתוך ${ingredientsList?.length ?? 0}`}
                     </span>
                   </div>
-                  <div className="overflow-x-auto">
-                  <Table className="table-fixed w-full">
+                  <div className="w-full overflow-x-hidden overflow-y-auto max-h-[min(60vh,600px)] rounded-lg border">
+                  <Table className="table-fixed w-full text-sm" style={{ tableLayout: "fixed" }}>
                     <colgroup>
+                      <col style={{ width: "4%" }} />
+                      <col style={{ width: "8%" }} />
+                      <col style={{ width: "7%" }} />
+                      <col style={{ width: "7%" }} />
+                      <col style={{ width: "7%" }} />
+                      <col style={{ width: "9%" }} />
                       <col style={{ width: "5%" }} />
-                      <col style={{ width: "12%" }} />
-                      <col style={{ width: "9%" }} />
-                      <col style={{ width: "9%" }} />
-                      <col style={{ width: "15%" }} />
+                      <col style={{ width: "5%" }} />
+                      <col style={{ width: "5%" }} />
                       <col style={{ width: "6%" }} />
                       <col style={{ width: "7%" }} />
-                      <col style={{ width: "7%" }} />
-                      <col style={{ width: "8%" }} />
-                      <col style={{ width: "9%" }} />
-                      <col style={{ width: "18%" }} />
+                      <col style={{ width: "14%" }} />
                     </colgroup>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-10 bg-background [&_tr]:bg-background [&_tr]:border-b">
                       <TableRow>
                         <TableHead className="text-right w-14">פעולות</TableHead>
-                        <TableHead className="text-right">הכי זול אצל</TableHead>
+                        <TableHead className="text-right">הכי זול</TableHead>
                         {(["sku", "status", "source", "supplier", "minStock", "stock", "waste", "unit", "price", "name"] as const).map((key) => {
                           const labels: Record<string, string> = { name: "רכיב", price: "מחיר", unit: "יחידה", waste: "פחת %", stock: "מלאי", minStock: "מינ׳", supplier: "ספק", sku: "מק״ט", source: "מקור", status: "סטטוס" }
                           const isSortable = ["name", "price", "unit", "waste", "stock", "minStock", "supplier", "sku", "source", "status"].includes(key)
@@ -1975,20 +2048,24 @@ export function AdminPanel() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right text-sm">
-                            <AdminCheapestPopover ing={ing} />
+                            <AdminCheapestPopover
+                              ing={ing}
+                              webPrice={webPriceByIngredient[ing.name]}
+                              onWebPriceSaved={(d) => setWebPriceByIngredient((prev) => ({ ...prev, [ing.name]: d }))}
+                            />
                           </TableCell>
-                          <TableCell className="text-right">{ing.sku || "—"}</TableCell>
+                          <TableCell className="text-right truncate" title={ing.sku || undefined}>{ing.sku || "—"}</TableCell>
                           <TableCell className="text-right">
                             <Badge variant={ing.status === "שויך" ? "default" : "secondary"}>{ing.status}</Badge>
                           </TableCell>
                           <TableCell className="text-right">{ing.source === "global" ? "גלובלי" : "מסעדה"}</TableCell>
-                          <TableCell className="text-right">{ing.supplier || "—"}</TableCell>
+                          <TableCell className="text-right truncate" title={ing.supplier || undefined}>{ing.supplier || "—"}</TableCell>
                           <TableCell className="text-right">{ing.minStock}</TableCell>
                           <TableCell className="text-right">{ing.stock}</TableCell>
                           <TableCell className="text-right">{ing.waste}%</TableCell>
                           <TableCell className="text-right">{ing.unit}</TableCell>
                           <TableCell className="text-right">₪{ing.price.toFixed(2)}</TableCell>
-                          <TableCell className="font-medium text-right">{ing.name}</TableCell>
+                          <TableCell className="font-medium text-right truncate" title={ing.name}>{ing.name}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

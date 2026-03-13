@@ -109,8 +109,19 @@ function CheapestPricePopover({
   pricePerKgFn: (p: number, u: string) => number
 }) {
   const gc = ingredient.globalCheapest
+  const wp = webPrice
+  const cheapest =
+    gc && wp
+      ? pricePerKgFn(gc.price, gc.unit) <= pricePerKgFn(wp.price, wp.unit)
+        ? { price: gc.price, unit: gc.unit }
+        : { price: wp.price, unit: wp.unit }
+      : gc
+        ? { price: gc.price, unit: gc.unit }
+        : wp
+          ? { price: wp.price, unit: wp.unit }
+          : null
   const hasAny = gc || webPrice
-  const displayPrice = gc ? `₪${gc.price.toFixed(1)}/${gc.unit}` : (webPrice ? `₪${webPrice.price.toFixed(1)}/${webPrice.unit}` : null)
+  const displayPrice = cheapest ? `₪${cheapest.price.toFixed(1)}/${cheapest.unit}` : null
   const isCheaper = ingredient.priceSource === "mine" && gc && pricePerKgFn(gc.price, gc.unit) < pricePerKgFn(ingredient.price, ingredient.unit)
   return (
     <Popover>
@@ -131,11 +142,11 @@ function CheapestPricePopover({
         <div className="space-y-2">
           {gc ? (
             <div className={cn("text-sm", isCheaper && "text-green-600 dark:text-green-400 font-medium")}>
-              <span className="text-muted-foreground">מהמערכת:</span> ₪{gc.price.toFixed(1)}/{gc.unit}
+              <span className="text-muted-foreground">מהספקים:</span> ₪{gc.price.toFixed(1)}/{gc.unit}
               {gc.supplier && <span className="text-primary"> אצל {gc.supplier}</span>}
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground">מהמערכת: —</div>
+            <div className="text-sm text-muted-foreground">מהספקים: —</div>
           )}
           {webPrice ? (
             <div className="text-sm text-blue-600 dark:text-blue-400 space-y-1">
@@ -323,9 +334,28 @@ export function Ingredients() {
         byId.set(d.id, ing)
         if (data.supplier) supSet.add(data.supplier)
       })
-      setIngredients(Array.from(byId.values()))
+      const ings = Array.from(byId.values())
+      setIngredients(ings)
       setSuppliers(["כל הספקים", ...Array.from(supSet).sort()])
       setRestaurantSuppliers(Array.from(restSupSet).sort())
+      if (isOwner && ings.length > 0) {
+        const webCache: Record<string, { price: number; store: string; unit: string; source: string }> = {}
+        await Promise.all(
+          ings.map(async (ing) => {
+            try {
+              const id = ing.name.replace(/\//g, "_").replace(/\./g, "_") || "unknown"
+              const snap = await getDoc(doc(db, "webPriceCache", id))
+              const d = snap.data()
+              if (d && typeof d.price === "number") {
+                webCache[ing.name] = { price: d.price, store: (d.store as string) || "—", unit: (d.unit as string) || "קג", source: "cache" }
+              }
+            } catch {
+              //
+            }
+          })
+        )
+        setWebPriceByIngredient((prev) => ({ ...prev, ...webCache }))
+      }
     } catch (e) {
       console.error("load ingredients:", e)
       toast.error("שגיאה בטעינת רכיבים")
@@ -361,6 +391,17 @@ export function Ingredients() {
           ...prev,
           [ingredientName]: { price: data!.price, store: data!.store, unit: data!.unit, source: "ai" },
         }))
+        try {
+          const id = ingredientName.replace(/\//g, "_").replace(/\./g, "_") || "unknown"
+          await setDoc(doc(db, "webPriceCache", id), {
+            price: data.price,
+            store: data.store,
+            unit: data.unit,
+            checkedAt: new Date().toISOString(),
+          })
+        } catch {
+          //
+        }
       } else {
         toast.error("לא הצלחתי למצוא מחיר באינטרנט")
       }
