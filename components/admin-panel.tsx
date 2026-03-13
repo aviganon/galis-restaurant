@@ -1379,7 +1379,7 @@ export function AdminPanel() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl space-y-6">
+    <div className="container mx-auto px-4 py-8 max-w-7xl space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -1902,7 +1902,7 @@ export function AdminPanel() {
                     </span>
                   </div>
                   <div className="overflow-x-auto">
-                  <Table className="table-fixed min-w-[800px]">
+                  <Table className="table-fixed w-full">
                     <colgroup>
                       <col style={{ width: "5%" }} />
                       <col style={{ width: "12%" }} />
