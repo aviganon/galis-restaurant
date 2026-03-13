@@ -363,8 +363,8 @@ export function AdminPanel() {
   if (userRole === "user") {
     return (
       <div className="container mx-auto px-4 py-16 text-center">
-        <p className="text-lg text-muted-foreground mb-2">אין הרשאה לצפייה בדף זה</p>
-        <p className="text-sm text-muted-foreground">פאנל הניהול זמין לבעלים ולמנהלים בלבד</p>
+        <p className="text-lg text-muted-foreground mb-2">{t("pages.adminPanel.noPermission")}</p>
+        <p className="text-sm text-muted-foreground">{t("pages.adminPanel.adminOnly")}</p>
       </div>
     )
   }
@@ -1675,7 +1675,7 @@ export function AdminPanel() {
                         <p className="text-sm font-medium mb-1">משויכים — לחץ להסרה:</p>
                         <div className="flex flex-wrap gap-2">
                           {(rest.assignedSuppliers?.length ?? 0) === 0 ? (
-                            <span className="text-sm text-muted-foreground">אין ספקים משויכים</span>
+                            <span className="text-sm text-muted-foreground">{t("pages.adminPanel.noAssignedSuppliers")}</span>
                           ) : (
                             (rest.assignedSuppliers || []).map((s) => (
                               <Button
@@ -2111,7 +2111,7 @@ export function AdminPanel() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>מחיר ₪ *</Label>
+                <Label>{t("pages.adminPanel.priceLabelNis")} *</Label>
                 <Input type="number" value={addIngredientPrice} onChange={(e) => setAddIngredientPrice(e.target.value)} placeholder="0" min={0} step={0.01} />
               </div>
               <div className="space-y-2">
@@ -2129,7 +2129,7 @@ export function AdminPanel() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>פחת %</Label>
+                <Label>{t("pages.adminPanel.wasteLabel")}</Label>
                 <Input type="number" value={addIngredientWaste} onChange={(e) => setAddIngredientWaste(e.target.value)} placeholder="0" min={0} max={100} step={0.1} />
               </div>
               <div className="space-y-2">
@@ -2141,12 +2141,12 @@ export function AdminPanel() {
                 <Input type="number" value={addIngredientMinStock} onChange={(e) => setAddIngredientMinStock(e.target.value)} placeholder="0" min={0} />
               </div>
               <div className="space-y-2">
-                <Label>מק״ט</Label>
+                <Label>{t("pages.adminPanel.skuLabel")}</Label>
                 <Input value={addIngredientSku} onChange={(e) => setAddIngredientSku(e.target.value)} placeholder={t("pages.adminPanel.skuPlaceholder")} />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>ספק (אופציונלי — ניתן לשייך בעריכה)</Label>
+              <Label>{t("pages.adminPanel.supplierOptional")}</Label>
               {(() => {
                 const suppliers = suppliersWithRests.map((s) => s.name).sort()
                 if (suppliers.length === 0) {
@@ -2162,7 +2162,7 @@ export function AdminPanel() {
                   <Select value={addIngredientSupplier || "__none__"} onValueChange={(v) => setAddIngredientSupplier(v === "__none__" ? "" : v)}>
                     <SelectTrigger><SelectValue placeholder={t("pages.adminPanel.selectSupplier")} /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__none__">ללא ספק</SelectItem>
+                      <SelectItem value="__none__">{t("pages.adminPanel.noSupplier")}</SelectItem>
                       {suppliers.map((name) => (
                         <SelectItem key={name} value={name}>{name}</SelectItem>
                       ))}
@@ -2173,7 +2173,7 @@ export function AdminPanel() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddIngredientOpen(false)}>ביטול</Button>
+            <Button variant="outline" onClick={() => setAddIngredientOpen(false)}>{t("pages.adminPanel.cancel")}</Button>
             <Button onClick={handleSaveAddIngredient} disabled={addIngredientSaving}>
               {addIngredientSaving ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : null}
               שמור רכיב
@@ -2185,7 +2185,7 @@ export function AdminPanel() {
       <Dialog open={editAdminIngredientOpen} onOpenChange={(o) => { setEditAdminIngredientOpen(o); if (!o) setEditAdminIngredient(null) }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>עריכת רכיב</DialogTitle>
+            <DialogTitle>{t("pages.adminPanel.editIngredient")}</DialogTitle>
             <p className="text-sm text-muted-foreground">
               {editAdminIngredient && `${editAdminIngredient.name} (${editAdminIngredient.source === "global" ? t("pages.adminPanel.global") : t("pages.adminPanel.restaurant")})`}
             </p>
@@ -2224,15 +2224,15 @@ export function AdminPanel() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>מק״ט</Label>
+              <Label>{t("pages.adminPanel.skuLabel")}</Label>
               <Input value={editAdminIngSku} onChange={(e) => setEditAdminIngSku(e.target.value)} placeholder={t("pages.adminPanel.skuPlaceholder")} />
             </div>
             <div className="space-y-2">
-              <Label>ספק</Label>
+              <Label>{t("pages.adminPanel.supplierLabel")}</Label>
               <Input
                 value={editAdminIngSupplier}
                 onChange={(e) => setEditAdminIngSupplier(e.target.value)}
-                placeholder="שם ספק"
+                placeholder={t("pages.adminPanel.supplierNamePlaceholder")}
                 list="edit-admin-ing-supplier-list"
               />
               <datalist id="edit-admin-ing-supplier-list">
@@ -2243,7 +2243,7 @@ export function AdminPanel() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditAdminIngredientOpen(false)}>ביטול</Button>
+            <Button variant="outline" onClick={() => setEditAdminIngredientOpen(false)}>{t("pages.adminPanel.cancel")}</Button>
             <Button onClick={handleSaveEditAdminIngredient} disabled={editAdminIngSaving}>
               {editAdminIngSaving ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : null}
               שמור
@@ -2255,13 +2255,13 @@ export function AdminPanel() {
       <AlertDialog open={deleteRestDialogOpen} onOpenChange={setDeleteRestDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>מחיקת מסעדה</AlertDialogTitle>
+            <AlertDialogTitle>{t("pages.adminPanel.deleteRestaurantTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
               האם אתה בטוח שברצונך למחוק את המסעדה &quot;{restToDelete?.name}&quot;? פעולה זו תמחק את כל המנות, הרכיבים וההגדרות ולא ניתן לשחזר.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={!!deletingRestId}>ביטול</AlertDialogCancel>
+            <AlertDialogCancel disabled={!!deletingRestId}>{t("pages.adminPanel.cancel")}</AlertDialogCancel>
             <Button
               variant="destructive"
               onClick={() => restToDelete && handleDeleteRestaurant(restToDelete)}
@@ -2277,13 +2277,13 @@ export function AdminPanel() {
       <AlertDialog open={deleteSupplierDialogOpen} onOpenChange={(o) => { setDeleteSupplierDialogOpen(o); if (!o) setSupplierToDelete(null) }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>מחיקת ספק</AlertDialogTitle>
+            <AlertDialogTitle>{t("pages.adminPanel.deleteSupplierTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
               האם אתה בטוח שברצונך למחוק את הספק &quot;{supplierToDelete?.name}&quot;? פעולה זו תמחק את פרטי הספק, את כל הרכיבים הגלובליים שלו ואת השיוך למסעדות. לא ניתן לשחזר.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={!!deletingSupplierName}>ביטול</AlertDialogCancel>
+            <AlertDialogCancel disabled={!!deletingSupplierName}>{t("pages.adminPanel.cancel")}</AlertDialogCancel>
             <Button
               variant="destructive"
               onClick={handleDeleteSupplier}
@@ -2303,7 +2303,7 @@ export function AdminPanel() {
               <span className="text-2xl">🏭</span>
               הוספת ספק חדש
             </DialogTitle>
-            <p className="text-sm text-muted-foreground">פרטי ספק מלאים + רשימת רכיבים</p>
+            <p className="text-sm text-muted-foreground">{t("pages.adminPanel.supplierDetailsFull")}</p>
           </DialogHeader>
           <div className="overflow-y-auto flex-1 min-h-0 -mx-2 px-2 mt-2">
             <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr] gap-6 xl:gap-10">
@@ -2314,72 +2314,72 @@ export function AdminPanel() {
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                   <div className="space-y-2 sm:col-span-2 xl:col-span-3">
-                    <Label>שם הספק *</Label>
-                    <Input value={nsmName} onChange={(e) => setNsmName(e.target.value)} placeholder="תנובה, אסם..." className="w-full min-w-0" />
+                    <Label>{t("pages.adminPanel.supplierNameLabel")}</Label>
+                    <Input value={nsmName} onChange={(e) => setNsmName(e.target.value)} placeholder={t("pages.adminPanel.supplierNameExample")} className="w-full min-w-0" />
                   </div>
                   <div className="space-y-2">
-                    <Label>טלפון</Label>
-                    <Input value={nsmPhone} onChange={(e) => setNsmPhone(e.target.value)} type="tel" placeholder="050-0000000" className="w-full min-w-0" />
+                    <Label>{t("pages.adminPanel.phone")}</Label>
+                    <Input value={nsmPhone} onChange={(e) => setNsmPhone(e.target.value)} type="tel" placeholder={t("pages.adminPanel.phonePlaceholder")} className="w-full min-w-0" />
                   </div>
                   <div className="space-y-2">
-                    <Label>פקס</Label>
+                    <Label>{t("pages.adminPanel.fax")}</Label>
                     <Input value={nsmFax} onChange={(e) => setNsmFax(e.target.value)} type="tel" placeholder="03-0000000" className="w-full min-w-0" />
                   </div>
                   <div className="space-y-2 sm:col-span-2 xl:col-span-1">
-                    <Label>אימייל</Label>
+                    <Label>{t("pages.adminPanel.email")}</Label>
                     <Input value={nsmEmail} onChange={(e) => setNsmEmail(e.target.value)} type="email" placeholder="supplier@email.com" className="w-full min-w-0" />
                   </div>
                   <div className="space-y-2">
-                    <Label>איש קשר</Label>
-                    <Input value={nsmContact} onChange={(e) => setNsmContact(e.target.value)} placeholder="שם נציג" className="w-full min-w-0" />
+                    <Label>{t("pages.adminPanel.contact")}</Label>
+                    <Input value={nsmContact} onChange={(e) => setNsmContact(e.target.value)} placeholder={t("pages.adminPanel.contactPlaceholder")} className="w-full min-w-0" />
                   </div>
                   <div className="space-y-2 sm:col-span-2 xl:col-span-1">
-                    <Label>כתובת</Label>
-                    <Input value={nsmAddress} onChange={(e) => setNsmAddress(e.target.value)} placeholder="רחוב, עיר" className="w-full min-w-0" />
+                    <Label>{t("pages.adminPanel.address")}</Label>
+                    <Input value={nsmAddress} onChange={(e) => setNsmAddress(e.target.value)} placeholder={t("pages.adminPanel.addressPlaceholder")} className="w-full min-w-0" />
                   </div>
                   <div className="space-y-2">
-                    <Label>יום אספקה</Label>
+                    <Label>{t("pages.adminPanel.deliveryDay")}</Label>
                     <Select value={nsmDeliveryDay} onValueChange={setNsmDeliveryDay}>
-                      <SelectTrigger className="w-full min-w-0"><SelectValue placeholder="בחר יום" /></SelectTrigger>
+                      <SelectTrigger className="w-full min-w-0"><SelectValue placeholder={t("pages.adminPanel.selectDay")} /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="ראשון">ראשון</SelectItem>
-                        <SelectItem value="שני">שני</SelectItem>
-                        <SelectItem value="שלישי">שלישי</SelectItem>
-                        <SelectItem value="רביעי">רביעי</SelectItem>
-                        <SelectItem value="חמישי">חמישי</SelectItem>
-                        <SelectItem value="שישי">שישי</SelectItem>
-                        <SelectItem value="כל יום">כל יום</SelectItem>
+                        <SelectItem value="ראשון">{t("pages.adminPanel.daySun")}</SelectItem>
+                        <SelectItem value="שני">{t("pages.adminPanel.dayMon")}</SelectItem>
+                        <SelectItem value="שלישי">{t("pages.adminPanel.dayTue")}</SelectItem>
+                        <SelectItem value="רביעי">{t("pages.adminPanel.dayWed")}</SelectItem>
+                        <SelectItem value="חמישי">{t("pages.adminPanel.dayThu")}</SelectItem>
+                        <SelectItem value="שישי">{t("pages.adminPanel.dayFri")}</SelectItem>
+                        <SelectItem value="כל יום">{t("pages.adminPanel.everyDay")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>תנאי תשלום</Label>
+                    <Label>{t("pages.adminPanel.paymentTerms")}</Label>
                     <Select value={nsmPaymentTerms} onValueChange={setNsmPaymentTerms}>
-                      <SelectTrigger className="w-full min-w-0"><SelectValue placeholder="בחר" /></SelectTrigger>
+                      <SelectTrigger className="w-full min-w-0"><SelectValue placeholder={t("pages.adminPanel.select")} /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="מזומן">מזומן</SelectItem>
+                        <SelectItem value="מזומן">{t("pages.adminPanel.cash")}</SelectItem>
                         <SelectItem value="שוטף + 30">שוטף + 30</SelectItem>
                         <SelectItem value="שוטף + 60">שוטף + 60</SelectItem>
                         <SelectItem value="שוטף + 90">שוטף + 90</SelectItem>
-                        <SelectItem value="שיק">שיק</SelectItem>
+                        <SelectItem value="שיק">{t("pages.adminPanel.check")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>מינ׳ הזמנה (₪)</Label>
+                    <Label>{t("pages.adminPanel.minOrder")}</Label>
                     <Input value={nsmMinOrder} onChange={(e) => setNsmMinOrder(e.target.value)} type="number" placeholder="0" min={0} className="w-full min-w-0" />
                   </div>
                   <div className="space-y-2">
-                    <Label>עלות משלוח (₪)</Label>
+                    <Label>{t("pages.adminPanel.deliveryCost")}</Label>
                     <Input value={nsmDeliveryCost} onChange={(e) => setNsmDeliveryCost(e.target.value)} type="number" placeholder="0" min={0} className="w-full min-w-0" />
                   </div>
                   <div className="space-y-2 sm:col-span-2 xl:col-span-1">
-                    <Label>ח.פ / ע.מ</Label>
-                    <Input value={nsmVatId} onChange={(e) => setNsmVatId(e.target.value)} placeholder="מספר עוסק" className="w-full min-w-0" />
+                    <Label>{t("pages.adminPanel.vatId")}</Label>
+                    <Input value={nsmVatId} onChange={(e) => setNsmVatId(e.target.value)} placeholder={t("pages.adminPanel.vatIdPlaceholder")} className="w-full min-w-0" />
                   </div>
                   <div className="space-y-2 sm:col-span-2 xl:col-span-3">
-                    <Label>הערות</Label>
-                    <Input value={nsmNotes} onChange={(e) => setNsmNotes(e.target.value)} placeholder="תנאים, הנחות..." className="w-full min-w-0" />
+                    <Label>{t("pages.adminPanel.notes")}</Label>
+                    <Input value={nsmNotes} onChange={(e) => setNsmNotes(e.target.value)} placeholder={t("pages.adminPanel.notesPlaceholder")} className="w-full min-w-0" />
                   </div>
                 </div>
               </div>
@@ -2402,39 +2402,39 @@ export function AdminPanel() {
                     </Button>
                   </div>
                 ))}
-                {nsmItems.length === 0 && <p className="text-sm text-muted-foreground py-2">הוסף רכיבים</p>}
+                {nsmItems.length === 0 && <p className="text-sm text-muted-foreground py-2">{t("pages.adminPanel.addIngredients")}</p>}
               </div>
               <div className="space-y-2 p-3 bg-background rounded-lg border">
                 <p className="text-sm font-medium">➕ הוסף רכיב</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  <Input value={nsmItemName} onChange={(e) => setNsmItemName(e.target.value)} placeholder="שם רכיב" className="min-w-0" onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addNsmItem())} />
-                  <Input value={nsmItemPrice} onChange={(e) => setNsmItemPrice(e.target.value)} type="number" placeholder="מחיר ₪" min={0} step={0.01} className="min-w-0" />
+                  <Input value={nsmItemName} onChange={(e) => setNsmItemName(e.target.value)} placeholder={t("pages.adminPanel.ingredientNamePlaceholderShort")} className="min-w-0" onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addNsmItem())} />
+                  <Input value={nsmItemPrice} onChange={(e) => setNsmItemPrice(e.target.value)} type="number" placeholder={t("pages.adminPanel.pricePlaceholder")} min={0} step={0.01} className="min-w-0" />
                   <Select value={nsmItemUnit} onValueChange={setNsmItemUnit}>
                     <SelectTrigger className="w-full min-w-0"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="גרם">גרם</SelectItem>
+                      <SelectItem value="גרם">{t("pages.adminPanel.unitGram")}</SelectItem>
                       <SelectItem value={'ק"ג'}>ק&quot;ג</SelectItem>
-                      <SelectItem value="מל">מל</SelectItem>
-                      <SelectItem value="ליטר">ליטר</SelectItem>
-                      <SelectItem value="יחידה">יחידה</SelectItem>
-                      <SelectItem value="חבילה">חבילה</SelectItem>
+                      <SelectItem value="מל">{t("pages.adminPanel.unitMl")}</SelectItem>
+                      <SelectItem value="ליטר">{t("pages.adminPanel.unitLiter")}</SelectItem>
+                      <SelectItem value="יחידה">{t("pages.adminPanel.unitUnit")}</SelectItem>
+                      <SelectItem value="חבילה">{t("pages.adminPanel.unitPackage")}</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Input value={nsmItemWaste} onChange={(e) => setNsmItemWaste(e.target.value)} type="number" placeholder="פחת %" min={0} max={100} step={0.1} className="min-w-0" />
-                  <Input value={nsmItemStock} onChange={(e) => setNsmItemStock(e.target.value)} type="number" placeholder="מלאי" min={0} className="min-w-0" />
-                  <Input value={nsmItemMinStock} onChange={(e) => setNsmItemMinStock(e.target.value)} type="number" placeholder="מינ׳ מלאי" min={0} className="min-w-0" />
-                  <Input value={nsmItemSku} onChange={(e) => setNsmItemSku(e.target.value)} placeholder="מק״ט" className="min-w-0 sm:col-span-2" />
+                  <Input value={nsmItemWaste} onChange={(e) => setNsmItemWaste(e.target.value)} type="number" placeholder={t("pages.adminPanel.wastePlaceholder")} min={0} max={100} step={0.1} className="min-w-0" />
+                  <Input value={nsmItemStock} onChange={(e) => setNsmItemStock(e.target.value)} type="number" placeholder={t("pages.adminPanel.inventory")} min={0} className="min-w-0" />
+                  <Input value={nsmItemMinStock} onChange={(e) => setNsmItemMinStock(e.target.value)} type="number" placeholder={t("pages.adminPanel.minStockPlaceholder")} min={0} className="min-w-0" />
+                  <Input value={nsmItemSku} onChange={(e) => setNsmItemSku(e.target.value)} placeholder={t("pages.adminPanel.skuPlaceholderShort")} className="min-w-0 sm:col-span-2" />
                 </div>
-                <Button size="sm" onClick={addNsmItem}>➕ הוסף</Button>
+                <Button size="sm" onClick={addNsmItem}>➕ {t("pages.adminPanel.addIngredient")}</Button>
               </div>
             </div>
           </div>
           </div>
           <DialogFooter className="shrink-0 border-t pt-4 mt-4">
-            <Button variant="outline" onClick={() => setAddSupplierOpen(false)}>ביטול</Button>
+            <Button variant="outline" onClick={() => setAddSupplierOpen(false)}>{t("pages.adminPanel.cancel")}</Button>
             <Button onClick={handleSaveNewSupplier} disabled={addSupplierSaving}>
               {addSupplierSaving ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : null}
-              💾 שמור ספק
+              💾 {t("pages.adminPanel.saveSupplier")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2445,14 +2445,14 @@ export function AdminPanel() {
           <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <span className="text-2xl">✏️</span>
-              הוספת רכיבים לספק: {editSupplierName}
+              {t("pages.adminPanel.addIngredientsToSupplier")}: {editSupplierName}
             </DialogTitle>
-            <p className="text-sm text-muted-foreground">רכיבים חדשים יתווספו לקטלוג הגלובלי ויעודכנו אוטומטית במסעדות המשויכות</p>
+            <p className="text-sm text-muted-foreground">{t("pages.adminPanel.newIngredientsNotice")}</p>
           </DialogHeader>
           <div className="overflow-y-auto flex-1 min-h-0 space-y-4 mt-4">
             {(supplierToIngredients[editSupplierName] || []).length > 0 && (
               <div className="space-y-2">
-                <Label>רכיבים קיימים ({supplierToIngredients[editSupplierName]?.length ?? 0})</Label>
+                <Label>{t("pages.adminPanel.existingIngredientsLabel")} ({supplierToIngredients[editSupplierName]?.length ?? 0})</Label>
                 <div className="max-h-32 overflow-y-auto border rounded-lg p-2 space-y-1 bg-muted/30">
                   {(supplierToIngredients[editSupplierName] || []).map((i) => (
                     <div key={i.id} className="flex items-center justify-between gap-2 py-1 px-2 text-sm">
@@ -2472,7 +2472,7 @@ export function AdminPanel() {
               </div>
             )}
             <div className="space-y-2">
-              <Label>רכיבים חדשים להוספה *</Label>
+              <Label>{t("pages.adminPanel.newIngredientsToAdd")}</Label>
               <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-2">
                 {editNsmItems.map((i) => (
                   <div key={i.name} className="flex items-center justify-between gap-2 py-1 px-2 bg-muted rounded">
@@ -2486,7 +2486,7 @@ export function AdminPanel() {
                     </Button>
                   </div>
                 ))}
-                {editNsmItems.length === 0 && <p className="text-sm text-muted-foreground py-2">הוסף רכיבים</p>}
+                {editNsmItems.length === 0 && <p className="text-sm text-muted-foreground py-2">{t("pages.adminPanel.addIngredients")}</p>}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                 <div className="relative">
@@ -2498,7 +2498,7 @@ export function AdminPanel() {
                     }}
                     onFocus={() => setEditIngredientSearchOpen(true)}
                     onBlur={() => setTimeout(() => setEditIngredientSearchOpen(false), 150)}
-                    placeholder="חפש או הזן שם רכיב"
+                    placeholder={t("pages.adminPanel.searchOrEnterIngredient")}
                     className="min-w-0"
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addEditNsmItem())}
                     autoFocus
@@ -2535,31 +2535,31 @@ export function AdminPanel() {
                     )
                   })()}
                 </div>
-                <Input value={editNsmItemPrice} onChange={(e) => setEditNsmItemPrice(e.target.value)} type="number" placeholder="מחיר ₪" min={0} step={0.01} className="min-w-0" />
+                <Input value={editNsmItemPrice} onChange={(e) => setEditNsmItemPrice(e.target.value)} type="number" placeholder={t("pages.adminPanel.pricePlaceholder")} min={0} step={0.01} className="min-w-0" />
                 <Select value={editNsmItemUnit} onValueChange={setEditNsmItemUnit}>
                   <SelectTrigger className="w-full min-w-0"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="גרם">גרם</SelectItem>
+                    <SelectItem value="גרם">{t("pages.adminPanel.unitGram")}</SelectItem>
                     <SelectItem value={'ק"ג'}>ק&quot;ג</SelectItem>
-                    <SelectItem value="מל">מל</SelectItem>
-                    <SelectItem value="ליטר">ליטר</SelectItem>
-                    <SelectItem value="יחידה">יחידה</SelectItem>
-                    <SelectItem value="חבילה">חבילה</SelectItem>
+                    <SelectItem value="מל">{t("pages.adminPanel.unitMl")}</SelectItem>
+                    <SelectItem value="ליטר">{t("pages.adminPanel.unitLiter")}</SelectItem>
+                    <SelectItem value="יחידה">{t("pages.adminPanel.unitUnit")}</SelectItem>
+                    <SelectItem value="חבילה">{t("pages.adminPanel.unitPackage")}</SelectItem>
                   </SelectContent>
                 </Select>
-                <Input value={editNsmItemWaste} onChange={(e) => setEditNsmItemWaste(e.target.value)} type="number" placeholder="פחת %" min={0} max={100} step={0.1} className="min-w-0" />
-                <Input value={editNsmItemStock} onChange={(e) => setEditNsmItemStock(e.target.value)} type="number" placeholder="מלאי" min={0} className="min-w-0" />
-                <Input value={editNsmItemMinStock} onChange={(e) => setEditNsmItemMinStock(e.target.value)} type="number" placeholder="מינ׳ מלאי" min={0} className="min-w-0" />
-                <Input value={editNsmItemSku} onChange={(e) => setEditNsmItemSku(e.target.value)} placeholder="מק״ט" className="min-w-0" />
-                <Button size="sm" onClick={addEditNsmItem} className="sm:col-span-2">➕ הוסף</Button>
+                <Input value={editNsmItemWaste} onChange={(e) => setEditNsmItemWaste(e.target.value)} type="number" placeholder={t("pages.adminPanel.wastePlaceholder")} min={0} max={100} step={0.1} className="min-w-0" />
+                <Input value={editNsmItemStock} onChange={(e) => setEditNsmItemStock(e.target.value)} type="number" placeholder={t("pages.adminPanel.inventory")} min={0} className="min-w-0" />
+                <Input value={editNsmItemMinStock} onChange={(e) => setEditNsmItemMinStock(e.target.value)} type="number" placeholder={t("pages.adminPanel.minStockPlaceholder")} min={0} className="min-w-0" />
+                <Input value={editNsmItemSku} onChange={(e) => setEditNsmItemSku(e.target.value)} placeholder={t("pages.adminPanel.skuPlaceholderShort")} className="min-w-0" />
+                <Button size="sm" onClick={addEditNsmItem} className="sm:col-span-2">➕ {t("pages.adminPanel.addIngredient")}</Button>
               </div>
             </div>
           </div>
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setEditSupplierOpen(false)}>ביטול</Button>
+            <Button variant="outline" onClick={() => setEditSupplierOpen(false)}>{t("pages.adminPanel.cancel")}</Button>
             <Button onClick={handleSaveEditSupplier} disabled={editSupplierSaving || editNsmItems.length === 0}>
               {editSupplierSaving ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : null}
-              💾 שמור ועדכן מסעדות
+              💾 {t("pages.adminPanel.saveAndUpdateRestaurants")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2568,51 +2568,51 @@ export function AdminPanel() {
       <Dialog open={editSupplierDetailsOpen} onOpenChange={setEditSupplierDetailsOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>עריכת פרטי ספק</DialogTitle>
+            <DialogTitle>{t("pages.adminPanel.editSupplierDetails")}</DialogTitle>
             <p className="text-sm text-muted-foreground">
-              {editSupplierDetailsName && `ספק: ${editSupplierDetailsName}`}
+              {editSupplierDetailsName && `${t("pages.adminPanel.supplierLabelShort")}: ${editSupplierDetailsName}`}
             </p>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>טלפון</Label>
+              <Label>{t("pages.adminPanel.phone")}</Label>
               <Input
                 value={editSupplierDetailsPhone}
                 onChange={(e) => setEditSupplierDetailsPhone(e.target.value)}
-                placeholder="מספר טלפון"
+                placeholder={t("pages.adminPanel.phonePlaceholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label>אימייל</Label>
+              <Label>{t("pages.adminPanel.email")}</Label>
               <Input
                 type="email"
                 value={editSupplierDetailsEmail}
                 onChange={(e) => setEditSupplierDetailsEmail(e.target.value)}
-                placeholder="דוא״ל"
+                placeholder={t("pages.adminPanel.emailPlaceholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label>איש קשר</Label>
+              <Label>{t("pages.adminPanel.contact")}</Label>
               <Input
                 value={editSupplierDetailsContact}
                 onChange={(e) => setEditSupplierDetailsContact(e.target.value)}
-                placeholder="שם איש קשר"
+                placeholder={t("pages.adminPanel.contactNamePlaceholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label>כתובת</Label>
+              <Label>{t("pages.adminPanel.address")}</Label>
               <Input
                 value={editSupplierDetailsAddress}
                 onChange={(e) => setEditSupplierDetailsAddress(e.target.value)}
-                placeholder="כתובת"
+                placeholder={t("pages.adminPanel.addressPlaceholderShort")}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditSupplierDetailsOpen(false)}>ביטול</Button>
+            <Button variant="outline" onClick={() => setEditSupplierDetailsOpen(false)}>{t("pages.adminPanel.cancel")}</Button>
             <Button onClick={handleSaveEditSupplierDetails} disabled={editSupplierDetailsSaving}>
               {editSupplierDetailsSaving ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : null}
-              שמור
+              {t("pages.adminPanel.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2624,7 +2624,7 @@ export function AdminPanel() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Key className="w-5 h-5" />
-                מפתח Claude API
+                {t("pages.adminPanel.claudeApiKey")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -2667,10 +2667,10 @@ export function AdminPanel() {
                       <>
                         <Button variant="outline" onClick={handleTestApi} disabled={testingApi}>
                           {testingApi ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : null}
-                          בדוק חיבור
+                          {t("pages.adminPanel.checkConnection")}
                         </Button>
                         <Button variant="outline" onClick={handleClearKey} disabled={saving}>
-                          הסר מפתח
+                          {t("pages.adminPanel.removeKey")}
                         </Button>
                       </>
                     )}
@@ -2688,19 +2688,19 @@ export function AdminPanel() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Ticket className="w-5 h-5" />
-                  צור קוד הזמנה למנהל
+                  {t("pages.adminPanel.createInviteCode")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
                   {currentRestaurantId && isSystemOwner
-                    ? "קוד זה ישייך את המנהל למסעדה הנבחרת. העבר את הקוד למנהל — הוא יירשם ויקבל גישה."
-                    : "קוד זה יאפשר למנהל להקים מסעדה חדשה. העבר את הקוד — הוא יירשם ויקים מסעדה."}
+                    ? t("pages.adminPanel.managerCodeAssignDesc")
+                    : t("pages.adminPanel.managerCodeCreateDesc")}
                 </p>
                 <div className="flex gap-2 items-center">
                   <Button onClick={handleCreateManagerCode} disabled={generatingCode}>
                     {generatingCode ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Copy className="w-4 h-4 ml-1" />}
-                    צור קוד
+                    {t("pages.adminPanel.createCode")}
                   </Button>
                   {lastGeneratedCode && (
                     <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted font-mono text-sm">
@@ -2710,7 +2710,7 @@ export function AdminPanel() {
                         variant="ghost"
                         onClick={() => {
                           navigator.clipboard.writeText(lastGeneratedCode!)
-                          toast.success("הקוד הועתק")
+                          toast.success(t("pages.adminPanel.codeCopied"))
                         }}
                       >
                         <Copy className="w-4 h-4" />
@@ -2727,24 +2727,24 @@ export function AdminPanel() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <UserPlus className="w-5 h-5" />
-                  הוסף משתמש למסעדה
+                  {t("pages.adminPanel.addUserToRestaurant")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  הזמן משתמשים — הם יוכלו להירשם ולקבל גישה למסעדה. תוכל להגדיר מה כל משתמש רואה.
+                  {t("pages.adminPanel.inviteUsersDesc")}
                 </p>
                 <div className="flex gap-2">
                   <Input
                     type="email"
-                    placeholder="אימייל המשתמש"
+                    placeholder={t("pages.adminPanel.userEmailPlaceholder")}
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
                     className="flex-1"
                   />
                   <Button onClick={handleInviteUser} disabled={inviting}>
                     {inviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4 ml-1" />}
-                    הזמן
+                    {t("pages.adminPanel.invite")}
                   </Button>
                 </div>
               </CardContent>
@@ -2756,20 +2756,20 @@ export function AdminPanel() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="w-5 h-5" />
-                  משתמשי המסעדה
+                  {t("pages.adminPanel.restaurantUsers")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  הגדר הרשאות לכל משתמש — מה הוא יכול לראות במערכת.
+                  {t("pages.adminPanel.setPermissionsDesc")}
                 </p>
                 {loadingUsers ? (
                   <div className="flex gap-2 text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    טוען משתמשים...
+                    {t("pages.adminPanel.loadingUsers")}
                   </div>
                 ) : restaurantUsers.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">אין עדיין משתמשים במסעדה זו.</p>
+                  <p className="text-sm text-muted-foreground">{t("pages.adminPanel.noUsersYet")}</p>
                 ) : (
                   <div className="space-y-4">
                     {restaurantUsers
@@ -2786,7 +2786,7 @@ export function AdminPanel() {
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => setEditingPermissions(null)}
-                                title="סגור"
+                                title={t("pages.adminPanel.close")}
                               >
                                 <X className="w-4 h-4" />
                               </Button>
@@ -2796,27 +2796,27 @@ export function AdminPanel() {
                                 variant="outline"
                                 onClick={() => setEditingPermissions(u.uid)}
                               >
-                                הרשאות
+                                {t("pages.adminPanel.permissions")}
                               </Button>
                             )}
                           </div>
                           {editingPermissions === u.uid && (
                             <div className="flex flex-col gap-2 pt-2 border-t">
-                              <p className="text-xs text-muted-foreground mb-1">מה המשתמש רואה בתפריט:</p>
+                              <p className="text-xs text-muted-foreground mb-1">{t("pages.adminPanel.whatUserSeesInMenu")}</p>
                               {[
-                                { key: "canSeeDashboard" as const, label: "לוח בקרה" },
-                                { key: "canSeeProductTree" as const, label: "עץ מוצר" },
-                                { key: "canSeeIngredients" as const, label: "רכיבים" },
-                                { key: "canSeeInventory" as const, label: "מלאי" },
-                                { key: "canSeeSuppliers" as const, label: "ספקים" },
-                                { key: "canSeePurchaseOrders" as const, label: "הזמנות ספקים" },
-                                { key: "canSeeUpload" as const, label: "העלאה" },
-                                { key: "canSeeReports" as const, label: "דוחות" },
-                                { key: "canSeeCosts" as const, label: "עלויות תפריט" },
-                                { key: "canSeeSettings" as const, label: "הגדרות" },
-                              ].map(({ key, label }) => (
+                                { key: "canSeeDashboard" as const, labelKey: "permDashboard" },
+                                { key: "canSeeProductTree" as const, labelKey: "permProductTree" },
+                                { key: "canSeeIngredients" as const, labelKey: "permIngredients" },
+                                { key: "canSeeInventory" as const, labelKey: "permInventory" },
+                                { key: "canSeeSuppliers" as const, labelKey: "permSuppliers" },
+                                { key: "canSeePurchaseOrders" as const, labelKey: "permPurchaseOrders" },
+                                { key: "canSeeUpload" as const, labelKey: "permUpload" },
+                                { key: "canSeeReports" as const, labelKey: "permReports" },
+                                { key: "canSeeCosts" as const, labelKey: "permMenuCosts" },
+                                { key: "canSeeSettings" as const, labelKey: "permSettings" },
+                              ].map(({ key, labelKey }) => (
                                 <div key={key} className="flex items-center justify-between">
-                                  <Label className="text-sm">{label}</Label>
+                                  <Label className="text-sm">{t(`pages.adminPanel.${labelKey}`)}</Label>
                                   <Switch
                                     checked={u.permissions?.[key] ?? (key === "canSeeDashboard" || key === "canSeeProductTree" || key === "canSeeIngredients" || key === "canSeeInventory" || key === "canSeeSuppliers" || key === "canSeePurchaseOrders" || key === "canSeeUpload")}
                                     onCheckedChange={(checked) => {
@@ -2831,7 +2831,7 @@ export function AdminPanel() {
                         </div>
                       ))}
                     {restaurantUsers.filter((u) => u.role === "user").length === 0 && restaurantUsers.length > 0 && (
-                      <p className="text-sm text-muted-foreground">אין משתמשים עם הרשאות להגדרה (רק מנהלים).</p>
+                      <p className="text-sm text-muted-foreground">{t("pages.adminPanel.noUsersWithPermissions")}</p>
                     )}
                   </div>
                 )}
