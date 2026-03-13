@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from "react"
-import { Shield, Key, Loader2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown, GripVertical } from "lucide-react"
+import { Shield, Key, Loader2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown, GripVertical, Columns3, Eye, EyeOff } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -37,6 +37,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
+} from "@/components/ui/dropdown-menu"
 import { getClaudeApiKey, setClaudeApiKey, testClaudeConnection } from "@/lib/claude"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
@@ -291,6 +298,16 @@ export function AdminPanel() {
     } catch (_) {}
     return [...defaultColumnOrder]
   })
+  const INGREDIENTS_COLUMN_VISIBILITY_KEY = "admin-ingredients-column-visibility"
+  const [ingredientsColumnVisibility, setIngredientsColumnVisibility] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {}
+    try {
+      const stored = localStorage.getItem(INGREDIENTS_COLUMN_VISIBILITY_KEY)
+      if (stored) return JSON.parse(stored) as Record<string, boolean>
+    } catch (_) {}
+    return {}
+  })
+  const visibleColumnOrder = ingredientsColumnOrder.filter((k) => ingredientsColumnVisibility[k] !== false)
 
   const [suppliersSearchText, setSuppliersSearchText] = useState("")
   const [suppliersFilterAssigned, setSuppliersFilterAssigned] = useState<string>("__all__")
@@ -716,11 +733,24 @@ export function AdminPanel() {
   const handleIngredientsColumnReorder = useCallback((fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex) return
     setIngredientsColumnOrder((prev) => {
-      const next = [...prev]
-      const [removed] = next.splice(fromIndex, 1)
-      next.splice(toIndex, 0, removed)
+      const visible = prev.filter((k) => ingredientsColumnVisibility[k] !== false)
+      const hidden = prev.filter((k) => ingredientsColumnVisibility[k] === false)
+      const nextVisible = [...visible]
+      const [removed] = nextVisible.splice(fromIndex, 1)
+      nextVisible.splice(toIndex, 0, removed)
+      const next = [...nextVisible, ...hidden]
       try {
         localStorage.setItem(INGREDIENTS_COLUMN_ORDER_KEY, JSON.stringify(next))
+      } catch (_) {}
+      return next
+    })
+  }, [ingredientsColumnVisibility])
+
+  const toggleIngredientsColumnVisibility = useCallback((key: string) => {
+    setIngredientsColumnVisibility((prev) => {
+      const next = { ...prev, [key]: prev[key] === false }
+      try {
+        localStorage.setItem(INGREDIENTS_COLUMN_VISIBILITY_KEY, JSON.stringify(next))
       } catch (_) {}
       return next
     })
@@ -2024,6 +2054,29 @@ export function AdminPanel() {
                               <Plus className="w-3.5 h-3.5 ml-0.5" />
                               {t("pages.adminPanel.addIngredient")}
                             </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" title={t("pages.adminPanel.showHideColumns")}>
+                                  <Columns3 className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align={isRtl ? "start" : "end"} className="min-w-[180px]">
+                                {defaultColumnOrder.map((k) => {
+                                  const isVisible = ingredientsColumnVisibility[k] !== false
+                                  const colLabels: Record<string, string> = { name: t("pages.adminPanel.ingredientLabel"), price: t("pages.adminPanel.priceLabel"), cheapest: t("pages.adminPanel.cheapest"), sku: t("pages.adminPanel.skuLabel"), status: t("pages.adminPanel.statusLabel"), source: t("pages.adminPanel.sourceLabel"), supplier: t("pages.adminPanel.supplierLabel"), minStock: t("pages.adminPanel.minStockLabel"), stock: t("pages.adminPanel.inventory"), waste: t("pages.adminPanel.wasteLabel"), unit: t("pages.adminPanel.unitUnit") }
+                                  const label = colLabels[k] || k
+                                  return (
+                                    <DropdownMenuCheckboxItem
+                                      key={k}
+                                      checked={isVisible}
+                                      onCheckedChange={() => toggleIngredientsColumnVisibility(k)}
+                                    >
+                                      {label}
+                                    </DropdownMenuCheckboxItem>
+                                  )
+                                })}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </TableHead>
                         <TableHead className={`${textAlign} p-2 align-middle text-xs text-muted-foreground`}>
@@ -2034,7 +2087,7 @@ export function AdminPanel() {
                         <TableHead colSpan={10} className="p-0" />
                       </TableRow>
                       <TableRow>
-                        {ingredientsColumnOrder.map((key, colIndex) => {
+                        {visibleColumnOrder.map((key, colIndex) => {
                           if (key === "cheapest") {
                             return (
                               <TableHead
@@ -2053,6 +2106,9 @@ export function AdminPanel() {
                                 <span className={`flex items-center gap-1 ${justify}`}>
                                   <GripVertical className="w-3 h-3 text-muted-foreground/60 cursor-grab active:cursor-grabbing shrink-0" />
                                   {t("pages.adminPanel.cheapest")}
+                                  <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 opacity-60 hover:opacity-100" onClick={(e) => { e.stopPropagation(); toggleIngredientsColumnVisibility("cheapest") }} title={t("pages.adminPanel.hideColumn")}>
+                                    <EyeOff className="w-3 h-3" />
+                                  </Button>
                                 </span>
                               </TableHead>
                             )
@@ -2090,6 +2146,9 @@ export function AdminPanel() {
                                   ingredientsSortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
                                 )}
                                 {ingredientsSortBy !== key && isSortable && <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                                <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 opacity-60 hover:opacity-100" onClick={(e) => { e.stopPropagation(); toggleIngredientsColumnVisibility(key) }} title={t("pages.adminPanel.hideColumn")}>
+                                  <EyeOff className="w-3 h-3" />
+                                </Button>
                               </span>
                             </TableHead>
                           )
@@ -2123,7 +2182,7 @@ export function AdminPanel() {
                         }
                         return (
                         <TableRow key={`${ing.source}-${ing.id}`}>
-                          {ingredientsColumnOrder.map((k) => cellByKey[k] ? <React.Fragment key={k}>{cellByKey[k]}</React.Fragment> : null)}
+                          {visibleColumnOrder.map((k) => cellByKey[k] ? <React.Fragment key={k}>{cellByKey[k]}</React.Fragment> : null)}
                           <TableCell className={textAlign}>
                             <div className={`flex gap-1 ${justify}`}>
                               <Button
