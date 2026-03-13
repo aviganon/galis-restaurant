@@ -2026,7 +2026,7 @@ export function AdminPanel() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredAndSortedIngredients.map((ing) => (
+                      {[...filteredAndSortedIngredients].reverse().map((ing) => (
                         <TableRow key={`${ing.source}-${ing.id}`}>
                           <TableCell className="font-medium text-right truncate" title={ing.name}>{ing.name}</TableCell>
                           <TableCell className="text-right">₪{ing.price.toFixed(2)}</TableCell>
