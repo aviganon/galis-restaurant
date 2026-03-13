@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback } from "react"
 import dynamic from "next/dynamic"
 import { collection, getDocs, doc, getDoc, setDoc, writeBatch, deleteDoc, addDoc } from "firebase/firestore"
-import { motion } from "framer-motion"
 import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplier-ingredients"
 import {
   Table,
@@ -54,16 +53,17 @@ import {
   Trash2,
   Edit2,
   Upload as UploadIcon,
-  FileText,
 } from "lucide-react"
-import type { ExtractedSupplierItem } from "@/lib/ai-extract"
-
-const FilePreviewModal = dynamic(
-  () => import("@/components/file-preview-modal").then((m) => ({ default: m.FilePreviewModal })),
-  { ssr: false }
-)
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
+
+interface InvoiceItem {
+  name: string
+  price: number
+  unit: string
+  sku?: string
+  qty?: number
+}
 
 interface SupplierInfo {
   name: string
@@ -73,6 +73,11 @@ interface SupplierInfo {
 }
 
 const isOwnerRole = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner"
+
+const SuppliersInvoiceUpload = dynamic(
+  () => import("@/components/suppliers-invoice-upload").then((m) => ({ default: m.SuppliersInvoiceUpload })),
+  { ssr: false }
+)
 
 export default function Suppliers() {
   const t = useTranslations()
@@ -111,16 +116,10 @@ export default function Suppliers() {
   const [deleteSupplierDialogOpen, setDeleteSupplierDialogOpen] = useState(false)
   const [deletingSupplierName, setDeletingSupplierName] = useState<string | null>(null)
 
-  const [fpmOpen, setFpmOpen] = useState(false)
-  const [fpmFile, setFpmFile] = useState<File | null>(null)
-  const [isInvoiceDragging, setIsInvoiceDragging] = useState(false)
   const [showInvoiceUploadArea, setShowInvoiceUploadArea] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const INVOICE_ACCEPT = ".xlsx,.xls,.csv,.pdf,.rtf,image/*"
 
   const handleConfirmSupplier = useCallback(
-    async (items: ExtractedSupplierItem[], supName: string, saveToGlobal?: boolean) => {
+    async (items: InvoiceItem[], supName: string, saveToGlobal?: boolean) => {
       const toGlobal = !!saveToGlobal && isOwner
       if (!toGlobal && !currentRestaurantId) {
         toast.error("יש לבחור מסעדה לפני עדכון מחירי ספקים")
@@ -220,65 +219,9 @@ export default function Suppliers() {
       } else {
         toast.warning("אין רכיבים תקינים לשמירה (שם ריק או מחיר 0)")
       }
-      setFpmFile(null)
-      setFpmOpen(false)
     },
     [currentRestaurantId, isOwner, loadSuppliers, refreshIngredients]
   )
-
-  useEffect(() => {
-    const prevent = (e: DragEvent) => {
-      if (e.dataTransfer?.types?.includes("Files")) {
-        e.preventDefault()
-        e.dataTransfer.dropEffect = "copy"
-      }
-    }
-    window.addEventListener("dragover", prevent, { passive: false })
-    window.addEventListener("drop", prevent, { passive: false })
-    return () => {
-      window.removeEventListener("dragover", prevent)
-      window.removeEventListener("drop", prevent)
-    }
-  }, [])
-
-  const handleInvoiceDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    e.dataTransfer.dropEffect = "copy"
-    setIsInvoiceDragging(true)
-  }, [])
-
-  const handleInvoiceDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsInvoiceDragging(true)
-  }, [])
-
-  const handleInvoiceDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsInvoiceDragging(false)
-  }, [])
-
-  const handleInvoiceDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsInvoiceDragging(false)
-    const files = e.dataTransfer?.files ? Array.from(e.dataTransfer.files) : []
-    if (files.length > 0) {
-      setFpmFile(files[0])
-      setFpmOpen(true)
-    }
-  }, [])
-
-  const handleInvoiceFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (files?.length) {
-      setFpmFile(files[0])
-      setFpmOpen(true)
-    }
-    e.target.value = ""
-  }, [])
 
   const handleDeleteSupplierFromRestaurant = async () => {
     const name = supplierDetailName
@@ -623,14 +566,6 @@ export default function Suppliers() {
 
   return (
     <div className="container mx-auto px-4 py-6">
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept={INVOICE_ACCEPT}
-        className="hidden"
-        onChange={handleInvoiceFileSelect}
-        aria-hidden
-      />
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold mb-1">{t("nav.suppliers")}</h1>
@@ -657,67 +592,15 @@ export default function Suppliers() {
         </div>
       </div>
 
-      {/* העלאת חשבוניות — נפתח בלחיצה על הכפתור */}
+      {/* העלאת חשבוניות — נטען רק בלחיצה על הכפתור (מונע שגיאת initialization) */}
       {showInvoiceUploadArea && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="mb-6"
-          onDragOver={handleInvoiceDragOver}
-          onDragEnter={handleInvoiceDragEnter}
-          onDragLeave={handleInvoiceDragLeave}
-          onDrop={handleInvoiceDrop}
-        >
-          <Card className={isInvoiceDragging ? "ring-2 ring-primary ring-offset-2" : ""}>
-            <CardContent className="p-6 relative">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute left-2 top-2 h-8 w-8"
-                onClick={() => setShowInvoiceUploadArea(false)}
-              >
-                <X className="w-4 h-4" />
-              </Button>
-              <div
-                className={`border-2 border-dashed rounded-xl p-6 text-center transition-all min-h-[140px] flex flex-col items-center justify-center cursor-pointer ${
-                  isInvoiceDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
-                }`}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isInvoiceDragging ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                    <FileText className="w-6 h-6" />
-                  </div>
-                  <div className="text-right">
-                    <h3 className="font-semibold">חשבוניות ספקים</h3>
-                    <p className="text-sm text-muted-foreground">גרור PDF/Excel/תמונה — AI יחלץ רכיבים ומחירים</p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap justify-center gap-2 text-xs text-muted-foreground mb-3">
-                  <Badge variant="outline">PDF</Badge>
-                  <Badge variant="outline">Excel</Badge>
-                  <Badge variant="outline">CSV</Badge>
-                  <Badge variant="outline">תמונות</Badge>
-                </div>
-                <Button type="button" variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}>
-                  <UploadIcon className="w-4 h-4 ml-2" />
-                  בחר קובץ
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+        <SuppliersInvoiceUpload
+          restaurantName={restaurantName}
+          onConfirm={handleConfirmSupplier}
+          onClose={() => setShowInvoiceUploadArea(false)}
+          onSuccess={loadSuppliers}
+        />
       )}
-
-      <FilePreviewModal
-        open={fpmOpen}
-        onOpenChange={(o) => { setFpmOpen(o); if (!o) setFpmFile(null) }}
-        file={fpmFile}
-        type="p"
-        restaurantName={restaurantName}
-        canSaveToGlobal={false}
-        onConfirmSupplier={handleConfirmSupplier}
-      />
 
       {safeFilteredSuppliers.length === 0 ? (
         <Card>
