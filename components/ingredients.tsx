@@ -404,7 +404,8 @@ export function Ingredients() {
         if (byId.has(d.id)) return
         const data = d.data()
         const sup = (data.supplier as string) || ""
-        if (!isOwner && sup && !assignedList.includes(sup)) return
+        // מכבדים assignedSuppliers — מסעדה חדשה בלי שיוך רואה רק רכיבים שלה
+        if (sup && !assignedList.includes(sup)) return
         const ing: Ingredient = {
           id: d.id,
           name: d.id,

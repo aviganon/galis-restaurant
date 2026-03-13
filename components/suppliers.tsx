@@ -252,7 +252,8 @@ export function Suppliers() {
         if (seenIds.has(d.id)) return
         const data = d.data()
         const sup = (data.supplier as string) || ""
-        if (!isOwner && sup && !assignedList.includes(sup)) return
+        // מכבדים assignedSuppliers — מסעדה חדשה בלי שיוך רואה רק רכיבים שלה
+        if (sup && !assignedList.includes(sup)) return
         const supKey = sup || "ללא ספק"
         const price = typeof data.price === "number" ? data.price : 0
         const stock = typeof data.stock === "number" ? data.stock : 0

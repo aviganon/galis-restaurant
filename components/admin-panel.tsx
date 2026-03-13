@@ -34,6 +34,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -2595,15 +2596,15 @@ export function AdminPanel() {
       </Dialog>
 
       <Dialog open={editSupplierOpen} onOpenChange={setEditSupplierOpen}>
-        <DialogContent className="max-w-4xl w-[calc(100vw-2rem)] max-h-[90dvh] overflow-hidden flex flex-col">
-          <DialogHeader className="shrink-0">
+        <DialogContent className="!max-w-[min(98vw,100rem)] w-[calc(100vw-1rem)] sm:!max-w-[min(98vw,100rem)] max-h-[90dvh] overflow-hidden flex flex-col p-6">
+          <DialogHeader className="shrink-0 pb-4">
             <DialogTitle className="flex items-center gap-2">
               <span className="text-2xl">✏️</span>
               {t("pages.adminPanel.addIngredientsToSupplier")}: {editSupplierName}
             </DialogTitle>
-            <p className="text-sm text-muted-foreground">{t("pages.adminPanel.newIngredientsNotice")}</p>
+            <DialogDescription className="text-sm text-muted-foreground mt-1">{t("pages.adminPanel.newIngredientsNotice")}</DialogDescription>
           </DialogHeader>
-          <div className="overflow-y-auto flex-1 min-h-0 space-y-4 mt-4">
+          <div className="overflow-y-auto flex-1 min-h-0 space-y-6 mt-2">
             {(supplierToIngredients[editSupplierName] || []).length > 0 && (
               <div className="space-y-2">
                 <Label>{t("pages.adminPanel.existingIngredientsLabel")} ({supplierToIngredients[editSupplierName]?.length ?? 0})</Label>
@@ -2625,9 +2626,9 @@ export function AdminPanel() {
                 </div>
               </div>
             )}
-            <div className="space-y-2">
-              <Label>{t("pages.adminPanel.newIngredientsToAdd")}</Label>
-              <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-2">
+            <div className="space-y-4">
+              <Label className="text-base">{t("pages.adminPanel.newIngredientsToAdd")}</Label>
+              <div className="max-h-40 overflow-y-auto border rounded-lg p-3 space-y-2">
                 {editNsmItems.map((i) => (
                   <div key={i.name} className="flex items-center justify-between gap-2 py-1 px-2 bg-muted rounded">
                     <span className="text-sm">
@@ -2642,9 +2643,9 @@ export function AdminPanel() {
                 ))}
                 {editNsmItems.length === 0 && <p className="text-sm text-muted-foreground py-2">{t("pages.adminPanel.addIngredients")}</p>}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="relative space-y-1 sm:col-span-2 lg:col-span-1">
-                  <Label className="text-xs">{t("pages.adminPanel.searchOrEnterIngredient")}</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg border">
+                <div className="relative space-y-1.5 sm:col-span-2 lg:col-span-1">
+                  <Label className="text-sm font-medium">{t("pages.adminPanel.searchOrEnterIngredient")}</Label>
                   <Input
                     value={editNsmItemName}
                     onChange={(e) => {
@@ -2652,7 +2653,7 @@ export function AdminPanel() {
                       setEditIngredientSearchOpen(true)
                     }}
                     onFocus={() => setEditIngredientSearchOpen(true)}
-                    onBlur={() => setTimeout(() => setEditIngredientSearchOpen(false), 150)}
+                    onBlur={() => setTimeout(() => setEditIngredientSearchOpen(false), 120)}
                     placeholder={t("pages.adminPanel.searchOrEnterIngredient")}
                     className="min-w-[200px] w-full"
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addEditNsmItem())}
@@ -2690,12 +2691,12 @@ export function AdminPanel() {
                     )
                   })()}
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">{t("pages.adminPanel.pricePlaceholder")}</Label>
-                  <Input value={editNsmItemPrice} onChange={(e) => setEditNsmItemPrice(e.target.value)} type="number" placeholder={t("pages.adminPanel.pricePlaceholder")} min={0} step={0.01} className="min-w-0" />
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">{t("pages.adminPanel.pricePlaceholder")}</Label>
+                  <Input value={editNsmItemPrice} onChange={(e) => setEditNsmItemPrice(e.target.value)} type="text" inputMode="decimal" placeholder={t("pages.adminPanel.pricePlaceholderHelp")} className="min-w-0" />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">{t("pages.adminPanel.unitUnit")}</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">{t("pages.adminPanel.unitUnit")}</Label>
                   <Select value={editNsmItemUnit} onValueChange={setEditNsmItemUnit}>
                   <SelectTrigger className="w-full min-w-0"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -2708,21 +2709,21 @@ export function AdminPanel() {
                   </SelectContent>
                 </Select>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">{t("pages.adminPanel.wastePlaceholder")}</Label>
-                  <Input value={editNsmItemWaste} onChange={(e) => setEditNsmItemWaste(e.target.value)} type="number" placeholder={t("pages.adminPanel.wastePlaceholder")} min={0} max={100} step={0.1} className="min-w-0" />
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">{t("pages.adminPanel.wastePlaceholder")}</Label>
+                  <Input value={editNsmItemWaste} onChange={(e) => setEditNsmItemWaste(e.target.value)} type="text" inputMode="decimal" placeholder={t("pages.adminPanel.wastePlaceholderHelp")} className="min-w-0" />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">{t("pages.adminPanel.inventory")}</Label>
-                  <Input value={editNsmItemStock} onChange={(e) => setEditNsmItemStock(e.target.value)} type="number" placeholder={t("pages.adminPanel.inventory")} min={0} className="min-w-0" />
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">{t("pages.adminPanel.inventory")}</Label>
+                  <Input value={editNsmItemStock} onChange={(e) => setEditNsmItemStock(e.target.value)} type="text" inputMode="numeric" placeholder={t("pages.adminPanel.inventoryPlaceholderHelp")} className="min-w-0" />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">{t("pages.adminPanel.minStockPlaceholder")}</Label>
-                  <Input value={editNsmItemMinStock} onChange={(e) => setEditNsmItemMinStock(e.target.value)} type="number" placeholder={t("pages.adminPanel.minStockPlaceholder")} min={0} className="min-w-0" />
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">{t("pages.adminPanel.minStockPlaceholder")}</Label>
+                  <Input value={editNsmItemMinStock} onChange={(e) => setEditNsmItemMinStock(e.target.value)} type="text" inputMode="numeric" placeholder={t("pages.adminPanel.minStockPlaceholderHelp")} className="min-w-0" />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">{t("pages.adminPanel.skuPlaceholderShort")}</Label>
-                  <Input value={editNsmItemSku} onChange={(e) => setEditNsmItemSku(e.target.value)} placeholder={t("pages.adminPanel.skuPlaceholderShort")} className="min-w-0" />
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">{t("pages.adminPanel.skuPlaceholderShort")}</Label>
+                  <Input value={editNsmItemSku} onChange={(e) => setEditNsmItemSku(e.target.value)} placeholder={t("pages.adminPanel.skuPlaceholderHelp")} className="min-w-0" />
                 </div>
                 <Button type="button" size="sm" onClick={addEditNsmItem} className="sm:col-span-2">➕ {t("pages.adminPanel.addIngredient")}</Button>
               </div>

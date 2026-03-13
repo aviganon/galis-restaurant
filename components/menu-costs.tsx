@@ -96,7 +96,7 @@ export function MenuCosts() {
           if (d.id in prices) return
           const data = d.data()
           const sup = (data.supplier as string) || ""
-          if (!isOwner && sup && !assignedList.includes(sup)) return
+          if (sup && !assignedList.includes(sup)) return
           prices[d.id] = typeof data.price === "number" ? data.price : 0
         })
 

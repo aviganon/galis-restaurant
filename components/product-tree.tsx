@@ -169,9 +169,8 @@ export default function ProductTree() {
         }
 
         type IngData = { price?: number; unit?: string; supplier?: string; stock?: number }
-        if (isOwner) {
-          globalIngSnap.forEach((d) => mergePrice(d.id, d.data() as IngData))
-        } else if (assignedList.length > 0) {
+        // בעלים ומנהלים: מכבדים assignedSuppliers — מסעדה חדשה בלי שיוך רואה רק רכיבים שלה
+        if (assignedList.length > 0) {
           globalIngSnap.forEach((d) => {
             const data = d.data() as IngData
             const sup = (data.supplier || "") as string
