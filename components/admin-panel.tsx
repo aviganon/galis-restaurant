@@ -1977,25 +1977,23 @@ export function AdminPanel() {
                   <Table className="table-fixed w-full text-sm" style={{ tableLayout: "fixed" }}>
                     <colgroup>
                       <col style={{ width: "4%" }} />
-                      <col style={{ width: "14%" }} />
-                      <col style={{ width: "6%" }} />
                       <col style={{ width: "8%" }} />
                       <col style={{ width: "7%" }} />
-                      <col style={{ width: "6%" }} />
+                      <col style={{ width: "7%" }} />
                       <col style={{ width: "7%" }} />
                       <col style={{ width: "9%" }} />
                       <col style={{ width: "5%" }} />
                       <col style={{ width: "5%" }} />
                       <col style={{ width: "5%" }} />
                       <col style={{ width: "6%" }} />
+                      <col style={{ width: "7%" }} />
+                      <col style={{ width: "14%" }} />
                     </colgroup>
                     <TableHeader className="sticky top-0 z-10 bg-background [&_tr]:bg-background [&_tr]:border-b">
                       <TableRow>
                         <TableHead className="text-right w-14">פעולות</TableHead>
-                        {(["name", "price", "cheapest", "sku", "status", "source", "supplier", "minStock", "stock", "waste", "unit"] as const).map((key) => {
-                          if (key === "cheapest") {
-                            return <TableHead key="cheapest" className="text-right">הכי זול</TableHead>
-                          }
+                        <TableHead className="text-right">הכי זול</TableHead>
+                        {(["sku", "status", "source", "supplier", "minStock", "stock", "waste", "unit", "price", "name"] as const).map((key) => {
                           const labels: Record<string, string> = { name: "רכיב", price: "מחיר", unit: "יחידה", waste: "פחת %", stock: "מלאי", minStock: "מינ׳", supplier: "ספק", sku: "מק״ט", source: "מקור", status: "סטטוס" }
                           const isSortable = ["name", "price", "unit", "waste", "stock", "minStock", "supplier", "sku", "source", "status"].includes(key)
                           return (
@@ -2049,8 +2047,6 @@ export function AdminPanel() {
                               </Button>
                             </div>
                           </TableCell>
-                          <TableCell className="font-medium text-right truncate" title={ing.name}>{ing.name}</TableCell>
-                          <TableCell className="text-right">₪{ing.price.toFixed(2)}</TableCell>
                           <TableCell className="text-right text-sm">
                             <AdminCheapestPopover
                               ing={ing}
@@ -2068,6 +2064,8 @@ export function AdminPanel() {
                           <TableCell className="text-right">{ing.stock}</TableCell>
                           <TableCell className="text-right">{ing.waste}%</TableCell>
                           <TableCell className="text-right">{ing.unit}</TableCell>
+                          <TableCell className="text-right">₪{ing.price.toFixed(2)}</TableCell>
+                          <TableCell className="font-medium text-right truncate" title={ing.name}>{ing.name}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

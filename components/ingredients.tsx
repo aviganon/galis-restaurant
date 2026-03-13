@@ -1105,28 +1105,16 @@ export function Ingredients() {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2 mt-4 flex-wrap" dir="rtl">
-            <div className="relative flex-1 min-w-[180px]">
+          <div className="flex flex-col sm:flex-row gap-2 mt-4" dir="rtl">
+            <div className="relative flex-1">
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="חיפוש: שם רכיב, מק״ט..."
+                placeholder="חיפוש מהיר: רכיב, מק״ט..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pr-10"
               />
             </div>
-            {isOwner && (
-              <Select value={priceSourceFilter} onValueChange={(v) => setPriceSourceFilter(v as "all" | "mine" | "market")}>
-                <SelectTrigger className="w-full sm:w-[130px]">
-                  <SelectValue placeholder="מקור מחיר" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">כל המחירים</SelectItem>
-                  <SelectItem value="mine">מחיר שלי</SelectItem>
-                  <SelectItem value="market">מחיר שוק</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
             <Select value={supplierFilter} onValueChange={setSupplierFilter}>
               <SelectTrigger className="w-full sm:w-[140px]">
                 <SelectValue />
@@ -1138,7 +1126,7 @@ export function Ingredients() {
               </SelectContent>
             </Select>
             <Select value={stockFilter} onValueChange={setStockFilter}>
-              <SelectTrigger className="w-full sm:w-[130px]">
+              <SelectTrigger className="w-full sm:w-[140px]">
                 <SelectValue placeholder="סטטוס מלאי" />
               </SelectTrigger>
               <SelectContent>
@@ -1148,7 +1136,19 @@ export function Ingredients() {
                 <SelectItem value="ok">תקין</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+            {isOwner && (
+              <Select value={priceSourceFilter} onValueChange={(v) => setPriceSourceFilter(v as "all" | "mine" | "market")}>
+                <SelectTrigger className="w-full sm:w-[140px]">
+                  <SelectValue placeholder="מקור מחיר" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">כל המחירים</SelectItem>
+                  <SelectItem value="mine">מחיר שלי</SelectItem>
+                  <SelectItem value="market">מחיר שוק</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            </div>
         </CardContent>
       </Card>
 
