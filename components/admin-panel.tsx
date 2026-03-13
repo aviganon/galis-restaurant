@@ -341,6 +341,7 @@ export function AdminPanel() {
   const [fpmOpen, setFpmOpen] = useState(false)
   const [fpmFile, setFpmFile] = useState<File | null>(null)
   const [isInvoiceDragging, setIsInvoiceDragging] = useState(false)
+  const [showInvoiceUploadArea, setShowInvoiceUploadArea] = useState(false)
   const adminInvoiceFileRef = useRef<HTMLInputElement>(null)
   const INVOICE_ACCEPT = ".xlsx,.xls,.csv,.pdf,.rtf,image/*"
   const [selectedSupplierDetail, setSelectedSupplierDetail] = useState<string | null>(null)
@@ -1942,7 +1943,7 @@ export function AdminPanel() {
                         <RefreshCw className={`w-4 h-4 ml-1 ${loadingSystemOwner ? "animate-spin" : ""}`} />
                         {t("pages.adminPanel.refresh")}
                       </Button>
-                      <Button variant="default" onClick={() => { adminInvoiceFileRef.current?.click() }}>
+                      <Button variant="default" onClick={() => setShowInvoiceUploadArea((v) => !v)}>
                         <UploadIcon className="w-4 h-4 ml-1" />
                         העלאת חשבונית
                       </Button>
@@ -1954,54 +1955,64 @@ export function AdminPanel() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {/* העלאת חשבוניות — לקטלוג הגלובלי */}
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="mb-6"
-                    onDragOver={handleAdminInvoiceDragOver}
-                    onDragEnter={handleAdminInvoiceDragEnter}
-                    onDragLeave={handleAdminInvoiceDragLeave}
-                    onDrop={handleAdminInvoiceDrop}
-                  >
-                    <Card className={isInvoiceDragging ? "ring-2 ring-primary ring-offset-2" : ""}>
-                      <CardContent className="p-6">
-                        <div
-                          className={`border-2 border-dashed rounded-xl p-6 text-center transition-all min-h-[140px] flex flex-col items-center justify-center cursor-pointer ${
-                            isInvoiceDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
-                          }`}
-                          onClick={() => adminInvoiceFileRef.current?.click()}
-                        >
-                          <div className="flex items-center gap-3 mb-3">
-                            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isInvoiceDragging ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                              <FileText className="w-6 h-6" />
-                            </div>
-                            <div className="text-right">
-                              <h3 className="font-semibold">חשבוניות ספקים — קטלוג גלובלי</h3>
-                              <p className="text-sm text-muted-foreground">גרור PDF/Excel/תמונה — AI יחלץ רכיבים ומחירים ויעלה לספקים הגלובליים</p>
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap justify-center gap-2 text-xs text-muted-foreground mb-3">
-                            <Badge variant="outline">PDF</Badge>
-                            <Badge variant="outline">Excel</Badge>
-                            <Badge variant="outline">CSV</Badge>
-                            <Badge variant="outline">תמונות</Badge>
-                          </div>
-                          <input
-                            ref={adminInvoiceFileRef}
-                            type="file"
-                            accept={INVOICE_ACCEPT}
-                            className="hidden"
-                            onChange={handleAdminInvoiceFileSelect}
-                          />
-                          <Button type="button" variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); adminInvoiceFileRef.current?.click() }}>
-                            <UploadIcon className="w-4 h-4 ml-2" />
-                            בחר קובץ
+                  {/* העלאת חשבוניות — נפתח בלחיצה על הכפתור */}
+                  {showInvoiceUploadArea && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="mb-6"
+                      onDragOver={handleAdminInvoiceDragOver}
+                      onDragEnter={handleAdminInvoiceDragEnter}
+                      onDragLeave={handleAdminInvoiceDragLeave}
+                      onDrop={handleAdminInvoiceDrop}
+                    >
+                      <Card className={isInvoiceDragging ? "ring-2 ring-primary ring-offset-2" : ""}>
+                        <CardContent className="p-6 relative">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute left-2 top-2 h-8 w-8"
+                            onClick={() => setShowInvoiceUploadArea(false)}
+                          >
+                            <X className="w-4 h-4" />
                           </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
+                          <div
+                            className={`border-2 border-dashed rounded-xl p-6 text-center transition-all min-h-[140px] flex flex-col items-center justify-center cursor-pointer ${
+                              isInvoiceDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
+                            }`}
+                            onClick={() => adminInvoiceFileRef.current?.click()}
+                          >
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isInvoiceDragging ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                                <FileText className="w-6 h-6" />
+                              </div>
+                              <div className="text-right">
+                                <h3 className="font-semibold">חשבוניות ספקים — קטלוג גלובלי</h3>
+                                <p className="text-sm text-muted-foreground">גרור PDF/Excel/תמונה — AI יחלץ רכיבים ומחירים ויעלה לספקים הגלובליים</p>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap justify-center gap-2 text-xs text-muted-foreground mb-3">
+                              <Badge variant="outline">PDF</Badge>
+                              <Badge variant="outline">Excel</Badge>
+                              <Badge variant="outline">CSV</Badge>
+                              <Badge variant="outline">תמונות</Badge>
+                            </div>
+                            <input
+                              ref={adminInvoiceFileRef}
+                              type="file"
+                              accept={INVOICE_ACCEPT}
+                              className="hidden"
+                              onChange={handleAdminInvoiceFileSelect}
+                            />
+                            <Button type="button" variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); adminInvoiceFileRef.current?.click() }}>
+                              <UploadIcon className="w-4 h-4 ml-2" />
+                              בחר קובץ
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  )}
 
                   <FilePreviewModal
                     open={fpmOpen}

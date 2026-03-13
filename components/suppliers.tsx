@@ -109,6 +109,7 @@ export function Suppliers() {
   const [fpmOpen, setFpmOpen] = useState(false)
   const [fpmFile, setFpmFile] = useState<File | null>(null)
   const [isInvoiceDragging, setIsInvoiceDragging] = useState(false)
+  const [showInvoiceUploadArea, setShowInvoiceUploadArea] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const INVOICE_ACCEPT = ".xlsx,.xls,.csv,.pdf,.rtf,image/*"
@@ -519,10 +520,6 @@ export function Suppliers() {
     }
   }, [selectedSupplierDetail, loadSupplierDetail])
 
-  const filteredSuppliers = (suppliers || []).filter(
-    (s) => (s?.name ?? "").includes(searchQuery)
-  )
-
   const addNsmItem = () => {
     const name = nsmItemName.trim()
     const price = parseFloat(String(nsmItemPrice)) || 0
@@ -616,17 +613,26 @@ export function Suppliers() {
     )
   }
 
-  const restaurantName = restaurants?.find((r) => r.id === currentRestaurantId)?.name
+  const restaurantName = restaurants?.find((r) => r.id === currentRestaurantId)?.name ?? undefined
+  const safeFilteredSuppliers = Array.isArray(suppliers) ? suppliers.filter((s) => (s?.name ?? "").includes(searchQuery)) : []
 
   return (
     <div className="container mx-auto px-4 py-6">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={INVOICE_ACCEPT}
+        className="hidden"
+        onChange={handleInvoiceFileSelect}
+        aria-hidden
+      />
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold mb-1">{t("nav.suppliers")}</h1>
           <p className="text-muted-foreground">{t("pages.suppliers.subtitle")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+          <Button variant="outline" onClick={() => setShowInvoiceUploadArea((v) => !v)}>
             <UploadIcon className="w-4 h-4 ml-1" />
             העלאת חשבונית
           </Button>
@@ -646,54 +652,57 @@ export function Suppliers() {
         </div>
       </div>
 
-      {/* העלאת חשבוניות ספקים */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="mb-6"
-        onDragOver={handleInvoiceDragOver}
-        onDragEnter={handleInvoiceDragEnter}
-        onDragLeave={handleInvoiceDragLeave}
-        onDrop={handleInvoiceDrop}
-      >
-        <Card className={isInvoiceDragging ? "ring-2 ring-primary ring-offset-2" : ""}>
-          <CardContent className="p-6">
-            <div
-              className={`border-2 border-dashed rounded-xl p-6 text-center transition-all min-h-[140px] flex flex-col items-center justify-center cursor-pointer ${
-                isInvoiceDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
-              }`}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isInvoiceDragging ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                  <FileText className="w-6 h-6" />
-                </div>
-                <div className="text-right">
-                  <h3 className="font-semibold">חשבוניות ספקים</h3>
-                  <p className="text-sm text-muted-foreground">גרור PDF/Excel/תמונה — AI יחלץ רכיבים ומחירים</p>
-                </div>
-              </div>
-              <div className="flex flex-wrap justify-center gap-2 text-xs text-muted-foreground mb-3">
-                <Badge variant="outline">PDF</Badge>
-                <Badge variant="outline">Excel</Badge>
-                <Badge variant="outline">CSV</Badge>
-                <Badge variant="outline">תמונות</Badge>
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept={INVOICE_ACCEPT}
-                className="hidden"
-                onChange={handleInvoiceFileSelect}
-              />
-              <Button type="button" variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}>
-                <UploadIcon className="w-4 h-4 ml-2" />
-                בחר קובץ
+      {/* העלאת חשבוניות — נפתח בלחיצה על הכפתור */}
+      {showInvoiceUploadArea && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="mb-6"
+          onDragOver={handleInvoiceDragOver}
+          onDragEnter={handleInvoiceDragEnter}
+          onDragLeave={handleInvoiceDragLeave}
+          onDrop={handleInvoiceDrop}
+        >
+          <Card className={isInvoiceDragging ? "ring-2 ring-primary ring-offset-2" : ""}>
+            <CardContent className="p-6 relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute left-2 top-2 h-8 w-8"
+                onClick={() => setShowInvoiceUploadArea(false)}
+              >
+                <X className="w-4 h-4" />
               </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+              <div
+                className={`border-2 border-dashed rounded-xl p-6 text-center transition-all min-h-[140px] flex flex-col items-center justify-center cursor-pointer ${
+                  isInvoiceDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
+                }`}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isInvoiceDragging ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                    <FileText className="w-6 h-6" />
+                  </div>
+                  <div className="text-right">
+                    <h3 className="font-semibold">חשבוניות ספקים</h3>
+                    <p className="text-sm text-muted-foreground">גרור PDF/Excel/תמונה — AI יחלץ רכיבים ומחירים</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap justify-center gap-2 text-xs text-muted-foreground mb-3">
+                  <Badge variant="outline">PDF</Badge>
+                  <Badge variant="outline">Excel</Badge>
+                  <Badge variant="outline">CSV</Badge>
+                  <Badge variant="outline">תמונות</Badge>
+                </div>
+                <Button type="button" variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}>
+                  <UploadIcon className="w-4 h-4 ml-2" />
+                  בחר קובץ
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       <FilePreviewModal
         open={fpmOpen}
@@ -705,7 +714,7 @@ export function Suppliers() {
         onConfirmSupplier={handleConfirmSupplier}
       />
 
-      {filteredSuppliers.length === 0 ? (
+      {safeFilteredSuppliers.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center text-muted-foreground">
             {t("pages.suppliers.noSuppliersDesc")}
@@ -715,7 +724,7 @@ export function Suppliers() {
         <>
           <p className="text-sm text-muted-foreground mb-4">{t("pages.suppliers.clickForDetails")}</p>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
-            {filteredSuppliers.map((supplier) => (
+            {safeFilteredSuppliers.map((supplier) => (
               <Card
                 key={supplier.name}
                 className={cn(
