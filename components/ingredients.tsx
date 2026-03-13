@@ -49,6 +49,7 @@ import {
   ChefHat,
   Globe,
   ChevronDown,
+  ExternalLink,
 } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -138,9 +139,20 @@ function CheapestPricePopover({
             <div className="text-sm text-muted-foreground">מהמערכת: —</div>
           )}
           {webPrice ? (
-            <div className="text-sm text-blue-600 dark:text-blue-400">
-              <span className="text-muted-foreground">מהאינטרנט:</span> ₪{webPrice.price.toFixed(1)}/{webPrice.unit}
-              <span className="font-medium"> אצל {webPrice.store}</span>
+            <div className="text-sm text-blue-600 dark:text-blue-400 space-y-1">
+              <div>
+                <span className="text-muted-foreground">מהאינטרנט:</span> ₪{webPrice.price.toFixed(1)}/{webPrice.unit}
+                <span className="font-medium"> אצל {webPrice.store}</span>
+              </div>
+              <a
+                href={`https://www.google.com/search?q=${encodeURIComponent(ingredient.name + " " + webPrice.store + " מחיר קנייה")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                <ExternalLink className="w-3 h-3" />
+                לקנייה באינטרנט
+              </a>
             </div>
           ) : (
             <Button
