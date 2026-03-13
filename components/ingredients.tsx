@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { collection, collectionGroup, getDocs, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
@@ -48,8 +48,11 @@ import {
   Loader2,
   ChefHat,
   Globe,
+  ChevronDown,
 } from "lucide-react"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { downloadExcel } from "@/lib/export-excel"
@@ -92,6 +95,78 @@ function pricePerKg(price: number, unit: string): number {
 const CATEGORIES = ["אחר", "בשר", "עוף", "דגים", "חלב", "ירקות", "פירות", "תבלינים", "שמנים", "קמחים"]
 
 const isOwnerRole = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner"
+
+function CheapestPricePopover({
+  ingredient,
+  webPrice,
+  onFetchWebPrice,
+  webPriceLoading,
+  pricePerKgFn,
+}: {
+  ingredient: Ingredient
+  webPrice?: { price: number; store: string; unit: string; source: string }
+  onFetchWebPrice: () => void
+  webPriceLoading: boolean
+  pricePerKgFn: (p: number, u: string) => number
+}) {
+  const gc = ingredient.globalCheapest
+  const hasAny = gc || webPrice
+  const cheapestPrice = gc ? `${gc.price.toFixed(1)}/${gc.unit}` : null
+  const isCheaper = ingredient.priceSource === "mine" && gc && pricePerKgFn(gc.price, gc.unit) < pricePerKgFn(ingredient.price, ingredient.unit)
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium transition-colors hover:bg-muted",
+            isCheaper && "text-green-600 dark:text-green-400",
+            !hasAny && "text-muted-foreground"
+          )}
+        >
+          {hasAny ? (
+            <>
+              <span>הכי זול:</span>
+              {gc && <span>₪{cheapestPrice}</span>}
+              {gc?.supplier && <span className="text-primary">אצל {gc.supplier}</span>}
+              <ChevronDown className="w-3 h-3" />
+            </>
+          ) : (
+            <span>אין נתוני מחיר</span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72">
+        <div className="space-y-3">
+          <p className="font-medium text-sm">{ingredient.name}</p>
+          {gc && (
+            <div className={cn("text-sm", isCheaper && "text-green-600 dark:text-green-400 font-medium")}>
+              <span className="text-muted-foreground">מהמערכת:</span> ₪{gc.price.toFixed(1)}/{gc.unit}
+              {gc.supplier && <span className="text-primary"> אצל {gc.supplier}</span>}
+            </div>
+          )}
+          {webPrice ? (
+            <div className="text-sm text-blue-600 dark:text-blue-400">
+              <span className="text-muted-foreground">מהאינטרנט:</span> ₪{webPrice.price.toFixed(1)}/{webPrice.unit}
+              <span className="font-medium"> אצל {webPrice.store}</span>
+            </div>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={onFetchWebPrice}
+              disabled={webPriceLoading}
+            >
+              {webPriceLoading ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <Globe className="w-3 h-3 ml-1" />}
+              בדוק באינטרנט
+            </Button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 export function Ingredients() {
   const { currentRestaurantId, setCurrentPage, userRole, isSystemOwner, refreshIngredients } = useApp()
@@ -144,6 +219,7 @@ export function Ingredients() {
   const [recipes, setRecipes] = useState<{ id: string; isCompound?: boolean }[]>([])
   const [webPriceByIngredient, setWebPriceByIngredient] = useState<Record<string, { price: number; store: string; unit: string; source: string }>>({})
   const [webPriceLoading, setWebPriceLoading] = useState<string | null>(null)
+  const [showCheapestBelow, setShowCheapestBelow] = useState(false)
 
   const loadIngredients = useCallback(async () => {
     if (!currentRestaurantId) {
@@ -1030,6 +1106,12 @@ export function Ingredients() {
                 </SelectContent>
               </Select>
             )}
+            {isOwner && (
+              <label className="flex items-center gap-2 cursor-pointer text-sm whitespace-nowrap">
+                <Checkbox checked={showCheapestBelow} onCheckedChange={(c) => setShowCheapestBelow(!!c)} />
+                <span>מחיר הכי זול מתחת</span>
+              </label>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -1061,7 +1143,7 @@ export function Ingredients() {
                   {isOwner && (
                     <TableHead className="text-right">מקור</TableHead>
                   )}
-                  {isOwner && (
+                  {isOwner && !showCheapestBelow && (
                     <TableHead className="text-right">הכי זול אצל</TableHead>
                   )}
                   <TableHead
@@ -1121,7 +1203,7 @@ export function Ingredients() {
               <TableBody>
                 {filteredIngredients.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={isOwner ? 12 : 9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={isOwner ? (showCheapestBelow ? 11 : 12) : 9} className="text-center py-8 text-muted-foreground">
                       אין רכיבים. הוסף רכיבים דרך העלאה או עץ מוצר.
                     </TableCell>
                   </TableRow>
@@ -1130,7 +1212,9 @@ export function Ingredients() {
                     const isCompound = "isCompound" in ingredient && ingredient.isCompound
                     const stockStatus = isCompound ? { status: "מתכון", color: "bg-primary/10 text-primary", icon: ChefHat } : getStockStatus(ingredient)
                     const StatusIcon = stockStatus.icon
+                    const colSpan = isOwner ? (showCheapestBelow ? 11 : 12) : 9
                     return (
+                      <React.Fragment key={ingredient.id}>
                       <motion.tr
                         key={ingredient.id}
                         initial={{ opacity: 0, x: -20 }}
@@ -1156,10 +1240,10 @@ export function Ingredients() {
                             )}
                           </TableCell>
                         )}
-                        {isOwner && (
+                        {isOwner && !showCheapestBelow && (
                           <TableCell className="text-right text-sm">
                             {isCompound ? "—" : (
-                              <div className="space-y-2 min-w-[160px]">
+                              <div className="space-y-2 min-w-[140px]">
                                 {ingredient.globalCheapest && (
                                   <div className={cn(
                                     ingredient.priceSource === "mine" &&
@@ -1239,6 +1323,20 @@ export function Ingredients() {
                           </TableCell>
                         )}
                       </motion.tr>
+                      {showCheapestBelow && isOwner && !isCompound && (
+                        <TableRow className="bg-muted/30 hover:bg-muted/40">
+                          <TableCell colSpan={colSpan} className="py-1.5 pr-4 text-right">
+                            <CheapestPricePopover
+                              ingredient={ingredient}
+                              webPrice={webPriceByIngredient[ingredient.name]}
+                              onFetchWebPrice={() => fetchWebPrice(ingredient.name)}
+                              webPriceLoading={webPriceLoading === ingredient.name}
+                              pricePerKgFn={pricePerKg}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
                     )
                   })
                 )}
