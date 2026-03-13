@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import dynamic from "next/dynamic"
 import { AnimatePresence, motion } from "framer-motion"
 import { onAuthStateChanged, signOut } from "firebase/auth"
 import { doc, getDoc, getDocFromServer, getDocsFromServer, setDoc, collection, getDocs } from "firebase/firestore"
@@ -10,6 +9,7 @@ import { firestoreConfig } from "@/lib/firestore-config"
 import { LoginScreen } from "@/components/login-screen"
 import { Dashboard } from "@/components/dashboard"
 import { Recipes } from "@/components/recipes"
+import Suppliers from "@/components/suppliers"
 import { Reports } from "@/components/reports"
 import { Settings } from "@/components/settings"
 import ProductTree from "@/components/product-tree"
@@ -25,11 +25,6 @@ import { AppProvider, type UserPermissions } from "@/contexts/app-context"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useTranslations } from "@/lib/use-translations"
-
-const Suppliers = dynamic(() => import("@/components/suppliers"), {
-  ssr: false,
-  loading: () => <div className="flex items-center justify-center min-h-[40vh]"><div className="animate-pulse text-muted-foreground">טוען...</div></div>,
-})
 
 const pageVariants = {
   initial: { opacity: 0, x: 20 },
