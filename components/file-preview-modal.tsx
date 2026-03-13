@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { extractWithAI, type ExtractType, type ExtractedItem, type ExtractedSupplierItem, type ExtractedDishItem } from "@/lib/ai-extract"
 import { toast } from "sonner"
-import { Loader2, X, Plus } from "lucide-react"
+import { Loader2, X, Plus, Globe } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 
 interface FilePreviewModalProps {
@@ -48,6 +48,8 @@ export function FilePreviewModal({
   const [detectedSupplier, setDetectedSupplier] = useState<string | null>(null)
   const [saveToGlobal, setSaveToGlobal] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [webPriceByName, setWebPriceByName] = useState<Record<string, { price: number; store: string; unit: string }>>({})
+  const [webPriceLoading, setWebPriceLoading] = useState(false)
 
   useEffect(() => {
     if (!open || !file) return
@@ -57,6 +59,7 @@ export function FilePreviewModal({
     setInvoiceDate(null)
     setDetectedSupplier(null)
     setSaveToGlobal(false)
+    setWebPriceByName({})
     setLoading(true)
     extractWithAI(file, type, initialSupplier || undefined)
       .then((res) => {
@@ -101,6 +104,45 @@ export function FilePreviewModal({
       setItems((prev) => [...prev, { name: "", qty: 0, price: 0 }])
     }
   }, [type])
+
+  const fetchWebPrices = useCallback(async () => {
+    if (type !== "p") return
+    const names = (items as ExtractedSupplierItem[]).map((i) => (i.name || "").trim()).filter(Boolean)
+    const unique = [...new Set(names)]
+    if (unique.length === 0) {
+      toast.error("הזן שמות רכיבים לחיפוש")
+      return
+    }
+    setWebPriceLoading(true)
+    const next: Record<string, { price: number; store: string; unit: string }> = {}
+    try {
+      for (const name of unique) {
+        try {
+          const res = await fetch("/api/ingredient-web-price", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name }),
+          })
+          if (res.ok) {
+            const d = await res.json()
+            if (d?.price) next[name] = { price: d.price, store: d.store || "—", unit: d.unit || "קג" }
+          }
+        } catch {
+          // נסה דרך AI מהלקוח
+          const { fetchWebPriceForIngredient } = await import("@/lib/ai-extract")
+          const d = await fetchWebPriceForIngredient(name)
+          if (d) next[name] = { price: d.price, store: d.store || "—", unit: d.unit || "קג" }
+        }
+        await new Promise((r) => setTimeout(r, 400))
+      }
+      setWebPriceByName((prev) => ({ ...prev, ...next }))
+      if (Object.keys(next).length > 0) toast.success(`נמצאו מחירים ל־${Object.keys(next).length} רכיבים`)
+    } catch (e) {
+      toast.error((e as Error)?.message || "שגיאה בחיפוש מחירים")
+    } finally {
+      setWebPriceLoading(false)
+    }
+  }, [type, items])
 
   const handleConfirm = useCallback(() => {
     if (type === "p") {
@@ -175,6 +217,15 @@ export function FilePreviewModal({
               </div>
               {type === "p" && (
                 <div className="space-y-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchWebPrices}
+                    disabled={webPriceLoading || items.length === 0}
+                  >
+                    {webPriceLoading ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Globe className="w-4 h-4 ml-2" />}
+                    השוואת מחירים באינטרנט
+                  </Button>
                   {canSaveToGlobal && (
                     <label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox checked={saveToGlobal} onCheckedChange={(v) => setSaveToGlobal(!!v)} />
@@ -192,7 +243,8 @@ export function FilePreviewModal({
                         {type === "p" && (
                           <>
                             <th className="text-center p-2 font-semibold">כמות</th>
-                            <th className="text-center p-2 font-semibold">מחיר</th>
+                            <th className="text-center p-2 font-semibold">מחיר חשבונית</th>
+                            <th className="text-center p-2 font-semibold">מחיר באינטרנט</th>
                             <th className="text-center p-2 font-semibold">יחידה</th>
                             <th className="text-center p-2 font-semibold w-16">מק"ט</th>
                           </>
@@ -243,6 +295,29 @@ export function FilePreviewModal({
                                   className="h-8 text-sm w-20"
                                   aria-label="מחיר"
                                 />
+                              </td>
+                              <td className="p-2 text-center min-w-[100px]">
+                                {(() => {
+                                  const name = ((item as ExtractedSupplierItem).name || "").trim()
+                                  const invPrice = (item as ExtractedSupplierItem).price ?? 0
+                                  const wp = name ? webPriceByName[name] : null
+                                  if (!wp) return <span className="text-muted-foreground text-xs">—</span>
+                                  const diff = invPrice > 0 ? ((wp.price - invPrice) / invPrice) * 100 : 0
+                                  const cheaper = diff < -5
+                                  const pricier = diff > 5
+                                  return (
+                                    <div className="text-xs">
+                                      <span className={cheaper ? "text-emerald-600 dark:text-emerald-400 font-medium" : pricier ? "text-amber-600 dark:text-amber-400" : ""}>
+                                        ₪{wp.price.toFixed(1)} {wp.store && <span className="text-muted-foreground">({wp.store})</span>}
+                                      </span>
+                                      {invPrice > 0 && (cheaper || pricier) && (
+                                        <div className={cheaper ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}>
+                                          {cheaper ? `זול ב־${Math.abs(diff).toFixed(0)}%` : `יקר ב־${diff.toFixed(0)}%`}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                })()}
                               </td>
                               <td className="p-2">
                                 <Input

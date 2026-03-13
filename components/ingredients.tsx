@@ -49,9 +49,22 @@ import {
   ChefHat,
   Globe,
   ChevronDown,
+  GripVertical,
+  Columns3,
+  EyeOff,
+  Rows2,
+  Rows3,
+  Rows4,
 } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
+} from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { downloadExcel } from "@/lib/export-excel"
@@ -238,6 +251,116 @@ export function Ingredients() {
   const [recipes, setRecipes] = useState<{ id: string; isCompound?: boolean }[]>([])
   const [webPriceByIngredient, setWebPriceByIngredient] = useState<Record<string, { price: number; store: string; unit: string; source: string }>>({})
   const [webPriceLoading, setWebPriceLoading] = useState<string | null>(null)
+
+  const INGREDIENTS_COLUMN_ORDER_KEY = "ingredients-column-order"
+  const defaultColumnOrder = ["name", "price", "source", "unit", "waste", "stock", "minStock", "supplier", "sku", "status", "actions"] as const
+  const [columnOrder, setColumnOrder] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [...defaultColumnOrder]
+    try {
+      const stored = localStorage.getItem(INGREDIENTS_COLUMN_ORDER_KEY)
+      if (stored) {
+        const parsed = JSON.parse(stored) as string[]
+        const valid = defaultColumnOrder.filter((c) => parsed.includes(c))
+        const missing = defaultColumnOrder.filter((c) => !parsed.includes(c))
+        if (valid.length + missing.length === defaultColumnOrder.length) return [...valid, ...missing]
+      }
+    } catch (_) {}
+    return [...defaultColumnOrder]
+  })
+  const INGREDIENTS_COLUMN_VISIBILITY_KEY = "ingredients-column-visibility"
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {}
+    try {
+      const stored = localStorage.getItem(INGREDIENTS_COLUMN_VISIBILITY_KEY)
+      if (stored) return JSON.parse(stored) as Record<string, boolean>
+    } catch (_) {}
+    return {}
+  })
+  const visibleColumnOrder = columnOrder.filter((k) => columnVisibility[k] !== false)
+  const toggleColumnVisibility = useCallback((key: string) => {
+    setColumnVisibility((prev) => {
+      const next = { ...prev, [key]: prev[key] === false }
+      try { localStorage.setItem(INGREDIENTS_COLUMN_VISIBILITY_KEY, JSON.stringify(next)) } catch (_) {}
+      return next
+    })
+  }, [])
+  const displayColumnOrder = visibleColumnOrder.filter((k) => (k !== "source" && k !== "actions") || isOwner)
+  const handleColumnReorder = useCallback((fromIndex: number, toIndex: number) => {
+    setColumnOrder((prev) => {
+      const display = prev.filter((k) => columnVisibility[k] !== false && ((k !== "source" && k !== "actions") || isOwner))
+      if (fromIndex < 0 || fromIndex >= display.length || toIndex < 0 || toIndex >= display.length) return prev
+      const displayOrder = [...display]
+      const [moved] = displayOrder.splice(fromIndex, 1)
+      displayOrder.splice(toIndex, 0, moved)
+      const rest = prev.filter((k) => !displayOrder.includes(k))
+      const next = [...displayOrder, ...rest]
+      try { localStorage.setItem(INGREDIENTS_COLUMN_ORDER_KEY, JSON.stringify(next)) } catch (_) {}
+      return next
+    })
+  }, [columnVisibility, isOwner])
+
+  const INGREDIENTS_ROW_DENSITY_KEY = "ingredients-row-density"
+  type RowDensity = "compact" | "normal" | "expanded"
+  const [rowDensity, setRowDensity] = useState<RowDensity>(() => {
+    if (typeof window === "undefined") return "normal"
+    try {
+      const stored = localStorage.getItem(INGREDIENTS_ROW_DENSITY_KEY) as RowDensity | null
+      if (stored && ["compact", "normal", "expanded"].includes(stored)) return stored
+    } catch (_) {}
+    return "normal"
+  })
+  const setRowDensityAndStore = useCallback((d: RowDensity) => {
+    setRowDensity(d)
+    try { localStorage.setItem(INGREDIENTS_ROW_DENSITY_KEY, d) } catch (_) {}
+  }, [])
+  const densityCellClass = rowDensity === "compact" ? "py-1 px-1.5" : rowDensity === "expanded" ? "py-3 px-3" : "py-2 px-2"
+
+  const INGREDIENTS_COLUMN_WIDTHS_KEY = "ingredients-column-widths"
+  const defaultColumnWidths: Record<string, number> = { name: 20, price: 9, source: 9, unit: 7, waste: 6, stock: 6, minStock: 6, supplier: 12, sku: 9, status: 8, actions: 8 }
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+    if (typeof window === "undefined") return { ...defaultColumnWidths }
+    try {
+      const stored = localStorage.getItem(INGREDIENTS_COLUMN_WIDTHS_KEY)
+      if (stored) return { ...defaultColumnWidths, ...JSON.parse(stored) }
+    } catch (_) {}
+    return { ...defaultColumnWidths }
+  })
+  const getColumnWidthPercent = useCallback((key: string) => {
+    const w = columnWidths[key] ?? defaultColumnWidths[key] ?? 10
+    return Math.max(5, Math.min(40, w))
+  }, [columnWidths])
+  const resizeRef = React.useRef<{ key: string; nextKey: string; startX: number; startW: number; startW2: number } | null>(null)
+  const handleResizeStart = useCallback((key: string, nextKey: string, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    resizeRef.current = { key, nextKey, startX: e.clientX, startW: getColumnWidthPercent(key), startW2: getColumnWidthPercent(nextKey) }
+    const onMove = (ev: MouseEvent) => {
+      if (!resizeRef.current) return
+      const { key: k, nextKey: nk, startX, startW, startW2 } = resizeRef.current
+      const delta = (ev.clientX - startX) / (typeof window !== "undefined" ? window.innerWidth : 800) * 100
+      const newW = Math.max(5, Math.min(40, startW + delta))
+      const newW2 = Math.max(5, Math.min(40, startW2 - delta))
+      if (newW + newW2 > 5) {
+        setColumnWidths((prev) => {
+          const next = { ...prev, [k]: newW, [nk]: newW2 }
+          try { localStorage.setItem(INGREDIENTS_COLUMN_WIDTHS_KEY, JSON.stringify(next)) } catch (_) {}
+          return next
+        })
+        resizeRef.current = { ...resizeRef.current, startX: ev.clientX, startW: newW, startW2: newW2 }
+      }
+    }
+    const onUp = () => {
+      resizeRef.current = null
+      document.removeEventListener("mousemove", onMove)
+      document.removeEventListener("mouseup", onUp)
+    }
+    document.addEventListener("mousemove", onMove)
+    document.addEventListener("mouseup", onUp)
+  }, [getColumnWidthPercent])
+  const resetColumnWidths = useCallback(() => {
+    setColumnWidths({ ...defaultColumnWidths })
+    try { localStorage.removeItem(INGREDIENTS_COLUMN_WIDTHS_KEY) } catch (_) {}
+  }, [])
 
   const loadIngredients = useCallback(async () => {
     if (!currentRestaurantId) {
@@ -1154,6 +1277,58 @@ export function Ingredients() {
                 </SelectContent>
               </Select>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 w-9 p-0 shrink-0"
+              title={t("pages.ingredients.rowDensity")}
+              onClick={() => setRowDensityAndStore(rowDensity === "compact" ? "normal" : rowDensity === "normal" ? "expanded" : "compact")}
+            >
+              {rowDensity === "compact" ? <Rows2 className="w-4 h-4" /> : rowDensity === "expanded" ? <Rows4 className="w-4 h-4" /> : <Rows3 className="w-4 h-4" />}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-9 w-9 p-0 shrink-0" title={t("pages.ingredients.tableDisplay")}>
+                  <Columns3 className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[180px]">
+                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{t("pages.ingredients.rowDensity")}</div>
+                {(["compact", "normal", "expanded"] as RowDensity[]).map((d) => (
+                  <DropdownMenuCheckboxItem key={d} checked={rowDensity === d} onCheckedChange={() => setRowDensityAndStore(d)}>
+                    {d === "compact" ? t("pages.ingredients.densityCompact") : d === "expanded" ? t("pages.ingredients.densityExpanded") : t("pages.ingredients.densityNormal")}
+                  </DropdownMenuCheckboxItem>
+                ))}
+                <div className="border-t my-1" />
+                <DropdownMenuItem onClick={resetColumnWidths}>
+                  {t("pages.ingredients.resetColumnWidths")}
+                </DropdownMenuItem>
+                <div className="border-t my-1" />
+                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{t("pages.ingredients.showHideColumns")}</div>
+                {defaultColumnOrder.filter((k) => (k !== "source" && k !== "actions") || isOwner).map((k) => {
+                  const isVisible = columnVisibility[k] !== false
+                  const colLabels: Record<string, string> = {
+                    name: t("pages.ingredients.ingredientName"),
+                    price: t("pages.ingredients.price"),
+                    source: t("pages.ingredients.source"),
+                    unit: t("pages.ingredients.unit"),
+                    waste: t("pages.ingredients.waste"),
+                    stock: t("pages.ingredients.stock"),
+                    minStock: t("pages.ingredients.minStockLabel"),
+                    supplier: t("pages.ingredients.supplier"),
+                    sku: t("pages.ingredients.sku"),
+                    status: t("pages.ingredients.stockStatus"),
+                    actions: t("pages.adminPanel.actions") || "פעולות",
+                  }
+                  const label = colLabels[k] || k
+                  return (
+                    <DropdownMenuCheckboxItem key={k} checked={isVisible} onCheckedChange={() => toggleColumnVisibility(k)}>
+                      {label}
+                    </DropdownMenuCheckboxItem>
+                  )
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
             </div>
         </CardContent>
       </Card>
@@ -1161,88 +1336,95 @@ export function Ingredients() {
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto" dir="rtl">
-            <Table>
+            <Table className="table-fixed w-full" style={{ tableLayout: "fixed" }}>
+              <colgroup>
+                {displayColumnOrder.map((key) => (
+                  <col key={key} style={{ width: `${getColumnWidthPercent(key)}%` }} />
+                ))}
+              </colgroup>
               <TableHeader>
                 <TableRow>
-                  <TableHead
-                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                    onClick={() => setSortBy((s) => (s === "name" ? "name_desc" : "name"))}
-                  >
-                    <span className="flex items-center justify-end gap-1">
-                      {t("pages.ingredients.ingredientName")}
-                      {(sortBy === "name" || sortBy === "name_desc") && (sortBy === "name" ? <TrendingDown className="w-3.5 h-3.5" /> : <TrendingUp className="w-3.5 h-3.5" />)}
-                    </span>
-                  </TableHead>
-                  <TableHead
-                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                    onClick={() => setSortBy((s) => (s === "price_asc" ? "price_desc" : "price_asc"))}
-                  >
-                    <span className="flex items-center justify-end gap-1">
-                      {t("pages.ingredients.price")}
-                      {(sortBy === "price_asc" || sortBy === "price_desc") && (sortBy === "price_desc" ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />)}
-                    </span>
-                  </TableHead>
-                  {isOwner && (
-                    <TableHead className="text-right">{t("pages.ingredients.source")}</TableHead>
-                  )}
-                  <TableHead
-                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                    onClick={() => setSortBy("unit")}
-                  >
-                    <span className="flex items-center justify-end gap-1">{t("pages.ingredients.unit")}</span>
-                  </TableHead>
-                  <TableHead
-                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                    onClick={() => setSortBy((s) => (s === "waste_asc" ? "waste_desc" : "waste_asc"))}
-                  >
-                    <span className="flex items-center justify-end gap-1">
-                      {t("pages.ingredients.waste")}
-                      {(sortBy === "waste_asc" || sortBy === "waste_desc") && (sortBy === "waste_desc" ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />)}
-                    </span>
-                  </TableHead>
-                  <TableHead
-                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                    onClick={() => setSortBy((s) => (s === "stock_asc" ? "stock_desc" : "stock_asc"))}
-                  >
-                    <span className="flex items-center justify-end gap-1">
-                      {t("pages.ingredients.stock")}
-                      {(sortBy === "stock_asc" || sortBy === "stock_desc") && (sortBy === "stock_desc" ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />)}
-                    </span>
-                  </TableHead>
-                  <TableHead
-                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                    onClick={() => setSortBy((s) => (s === "minStock_asc" ? "minStock_desc" : "minStock_asc"))}
-                  >
-                    <span className="flex items-center justify-end gap-1">
-                      מינימום
-                      {(sortBy === "minStock_asc" || sortBy === "minStock_desc") && (sortBy === "minStock_desc" ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />)}
-                    </span>
-                  </TableHead>
-                  <TableHead
-                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                    onClick={() => setSortBy("supplier")}
-                  >
-                    <span className="flex items-center justify-end gap-1">ספק</span>
-                  </TableHead>
-                  <TableHead
-                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                    onClick={() => setSortBy("sku")}
-                  >
-                    <span className="flex items-center justify-end gap-1">מק״ט</span>
-                  </TableHead>
-                  <TableHead
-                    className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                    onClick={() => setSortBy("status")}
-                  >
-                    <span className="flex items-center justify-end gap-1">סטטוס</span>
-                  </TableHead>
-                  {isOwner && <TableHead className="text-right w-24">פעולות</TableHead>}
+                  {displayColumnOrder.map((key, colIndex) => {
+                    const labels: Record<string, string> = {
+                      name: t("pages.ingredients.ingredientName"),
+                      price: t("pages.ingredients.price"),
+                      source: t("pages.ingredients.source"),
+                      unit: t("pages.ingredients.unit"),
+                      waste: t("pages.ingredients.waste"),
+                      stock: t("pages.ingredients.stock"),
+                      minStock: t("pages.ingredients.minStockLabel"),
+                      supplier: t("pages.ingredients.supplier"),
+                      sku: t("pages.ingredients.sku"),
+                      status: t("pages.ingredients.stockStatus"),
+                      actions: t("pages.adminPanel.actions"),
+                    }
+                    const sortKeys: Record<string, string> = {
+                      name: "name",
+                      price: "price_asc",
+                      unit: "unit",
+                      waste: "waste_asc",
+                      stock: "stock_asc",
+                      minStock: "minStock_asc",
+                      supplier: "supplier",
+                      sku: "sku",
+                      status: "status",
+                    }
+                    const isSortable = key in sortKeys
+                    const sortKey = sortKeys[key]
+                    const nextKey = displayColumnOrder[colIndex + 1]
+                    return (
+                      <TableHead
+                        key={key}
+                        className={cn("text-right relative", densityCellClass, isSortable && "cursor-pointer hover:bg-muted/50 select-none")}
+                        draggable
+                        title={t("pages.ingredients.dragToReorderColumns")}
+                        onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(colIndex)); e.dataTransfer.effectAllowed = "move" }}
+                        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move" }}
+                        onDrop={(e) => {
+                          e.preventDefault()
+                          const from = parseInt(e.dataTransfer.getData("text/plain"), 10)
+                          if (!isNaN(from)) handleColumnReorder(from, colIndex)
+                        }}
+                        onClick={() => {
+                          if (!isSortable) return
+                          if (key === "name") setSortBy((s) => (s === "name" ? "name_desc" : "name"))
+                          else if (key === "price") setSortBy((s) => (s === "price_asc" ? "price_desc" : "price_asc"))
+                          else if (key === "waste") setSortBy((s) => (s === "waste_asc" ? "waste_desc" : "waste_asc"))
+                          else if (key === "stock") setSortBy((s) => (s === "stock_asc" ? "stock_desc" : "stock_asc"))
+                          else if (key === "minStock") setSortBy((s) => (s === "minStock_asc" ? "minStock_desc" : "minStock_asc"))
+                          else setSortBy(sortKey)
+                        }}
+                      >
+                        <span className="flex items-center justify-end gap-1">
+                          <GripVertical className="w-3 h-3 text-muted-foreground/60 cursor-grab active:cursor-grabbing shrink-0" />
+                          {labels[key] || key}
+                          {key === "name" && (sortBy === "name" || sortBy === "name_desc") && (sortBy === "name" ? <TrendingDown className="w-3.5 h-3.5" /> : <TrendingUp className="w-3.5 h-3.5" />)}
+                          {key === "price" && (sortBy === "price_asc" || sortBy === "price_desc") && (sortBy === "price_desc" ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />)}
+                          {key === "waste" && (sortBy === "waste_asc" || sortBy === "waste_desc") && (sortBy === "waste_desc" ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />)}
+                          {key === "stock" && (sortBy === "stock_asc" || sortBy === "stock_desc") && (sortBy === "stock_desc" ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />)}
+                          {key === "minStock" && (sortBy === "minStock_asc" || sortBy === "minStock_desc") && (sortBy === "minStock_desc" ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />)}
+                          <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 opacity-60 hover:opacity-100" onClick={(e) => { e.stopPropagation(); toggleColumnVisibility(key) }} title={t("pages.ingredients.hideColumn")}>
+                            <EyeOff className="w-3 h-3" />
+                          </Button>
+                        </span>
+                        {nextKey && (
+                          <div
+                            role="separator"
+                            aria-orientation="vertical"
+                            className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/30 transition-colors z-10"
+                            title={t("pages.ingredients.resizeColumn")}
+                            onMouseDown={(e) => handleResizeStart(key, nextKey, e)}
+                          />
+                        )}
+                      </TableHead>
+                    )
+                  })}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredIngredients.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={isOwner ? 11 : 9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={displayColumnOrder.length} className="text-center py-8 text-muted-foreground">
                       אין רכיבים. הוסף רכיבים דרך העלאה או עץ מוצר.
                     </TableCell>
                   </TableRow>
@@ -1251,7 +1433,31 @@ export function Ingredients() {
                     const isCompound = "isCompound" in ingredient && ingredient.isCompound
                     const stockStatus = isCompound ? { status: "מתכון", color: "bg-primary/10 text-primary", icon: ChefHat } : getStockStatus(ingredient)
                     const StatusIcon = stockStatus.icon
-                    const colSpan = isOwner ? 11 : 9
+                    const colSpan = displayColumnOrder.length
+                    const cellByKey: Record<string, React.ReactNode> = {
+                      name: <TableCell key="name" className={cn("font-medium text-right", densityCellClass)}>{isCompound && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded ml-1">🧪 מתכון</span>}{ingredient.name}</TableCell>,
+                      price: <TableCell key="price" className={cn("text-right font-semibold", densityCellClass)}>{isCompound ? "—" : `${ingredient.price} ש"ח`}</TableCell>,
+                      source: <TableCell key="source" className={cn("text-right", densityCellClass)}>{isCompound ? "—" : (ingredient.priceSource === "market" ? <Badge variant="secondary" className="text-xs whitespace-nowrap">מחיר שוק</Badge> : <Badge variant="outline" className="text-xs whitespace-nowrap">מחיר שלי</Badge>)}</TableCell>,
+                      unit: <TableCell key="unit" className={cn("text-right", densityCellClass)}>{ingredient.unit}</TableCell>,
+                      waste: <TableCell key="waste" className={cn("text-right", densityCellClass)}>{isCompound ? "—" : `${ingredient.waste}%`}</TableCell>,
+                      stock: <TableCell key="stock" className={cn("text-right font-semibold", densityCellClass)}>{isCompound ? "—" : ingredient.stock}</TableCell>,
+                      minStock: <TableCell key="minStock" className={cn("text-right text-muted-foreground", densityCellClass)}>{isCompound ? "—" : ingredient.minStock}</TableCell>,
+                      supplier: <TableCell key="supplier" className={cn("text-right", densityCellClass)}><Badge variant="outline">{ingredient.supplier || "—"}</Badge></TableCell>,
+                      sku: <TableCell key="sku" className={cn("text-right text-muted-foreground text-sm", densityCellClass)}>{ingredient.sku || "—"}</TableCell>,
+                      status: <TableCell key="status" className={cn("text-right", densityCellClass)}><Badge className={stockStatus.color}><StatusIcon className="w-3 h-3 ml-1" />{stockStatus.status}</Badge></TableCell>,
+                      actions: <TableCell key="actions" className={cn("text-right", densityCellClass)}>
+                        <div className="flex gap-1 justify-end">
+                          {!isCompound && (
+                            <Button size="sm" variant="ghost" onClick={() => openEditIngredient(ingredient)} className="h-8 w-8 p-0" title="ערוך רכיב">
+                              <Edit2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                          <Button size="sm" variant="ghost" onClick={() => isCompound ? handleDeleteCompoundRecipe(ingredient.name) : handleDeleteIngredient(ingredient)} className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10" title={isCompound ? "מחק מתכון" : "מחק רכיב"} disabled={deletingIngredientId === ingredient.id}>
+                            {deletingIngredientId === ingredient.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                          </Button>
+                        </div>
+                      </TableCell>,
+                    }
                     return (
                       <React.Fragment key={ingredient.id}>
                       <motion.tr
@@ -1261,69 +1467,11 @@ export function Ingredients() {
                         transition={{ delay: index * 0.02 }}
                         className={cn("hover:bg-muted/50", isCompound && "bg-primary/5")}
                       >
-                        <TableCell className="font-medium text-right">
-                          {isCompound && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded ml-1">🧪 מתכון</span>}
-                          {ingredient.name}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {isCompound ? "—" : `${ingredient.price} ש"ח`}
-                        </TableCell>
-                        {isOwner && (
-                          <TableCell className="text-right">
-                            {isCompound ? "—" : (
-                              ingredient.priceSource === "market" ? (
-                                <Badge variant="secondary" className="text-xs whitespace-nowrap">מחיר שוק</Badge>
-                              ) : (
-                                <Badge variant="outline" className="text-xs whitespace-nowrap">מחיר שלי</Badge>
-                              )
-                            )}
-                          </TableCell>
-                        )}
-                        <TableCell className="text-right">{ingredient.unit}</TableCell>
-                        <TableCell className="text-right">{isCompound ? "—" : `${ingredient.waste}%`}</TableCell>
-                        <TableCell className="text-right font-semibold">{isCompound ? "—" : ingredient.stock}</TableCell>
-                        <TableCell className="text-right text-muted-foreground">{isCompound ? "—" : ingredient.minStock}</TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant="outline">{ingredient.supplier || "—"}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right text-muted-foreground text-sm">{ingredient.sku || "—"}</TableCell>
-                        <TableCell className="text-right">
-                          <Badge className={stockStatus.color}>
-                            <StatusIcon className="w-3 h-3 ml-1" />
-                            {stockStatus.status}
-                          </Badge>
-                        </TableCell>
-                        {isOwner && (
-                          <TableCell className="text-right">
-                            <div className="flex gap-1 justify-end">
-                              {!isCompound && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => openEditIngredient(ingredient)}
-                                  className="h-8 w-8 p-0"
-                                  title="ערוך רכיב"
-                                >
-                                  <Edit2 className="w-4 h-4" />
-                                </Button>
-                              )}
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => isCompound ? handleDeleteCompoundRecipe(ingredient.name) : handleDeleteIngredient(ingredient)}
-                                className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                title={isCompound ? "מחק מתכון" : "מחק רכיב"}
-                                disabled={deletingIngredientId === ingredient.id}
-                              >
-                                {deletingIngredientId === ingredient.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                              </Button>
-                            </div>
-                          </TableCell>
-                        )}
+                        {displayColumnOrder.map((k) => cellByKey[k] ? <React.Fragment key={k}>{cellByKey[k]}</React.Fragment> : null)}
                       </motion.tr>
                       {isOwner && !isCompound && (
                         <TableRow className="bg-muted/30 hover:bg-muted/40">
-                          <TableCell colSpan={colSpan} className="py-1.5 pr-4 text-right">
+                          <TableCell colSpan={displayColumnOrder.length} className="py-1.5 pr-4 text-right">
                             <CheapestPricePopover
                               ingredient={ingredient}
                               webPrice={webPriceByIngredient[ingredient.name]}
