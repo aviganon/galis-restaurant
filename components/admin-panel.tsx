@@ -1944,10 +1944,10 @@ export function AdminPanel() {
                   <CardTitle>רכיבים</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="w-full overflow-x-hidden overflow-y-auto max-h-[min(60vh,600px)] rounded-lg border" dir="rtl">
+                  <div className="w-full overflow-x-hidden overflow-y-auto max-h-[min(60vh,600px)] rounded-lg border">
                   <Table className="table-fixed w-full text-sm" style={{ tableLayout: "fixed" }}>
                     <colgroup>
-                      <col style={{ width: "22%" }} />
+                      <col style={{ width: "14%" }} />
                       <col style={{ width: "6%" }} />
                       <col style={{ width: "8%" }} />
                       <col style={{ width: "7%" }} />
@@ -1962,28 +1962,26 @@ export function AdminPanel() {
                     </colgroup>
                     <TableHeader className="sticky top-0 z-10 bg-background [&_tr]:bg-background [&_tr]:border-b">
                       <TableRow className="bg-muted/50 hover:bg-muted/50 border-b">
-                        <TableHead className="text-right p-2 align-middle">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <div className="flex items-center gap-1.5 flex-1 min-w-[120px]">
-                              <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-                              <Input
-                                value={ingredientsSearchText}
-                                onChange={(e) => setIngredientsSearchText(e.target.value)}
-                                placeholder="חיפוש רכיב..."
-                                className="h-8 text-right flex-1 min-w-0 text-sm"
-                              />
-                              {ingredientsSearchText && (
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={() => setIngredientsSearchText("")} title="נקה">
-                                  <X className="w-3.5 h-3.5" />
-                                </Button>
-                              )}
-                            </div>
+                        <TableHead className="text-right p-1.5 align-middle max-w-0">
+                          <div className="flex items-center gap-1 min-w-0">
+                            <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                            <Input
+                              value={ingredientsSearchText}
+                              onChange={(e) => setIngredientsSearchText(e.target.value)}
+                              placeholder="חיפוש..."
+                              className="h-7 text-right flex-1 min-w-0 text-xs"
+                            />
+                            {ingredientsSearchText && (
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0" onClick={() => setIngredientsSearchText("")} title="נקה">
+                                <X className="w-3 h-3" />
+                              </Button>
+                            )}
                             <Button
                               size="sm"
-                              className="h-8 shrink-0 text-xs"
+                              className="h-7 shrink-0 text-xs px-1.5"
                               onClick={() => { setAddIngredientSupplier(""); setAddIngredientOpen(true) }}
                             >
-                              <Plus className="w-4 h-4 ml-1" />
+                              <Plus className="w-3.5 h-3.5 ml-0.5" />
                               הוסף
                             </Button>
                           </div>
