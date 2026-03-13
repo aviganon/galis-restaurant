@@ -40,6 +40,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { getClaudeApiKey, setClaudeApiKey, testClaudeConnection } from "@/lib/claude"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
+import { useLanguage } from "@/contexts/language-context"
 import { doc, setDoc, getDoc, getDocFromServer, collection, collectionGroup, query, where, getDocs, getDocsFromServer, deleteDoc, writeBatch } from "firebase/firestore"
 import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplier-ingredients"
 import { firestoreConfig } from "@/lib/firestore-config"
@@ -242,7 +243,11 @@ function WebPriceCell({
 
 export function AdminPanel() {
   const t = useTranslations()
+  const { dir } = useLanguage()
   const { userRole, isSystemOwner, currentRestaurantId, restaurants, onImpersonate, refreshRestaurants, refreshIngredients } = useApp()
+  const isRtl = dir === "rtl"
+  const textAlign = isRtl ? "text-right" : "text-left"
+  const justify = isRtl ? "justify-end" : "justify-start"
   const [apiKey, setApiKey] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -1946,9 +1951,9 @@ export function AdminPanel() {
                 {t("pages.adminPanel.loadingIngredients")}
               </div>
             ) : (
-              <Card>
+              <Card dir={dir}>
                 <CardHeader>
-                  <CardTitle>{t("pages.adminPanel.globalIngredients")}</CardTitle>
+                  <CardTitle className={textAlign}>{t("pages.adminPanel.globalIngredients")}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="w-full overflow-x-hidden overflow-y-auto max-h-[min(60vh,600px)] rounded-lg border">
@@ -1969,14 +1974,14 @@ export function AdminPanel() {
                     </colgroup>
                     <TableHeader className="sticky top-0 z-10 bg-background [&_tr]:bg-background [&_tr]:border-b">
                       <TableRow className="bg-muted/50 hover:bg-muted/50 border-b">
-                        <TableHead className="text-right p-1.5 align-middle max-w-0">
-                          <div className="flex items-center gap-1 min-w-0">
+                        <TableHead className={`${textAlign} p-1.5 align-middle max-w-0`}>
+                          <div className={`flex items-center gap-1 min-w-0 ${justify}`}>
                             <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                             <Input
                               value={ingredientsSearchText}
                               onChange={(e) => setIngredientsSearchText(e.target.value)}
                               placeholder={t("pages.adminPanel.searchPlaceholder")}
-                              className="h-7 text-right flex-1 min-w-0 text-xs"
+                              className={`h-7 ${textAlign} flex-1 min-w-0 text-xs`}
                             />
                             {ingredientsSearchText && (
                               <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0" onClick={() => setIngredientsSearchText("")} title={t("pages.adminPanel.clear")}>
@@ -1993,7 +1998,7 @@ export function AdminPanel() {
                             </Button>
                           </div>
                         </TableHead>
-                        <TableHead className="text-right p-2 align-middle text-xs text-muted-foreground">
+                        <TableHead className={`${textAlign} p-2 align-middle text-xs text-muted-foreground`}>
                           {filteredAndSortedIngredients.length === (ingredientsList?.length ?? 0)
                             ? `${ingredientsList?.length ?? 0} ${t("pages.adminPanel.ingredientsCount")}`
                             : `${t("pages.adminPanel.showingCount")} ${filteredAndSortedIngredients.length} ${t("pages.adminPanel.of")} ${ingredientsList?.length ?? 0}`}
@@ -2003,14 +2008,14 @@ export function AdminPanel() {
                       <TableRow>
                         {(["name", "price", "cheapest", "sku", "status", "source", "supplier", "minStock", "stock", "waste", "unit"] as const).map((key) => {
                           if (key === "cheapest") {
-                            return <TableHead key="cheapest" className="text-right">{t("pages.adminPanel.cheapest")}</TableHead>
+                            return <TableHead key="cheapest" className={textAlign}>{t("pages.adminPanel.cheapest")}</TableHead>
                           }
                           const labels: Record<string, string> = { name: t("pages.adminPanel.ingredientLabel"), price: t("pages.adminPanel.priceLabel"), unit: t("pages.adminPanel.unitUnit"), waste: t("pages.adminPanel.wasteLabel"), stock: t("pages.adminPanel.inventory"), minStock: t("pages.adminPanel.minStockLabel"), supplier: t("pages.adminPanel.supplierLabel"), sku: t("pages.adminPanel.skuLabel"), source: t("pages.adminPanel.sourceLabel"), status: t("pages.adminPanel.statusLabel") }
                           const isSortable = ["name", "price", "unit", "waste", "stock", "minStock", "supplier", "sku", "source", "status"].includes(key)
                           return (
                             <TableHead
                               key={key}
-                              className={`text-right ${isSortable ? "cursor-pointer hover:bg-muted/50 select-none" : ""}`}
+                              className={`${textAlign} ${isSortable ? "cursor-pointer hover:bg-muted/50 select-none" : ""}`}
                               onClick={() => {
                                 if (!isSortable) return
                                 if (ingredientsSortBy === key) {
@@ -2022,7 +2027,7 @@ export function AdminPanel() {
                                 }
                               }}
                             >
-                              <span className="flex items-center gap-1 justify-end">
+                              <span className={`flex items-center gap-1 ${justify}`}>
                                 {labels[key] || key}
                                 {ingredientsSortBy === key && (
                                   ingredientsSortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
@@ -2032,15 +2037,15 @@ export function AdminPanel() {
                             </TableHead>
                           )
                         })}
-                        <TableHead className="text-right w-14">{t("pages.adminPanel.actions")}</TableHead>
+                        <TableHead className={`${textAlign} w-14`}>{t("pages.adminPanel.actions")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {[...filteredAndSortedIngredients].reverse().map((ing) => (
                         <TableRow key={`${ing.source}-${ing.id}`}>
-                          <TableCell className="font-medium text-right truncate" title={ing.name}>{ing.name}</TableCell>
-                          <TableCell className="text-right">₪{ing.price.toFixed(2)}</TableCell>
-                          <TableCell className="text-right text-sm">
+                          <TableCell className={`font-medium ${textAlign} truncate`} title={ing.name}>{ing.name}</TableCell>
+                          <TableCell className={textAlign}>₪{ing.price.toFixed(2)}</TableCell>
+                          <TableCell className={`${textAlign} text-sm`}>
                             <AdminCheapestPopover
                               ing={ing}
                               webPrice={webPriceByIngredient[ing.name]}
@@ -2048,18 +2053,18 @@ export function AdminPanel() {
                               t={t}
                             />
                           </TableCell>
-                          <TableCell className="text-right truncate" title={ing.sku || undefined}>{ing.sku || "—"}</TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className={`${textAlign} truncate`} title={ing.sku || undefined}>{ing.sku || "—"}</TableCell>
+                          <TableCell className={textAlign}>
                             <Badge variant={ing.status === "שויך" ? "default" : "secondary"}>{ing.status === "שויך" ? t("pages.adminPanel.assigned") : t("pages.adminPanel.pending")}</Badge>
                           </TableCell>
-                          <TableCell className="text-right">{ing.source === "global" ? t("pages.adminPanel.global") : t("pages.adminPanel.restaurant")}</TableCell>
-                          <TableCell className="text-right truncate" title={ing.supplier || undefined}>{ing.supplier || "—"}</TableCell>
-                          <TableCell className="text-right">{ing.minStock}</TableCell>
-                          <TableCell className="text-right">{ing.stock}</TableCell>
-                          <TableCell className="text-right">{ing.waste}%</TableCell>
-                          <TableCell className="text-right">{ing.unit}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex gap-1 justify-end">
+                          <TableCell className={textAlign}>{ing.source === "global" ? t("pages.adminPanel.global") : t("pages.adminPanel.restaurant")}</TableCell>
+                          <TableCell className={`${textAlign} truncate`} title={ing.supplier || undefined}>{ing.supplier || "—"}</TableCell>
+                          <TableCell className={textAlign}>{ing.minStock}</TableCell>
+                          <TableCell className={textAlign}>{ing.stock}</TableCell>
+                          <TableCell className={textAlign}>{ing.waste}%</TableCell>
+                          <TableCell className={textAlign}>{ing.unit}</TableCell>
+                          <TableCell className={textAlign}>
+                            <div className={`flex gap-1 ${justify}`}>
                               <Button
                                 variant="ghost"
                                 size="icon"
