@@ -4,6 +4,23 @@
 
 ---
 
+## סיכום דברים ש-Claude עשה
+
+| פעולה | פרטים |
+|-------|--------|
+| **הסרת pnpm** | מחק `pnpm-lock.yaml`, הפרויקט עבר ל-npm |
+| **הגדרת Vercel** | יצר `vercel.json` עם `installCommand: "npm install"` |
+| **package.json** | הוסיף `packageManager: "npm@10.0.0"` |
+| **עדכון תלויות** | firebase-admin, dotenv, framer-motion, lucide-react, react-day-picker, tw-animate-css, typescript |
+| **עדכון SERPER-SETUP.md** | הוסיף רשימת משתני Firebase ל-Vercel |
+| **יצירת מסמך הוראות** | `CLAUDE-בדיקה-ועדכון.md` — בדיקות ומשתני סביבה |
+| **Deploy ל-Firebase** | הרצת `npm run deploy` — האתר ב־galis-6ebbc.web.app |
+| **Push ל-GitHub** | כל השינויים נדחפו ל־aviganon/galis-restaurant |
+
+**לא בוצע (דורש פעולה ידנית):** הוספת משתני Firebase ב-Vercel Dashboard — בלי זה ה-build ב-Vercel נכשל.
+
+---
+
 ## 1. סיכום שינויים שבוצעו
 
 ### פריסה (Deploy)
