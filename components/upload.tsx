@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react"
 import { motion } from "framer-motion"
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage"
-import { writeBatch, doc, setDoc } from "firebase/firestore"
+import { writeBatch, doc, setDoc, getDoc, getDocs, collection } from "firebase/firestore"
 import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplier-ingredients"
 import { auth, storage, db } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
@@ -84,7 +84,7 @@ const VAT_RATE = 1.17
 const isOwnerRole = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner"
 
 export function Upload() {
-  const { currentRestaurantId, userRole, isSystemOwner, refreshIngredients } = useApp()
+  const { currentRestaurantId, userRole, isSystemOwner, refreshIngredients, restaurants } = useApp()
   const isOwner = isOwnerRole(userRole, isSystemOwner)
   const [isDragging, setIsDragging] = useState(false)
   const [selectedType, setSelectedType] = useState<string | null>(null)
@@ -154,13 +154,19 @@ export function Upload() {
     const explicitType = selectedType === "prices" || selectedType === "invoice" ? "p" : selectedType === "recipe" ? "d" : selectedType === "sales" ? "s" : null
     const typeToUse = forceType ?? (explicitType ?? (isAiCapable ? "p" : null))
     if (isAiCapable && typeToUse) {
+      // מנות (d), דוח מכירות (s) וחשבונית (p) כשמשתמש רגיל — דורשים מסעדה נבחרת
+      const needsRestaurant = typeToUse === "d" || typeToUse === "s" || (typeToUse === "p" && !isOwner)
+      if (needsRestaurant && !currentRestaurantId) {
+        toast.error("בחר מסעדה לפני ההעלאה — כל הנתונים יישמרו במסעדה הנבחרת")
+        return
+      }
       setFpmFile(file)
       setFpmType(typeToUse)
       setFpmOpen(true)
     } else {
       processFilesToStorage([file])
     }
-  }, [selectedType, processFilesToStorage])
+  }, [selectedType, processFilesToStorage, currentRestaurantId, isOwner])
 
   const processFiles = useCallback(
     async (files: FileList | File[] | null) => {
@@ -225,22 +231,56 @@ export function Upload() {
         toast.error("יש לבחור מסעדה לפני עדכון מחירי ספקים")
         return
       }
+      const restId = currentRestaurantId!
+      const now = new Date().toISOString()
+
+      if (!toGlobal && supName?.trim()) {
+        const asRef = doc(db, "restaurants", restId, "appState", "assignedSuppliers")
+        const asSnap = await getDoc(asRef)
+        const currentList: string[] = Array.isArray(asSnap.data()?.list) ? asSnap.data()!.list : []
+        if (!currentList.includes(supName.trim())) {
+          await setDoc(asRef, { list: [...currentList, supName.trim()] }, { merge: true })
+        }
+      }
+
+      let currentStocks: Record<string, number> = {}
+      if (!toGlobal) {
+        const restIngSnap = await getDocs(collection(db, "restaurants", restId, "ingredients"))
+        restIngSnap.forEach((d) => {
+          const data = d.data()
+          currentStocks[d.id] = typeof data.stock === "number" ? data.stock : 0
+        })
+      }
+
       const batch = writeBatch(db)
       let count = 0
       items.forEach((item) => {
         if (!item.name?.trim() || item.price <= 0) return
-        const payload = {
+        const qty = typeof item.qty === "number" && item.qty > 0 ? item.qty : 0
+        const payload: Record<string, unknown> = {
           price: item.price,
           unit: item.unit || "קג",
           supplier: supName,
-          lastUpdated: new Date().toISOString(),
+          lastUpdated: now,
           createdBy: toGlobal ? "global" : "restaurant",
+          waste: 0,
+          sku: item.sku ?? "",
+        }
+        if (!toGlobal && qty > 0) {
+          payload.stock = (currentStocks[item.name.trim()] ?? 0) + qty
         }
         if (toGlobal) {
           batch.set(doc(db, "ingredients", item.name.trim()), { ...payload }, { merge: true })
+          const priceId = (supName || "").replace(/\//g, "_").replace(/\./g, "_").trim() || "default"
+          batch.set(doc(db, "ingredients", item.name.trim(), "prices", priceId), {
+            price: item.price,
+            unit: item.unit || "קג",
+            supplier: supName,
+            lastUpdated: now,
+          }, { merge: true })
         } else {
           batch.set(
-            doc(db, "restaurants", currentRestaurantId!, "ingredients", item.name.trim()),
+            doc(db, "restaurants", restId, "ingredients", item.name.trim()),
             { ...payload },
             { merge: true }
           )
@@ -264,7 +304,8 @@ export function Upload() {
             )
           }
         }
-        toast.success(`${count} רכיבים עודכנו בהצלחה — עלויות המנות יתעדכנו אוטומטית`)
+        const withStock = items.filter((i) => typeof i.qty === "number" && i.qty > 0).length
+        toast.success(`${count} רכיבים עודכנו בהצלחה${withStock > 0 ? ` — מלאי עודכן ל־${withStock} רכיבים` : ""} — עלויות המנות יתעדכנו אוטומטית`)
         refreshIngredients?.()
       } else {
         toast.warning("אין רכיבים תקינים לשמירה (שם ריק או מחיר 0)")
@@ -301,8 +342,16 @@ export function Upload() {
         return
       }
       try {
+        const recSnap = await getDocs(collection(db, "restaurants", currentRestaurantId, "recipes"))
+        const existingNames = new Set(recSnap.docs.map((d) => d.id))
+        const newDishes = toSave.filter((it) => !existingNames.has(it.name!.trim()))
+        if (newDishes.length === 0) {
+          toast.info("כל המנות כבר קיימות במסעדה — עבור לעץ מוצר לעריכה")
+          setFpmFile(null)
+          return
+        }
         const batch = writeBatch(db)
-        toSave.forEach((it) => {
+        newDishes.forEach((it) => {
           const name = it.name!.trim()
           const ingredients = (it.ingredients || []).map((ing) => ({
             name: ing.name,
@@ -323,7 +372,10 @@ export function Upload() {
           )
         })
         await batch.commit()
-        toast.success(`${toSave.length} מנות נשמרו בהצלחה — עבור לעץ מוצר לראות`)
+        const skipped = toSave.length - newDishes.length
+        toast.success(
+          `${newDishes.length} מנות נוספו בהצלחה${skipped > 0 ? ` (${skipped} כבר קיימות — דולגו)` : ""} — עבור לעץ מוצר לעריכה`
+        )
         refreshIngredients?.()
       } catch (e) {
         toast.error("שגיאה בשמירה: " + (e as Error).message)
@@ -364,13 +416,87 @@ export function Upload() {
           })
           await batch.commit()
         }
-        toast.success(`דוח מכירות נשמר — ${Object.keys(dailySales).length} מנות${priceUpdates.length > 0 ? `, ${priceUpdates.length} מחירים עודכנו` : ""}`)
+
+        const [recSnap, ingSnap] = await Promise.all([
+          getDocs(collection(db, "restaurants", currentRestaurantId, "recipes")),
+          getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients")),
+        ])
+        const recipesMap: Record<string, { ingredients: { name: string; qty: number; unit: string; isSubRecipe?: boolean }[]; yieldQty?: number }> = {}
+        recSnap.forEach((d) => {
+          const data = d.data()
+          recipesMap[d.id] = {
+            ingredients: Array.isArray(data.ingredients) ? data.ingredients : [],
+            yieldQty: typeof data.yieldQty === "number" ? data.yieldQty : 1,
+          }
+        })
+        const ingData: Record<string, { stock: number; unit: string }> = {}
+        ingSnap.forEach((d) => {
+          const data = d.data()
+          ingData[d.id] = {
+            stock: typeof data.stock === "number" ? data.stock : 0,
+            unit: (data.unit as string) || "קג",
+          }
+        })
+
+        const toDeduct: Record<string, number> = {}
+        const toGrams = (qty: number, unit: string): number => {
+          const u = (unit || "").toLowerCase()
+          if (u === "גרם" || u === "ג") return qty
+          if (u === "קג" || u === 'ק"ג') return qty * 1000
+          if (u === "מל" || u === "מ\"ל") return qty
+          if (u === "ליטר") return qty * 1000
+          return qty
+        }
+        const fromGrams = (grams: number, unit: string): number => {
+          const u = (unit || "").toLowerCase()
+          if (u === "גרם" || u === "ג") return grams
+          if (u === "קג" || u === 'ק"ג') return grams / 1000
+          if (u === "מל" || u === "מ\"ל") return grams
+          if (u === "ליטר") return grams / 1000
+          return grams
+        }
+        const addUsage = (recipeName: string, mult: number) => {
+          const rec = recipesMap[recipeName]
+          if (!rec?.ingredients?.length) return
+          const yieldQty = rec.yieldQty ?? 1
+          rec.ingredients.forEach((ing) => {
+            if (ing.isSubRecipe) addUsage(ing.name, (ing.qty || 0) / yieldQty * mult)
+            else {
+              const g = toGrams(ing.qty || 0, ing.unit || "גרם") * mult / yieldQty
+              toDeduct[ing.name] = (toDeduct[ing.name] ?? 0) + g
+            }
+          })
+        }
+        Object.entries(dailySales).forEach(([dishName, { avg }]) => {
+          const sold = Math.round(avg) || 0
+          if (sold > 0) addUsage(dishName, sold)
+        })
+
+        if (Object.keys(toDeduct).length > 0) {
+          const stockBatch = writeBatch(db)
+          Object.entries(toDeduct).forEach(([ingName, gramsUsed]) => {
+            const ing = ingData[ingName]
+            if (!ing) return
+            const deduct = fromGrams(gramsUsed, ing.unit)
+            const newStock = Math.max(0, ing.stock - deduct)
+            stockBatch.set(
+              doc(db, "restaurants", currentRestaurantId, "ingredients", ingName),
+              { stock: newStock, lastUpdated: new Date().toISOString() },
+              { merge: true }
+            )
+          })
+          await stockBatch.commit()
+        }
+
+        const stockUpdated = Object.keys(toDeduct).length
+        toast.success(`דוח מכירות נשמר — ${Object.keys(dailySales).length} מנות${priceUpdates.length > 0 ? `, ${priceUpdates.length} מחירים עודכנו` : ""}${stockUpdated > 0 ? ` — מלאי עודכן (${stockUpdated} רכיבים)` : ""}`)
+        refreshIngredients?.()
       } catch (e) {
         toast.error("שגיאה בשמירה: " + (e as Error).message)
       }
       setFpmFile(null)
     },
-    [currentRestaurantId]
+    [currentRestaurantId, refreshIngredients]
   )
 
   // Safari/Chrome: מונע מהדפדפן לפתוח קובץ כשמשחררים מחוץ לאזור — חיוני לגרירה
@@ -474,8 +600,30 @@ export function Upload() {
     errors: uploads.filter(u => u.status === "error").length
   }
 
+  const restaurantName = restaurants?.find((r) => r.id === currentRestaurantId)?.name
+
   return (
     <div className="p-4 md:p-6 space-y-6">
+      {/* באנר מסעדה נבחרת — כל ההעלאות נשמרות במסעדה הזו */}
+      {currentRestaurantId && restaurantName ? (
+        <Card className="border-primary/50 bg-primary/5">
+          <CardContent className="py-3 px-4 flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
+            <span className="text-sm font-medium">
+              העלאה למסעדה: <strong>{restaurantName}</strong> — כל הנתונים יישמרו במסעדה הזו
+            </span>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+          <CardContent className="py-3 px-4 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+            <span className="text-sm">
+              בחר מסעדה כדי להעלות — מנות, דוחות מכירות ומחירונים יישמרו במסעדה הנבחרת
+            </span>
+          </CardContent>
+        </Card>
+      )}
       <FilePreviewModal
         open={fpmOpen}
         onOpenChange={(o) => {
@@ -484,6 +632,7 @@ export function Upload() {
         }}
         file={fpmFile}
         type={fpmType}
+        restaurantName={restaurantName}
         canSaveToGlobal={isOwner && (fpmType === "p")}
         onConfirmSupplier={handleConfirmSupplier}
         onConfirmDishes={handleConfirmDishes}

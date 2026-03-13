@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth"
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth"
 import { auth, db } from "@/lib/firebase"
 import { doc, getDoc, setDoc } from "firebase/firestore"
 import { firestoreConfig } from "@/lib/firestore-config"
@@ -107,6 +107,25 @@ export function LoginScreen(_props: LoginScreenProps) {
     } catch (err: unknown) {
       const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
       setError(getAuthErrorHebrew(code) || (err instanceof Error ? err.message : "שגיאה בהתחברות"))
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError("הזן את האימייל שלך כדי לאפס סיסמה")
+      return
+    }
+    setError("")
+    setIsLoading(true)
+    try {
+      await sendPasswordResetEmail(auth, email.trim())
+      setError("נשלח אימייל לאיפוס סיסמה — בדוק את תיבת הדואר")
+    } catch (err: unknown) {
+      const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
+      if (code === "auth/user-not-found") setError("לא נמצא משתמש עם אימייל זה")
+      else setError(getAuthErrorHebrew(code) || "שגיאה בשליחת אימייל")
     } finally {
       setIsLoading(false)
     }
@@ -565,7 +584,7 @@ export function LoginScreen(_props: LoginScreenProps) {
                         {!isLoading && <ArrowLeft className="w-4 h-4 mr-2" />}
                       </Button>
 
-                      <button type="button" className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors">
+                      <button type="button" onClick={handleForgotPassword} disabled={isLoading} className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors">
                         שכחתי סיסמה
                       </button>
                     </form>

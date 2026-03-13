@@ -21,6 +21,8 @@ export interface ExtractedSupplierItem {
   price: number
   unit: string
   sku?: string
+  /** כמות שהתקבלה — מעדכן מלאי אוטומטית */
+  qty?: number
 }
 
 export interface ExtractedDishItem {
@@ -45,13 +47,30 @@ export interface ExtractResult {
   no_prices?: boolean
 }
 
+const SUPPLIER_KNOWLEDGE = `
+מבנה חשבונית: שם פריט (תיאור בלבד), מק"ט (קוד נפרד), כמות שהתקבלה (qty), יחידה, מחיר ליחידה, סה"כ. חלץ מחיר נטו ליחידה וכמות (qty) — הכמות מעדכנת מלאי.
+מחירים: זהה ₪ ש״ח שקלים NIS — המר למספר. דלג: מע"מ, סיכומים, פקדונות, הובלה, מחיר=0.
+יחידות נפוצות: קג/ק"ג (משקל), גרם (משקל קטן), ליטר/מ"ל (נוזלים), יחידה (פריט בודד), חבילה, קרטון, קופסה, שקית. נרמל: קג→קג, ג→גרם, ליטר→ליטר.
+רכיבים נפוצים במחירוני ספקים: בשר (חזה עוף, שוק, אונטריב, אנטרקוט, כבש), ירקות (עגבניות, מלפפון, חסה, בצל, גזר, פלפל, חציל, ברוקולי), קמחים (קמח חיטה, קמח מלא, סולת), מוצרי חלב (גבינה, שמנת, יוגורט, חלב), דגים (סלמון, דניס, מוסר, טונה), תבלינים (מלח, פלפל, פפריקה, כורכום), שמנים (שמן קנולה, שמן זית), גרגרים (אורז, גרגרי חומוס, עדשים), מוצרים יבשים (פסטה, אטריות, קוסקוס).
+שמות חלופיים: חזה עוף=חזה תרנגולת, אונטריב=בשר טחון שמן, אנטרקוט=צלע, טחינה=טחינה גולמית, גרגרי חומוס=חומוס יבש.
+`
+
 const SUPPLIER_SYSTEM = `אתה מומחה לניתוח חשבוניות ומחירוני ספקי מזון ומשקאות בישראל.
-חוקים: שם פריט=תיאור בלבד. מק"ט=קוד נפרד. מחיר נטו (לא סה"כ). יחידה: קג/יחידה/ליטר.
-דלג: מע"מ, סיכומים, פקדונות, מחיר=0.
-החזר JSON בלבד: {"supplier_name":"...","invoice_date":"DD/MM/YYYY","items":[{"name":"...","sku":"מקט או null","price":0.00,"unit":"יחידה"}]}`
+${SUPPLIER_KNOWLEDGE}
+חוקים: שם פריט=תיאור בלבד (ללא מק"ט). מק"ט=קוד נפרד ב-sku. מחיר נטו ליחידה. qty=כמות שהתקבלה (לעדכון מלאי).
+החזר JSON בלבד: {"supplier_name":"...","invoice_date":"DD/MM/YYYY","items":[{"name":"...","sku":"מקט או null","price":0.00,"unit":"יחידה","qty":0}]}`
+
+const MENU_KNOWLEDGE = `
+קטגוריות נפוצות בתפריטים ישראליים: ראשונות, סלטים, מרקים, אנטיפסטי, מנות עיקריות, עיקריות, בשרים, דגים, פסטות, פיצות, קינוחים, משקאות, תוספות, מנות ילדים, מנות משפחתיות.
+מחירים: זהה ₪ ש״ח שקלים NIS — המר למספר. דלג על "מחיר לפי משקל" או "לפי בקשה".
+מבנה: תפריטים לרוב בשתי עמודות — שם מנה | מחיר. כותרות קטגוריה (ראשונות, עיקריות) אינן מנות.
+מנות ישראליות טיפוסיות ורכיביהן (כמויות למנה): חומוס→גרגרי חומוס 80ג, טחינה 80ג, לימון 20ג, שמן 15ג; פלאפל→גרגרי חומוס 100ג, פטרוזיליה 15ג, שום 5ג; שווארמה→בשר עוף 150ג, פיתה 80ג, טחינה 80ג; שניצל→חזה עוף 150ג, פירורי לחם 30ג, ביצה 1 יח; קבב→בשר טחון 150ג, בצל 30ג, פטרוזיליה 10ג; סלמון→דג סלמון 180ג, לימון 20ג, שמן 15ג; פסטה→פסטה 120ג, רוטב 80ג, שום 5ג; המבורגר→בשר טחון 200ג, לחמניה 80ג, ירקות 50ג; סלט קיסר→חסה 80ג, פרמזן 20ג, קרוטונים 30ג; פיצה→בצק 200ג, עגבניות 50ג, מוצרלה 80ג; ברוסקטה→לחם 60ג, עגבניות 50ג, שום 5ג; טרטר→בשר נא 120ג, חלמון 1 יח; סטייק→בשר בקר 250ג, תבלינים 5ג; דניס→דג דניס 200ג, לימון 20ג; ריזוטו→אורז 80ג, יין 50מ"ל, פרמזן 30ג; מרק→ירקות 150ג או בשר 10ג, תבלינים; חומוס ביתי→גרגרי חומוס 100ג, טחינה 80ג, לימון 30ג; פלאפל→גרגרי חומוס 90ג, שום 5ג, פטרוזיליה 10ג; סלט ירקות→חסה 50ג, עגבניה 50ג, מלפפון 40ג, בצל 20ג; צ'יפס→תפוחי אדמה 150ג, שמן 15ג; פלאפל בפיתה→חמוצים 30ג, פלאפל 80ג, סלט 40ג; חומוס מלא→חומוס 150ג, ביצה 1 יח, פלאפל 30ג.
+`
 
 const DISH_SYSTEM = `אתה מנתח תפריטי מסעדות בישראל. חלץ מנות, מחירים, קטגוריות.
-רכיבים: עד 6 למנה. יחידות: גרם/קג/יחידה/מ"ל.
+${MENU_KNOWLEDGE}
+חשוב: לכל מנה ישייך רכיבים וכמויות לפי הבנתך — השתמש בכמויות הטיפוסיות מהרשימה למעלה. אם אין התאמה — השער כמויות סבירות (מנה עיקרית: 150–250ג בשר/דג, מנה קטנה: 50–100ג).
+רכיבים: עד 8 למנה. יחידות: גרם/קג/יחידה/מ"ל.
 החזר JSON בלבד: {"items":[{"name":"שם מנה","price":0,"category":"קטגוריה","ingredients":[{"name":"שם רכיב","qty":100,"unit":"גרם"}]}]}`
 
 const SALES_SYSTEM = `אתה מנתח דוחות מכירות. חלץ: name, qty, price.
@@ -196,9 +215,9 @@ export async function extractWithAI(
           : SALES_SYSTEM
     const userContent =
       type === "p"
-        ? "נתח את המסמך וחלץ פריטים ומחירים. JSON בלבד."
+        ? "נתח את החשבונית וחלץ רכיבים (שם), מחיר ליחידה, יחידה, כמות שהתקבלה (qty). JSON בלבד."
         : type === "d"
-          ? "חלץ מנות ומחירים מהתפריט. JSON בלבד."
+          ? "חלץ מנות ומחירים מהתפריט. לכל מנה ישייך רכיבים לפי הבנתך (בשר, ירקות, קמח וכו') — גם אם לא מופיעים בתפריט. JSON בלבד."
           : "חלץ מנות, כמויות ומחירים. JSON בלבד."
     const data = await callClaude({
       model: "claude-sonnet-4-20250514",
@@ -222,9 +241,9 @@ export async function extractWithAI(
           : SALES_SYSTEM
     const userContent =
       type === "p"
-        ? "נתח את המסמך וחלץ פריטים ומחירים. JSON בלבד."
+        ? "נתח את החשבונית וחלץ רכיבים (שם), מחיר ליחידה, יחידה, כמות שהתקבלה (qty). JSON בלבד."
         : type === "d"
-          ? "חלץ מנות ומחירים מהתפריט. JSON בלבד."
+          ? "חלץ מנות ומחירים מהתפריט. לכל מנה ישייך רכיבים לפי הבנתך (בשר, ירקות, קמח וכו') — גם אם לא מופיעים בתפריט. JSON בלבד."
           : "חלץ מנות, כמויות ומחירים. JSON בלבד."
     const mediaBlock =
       isPdf
@@ -251,11 +270,17 @@ export async function extractWithAI(
         : type === "d"
           ? DISH_SYSTEM
           : SALES_SYSTEM
+    const sheetUserText =
+      type === "d"
+        ? `הנתונים:\n${preview}\n\nחלץ מנות ומחירים. לכל מנה ישייך רכיבים וכמויות לפי הבנתך. JSON בלבד.`
+        : type === "p"
+          ? `הנתונים:\n${preview}\n\nחלץ רכיבים (שם), מחיר, יחידה, כמות (qty). JSON בלבד.`
+          : `הנתונים:\n${preview}\n\nחלץ ל-JSON.`
     const data = await callClaude({
       model: "claude-sonnet-4-20250514",
       max_tokens: 2000,
       system,
-      messages: [{ role: "user", content: [{ type: "text", text: `הנתונים:\n${preview}\n\nחלץ ל-JSON.` }] }],
+      messages: [{ role: "user", content: [{ type: "text", text: sheetUserText }] }],
     })
     const text = data.content?.map((b) => b.text ?? "").join("") ?? ""
     const clean = text.replace(/```json|```/g, "").trim()
@@ -264,4 +289,86 @@ export async function extractWithAI(
   }
 
   return { items: [] }
+}
+
+export interface IngredientForSuggestion {
+  name: string
+  price: number
+  unit: string
+  supplier?: string
+  stock?: number
+}
+
+const SUGGEST_DISH_SYSTEM = `אתה שף ומנהל תפריט. בהתבסס על רשימת הרכיבים שיש למסעדה (עם מחירים ויחידות מהספקים), הצע מנה אחת מתאימה.
+חוקים:
+- השתמש רק ברכיבים מהרשימה — אל תוסיף רכיבים שלא קיימים.
+- ציין כמויות מדויקות (גרם, יחידה וכו') לפי היחידות ברשימה.
+- הצע מנה פופולרית שמתאימה למסעדה ישראלית (עיקריות, ראשונות, סלטים וכו').
+- קבע מחיר מכירה סביר (כולל מע"מ) לפי עלות הרכיבים + רווח סביר (30–40% עלות מזון).
+החזר JSON בלבד: {"name":"שם המנה","category":"קטגוריה","sellingPrice":0,"ingredients":[{"name":"שם רכיב","qty":0,"unit":"גרם"}]}`
+
+export async function suggestDishFromIngredients(
+  ingredients: IngredientForSuggestion[]
+): Promise<ExtractedDishItem | null> {
+  if (ingredients.length === 0) return null
+  const list = ingredients
+    .slice(0, 80)
+    .map((i) => `${i.name} — ${i.price} ש"ח/${i.unit}${i.stock != null ? ` (מלאי: ${i.stock})` : ""}`)
+    .join("\n")
+  const data = await callClaude({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 1500,
+    system: SUGGEST_DISH_SYSTEM,
+    messages: [{ role: "user", content: [{ type: "text", text: `רשימת הרכיבים במסעדה:\n${list}\n\nהצע מנה אחת עם מתכון מלא. JSON בלבד.` }] }],
+  })
+  const out = data.content?.map((b) => b.text ?? "").join("") ?? ""
+  const clean = out.replace(/```json|```/g, "").trim()
+  try {
+    const parsed = JSON.parse(clean) as { name?: string; category?: string; sellingPrice?: number; ingredients?: Array<{ name: string; qty: number; unit: string }> }
+    if (!parsed?.name || !Array.isArray(parsed.ingredients)) return null
+    return {
+      name: parsed.name,
+      price: typeof parsed.sellingPrice === "number" ? parsed.sellingPrice : 0,
+      category: parsed.category || "עיקריות",
+      ingredients: parsed.ingredients.filter((ing) => ingredients.some((i) => i.name === ing.name)),
+    }
+  } catch {
+    return null
+  }
+}
+
+/** מחיר מהאינטרנט — AI מחזיר מחיר טיפוסי וחנות בישראל */
+export interface WebPriceResult {
+  price: number
+  store: string
+  unit: string
+}
+
+const WEB_PRICE_SYSTEM = `אתה מומחה למחירי מוצרי מזון בישראל. לפי שם הרכיב, החזר:
+- מחיר בשקלים (מספר) — מחיר טיפוסי בסופרמרקטים
+- חנות/רשת (רמי לוי, שופרסל, ויקטורי, יוחננוף, מגה בעיר וכו') — איפה בדרך כלל הכי זול
+- יחידה (קג, גרם, ליטר, יחידה)
+
+החזר JSON בלבד: {"price":0,"store":"שם חנות","unit":"יחידה"}`
+
+export async function fetchWebPriceForIngredient(ingredientName: string): Promise<WebPriceResult | null> {
+  const data = await callClaude({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 500,
+    system: WEB_PRICE_SYSTEM,
+    messages: [{ role: "user", content: [{ type: "text", text: `מה המחיר הטיפוסי ל-${ingredientName} בסופרמרקטים בישראל? איפה הכי זול? החזר JSON בלבד: {"price":0,"store":"שם","unit":"יחידה"}` }] }],
+  })
+  const out = data.content?.map((b) => b.text ?? "").join("") ?? ""
+  const clean = out.replace(/```json|```/g, "").trim()
+  try {
+    const parsed = JSON.parse(clean) as { price?: number; store?: string; unit?: string }
+    if (typeof parsed?.price !== "number" || parsed.price <= 0) return null
+    return {
+      price: parsed.price,
+      store: (parsed.store as string) || "לא צוין",
+      unit: (parsed.unit as string) || "קג",
+    }
+  } catch {
+    return null
+  }
 }

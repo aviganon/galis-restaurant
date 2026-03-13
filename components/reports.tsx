@@ -43,11 +43,13 @@ export function Reports() {
     setLoading(true)
     const load = async () => {
       try {
-        const [recSnap, restIngSnap, salesDoc] = await Promise.all([
+        const [recSnap, restIngSnap, salesDoc, asDoc] = await Promise.all([
           getDocs(collection(db, "restaurants", currentRestaurantId, "recipes")),
           getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients")),
           getDoc(doc(db, "restaurants", currentRestaurantId, "appState", `salesReport_${currentRestaurantId}`)),
+          getDoc(doc(db, "restaurants", currentRestaurantId, "appState", "assignedSuppliers")),
         ])
+        const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
         const globalIngSnap = isOwner ? await getDocs(collection(db, "ingredients")) : null
 
         const prices: Record<string, number> = {}
@@ -58,6 +60,8 @@ export function Reports() {
         globalIngSnap?.forEach((d) => {
           if (!(d.id in prices)) {
             const data = d.data()
+            const sup = (data.supplier as string) || ""
+            if (!isOwner && sup && !assignedList.includes(sup)) return
             prices[d.id] = typeof data.price === "number" ? data.price : 0
           }
         })

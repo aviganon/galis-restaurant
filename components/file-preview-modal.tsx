@@ -22,6 +22,7 @@ interface FilePreviewModalProps {
   file: File | null
   type: ExtractType
   supplierName?: string
+  restaurantName?: string | null
   canSaveToGlobal?: boolean
   onConfirmSupplier?: (items: ExtractedSupplierItem[], supplierName: string, saveToGlobal?: boolean) => void
   onConfirmDishes?: (items: ExtractedDishItem[]) => void
@@ -34,6 +35,7 @@ export function FilePreviewModal({
   file,
   type,
   supplierName: initialSupplier = "",
+  restaurantName,
   canSaveToGlobal = false,
   onConfirmSupplier,
   onConfirmDishes,
@@ -42,6 +44,8 @@ export function FilePreviewModal({
   const [loading, setLoading] = useState(false)
   const [items, setItems] = useState<ExtractedItem[]>([])
   const [supplierName, setSupplierName] = useState(initialSupplier)
+  const [invoiceDate, setInvoiceDate] = useState<string | null>(null)
+  const [detectedSupplier, setDetectedSupplier] = useState<string | null>(null)
   const [saveToGlobal, setSaveToGlobal] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -50,6 +54,8 @@ export function FilePreviewModal({
     setItems([])
     setError(null)
     setSupplierName(initialSupplier)
+    setInvoiceDate(null)
+    setDetectedSupplier(null)
     setSaveToGlobal(false)
     setLoading(true)
     extractWithAI(file, type, initialSupplier || undefined)
@@ -60,7 +66,11 @@ export function FilePreviewModal({
           return
         }
         setItems(res.items || [])
-        if (res.supplier_name && !initialSupplier) setSupplierName(res.supplier_name)
+        if (res.supplier_name && !initialSupplier) {
+          setSupplierName(res.supplier_name)
+          setDetectedSupplier(res.supplier_name)
+        }
+        if (res.invoice_date) setInvoiceDate(res.invoice_date)
       })
       .catch((e) => {
         setError(e.message || "שגיאה בניתוח")
@@ -84,7 +94,7 @@ export function FilePreviewModal({
 
   const addRow = useCallback(() => {
     if (type === "p") {
-      setItems((prev) => [...prev, { name: "", price: 0, unit: "קג", sku: "" }])
+      setItems((prev) => [...prev, { name: "", price: 0, unit: "קג", sku: "", qty: 0 }])
     } else if (type === "d") {
       setItems((prev) => [...prev, { name: "", price: 0, category: "אחר", ingredients: [] }])
     } else {
@@ -133,19 +143,38 @@ export function FilePreviewModal({
           )}
           {!loading && !error && items.length > 0 && (
             <>
+              {/* ישויוך — למי הפריטים ישויכו */}
+              <div className="p-3 rounded-lg bg-muted/50 border space-y-2">
+                <p className="text-sm font-medium">ישויוך הפריטים</p>
+                {type === "p" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="fpm-supplier">שם ספק — הפריטים ישויכו לספק זה</Label>
+                      {detectedSupplier && (
+                        <p className="text-xs text-emerald-600 dark:text-emerald-500">זוהה מהחשבונית: {detectedSupplier}</p>
+                      )}
+                      <Input
+                        id="fpm-supplier"
+                        name="fpmSupplier"
+                        value={supplierName}
+                        onChange={(e) => setSupplierName(e.target.value)}
+                        placeholder="שם הספק"
+                        className="h-10"
+                      />
+                    </div>
+                    {invoiceDate && (
+                      <p className="text-xs text-muted-foreground">תאריך חשבונית: {invoiceDate}</p>
+                    )}
+                  </>
+                )}
+                {(type === "d" || type === "s") && (
+                  <p className="text-sm text-muted-foreground">
+                    {restaurantName ? `הפריטים ישויכו למסעדה: ${restaurantName}` : "הפריטים ישויכו למסעדה הנבחרת — בחר מסעדה למעלה"}
+                  </p>
+                )}
+              </div>
               {type === "p" && (
                 <div className="space-y-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="fpm-supplier">שם ספק</Label>
-                    <Input
-                      id="fpm-supplier"
-                      name="fpmSupplier"
-                      value={supplierName}
-                      onChange={(e) => setSupplierName(e.target.value)}
-                      placeholder="שם הספק"
-                      className="h-10"
-                    />
-                  </div>
                   {canSaveToGlobal && (
                     <label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox checked={saveToGlobal} onCheckedChange={(v) => setSaveToGlobal(!!v)} />
@@ -162,6 +191,7 @@ export function FilePreviewModal({
                         <th className="text-right p-2 font-semibold">שם</th>
                         {type === "p" && (
                           <>
+                            <th className="text-center p-2 font-semibold">כמות</th>
                             <th className="text-center p-2 font-semibold">מחיר</th>
                             <th className="text-center p-2 font-semibold">יחידה</th>
                             <th className="text-center p-2 font-semibold w-16">מק"ט</th>
@@ -191,6 +221,18 @@ export function FilePreviewModal({
                           </td>
                           {type === "p" && (
                             <>
+                              <td className="p-2">
+                                <Input
+                                  id={`fpm-item-${idx}-qty`}
+                                  name={`fpmItemQty-${idx}`}
+                                  type="number"
+                                  value={(item as ExtractedSupplierItem).qty ?? 0}
+                                  onChange={(e) => updateItem(idx, "qty", parseFloat(e.target.value) || 0)}
+                                  className="h-8 text-sm w-16"
+                                  aria-label="כמות"
+                                  placeholder="מלאי"
+                                />
+                              </td>
                               <td className="p-2">
                                 <Input
                                   id={`fpm-item-${idx}-price`}

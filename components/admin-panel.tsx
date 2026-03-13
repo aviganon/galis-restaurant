@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Shield, Key, Loader2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
+import { Shield, Key, Loader2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/dialog"
 import { getClaudeApiKey, setClaudeApiKey, testClaudeConnection } from "@/lib/claude"
 import { toast } from "sonner"
-import { doc, setDoc, getDoc, getDocFromServer, collection, query, where, getDocs, getDocsFromServer, deleteDoc, writeBatch } from "firebase/firestore"
+import { doc, setDoc, getDoc, getDocFromServer, collection, collectionGroup, query, where, getDocs, getDocsFromServer, deleteDoc, writeBatch } from "firebase/firestore"
 import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplier-ingredients"
 import { firestoreConfig } from "@/lib/firestore-config"
 import { db } from "@/lib/firebase"
@@ -65,6 +65,8 @@ type SupplierWithRests = {
   address?: string | null
 }
 
+type GlobalCheapest = { price: number; supplier: string; unit: string }
+
 type IngredientRow = {
   id: string
   name: string
@@ -77,6 +79,61 @@ type IngredientRow = {
   sku: string
   source: "global" | "restaurant"
   status: "שויך" | "ממתין"
+  globalCheapest?: GlobalCheapest
+}
+
+function pricePerKg(p: number, u: string): number {
+  const x = (u || "").toLowerCase()
+  if (x.includes("ק\"ג") || x === "קג" || x === "kg") return p
+  if (x === "גרם" || x === "g") return p * 1000
+  return p
+}
+
+function WebPriceCell({ ingredientName }: { ingredientName: string }) {
+  const [data, setData] = useState<{ price: number; store: string; unit: string } | null>(null)
+  const [loading, setLoading] = useState(false)
+  const fetchWebPrice = useCallback(async () => {
+    setLoading(true)
+    try {
+      let d: { price: number; store: string; unit: string } | null = null
+      try {
+        const res = await fetch("/api/ingredient-web-price", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: ingredientName }),
+        })
+        if (res.ok) {
+          const j = await res.json()
+          if (j.price) d = { price: j.price, store: j.store || "—", unit: j.unit || "קג" }
+        }
+      } catch {
+        //
+      }
+      if (!d) {
+        const { fetchWebPriceForIngredient } = await import("@/lib/ai-extract")
+        d = await fetchWebPriceForIngredient(ingredientName)
+      }
+      if (d) setData({ price: d.price, store: d.store, unit: d.unit })
+      else toast.error("לא הצלחתי למצוא מחיר")
+    } catch (e) {
+      toast.error((e as Error)?.message || "שגיאה")
+    } finally {
+      setLoading(false)
+    }
+  }, [ingredientName])
+  if (data) {
+    return (
+      <div className="text-blue-600 dark:text-blue-400 text-xs">
+        <span className="text-muted-foreground">מהאינטרנט:</span> ₪{data.price.toFixed(1)}/{data.unit} אצל {data.store}
+      </div>
+    )
+  }
+  return (
+    <Button variant="ghost" size="sm" className="h-6 px-1 text-xs" onClick={fetchWebPrice} disabled={loading}>
+      {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Globe className="w-3 h-3 ml-1" />}
+      בדוק באינטרנט
+    </Button>
+  )
 }
 
 export function AdminPanel() {
@@ -278,6 +335,39 @@ export function AdminPanel() {
         getDocsFromServer(collection(db, "ingredients")),
         getDocsFromServer(collection(db, "suppliers")),
       ])
+      let pricesSnap: Awaited<ReturnType<typeof getDocs>>
+      try {
+        pricesSnap = await getDocs(collectionGroup(db, "prices"))
+      } catch {
+        pricesSnap = { docs: [], empty: true, size: 0, forEach: () => {} } as Awaited<ReturnType<typeof getDocs>>
+      }
+
+      const globalCheapestByIngredient = new Map<string, GlobalCheapest>()
+      pricesSnap.forEach((d) => {
+        const data = d.data()
+        const parentId = d.ref.parent.parent?.id
+        if (!parentId) return
+        const price = typeof data.price === "number" ? data.price : 0
+        if (price <= 0) return
+        const unit = (data.unit as string) || "ק\"ג"
+        const supplier = (data.supplier as string) || ""
+        const existing = globalCheapestByIngredient.get(parentId)
+        if (!existing || pricePerKg(price, unit) < pricePerKg(existing.price, existing.unit)) {
+          globalCheapestByIngredient.set(parentId, { price, unit, supplier })
+        }
+      })
+      globalIngSnap.forEach((d) => {
+        const data = d.data()
+        const price = typeof data.price === "number" ? data.price : 0
+        const unit = (data.unit as string) || "ק\"ג"
+        const sup = (data.supplier as string) || ""
+        if (price > 0) {
+          const existing = globalCheapestByIngredient.get(d.id)
+          if (!existing || pricePerKg(price, unit) < pricePerKg(existing.price, existing.unit)) {
+            globalCheapestByIngredient.set(d.id, { price, unit, supplier: sup })
+          }
+        }
+      })
 
       const supplierSet = new Set<string>()
       const supplierDetails: Record<string, { phone?: string | null; email?: string | null; contact?: string | null; address?: string | null }> = {}
@@ -298,6 +388,7 @@ export function AdminPanel() {
           sku: (data.sku as string) || "",
           source: "global",
           status: "ממתין",
+          globalCheapest: globalCheapestByIngredient.get(d.id),
         }
         if (s) {
           if (!supplierToIng[s]) supplierToIng[s] = []
@@ -403,6 +494,7 @@ export function AdminPanel() {
           sku: (data.sku as string) || "",
           source: "global",
           status: "ממתין",
+          globalCheapest: globalCheapestByIngredient.get(d.id),
         }
       })
       setIngredientsList(allIngredients)
@@ -515,6 +607,8 @@ export function AdminPanel() {
       }
       await setDoc(doc(db, "ingredients", name), data, { merge: true })
       if (supplier) {
+        const priceId = supplier.replace(/\//g, "_").replace(/\./g, "_").trim() || "default"
+        await setDoc(doc(db, "ingredients", name, "prices", priceId), { price, unit: addIngredientUnit, supplier, lastUpdated: data.lastUpdated }, { merge: true })
         const synced = await syncSupplierIngredientsToAssignedRestaurants(
           supplier,
           [{ name, price, unit: addIngredientUnit, supplier, waste, sku: sku || "" }]
@@ -571,6 +665,8 @@ export function AdminPanel() {
       }
       await setDoc(doc(db, "ingredients", editAdminIngredient.id), data, { merge: true })
       if (supplier) {
+        const priceId = supplier.replace(/\//g, "_").replace(/\./g, "_").trim() || "default"
+        await setDoc(doc(db, "ingredients", editAdminIngredient.id, "prices", priceId), { price, unit: editAdminIngUnit, supplier, lastUpdated: data.lastUpdated }, { merge: true })
         const synced = await syncSupplierIngredientsToAssignedRestaurants(
           supplier,
           [{ name: editAdminIngredient.name, price, unit: editAdminIngUnit, supplier, waste, sku }]
@@ -1781,6 +1877,7 @@ export function AdminPanel() {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="text-right w-14">פעולות</TableHead>
+                        <TableHead className="text-right">הכי זול אצל</TableHead>
                         {(["sku", "status", "source", "supplier", "minStock", "stock", "waste", "unit", "price", "name"] as const).map((key) => {
                           const labels: Record<string, string> = { name: "רכיב", price: "מחיר", unit: "יחידה", waste: "פחת %", stock: "מלאי", minStock: "מינ׳", supplier: "ספק", sku: "מק״ט", source: "מקור", status: "סטטוס" }
                           const isSortable = ["name", "price", "unit", "waste", "stock", "minStock", "supplier", "sku", "source", "status"].includes(key)
@@ -1833,6 +1930,19 @@ export function AdminPanel() {
                               >
                                 {deletingIngredientId === `${ing.source}-${ing.id}` ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                               </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right text-sm">
+                            <div className="space-y-1">
+                              {ing.globalCheapest && (
+                                <div className="text-muted-foreground">
+                                  <span className="text-xs">מהמערכת:</span> ₪{ing.globalCheapest.price.toFixed(1)}/{ing.globalCheapest.unit}
+                                  {ing.globalCheapest.supplier && (
+                                    <span className="text-primary font-medium"> אצל {ing.globalCheapest.supplier}</span>
+                                  )}
+                                </div>
+                              )}
+                              <WebPriceCell ingredientName={ing.name} />
                             </div>
                           </TableCell>
                           <TableCell className="text-right">{ing.sku || "—"}</TableCell>
@@ -2397,7 +2507,18 @@ export function AdminPanel() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                מפתח זה נשמר ב-Firestore ומשמש לניתוח קבצים (מחירונים, תפריטים, חשבוניות) באמצעות AI.
+                מפתח זה נשמר ב-Firestore ומשמש לניתוח קבצים (מחירונים, תפריטים, חשבוניות) ובדיקת מחירים באינטרנט באמצעות AI.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                איפה נרשמים:{" "}
+                <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                  Anthropic (Claude)
+                </a>
+                {" "}•{" "}
+                <a href="https://serper.dev/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                  Serper
+                </a>
+                {" "}(חיפוש באינטרנט — לפריסה בשרת)
               </p>
               {loading ? (
                 <div className="flex items-center gap-2 text-muted-foreground">

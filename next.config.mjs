@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
+// ב-Vercel: ללא export כדי שה-API routes יעבדו. ב-Firebase/מקומי: export לקבצים סטטיים.
 const nextConfig = {
-  output: "export",
+  ...(process.env.VERCEL === "1" ? {} : { output: "export" }),
   typescript: {
     ignoreBuildErrors: true,
   },

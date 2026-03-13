@@ -252,7 +252,7 @@ export function Dashboard() {
           if (ingIds.has(d.id)) return
           const data = d.data()
           const sup = (data.supplier as string) || ""
-          if (sup && !assignedList.includes(sup)) return
+          if (!isOwner && sup && !assignedList.includes(sup)) return
           mergeIng(d)
         })
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { collection, getDocs, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore"
+import { collection, collectionGroup, getDocs, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
 import { motion } from "framer-motion"
@@ -47,11 +47,20 @@ import {
   TrendingDown,
   Loader2,
   ChefHat,
+  Globe,
 } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { downloadExcel } from "@/lib/export-excel"
+import { fetchWebPriceForIngredient } from "@/lib/ai-extract"
+
+/** מחיר הכי זול גלובלי — לבעלים להשוואה */
+interface GlobalCheapest {
+  price: number
+  supplier: string
+  unit: string
+}
 
 interface Ingredient {
   id: string
@@ -65,9 +74,21 @@ interface Ingredient {
   sku: string
   category: string
   lastPriceChange?: number
+  /** בעלים: מחיר מהמסעדה שלי vs מחיר שוק (גלובלי מספקים אחרים) */
+  priceSource?: "mine" | "market"
+  /** בעלים: הכי זול גלובלי (מאיפה לקנות) */
+  globalCheapest?: GlobalCheapest
 }
 
 const UNITS = ["גרם", "ק\"ג", "מל", "ליטר", "יחידה", "חבילה", "כף", "כפית"]
+
+/** המרה למחיר ליחידת kg להשוואה (גרם/קג) */
+function pricePerKg(price: number, unit: string): number {
+  const u = (unit || "").toLowerCase()
+  if (u.includes("ק\"ג") || u === "קג" || u === "kg") return price
+  if (u === "גרם" || u === "g") return price * 1000
+  return price
+}
 const CATEGORIES = ["אחר", "בשר", "עוף", "דגים", "חלב", "ירקות", "פירות", "תבלינים", "שמנים", "קמחים"]
 
 const isOwnerRole = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner"
@@ -82,6 +103,7 @@ export function Ingredients() {
   const [searchTerm, setSearchTerm] = useState("")
   const [supplierFilter, setSupplierFilter] = useState("כל הספקים")
   const [stockFilter, setStockFilter] = useState("all")
+  const [priceSourceFilter, setPriceSourceFilter] = useState<"all" | "mine" | "market">("all")
   const [sortBy, setSortBy] = useState("name")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [addIngSaving, setAddIngSaving] = useState(false)
@@ -120,6 +142,8 @@ export function Ingredients() {
   const [compoundItemUnit, setCompoundItemUnit] = useState("גרם")
   const [compoundItemWaste, setCompoundItemWaste] = useState(0)
   const [recipes, setRecipes] = useState<{ id: string; isCompound?: boolean }[]>([])
+  const [webPriceByIngredient, setWebPriceByIngredient] = useState<Record<string, { price: number; store: string; unit: string; source: string }>>({})
+  const [webPriceLoading, setWebPriceLoading] = useState<string | null>(null)
 
   const loadIngredients = useCallback(async () => {
     if (!currentRestaurantId) {
@@ -133,13 +157,54 @@ export function Ingredients() {
         getDoc(doc(db, "restaurants", currentRestaurantId, "appState", "assignedSuppliers")),
         getDocs(collection(db, "ingredients")),
       ])
+      let pricesSnap: Awaited<ReturnType<typeof getDocs>> | null = null
+      if (isOwner) {
+        try {
+          pricesSnap = await getDocs(collectionGroup(db, "prices"))
+        } catch {
+          // אם טעינת prices נכשלת — ממשיכים בלי "הכי זול"
+        }
+      }
+
       const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
       const byId = new Map<string, Ingredient>()
       const supSet = new Set<string>()
       const restSupSet = new Set<string>()
+
+      const globalCheapestByIngredient = new Map<string, GlobalCheapest>()
+      if (isOwner && pricesSnap) {
+        pricesSnap.forEach((d) => {
+          const data = d.data()
+          const parentId = d.ref.parent.parent?.id
+          if (!parentId) return
+          const price = typeof data.price === "number" ? data.price : 0
+          if (price <= 0) return
+          const unit = (data.unit as string) || "ק\"ג"
+          const supplier = (data.supplier as string) || ""
+          const existing = globalCheapestByIngredient.get(parentId)
+          const ppkg = pricePerKg(price, unit)
+          if (!existing || ppkg < pricePerKg(existing.price, existing.unit)) {
+            globalCheapestByIngredient.set(parentId, { price, unit, supplier })
+          }
+        })
+      }
+      globalSnap.forEach((d) => {
+        const data = d.data()
+        const price = typeof data.price === "number" ? data.price : 0
+        const unit = (data.unit as string) || "ק\"ג"
+        const sup = (data.supplier as string) || ""
+        if (isOwner && price > 0) {
+          const existing = globalCheapestByIngredient.get(d.id)
+          const ppkg = pricePerKg(price, unit)
+          if (!existing || ppkg < pricePerKg(existing.price, existing.unit)) {
+            globalCheapestByIngredient.set(d.id, { price, unit, supplier: sup })
+          }
+        }
+      })
+
       restSnap.forEach((d) => {
         const data = d.data()
-        byId.set(d.id, {
+        const ing: Ingredient = {
           id: d.id,
           name: d.id,
           price: typeof data.price === "number" ? data.price : 0,
@@ -150,7 +215,10 @@ export function Ingredients() {
           supplier: (data.supplier as string) || "",
           sku: (data.sku as string) || "",
           category: (data.category as string) || "אחר",
-        })
+          priceSource: isOwner ? "mine" : undefined,
+          globalCheapest: isOwner ? globalCheapestByIngredient.get(d.id) : undefined,
+        }
+        byId.set(d.id, ing)
         if (data.supplier) {
           supSet.add(data.supplier)
           restSupSet.add(data.supplier)
@@ -161,7 +229,7 @@ export function Ingredients() {
         const data = d.data()
         const sup = (data.supplier as string) || ""
         if (!isOwner && sup && !assignedList.includes(sup)) return
-        byId.set(d.id, {
+        const ing: Ingredient = {
           id: d.id,
           name: d.id,
           price: typeof data.price === "number" ? data.price : 0,
@@ -172,7 +240,10 @@ export function Ingredients() {
           supplier: sup,
           sku: (data.sku as string) || "",
           category: (data.category as string) || "אחר",
-        })
+          priceSource: isOwner ? "market" : undefined,
+          globalCheapest: isOwner ? globalCheapestByIngredient.get(d.id) : undefined,
+        }
+        byId.set(d.id, ing)
         if (data.supplier) supSet.add(data.supplier)
       })
       setIngredients(Array.from(byId.values()))
@@ -189,6 +260,39 @@ export function Ingredients() {
   useEffect(() => {
     loadIngredients()
   }, [loadIngredients])
+
+  const fetchWebPrice = useCallback(async (ingredientName: string) => {
+    setWebPriceLoading(ingredientName)
+    try {
+      let data: { price: number; store: string; unit: string } | null = null
+      try {
+        const res = await fetch("/api/ingredient-web-price", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: ingredientName }),
+        })
+        if (res.ok) {
+          const d = await res.json()
+          if (d.price) data = { price: d.price, store: d.store || "—", unit: d.unit || "קג" }
+        }
+      } catch {
+        // API לא זמין (פריסה סטטית) — נשתמש ב-AI מהלקוח
+      }
+      if (!data) data = await fetchWebPriceForIngredient(ingredientName)
+      if (data) {
+        setWebPriceByIngredient((prev) => ({
+          ...prev,
+          [ingredientName]: { price: data!.price, store: data!.store, unit: data!.unit, source: "ai" },
+        }))
+      } else {
+        toast.error("לא הצלחתי למצוא מחיר באינטרנט")
+      }
+    } catch (e) {
+      toast.error((e as Error)?.message || "שגיאה בבדיקת מחיר")
+    } finally {
+      setWebPriceLoading(null)
+    }
+  }, [])
 
   const loadRecipes = useCallback(async () => {
     if (!currentRestaurantId) return
@@ -430,7 +534,12 @@ export function Ingredients() {
         (stockFilter === "low" && ing.stock < ing.minStock && ing.stock > 0) ||
         (stockFilter === "zero" && ing.stock === 0) ||
         (stockFilter === "ok" && ing.stock >= ing.minStock)
-      return matchesSearch && matchesSupplier && matchesStatus
+      const matchesPriceSource =
+        ing.isCompound ||
+        priceSourceFilter === "all" ||
+        (priceSourceFilter === "mine" && ing.priceSource === "mine") ||
+        (priceSourceFilter === "market" && ing.priceSource === "market")
+      return matchesSearch && matchesSupplier && matchesStatus && matchesPriceSource
     })
     .sort((a, b) => {
       if (a.isCompound && !b.isCompound) return 1
@@ -909,6 +1018,18 @@ export function Ingredients() {
                 <SelectItem value="ok">תקין</SelectItem>
               </SelectContent>
             </Select>
+            {isOwner && (
+              <Select value={priceSourceFilter} onValueChange={(v) => setPriceSourceFilter(v as "all" | "mine" | "market")}>
+                <SelectTrigger className="w-full sm:w-[140px]">
+                  <SelectValue placeholder="מקור מחיר" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">כל המחירים</SelectItem>
+                  <SelectItem value="mine">מחיר שלי</SelectItem>
+                  <SelectItem value="market">מחיר שוק</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -937,6 +1058,12 @@ export function Ingredients() {
                       {(sortBy === "price_asc" || sortBy === "price_desc") && (sortBy === "price_desc" ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />)}
                     </span>
                   </TableHead>
+                  {isOwner && (
+                    <TableHead className="text-right">מקור</TableHead>
+                  )}
+                  {isOwner && (
+                    <TableHead className="text-right">הכי זול אצל</TableHead>
+                  )}
                   <TableHead
                     className="text-right cursor-pointer hover:bg-muted/50 select-none"
                     onClick={() => setSortBy("unit")}
@@ -988,13 +1115,13 @@ export function Ingredients() {
                   >
                     <span className="flex items-center justify-end gap-1">סטטוס</span>
                   </TableHead>
-                  {isOwner && <TableHead className="text-right w-20">פעולות</TableHead>}
+                  {isOwner && <TableHead className="text-right w-24">פעולות</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredIngredients.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={isOwner ? 10 : 9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={isOwner ? 12 : 9} className="text-center py-8 text-muted-foreground">
                       אין רכיבים. הוסף רכיבים דרך העלאה או עץ מוצר.
                     </TableCell>
                   </TableRow>
@@ -1015,7 +1142,61 @@ export function Ingredients() {
                           {isCompound && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded ml-1">🧪 מתכון</span>}
                           {ingredient.name}
                         </TableCell>
-                        <TableCell className="text-right font-semibold">{isCompound ? "—" : `${ingredient.price} ש"ח`}</TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {isCompound ? "—" : `${ingredient.price} ש"ח`}
+                        </TableCell>
+                        {isOwner && (
+                          <TableCell className="text-right">
+                            {isCompound ? "—" : (
+                              ingredient.priceSource === "market" ? (
+                                <Badge variant="secondary" className="text-xs whitespace-nowrap">מחיר שוק</Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs whitespace-nowrap">מחיר שלי</Badge>
+                              )
+                            )}
+                          </TableCell>
+                        )}
+                        {isOwner && (
+                          <TableCell className="text-right text-sm">
+                            {isCompound ? "—" : (
+                              <div className="space-y-1 min-w-[140px]">
+                                {ingredient.globalCheapest && (
+                                  <div className={cn(
+                                    ingredient.priceSource === "mine" &&
+                                    pricePerKg(ingredient.globalCheapest.price, ingredient.globalCheapest.unit) < pricePerKg(ingredient.price, ingredient.unit) &&
+                                    "text-green-600 dark:text-green-400 font-medium"
+                                  )}>
+                                    <span className="text-muted-foreground text-xs">מהמערכת:</span> ₪{ingredient.globalCheapest.price.toFixed(1)}/{ingredient.globalCheapest.unit}
+                                    {ingredient.globalCheapest.supplier && (
+                                      <span className="text-primary font-medium"> אצל {ingredient.globalCheapest.supplier}</span>
+                                    )}
+                                  </div>
+                                )}
+                                {webPriceByIngredient[ingredient.name] ? (
+                                  <div className="text-blue-600 dark:text-blue-400">
+                                    <span className="text-muted-foreground text-xs">מהאינטרנט (AI):</span> ₪{webPriceByIngredient[ingredient.name].price.toFixed(1)}/{webPriceByIngredient[ingredient.name].unit}
+                                    <span className="font-medium"> אצל {webPriceByIngredient[ingredient.name].store}</span>
+                                  </div>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 px-1 text-xs text-muted-foreground hover:text-primary"
+                                    onClick={() => fetchWebPrice(ingredient.name)}
+                                    disabled={webPriceLoading === ingredient.name}
+                                  >
+                                    {webPriceLoading === ingredient.name ? (
+                                      <Loader2 className="w-3 h-3 animate-spin ml-1" />
+                                    ) : (
+                                      <Globe className="w-3 h-3 ml-1" />
+                                    )}
+                                    בדוק באינטרנט
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+                          </TableCell>
+                        )}
                         <TableCell className="text-right">{ingredient.unit}</TableCell>
                         <TableCell className="text-right">{isCompound ? "—" : `${ingredient.waste}%`}</TableCell>
                         <TableCell className="text-right font-semibold">{isCompound ? "—" : ingredient.stock}</TableCell>

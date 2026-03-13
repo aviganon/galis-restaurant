@@ -6,7 +6,7 @@ import {
   Search, Plus, FileSpreadsheet, Copy, Camera, Trash2, ChevronDown, 
   ChevronUp, X, Edit2, MoreVertical, Filter, SortAsc, SortDesc,
   Package, Utensils, DollarSign, TrendingUp, TrendingDown, AlertTriangle,
-  CheckCircle2, Info, ChefHat, Scale, Percent
+  CheckCircle2, Info, ChefHat, Scale, Percent, Sparkles, Loader2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,7 +24,7 @@ import { doc, collection, getDocs, getDoc, setDoc, deleteDoc, writeBatch } from 
 import { db } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
 import { FilePreviewModal } from "@/components/file-preview-modal"
-import type { ExtractedDishItem } from "@/lib/ai-extract"
+import { suggestDishFromIngredients, type ExtractedDishItem } from "@/lib/ai-extract"
 import { toast } from "sonner"
 
 // Types
@@ -83,6 +83,10 @@ export default function ProductTree() {
   const [targetFoodCost, setTargetFoodCost] = useState(30)
   const [isAddDishModalOpen, setIsAddDishModalOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [isAiSuggestOpen, setIsAiSuggestOpen] = useState(false)
+  const [aiSuggestLoading, setAiSuggestLoading] = useState(false)
+  const [aiSuggestedDish, setAiSuggestedDish] = useState<ExtractedDishItem | null>(null)
+  const [ingredientStock, setIngredientStock] = useState<Record<string, number>>({})
   const [importFile, setImportFile] = useState<File | null>(null)
   const [fpmOpen, setFpmOpen] = useState(false)
   const importFileInputRef = useRef<HTMLInputElement>(null)
@@ -143,29 +147,32 @@ export default function ProductTree() {
         })
 
         const newPrices: Record<string, SupplierPrice> = {}
-        const mergePrice = (name: string, data: { price?: number; unit?: string; supplier?: string }) => {
+        const newStock: Record<string, number> = {}
+        const mergePrice = (name: string, data: { price?: number; unit?: string; supplier?: string; stock?: number }) => {
           const p = typeof data.price === "number" ? data.price : 0
           if (!newPrices[name]) newPrices[name] = { name, price: p, prev: p, unit: "קג", supplier: "" }
           newPrices[name].price = p
           if (data.unit) newPrices[name].unit = data.unit
           if (data.supplier) newPrices[name].supplier = data.supplier
+          if (typeof data.stock === "number") newStock[name] = data.stock
         }
 
-        type IngData = { price?: number; unit?: string; supplier?: string }
-        if (assignedList.length > 0) {
+        type IngData = { price?: number; unit?: string; supplier?: string; stock?: number }
+        if (isOwner) {
+          globalIngSnap.forEach((d) => mergePrice(d.id, d.data() as IngData))
+        } else if (assignedList.length > 0) {
           globalIngSnap.forEach((d) => {
             const data = d.data() as IngData
             const sup = (data.supplier || "") as string
             if (!sup || assignedList.includes(sup)) mergePrice(d.id, data)
           })
-        } else if (isOwner) {
-          globalIngSnap.forEach((d) => mergePrice(d.id, d.data() as IngData))
         }
         restIngSnap.forEach((d) => mergePrice(d.id, d.data() as IngData))
 
         setDishes(newDishes)
         setSelectedDish(prev => (prev && newDishes[prev] ? prev : Object.keys(newDishes)[0] || null))
         setSupplierPrices(newPrices)
+        setIngredientStock(newStock)
       } catch (e) {
         console.error("load recipes/ingredients:", e)
       } finally {
@@ -429,6 +436,62 @@ export default function ProductTree() {
     [openImportFpm]
   )
 
+  const handleAiSuggest = useCallback(async () => {
+    const list = Object.entries(supplierPrices).map(([name, sp]) => ({
+      name,
+      price: sp.price,
+      unit: sp.unit || "קג",
+      supplier: sp.supplier || undefined,
+      stock: ingredientStock[name],
+    }))
+    if (list.length === 0) {
+      toast.error("אין רכיבים במסעדה — הוסף רכיבים מדף ספקים")
+      return
+    }
+    setAiSuggestLoading(true)
+    setAiSuggestedDish(null)
+    setIsAiSuggestOpen(true)
+    try {
+      const suggested = await suggestDishFromIngredients(list)
+      if (suggested) {
+        setAiSuggestedDish(suggested)
+      } else {
+        toast.error("לא הצלחתי להציע מנה — נסה שוב")
+        setIsAiSuggestOpen(false)
+      }
+    } catch (e) {
+      toast.error((e as Error)?.message || "שגיאה בהצעת מנה")
+      setIsAiSuggestOpen(false)
+    } finally {
+      setAiSuggestLoading(false)
+    }
+  }, [supplierPrices, ingredientStock])
+
+  const handleAddAiSuggestedDish = useCallback(() => {
+    if (!aiSuggestedDish?.name?.trim()) return
+    const ingredients: Ingredient[] = (aiSuggestedDish.ingredients || []).map((ing) => ({
+      name: ing.name,
+      qty: ing.qty,
+      unit: ing.unit || "גרם",
+      waste: 0,
+    }))
+    const dish: Dish = {
+      name: aiSuggestedDish.name.trim(),
+      category: aiSuggestedDish.category || "עיקריות",
+      sellingPrice: aiSuggestedDish.price || 0,
+      ingredients,
+      isCompound: false,
+      yieldQty: 1,
+      yieldUnit: "מנה",
+    }
+    saveDishToFirestore(aiSuggestedDish.name.trim(), dish)
+    setDishes((prev) => ({ ...prev, [aiSuggestedDish.name.trim()]: dish }))
+    setSelectedDish(aiSuggestedDish.name.trim())
+    setAiSuggestedDish(null)
+    setIsAiSuggestOpen(false)
+    toast.success(`המנה "${aiSuggestedDish.name}" נוספה — ניתן לערוך`)
+  }, [aiSuggestedDish, saveDishToFirestore])
+
   const handleConfirmDishes = useCallback(async (items: ExtractedDishItem[]) => {
     const next: Record<string, Dish> = { ...dishes }
     const toSave: { name: string; dish: Dish }[] = []
@@ -642,6 +705,80 @@ export default function ProductTree() {
                 </DialogContent>
               </Dialog>
               
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={handleAiSuggest}
+                disabled={aiSuggestLoading || Object.keys(supplierPrices).length === 0}
+              >
+                {aiSuggestLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                <span className="hidden sm:inline">הצעת AI</span>
+              </Button>
+              <Dialog open={isAiSuggestOpen} onOpenChange={(o) => { setIsAiSuggestOpen(o); if (!o) setAiSuggestedDish(null) }}>
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-primary" />
+                      הצעת מנה מ-AI
+                    </DialogTitle>
+                  </DialogHeader>
+                  {aiSuggestedDish ? (
+                    <div className="space-y-4 py-2">
+                      <div>
+                        <p className="font-medium">{aiSuggestedDish.name}</p>
+                        <p className="text-sm text-muted-foreground">{aiSuggestedDish.category} • ₪{(aiSuggestedDish.price || 0).toFixed(0)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium mb-2">רכיבים במנה:</p>
+                        <ul className="space-y-1 text-sm">
+                          {(aiSuggestedDish.ingredients || []).map((ing, i) => (
+                            <li key={i}>{ing.name} — {ing.qty} {ing.unit}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <details className="text-sm border rounded-lg p-3 bg-muted/30">
+                        <summary className="cursor-pointer font-medium">רכיבים קיימים במערכת ({Object.keys(supplierPrices).length})</summary>
+                        <ul className="mt-2 space-y-1 max-h-40 overflow-y-auto text-muted-foreground">
+                          {Object.entries(supplierPrices).map(([name, sp]) => (
+                            <li key={name}>
+                              {name} — ₪{sp.price.toFixed(1)}/{sp.unit}
+                              {sp.supplier && <span className="text-primary"> • איפה לרכוש: {sp.supplier}</span>}
+                              {ingredientStock[name] != null ? ` (מלאי: ${ingredientStock[name]})` : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                      <div className="flex gap-2 justify-end">
+                        <Button variant="outline" onClick={() => { setAiSuggestedDish(null); setIsAiSuggestOpen(false) }}>ביטול</Button>
+                        <Button onClick={handleAddAiSuggestedDish}>
+                          <Plus className="w-4 h-4 ml-1" />
+                          הוסף מנה
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 py-2">
+                      <div className="py-4 flex flex-col items-center gap-2 text-muted-foreground">
+                        <Loader2 className="w-8 h-8 animate-spin" />
+                        <p>מנתח רכיבים ומציע מנה...</p>
+                      </div>
+                      <details open className="text-sm border rounded-lg p-3 bg-muted/30">
+                        <summary className="cursor-pointer font-medium">רכיבים במערכת ({Object.keys(supplierPrices).length})</summary>
+                        <ul className="mt-2 space-y-1 max-h-40 overflow-y-auto text-muted-foreground">
+                          {Object.entries(supplierPrices).map(([name, sp]) => (
+                            <li key={name}>
+                              {name} — ₪{sp.price.toFixed(1)}/{sp.unit}
+                              {sp.supplier && <span className="text-primary"> • איפה לרכוש: {sp.supplier}</span>}
+                              {ingredientStock[name] != null ? ` (מלאי: ${ingredientStock[name]})` : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
               <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" variant="outline" className="gap-1.5">
