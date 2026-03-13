@@ -174,7 +174,8 @@ export default function ProductTree() {
           globalIngSnap.forEach((d) => {
             const data = d.data() as IngData
             const sup = (data.supplier || "") as string
-            if (!sup || assignedList.includes(sup)) mergePrice(d.id, data)
+            // רכיבים ללא ספק מהקטלוג הגלובלי — לא מוצגים במסעדות
+            if (sup && assignedList.includes(sup)) mergePrice(d.id, data)
           })
         }
         restIngSnap.forEach((d) => mergePrice(d.id, d.data() as IngData))

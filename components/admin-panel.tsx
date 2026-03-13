@@ -1,7 +1,8 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
-import { Shield, Key, Loader2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown, GripVertical, Columns3 } from "lucide-react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
+import { Shield, Key, Loader2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown, GripVertical, Columns3, Upload as UploadIcon, FileText } from "lucide-react"
+import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -49,6 +50,8 @@ import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
 import { useLanguage } from "@/contexts/language-context"
 import { doc, setDoc, getDoc, getDocFromServer, collection, collectionGroup, query, where, getDocs, getDocsFromServer, deleteDoc, writeBatch } from "firebase/firestore"
+import { FilePreviewModal } from "@/components/file-preview-modal"
+import type { ExtractedSupplierItem } from "@/lib/ai-extract"
 import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplier-ingredients"
 import { firestoreConfig } from "@/lib/firestore-config"
 import { db } from "@/lib/firebase"
@@ -335,6 +338,11 @@ export function AdminPanel() {
   const [suppliersFilterAssigned, setSuppliersFilterAssigned] = useState<string>("__all__")
   const [suppliersSortBy, setSuppliersSortBy] = useState<string>("")
   const [suppliersSortDir, setSuppliersSortDir] = useState<"asc" | "desc">("asc")
+  const [fpmOpen, setFpmOpen] = useState(false)
+  const [fpmFile, setFpmFile] = useState<File | null>(null)
+  const [isInvoiceDragging, setIsInvoiceDragging] = useState(false)
+  const adminInvoiceFileRef = useRef<HTMLInputElement>(null)
+  const INVOICE_ACCEPT = ".xlsx,.xls,.csv,.pdf,.rtf,image/*"
   const [selectedSupplierDetail, setSelectedSupplierDetail] = useState<string | null>(null)
   const [loadingSystemOwner, setLoadingSystemOwner] = useState(false)
   const [addIngredientOpen, setAddIngredientOpen] = useState(false)
@@ -982,6 +990,111 @@ export function AdminPanel() {
       setAssigningSupplier(null)
     }
   }
+
+  const handleConfirmAdminSupplier = useCallback(
+    async (items: ExtractedSupplierItem[], supName: string) => {
+      const supTrim = supName.trim()
+      if (!supTrim) {
+        toast.error("יש להזין שם ספק")
+        return
+      }
+      const now = new Date().toISOString()
+      const batch = writeBatch(db)
+      let count = 0
+      items.forEach((item) => {
+        if (!item.name?.trim() || item.price <= 0) return
+        const payload = {
+          price: item.price,
+          unit: item.unit || "קג",
+          supplier: supTrim,
+          lastUpdated: now,
+          createdBy: "global" as const,
+          waste: 0,
+          minStock: 0,
+          sku: item.sku ?? "",
+        }
+        batch.set(doc(db, "ingredients", item.name.trim()), payload, { merge: true })
+        const priceId = supTrim.replace(/\//g, "_").replace(/\./g, "_").trim() || "default"
+        batch.set(doc(db, "ingredients", item.name.trim(), "prices", priceId), {
+          price: item.price,
+          unit: item.unit || "קג",
+          supplier: supTrim,
+          lastUpdated: now,
+        }, { merge: true })
+        count++
+      })
+      if (count > 0) {
+        await batch.commit()
+        const supplierId = supTrim.replace(/\//g, "_").replace(/\./g, "_").trim() || "supplier"
+        await setDoc(doc(db, "suppliers", supplierId), { name: supTrim, lastUpdated: now, createdBy: "owner" }, { merge: true })
+        const toSync = items.filter((i) => i.name?.trim() && i.price > 0).map((i) => ({ name: i.name!.trim(), price: i.price, unit: i.unit || "קג", supplier: supTrim }))
+        if (toSync.length > 0) {
+          const synced = await syncSupplierIngredientsToAssignedRestaurants(supTrim, toSync)
+          const restCount = synced > 0 ? Math.ceil(synced / toSync.length) : 0
+          toast.success(`ספק "${supTrim}" — ${count} רכיבים נוספו לקטלוג הגלובלי${restCount > 0 ? ` — עודכן ב־${restCount} מסעדות` : ""}`)
+        } else {
+          toast.success(`ספק "${supTrim}" — ${count} רכיבים נוספו לקטלוג הגלובלי`)
+        }
+        loadSystemOwnerData()
+      } else {
+        toast.warning("אין רכיבים תקינים לשמירה (שם ריק או מחיר 0)")
+      }
+      setFpmFile(null)
+      setFpmOpen(false)
+    },
+    [loadSystemOwnerData]
+  )
+
+  useEffect(() => {
+    const prevent = (e: DragEvent) => {
+      if (e.dataTransfer?.types?.includes("Files")) {
+        e.preventDefault()
+        e.dataTransfer.dropEffect = "copy"
+      }
+    }
+    window.addEventListener("dragover", prevent, { passive: false })
+    window.addEventListener("drop", prevent, { passive: false })
+    return () => { window.removeEventListener("dragover", prevent); window.removeEventListener("drop", prevent) }
+  }, [])
+
+  const handleAdminInvoiceDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = "copy"
+    setIsInvoiceDragging(true)
+  }, [])
+
+  const handleAdminInvoiceDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsInvoiceDragging(true)
+  }, [])
+
+  const handleAdminInvoiceDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsInvoiceDragging(false)
+  }, [])
+
+  const handleAdminInvoiceDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsInvoiceDragging(false)
+    const files = e.dataTransfer?.files ? Array.from(e.dataTransfer.files) : []
+    if (files.length > 0) {
+      setFpmFile(files[0])
+      setFpmOpen(true)
+    }
+  }, [])
+
+  const handleAdminInvoiceFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (files?.length) {
+      setFpmFile(files[0])
+      setFpmOpen(true)
+    }
+    e.target.value = ""
+  }, [])
 
   const resetAddSupplierModal = () => {
     setNsmName("")
@@ -1837,6 +1950,64 @@ export function AdminPanel() {
                   </div>
                 </CardHeader>
                 <CardContent>
+                  {/* העלאת חשבוניות — לקטלוג הגלובלי */}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="mb-6"
+                    onDragOver={handleAdminInvoiceDragOver}
+                    onDragEnter={handleAdminInvoiceDragEnter}
+                    onDragLeave={handleAdminInvoiceDragLeave}
+                    onDrop={handleAdminInvoiceDrop}
+                  >
+                    <Card className={isInvoiceDragging ? "ring-2 ring-primary ring-offset-2" : ""}>
+                      <CardContent className="p-6">
+                        <div
+                          className={`border-2 border-dashed rounded-xl p-6 text-center transition-all min-h-[140px] flex flex-col items-center justify-center cursor-pointer ${
+                            isInvoiceDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
+                          }`}
+                          onClick={() => adminInvoiceFileRef.current?.click()}
+                        >
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isInvoiceDragging ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                              <FileText className="w-6 h-6" />
+                            </div>
+                            <div className="text-right">
+                              <h3 className="font-semibold">חשבוניות ספקים — קטלוג גלובלי</h3>
+                              <p className="text-sm text-muted-foreground">גרור PDF/Excel/תמונה — AI יחלץ רכיבים ומחירים ויעלה לספקים הגלובליים</p>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap justify-center gap-2 text-xs text-muted-foreground mb-3">
+                            <Badge variant="outline">PDF</Badge>
+                            <Badge variant="outline">Excel</Badge>
+                            <Badge variant="outline">CSV</Badge>
+                            <Badge variant="outline">תמונות</Badge>
+                          </div>
+                          <input
+                            ref={adminInvoiceFileRef}
+                            type="file"
+                            accept={INVOICE_ACCEPT}
+                            className="hidden"
+                            onChange={handleAdminInvoiceFileSelect}
+                          />
+                          <Button type="button" variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); adminInvoiceFileRef.current?.click() }}>
+                            <UploadIcon className="w-4 h-4 ml-2" />
+                            בחר קובץ
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+
+                  <FilePreviewModal
+                    open={fpmOpen}
+                    onOpenChange={(o) => { setFpmOpen(o); if (!o) setFpmFile(null) }}
+                    file={fpmFile}
+                    type="p"
+                    forceSaveToGlobal={true}
+                    onConfirmSupplier={handleConfirmAdminSupplier}
+                  />
+
                   <div className="flex flex-wrap gap-2 items-center mb-4 p-3 rounded-lg bg-muted/50 border">
                     <div className="flex items-center gap-2 flex-1 min-w-[180px]">
                       <Search className="w-4 h-4 text-muted-foreground shrink-0" />

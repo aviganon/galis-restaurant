@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { collection, getDocs } from "firebase/firestore"
+import { collection, getDocs, doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
 import { motion } from "framer-motion"
@@ -61,8 +61,12 @@ export function Inventory() {
     setLoading(true)
     const load = async () => {
       try {
-        const restSnap = await getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients"))
-        const globalSnap = isOwner ? await getDocs(collection(db, "ingredients")) : null
+        const [restSnap, asDoc, globalSnap] = await Promise.all([
+          getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients")),
+          getDoc(doc(db, "restaurants", currentRestaurantId, "appState", "assignedSuppliers")),
+          isOwner ? getDocs(collection(db, "ingredients")) : Promise.resolve(null),
+        ])
+        const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
         const byId = new Map<string, InventoryItem>()
         restSnap.forEach((d) => {
           const data = d.data()
@@ -77,17 +81,20 @@ export function Inventory() {
           })
         })
         globalSnap?.forEach((d) => {
-          if (!byId.has(d.id)) {
+          if (!byId.has(d.id) && assignedList.length > 0) {
             const data = d.data()
-            byId.set(d.id, {
-              id: d.id,
-              name: d.id,
-              currentStock: typeof data.stock === "number" ? data.stock : 0,
-              unit: (data.unit as string) || "ק\"ג",
-              minStock: typeof data.minStock === "number" ? data.minStock : 0,
-              maxStock: typeof data.maxStock === "number" ? data.maxStock : 100,
-              supplier: (data.supplier as string) || "",
-            })
+            const sup = (data.supplier as string) || ""
+            if (sup && assignedList.includes(sup)) {
+              byId.set(d.id, {
+                id: d.id,
+                name: d.id,
+                currentStock: typeof data.stock === "number" ? data.stock : 0,
+                unit: (data.unit as string) || "ק\"ג",
+                minStock: typeof data.minStock === "number" ? data.minStock : 0,
+                maxStock: typeof data.maxStock === "number" ? data.maxStock : 100,
+                supplier: sup,
+              })
+            }
           }
         })
         setItems(Array.from(byId.values()))

@@ -24,6 +24,8 @@ interface FilePreviewModalProps {
   supplierName?: string
   restaurantName?: string | null
   canSaveToGlobal?: boolean
+  /** כשמופעל — שמירה תמיד לקטלוג הגלובלי (לפאנל מנהל) */
+  forceSaveToGlobal?: boolean
   onConfirmSupplier?: (items: ExtractedSupplierItem[], supplierName: string, saveToGlobal?: boolean) => void
   onConfirmDishes?: (items: ExtractedDishItem[]) => void
   onConfirmSales?: (items: Array<{ name: string; qty: number; price: number }>) => void
@@ -37,6 +39,7 @@ export function FilePreviewModal({
   supplierName: initialSupplier = "",
   restaurantName,
   canSaveToGlobal = false,
+  forceSaveToGlobal = false,
   onConfirmSupplier,
   onConfirmDishes,
   onConfirmSales,
@@ -58,7 +61,7 @@ export function FilePreviewModal({
     setSupplierName(initialSupplier)
     setInvoiceDate(null)
     setDetectedSupplier(null)
-    setSaveToGlobal(false)
+    setSaveToGlobal(forceSaveToGlobal)
     setWebPriceByName({})
     setLoading(true)
     extractWithAI(file, type, initialSupplier || undefined)
@@ -80,7 +83,7 @@ export function FilePreviewModal({
         toast.error(e.message)
       })
       .finally(() => setLoading(false))
-  }, [open, file, type, initialSupplier])
+  }, [open, file, type, initialSupplier, forceSaveToGlobal])
 
   const updateItem = useCallback((idx: number, field: string, value: string | number) => {
     setItems((prev) => {
@@ -150,14 +153,14 @@ export function FilePreviewModal({
         toast.error("יש להזין שם ספק")
         return
       }
-      onConfirmSupplier?.(items as ExtractedSupplierItem[], supplierName.trim(), canSaveToGlobal ? saveToGlobal : undefined)
+      onConfirmSupplier?.(items as ExtractedSupplierItem[], supplierName.trim(), forceSaveToGlobal ? true : (canSaveToGlobal ? saveToGlobal : undefined))
     } else if (type === "d") {
       onConfirmDishes?.(items as ExtractedDishItem[])
     } else {
       onConfirmSales?.(items as Array<{ name: string; qty: number; price: number }>)
     }
     onOpenChange(false)
-  }, [type, items, supplierName, saveToGlobal, canSaveToGlobal, onConfirmSupplier, onConfirmDishes, onConfirmSales, onOpenChange])
+  }, [type, items, supplierName, saveToGlobal, canSaveToGlobal, forceSaveToGlobal, onConfirmSupplier, onConfirmDishes, onConfirmSales, onOpenChange])
 
   const typeLabel = type === "p" ? "מחירי ספקים" : type === "d" ? "ייבוא תפריט" : "דוח מכירות"
 
@@ -226,7 +229,7 @@ export function FilePreviewModal({
                     {webPriceLoading ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Globe className="w-4 h-4 ml-2" />}
                     השוואת מחירים באינטרנט
                   </Button>
-                  {canSaveToGlobal && (
+                  {canSaveToGlobal && !forceSaveToGlobal && (
                     <label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox checked={saveToGlobal} onCheckedChange={(v) => setSaveToGlobal(!!v)} />
                       <span className="text-sm">שמור לקטלוג הגלובלי (רק בעלים)</span>

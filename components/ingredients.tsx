@@ -219,6 +219,7 @@ export function Ingredients() {
   const [supplierFilter, setSupplierFilter] = useState("כל הספקים")
   const [stockFilter, setStockFilter] = useState("all")
   const [priceSourceFilter, setPriceSourceFilter] = useState<"all" | "mine" | "market">("all")
+  const [cheapestFilter, setCheapestFilter] = useState<"all" | "hasCheaper" | "noCheaper">("all")
   const [sortBy, setSortBy] = useState("name")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [addIngSaving, setAddIngSaving] = useState(false)
@@ -261,7 +262,7 @@ export function Ingredients() {
   const [webPriceLoading, setWebPriceLoading] = useState<string | null>(null)
 
   const INGREDIENTS_COLUMN_ORDER_KEY = "ingredients-column-order"
-  const defaultColumnOrder = ["name", "price", "source", "unit", "waste", "stock", "minStock", "supplier", "sku", "status", "actions"] as const
+  const defaultColumnOrder = ["name", "price", "source", "cheapest", "unit", "waste", "stock", "minStock", "supplier", "sku", "status", "actions"] as const
   const [columnOrder, setColumnOrder] = useState<string[]>(() => {
     if (typeof window === "undefined") return [...defaultColumnOrder]
     try {
@@ -292,10 +293,10 @@ export function Ingredients() {
       return next
     })
   }, [])
-  const displayColumnOrder = visibleColumnOrder.filter((k) => (k !== "source" && k !== "actions") || isOwner)
+  const displayColumnOrder = visibleColumnOrder.filter((k) => (k !== "source" && k !== "cheapest" && k !== "actions") || isOwner)
   const handleColumnReorder = useCallback((fromIndex: number, toIndex: number) => {
     setColumnOrder((prev) => {
-      const display = prev.filter((k) => columnVisibility[k] !== false && ((k !== "source" && k !== "actions") || isOwner))
+      const display = prev.filter((k) => columnVisibility[k] !== false && ((k !== "source" && k !== "cheapest" && k !== "actions") || isOwner))
       if (fromIndex < 0 || fromIndex >= display.length || toIndex < 0 || toIndex >= display.length) return prev
       const displayOrder = [...display]
       const [moved] = displayOrder.splice(fromIndex, 1)
@@ -407,8 +408,10 @@ export function Ingredients() {
         if (byId.has(d.id)) return
         const data = d.data()
         const sup = (data.supplier as string) || ""
+        // רכיבים ללא ספק מהקטלוג הגלובלי — לא מוצגים במסעדות
+        if (!sup) return
         // מכבדים assignedSuppliers — מסעדה חדשה בלי שיוך רואה רק רכיבים שלה
-        if (sup && !assignedList.includes(sup)) return
+        if (!assignedList.includes(sup)) return
         const ing: Ingredient = {
           id: d.id,
           name: d.id,
@@ -750,7 +753,13 @@ export function Ingredients() {
         priceSourceFilter === "all" ||
         (priceSourceFilter === "mine" && ing.priceSource === "mine") ||
         (priceSourceFilter === "market" && ing.priceSource === "market")
-      return matchesSearch && matchesSupplier && matchesStatus && matchesPriceSource
+      const hasCheaper = !ing.isCompound && (!!ing.globalCheapest || !!webPriceByIngredient[ing.name])
+      const matchesCheapest =
+        ing.isCompound ||
+        cheapestFilter === "all" ||
+        (cheapestFilter === "hasCheaper" && hasCheaper) ||
+        (cheapestFilter === "noCheaper" && !hasCheaper)
+      return matchesSearch && matchesSupplier && matchesStatus && matchesPriceSource && matchesCheapest
     })
     .sort((a, b) => {
       if (a.isCompound && !b.isCompound) return 1
@@ -1227,16 +1236,28 @@ export function Ingredients() {
               </SelectContent>
             </Select>
             {isOwner && (
-              <Select value={priceSourceFilter} onValueChange={(v) => setPriceSourceFilter(v as "all" | "mine" | "market")}>
-                <SelectTrigger className={cn("w-full sm:w-[140px]", textAlign)}>
-                  <SelectValue placeholder={t("pages.ingredients.priceSource")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("pages.ingredients.allPrices")}</SelectItem>
-                  <SelectItem value="mine">{t("pages.ingredients.myPrice")}</SelectItem>
-                  <SelectItem value="market">{t("pages.ingredients.marketPrice")}</SelectItem>
-                </SelectContent>
-              </Select>
+              <>
+                <Select value={priceSourceFilter} onValueChange={(v) => setPriceSourceFilter(v as "all" | "mine" | "market")}>
+                  <SelectTrigger className={cn("w-full sm:w-[140px]", textAlign)}>
+                    <SelectValue placeholder={t("pages.ingredients.priceSource")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("pages.ingredients.allPrices")}</SelectItem>
+                    <SelectItem value="mine">{t("pages.ingredients.myPrice")}</SelectItem>
+                    <SelectItem value="market">{t("pages.ingredients.marketPrice")}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={cheapestFilter} onValueChange={(v) => setCheapestFilter(v as "all" | "hasCheaper" | "noCheaper")}>
+                  <SelectTrigger className={cn("w-full sm:w-[140px]", textAlign)}>
+                    <SelectValue placeholder={t("pages.ingredients.cheapest")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("pages.ingredients.all")}</SelectItem>
+                    <SelectItem value="hasCheaper">{t("pages.ingredients.hasCheaper")}</SelectItem>
+                    <SelectItem value="noCheaper">{t("pages.ingredients.noCheaper")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </>
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1255,10 +1276,11 @@ export function Ingredients() {
                 <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{t("pages.ingredients.showHideColumns")}</div>
                 {defaultColumnOrder.filter((k) => (k !== "source" && k !== "actions") || isOwner).map((k) => {
                   const isVisible = columnVisibility[k] !== false
-                  const colLabels: Record<string, string> = {
+                    const colLabels: Record<string, string> = {
                     name: t("pages.ingredients.ingredientName"),
                     price: t("pages.ingredients.price"),
                     source: t("pages.ingredients.source"),
+                    cheapest: t("pages.ingredients.cheapest"),
                     unit: t("pages.ingredients.unit"),
                     waste: t("pages.ingredients.waste"),
                     stock: t("pages.ingredients.stock"),
@@ -1292,6 +1314,7 @@ export function Ingredients() {
                       name: t("pages.ingredients.ingredientName"),
                       price: t("pages.ingredients.price"),
                       source: t("pages.ingredients.source"),
+                      cheapest: t("pages.ingredients.cheapest"),
                       unit: t("pages.ingredients.unit"),
                       waste: t("pages.ingredients.waste"),
                       stock: t("pages.ingredients.stock"),
@@ -1368,6 +1391,16 @@ export function Ingredients() {
                       name: <TableCell key="name" className={cn("font-medium", textAlign, densityCellClass)}>{isCompound && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded ml-1">🧪 מתכון</span>}{ingredient.name}</TableCell>,
                       price: <TableCell key="price" className={cn(textAlign, "font-semibold", densityCellClass)}>{isCompound ? "—" : `₪${Number(ingredient.price).toFixed(2)}`}</TableCell>,
                       source: <TableCell key="source" className={cn(textAlign, densityCellClass)}>{isCompound ? "—" : (ingredient.priceSource === "market" ? <Badge variant="secondary" className="text-xs whitespace-nowrap">מחיר שוק</Badge> : <Badge variant="outline" className="text-xs whitespace-nowrap">מחיר שלי</Badge>)}</TableCell>,
+                      cheapest: <TableCell key="cheapest" className={cn(textAlign, densityCellClass)}>{isCompound ? "—" : (
+                        <CheapestPricePopover
+                          ingredient={ingredient}
+                          webPrice={webPriceByIngredient[ingredient.name]}
+                          onFetchWebPrice={() => fetchWebPrice(ingredient.name)}
+                          webPriceLoading={webPriceLoading === ingredient.name}
+                          pricePerKgFn={pricePerKg}
+                          t={t}
+                        />
+                      )}</TableCell>,
                       unit: <TableCell key="unit" className={cn(textAlign, densityCellClass)}>{ingredient.unit}</TableCell>,
                       waste: <TableCell key="waste" className={cn(textAlign, densityCellClass)}>{isCompound ? "—" : `${ingredient.waste}%`}</TableCell>,
                       stock: <TableCell key="stock" className={cn(textAlign, "font-semibold", densityCellClass)}>{isCompound ? "—" : ingredient.stock}</TableCell>,
@@ -1389,7 +1422,6 @@ export function Ingredients() {
                       </TableCell>,
                     }
                     return (
-                      <React.Fragment key={ingredient.id}>
                       <motion.tr
                         key={ingredient.id}
                         initial={{ opacity: 0, x: -20 }}
@@ -1399,21 +1431,6 @@ export function Ingredients() {
                       >
                         {displayColumnOrder.map((k) => cellByKey[k] ? <React.Fragment key={k}>{cellByKey[k]}</React.Fragment> : null)}
                       </motion.tr>
-                      {isOwner && !isCompound && (
-                        <TableRow className="bg-muted/30 hover:bg-muted/40">
-                          <TableCell colSpan={displayColumnOrder.length} className={cn("py-1.5 pr-4 pl-4", textAlign)}>
-                            <CheapestPricePopover
-                              ingredient={ingredient}
-                              webPrice={webPriceByIngredient[ingredient.name]}
-                              onFetchWebPrice={() => fetchWebPrice(ingredient.name)}
-                              webPriceLoading={webPriceLoading === ingredient.name}
-                              pricePerKgFn={pricePerKg}
-                              t={t}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </React.Fragment>
                     )
                   })
                 )}

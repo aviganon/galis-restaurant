@@ -76,20 +76,23 @@ export function Dashboard() {
           let overTargetAll = 0
           const cards: { id: string; name: string; emoji?: string; branch?: string; dishes: number; avgFoodCost: number; overTarget: number }[] = []
           const globalIngSnap = await getDocs(collection(db, "ingredients"))
-          const globalPrices: Record<string, number> = {}
-          globalIngSnap.forEach((d) => {
-            const data = d.data()
-            globalPrices[d.id] = typeof data.price === "number" ? data.price : 0
-          })
 
           for (const rest of restaurants) {
-            const [recSnap, restIngSnap, salesDoc] = await Promise.all([
+            const [recSnap, restIngSnap, salesDoc, asDoc] = await Promise.all([
               getDocs(collection(db, "restaurants", rest.id, "recipes")),
               getDocs(collection(db, "restaurants", rest.id, "ingredients")),
               getDoc(doc(db, "restaurants", rest.id, "appState", `salesReport_${rest.id}`)),
+              getDoc(doc(db, "restaurants", rest.id, "appState", "assignedSuppliers")),
             ])
+            const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
             const recipes = recSnap.docs.filter((d) => !d.data().isCompound)
-            const prices: Record<string, number> = { ...globalPrices }
+            const prices: Record<string, number> = {}
+            globalIngSnap.forEach((d) => {
+              const data = d.data()
+              const sup = (data.supplier as string) || ""
+              if (!sup || !assignedList.includes(sup)) return
+              prices[d.id] = typeof data.price === "number" ? data.price : 0
+            })
             restIngSnap.forEach((d) => {
               const data = d.data()
               prices[d.id] = typeof data.price === "number" ? data.price : 0
@@ -254,7 +257,8 @@ export function Dashboard() {
           if (ingIds.has(d.id)) return
           const data = d.data()
           const sup = (data.supplier as string) || ""
-          if (sup && !assignedList.includes(sup)) return
+          if (!sup) return
+          if (!assignedList.includes(sup)) return
           mergeIng(d)
         })
 
