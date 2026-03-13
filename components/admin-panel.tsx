@@ -2084,7 +2084,7 @@ export function AdminPanel() {
                   </div>
 
                   {/* Table */}
-                  <div className="rounded-lg border overflow-auto max-h-[min(55vh,520px)]">
+                  <div className="rounded-lg border overflow-auto max-h-[min(55vh,520px)]" dir={dir}>
                   <Table className="w-full text-sm">
                     <colgroup>
                       {visibleColumnOrder.map((k) => (
@@ -2099,7 +2099,7 @@ export function AdminPanel() {
                             return (
                               <TableHead
                                 key="cheapest"
-                                className={`${textAlign} ${densityCellClass} select-none`}
+                                className={`${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""} select-none`}
                                 draggable
                                 title={t("pages.adminPanel.dragToReorderColumns")}
                                 onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(colIndex)); e.dataTransfer.effectAllowed = "move" }}
@@ -2122,7 +2122,7 @@ export function AdminPanel() {
                           return (
                             <TableHead
                               key={key}
-                              className={`${textAlign} ${densityCellClass} ${isSortable ? "cursor-pointer hover:bg-muted/50 select-none" : ""}`}
+                              className={`${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""} ${isSortable ? "cursor-pointer hover:bg-muted/50 select-none" : ""}`}
                               draggable
                               title={t("pages.adminPanel.dragToReorderColumns")}
                               onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(colIndex)); e.dataTransfer.effectAllowed = "move" }}
@@ -2154,15 +2154,15 @@ export function AdminPanel() {
                             </TableHead>
                           )
                         })}
-                        <TableHead className={`${textAlign} ${densityCellClass} w-14`}>{t("pages.adminPanel.actions")}</TableHead>
+                        <TableHead className={`${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""} w-14`}>{t("pages.adminPanel.actions")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {[...filteredAndSortedIngredients].reverse().map((ing) => {
                         const cellByKey: Record<string, React.ReactNode> = {
-                          name: <TableCell key="name" className={`font-medium ${textAlign} ${densityCellClass} truncate`} title={ing.name}>{ing.name}</TableCell>,
-                          price: <TableCell key="price" className={`${textAlign} ${densityCellClass}`}>₪{ing.price.toFixed(2)}</TableCell>,
-                          cheapest: <TableCell key="cheapest" className={`${textAlign} ${densityCellClass} text-sm`}>
+                          name: <TableCell key="name" className={`font-medium ${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""} truncate`} title={ing.name}>{ing.name}</TableCell>,
+                          price: <TableCell key="price" className={`${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""}`}>₪{ing.price.toFixed(2)}</TableCell>,
+                          cheapest: <TableCell key="cheapest" className={`${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""} text-sm`}>
                             <AdminCheapestPopover
                               ing={ing}
                               webPrice={webPriceByIngredient[ing.name]}
@@ -2170,21 +2170,21 @@ export function AdminPanel() {
                               t={t}
                             />
                           </TableCell>,
-                          sku: <TableCell key="sku" className={`${textAlign} ${densityCellClass} truncate`} title={ing.sku || undefined}>{ing.sku || "—"}</TableCell>,
-                          status: <TableCell key="status" className={`${textAlign} ${densityCellClass}`}>
+                          sku: <TableCell key="sku" className={`${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""} truncate`} title={ing.sku || undefined}>{ing.sku || "—"}</TableCell>,
+                          status: <TableCell key="status" className={`${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""}`}>
                             <Badge variant={ing.status === "שויך" ? "default" : "secondary"}>{ing.status === "שויך" ? t("pages.adminPanel.assigned") : t("pages.adminPanel.pending")}</Badge>
                           </TableCell>,
-                          source: <TableCell key="source" className={`${textAlign} ${densityCellClass}`}>{ing.source === "global" ? t("pages.adminPanel.global") : t("pages.adminPanel.restaurant")}</TableCell>,
-                          supplier: <TableCell key="supplier" className={`${textAlign} ${densityCellClass} truncate`} title={ing.supplier || undefined}>{ing.supplier || "—"}</TableCell>,
-                          minStock: <TableCell key="minStock" className={`${textAlign} ${densityCellClass}`}>{ing.minStock}</TableCell>,
-                          stock: <TableCell key="stock" className={`${textAlign} ${densityCellClass}`}>{ing.stock}</TableCell>,
-                          waste: <TableCell key="waste" className={`${textAlign} ${densityCellClass}`}>{ing.waste}%</TableCell>,
-                          unit: <TableCell key="unit" className={`${textAlign} ${densityCellClass}`}>{ing.unit}</TableCell>,
+                          source: <TableCell key="source" className={`${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""}`}>{ing.source === "global" ? t("pages.adminPanel.global") : t("pages.adminPanel.restaurant")}</TableCell>,
+                          supplier: <TableCell key="supplier" className={`${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""} truncate`} title={ing.supplier || undefined}>{ing.supplier || "—"}</TableCell>,
+                          minStock: <TableCell key="minStock" className={`${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""}`}>{ing.minStock}</TableCell>,
+                          stock: <TableCell key="stock" className={`${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""}`}>{ing.stock}</TableCell>,
+                          waste: <TableCell key="waste" className={`${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""}`}>{ing.waste}%</TableCell>,
+                          unit: <TableCell key="unit" className={`${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""}`}>{ing.unit}</TableCell>,
                         }
                         return (
                         <TableRow key={`${ing.source}-${ing.id}`}>
                           {visibleColumnOrder.map((k) => cellByKey[k] ? <React.Fragment key={k}>{cellByKey[k]}</React.Fragment> : null)}
-                          <TableCell className={`${textAlign} ${densityCellClass}`}>
+                          <TableCell className={`${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""}`}>
                             <div className={`flex gap-1 ${justify}`}>
                               <Button
                                 variant="ghost"
