@@ -4,6 +4,41 @@
 
 ---
 
+## הוראות מדויקות — מה לעשות עכשיו
+
+### 1. בסוף כל שיחה
+הרץ deploy אוטומטית:
+```bash
+cd "/Users/aviganonm5/Library/Mobile Documents/com~apple~CloudDocs/cursor" && npm run deploy
+```
+
+### 2. אם המשתמש מבקש שינויים בקוד
+- בצע את השינויים
+- הרץ `npm run build` לוודא שאין שגיאות
+- Commit + push + deploy
+
+### 3. אם יש שגיאת התחברות
+- **אל תשתמש ב-`<a href>`** — השתמש ב-`Button` + `onClick` + `window.open()` לקישורים חיצוניים
+- **אל תשנה ל-`flex flex-col`** בעמודת מחירים — השתמש ב-`space-y-2` בלבד
+
+### 4. אם Vercel מדווח על שגיאה
+- **Firebase env vars:** ה-build יצליח גם בלי (יש placeholder ב־`lib/firebase.ts`)
+- **כדי שההתחברות תעבוד ב-Vercel:** המשתמש חייב להוסיף משתני Firebase ב-Vercel Dashboard (סעיף 3 למטה)
+
+### 5. מבנה מחיר הכי זול
+- **בשורה:** רק מחיר לחיץ (₪X/יחידה ▼)
+- **בלחיצה:** Popover עם מהמערכת + מהאינטרנט + "לקנייה באינטרנט →"
+- **קישור לקנייה:** `Button` עם `onClick={() => window.open(url, "_blank")}` — לא `<a>`
+
+### 6. קבצים מרכזיים
+| קובץ | תפקיד |
+|------|-------|
+| `components/ingredients.tsx` | CheapestPricePopover, שורת מחיר מתחת לרכיב |
+| `components/admin-panel.tsx` | AdminCheapestPopover, WebPriceCell |
+| `lib/firebase.ts` | placeholder כשאין env vars (מאפשר build) |
+
+---
+
 ## סיכום דברים ש-Claude עשה
 
 | פעולה | פרטים |
@@ -17,7 +52,7 @@
 | **Deploy ל-Firebase** | הרצת `npm run deploy` — האתר ב־galis-6ebbc.web.app |
 | **Push ל-GitHub** | כל השינויים נדחפו ל־aviganon/galis-restaurant |
 
-**לא בוצע (דורש פעולה ידנית):** הוספת משתני Firebase ב-Vercel Dashboard — בלי זה ה-build ב-Vercel נכשל.
+**לא בוצע (דורש פעולה ידנית):** הוספת משתני Firebase ב-Vercel Dashboard — ה-build יצליח גם בלי, אבל ההתחברות לא תעבוד עד שיוספו.
 
 ---
 
@@ -53,6 +88,7 @@
 
 ### תכונות
 - מחיר שוק, הכי זול, "בדוק באינטרנט" (Serper + Claude)
+- מחיר לחיץ מתחת לרכיב — Popover עם מהמערכת + מהאינטרנט + "לקנייה באינטרנט"
 - API routes: `/api/claude`, `/api/ingredient-web-price`, `/api/invite`
 - Firestore: subcollection `ingredients/{id}/prices/{priceId}`
 
@@ -61,7 +97,7 @@
 ## 2. מה לבדוק
 
 ### קוד
-- [ ] `lib/firebase.ts` — זורק שגיאה אם חסרים משתני Firebase (מכוון)
+- [ ] `lib/firebase.ts` — משתמש ב-placeholder כשאין env vars (מאפשר build ב-Vercel)
 - [ ] `components/ingredients.tsx` — priceSource, globalCheapest, "בדוק באינטרנט"
 - [ ] `app/api/ingredient-web-price/route.ts` — Serper + Claude
 - [ ] `next.config.mjs` — ב־Vercel (VERCEL=1) אין static export, API routes עובדים
@@ -78,9 +114,9 @@
 
 ---
 
-## 3. משתני סביבה — Vercel (חובה)
+## 3. משתני סביבה — Vercel
 
-**בלי אלה ה-build ב־Vercel ייכשל.** הוסף ב־Vercel → Settings → Environment Variables:
+**ה-build יצליח גם בלי** (יש placeholder). **כדי שההתחברות תעבוד** הוסף ב־Vercel → Settings → Environment Variables:
 
 | משתנה | מקור |
 |-------|------|
