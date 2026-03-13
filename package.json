@@ -2,6 +2,7 @@
   "name": "my-project",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@10.0.0",
   "scripts": {
     "migrate:ingredients": "npx tsx scripts/migrate-ingredients.ts",
     "migrate:ingredients:admin": "node scripts/migrate-ingredients-admin.mjs",
