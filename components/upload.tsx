@@ -73,7 +73,6 @@ function formatTime(): string {
 
 const getUploadTypes = (t: (k: string) => string) => [
   { id: "prices", label: t("pages.upload.pricesLabel"), icon: FileSpreadsheet, description: t("pages.upload.pricesDesc") },
-  { id: "invoice", label: t("pages.upload.invoiceLabel"), icon: FileText, description: t("pages.upload.invoiceDesc") },
   { id: "recipe", label: t("pages.upload.recipeLabel"), icon: Camera, description: t("pages.upload.recipeDesc") },
   { id: "sales", label: t("pages.upload.salesLabel"), icon: FileSpreadsheet, description: t("pages.upload.salesDesc") },
   { id: "inventory", label: t("pages.upload.inventoryLabel"), icon: FileSpreadsheet, description: t("pages.upload.inventoryDesc") },
@@ -154,7 +153,7 @@ export function Upload() {
   const openFpm = useCallback((file: File, forceType?: "p" | "d" | "s") => {
     const ext = file.name.split(".").pop()?.toLowerCase()
     const isAiCapable = ["xlsx", "xls", "csv", "pdf", "png", "jpg", "jpeg", "gif", "webp", "rtf"].includes(ext ?? "")
-    const explicitType = selectedType === "prices" || selectedType === "invoice" ? "p" : selectedType === "recipe" ? "d" : selectedType === "sales" ? "s" : null
+    const explicitType = selectedType === "prices" ? "p" : selectedType === "recipe" ? "d" : selectedType === "sales" ? "s" : null
     const typeToUse = forceType ?? (explicitType ?? (isAiCapable ? "p" : null))
     if (isAiCapable && typeToUse) {
       // מנות (d), דוח מכירות (s) וחשבונית (p) כשמשתמש רגיל — דורשים מסעדה נבחרת
@@ -180,7 +179,7 @@ export function Upload() {
       try {
         const ext = first.name.split(".").pop()?.toLowerCase()
         const isAiCapable = ["xlsx", "xls", "csv", "pdf", "png", "jpg", "jpeg", "gif", "webp", "rtf"].includes(ext ?? "")
-        const hasExplicitType = selectedType === "prices" || selectedType === "invoice" || selectedType === "recipe" || selectedType === "sales"
+        const hasExplicitType = selectedType === "prices" || selectedType === "recipe" || selectedType === "sales"
 
         if (isAiCapable) {
           if (hasExplicitType) {
@@ -718,7 +717,7 @@ export function Upload() {
                   type="file"
                   id="upload-files"
                   name="uploadFiles"
-                  accept={(selectedType === "prices" || selectedType === "invoice" || selectedType === "recipe" || selectedType === "sales") ? AI_ACCEPT : ACCEPT}
+                  accept={(selectedType === "prices" || selectedType === "recipe" || selectedType === "sales") ? AI_ACCEPT : ACCEPT}
                   multiple
                   className="hidden"
                   onChange={handleFileSelect}

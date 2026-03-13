@@ -690,7 +690,7 @@ export default function ProductTree() {
                     <div>
                       <Label htmlFor="new-dish-price">{t("pages.productTree.sellingPriceLabel")}</Label>
                       <div className="flex items-center gap-2 mt-1.5">
-                        <span className="text-lg font-semibold">&#8362;</span>
+                        <span className="text-lg font-semibold">₪</span>
                         <Input 
                           id="new-dish-price"
                           name="dishPrice"
@@ -1085,7 +1085,7 @@ export default function ProductTree() {
                               <td className="py-2 px-2">
                                 <div className="flex items-center gap-1">
                                   <span className="font-semibold">
-                                    {isCompound ? `₪${cost.toFixed(2)}/מנה` : `&#8362;${(sp?.price ?? 0).toFixed(2)}`}
+                                    {isCompound ? `₪${cost.toFixed(2)}/מנה` : `₪${(sp?.price ?? 0).toFixed(2)}`}
                                   </span>
                                   {priceChanged && (
                                     <Badge 
@@ -1116,7 +1116,7 @@ export default function ProductTree() {
                               </td>
                               {canSeeCosts && (
                               <td className="py-2 px-2 font-semibold">
-                                &#8362;{cost.toFixed(2)}
+                                ₪{cost.toFixed(2)}
                               </td>
                               )}
                               <td className="py-2 px-1">
@@ -1231,7 +1231,7 @@ export default function ProductTree() {
                                       >
                                         <span className="font-medium">{name}</span>
                                         <span className="text-xs text-muted-foreground">
-                                          &#8362;{(sp?.price ?? 0).toFixed(2)} / {sp?.unit || ""}
+                                          ₪{(sp?.price ?? 0).toFixed(2)} / {sp?.unit || ""}
                                         </span>
                                       </button>
                                     )
@@ -1398,7 +1398,7 @@ export default function ProductTree() {
                     <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
                       <Label htmlFor="selling-price" className="text-sm">{t("pages.productTree.sellingPriceLabel")}:</Label>
                       <div className="flex items-center gap-1 flex-1">
-                        <span className="text-lg font-semibold">&#8362;</span>
+                        <span className="text-lg font-semibold">₪</span>
                         <Input
                           id="selling-price"
                           name="sellingPrice"
@@ -1519,7 +1519,7 @@ export default function ProductTree() {
                               <div key={idx} className="flex items-center justify-between text-sm">
                                 <span className="text-muted-foreground">{ing.name}</span>
                                 <span className="font-medium">
-                                  &#8362;{cost.toFixed(2)}
+                                  ₪{cost.toFixed(2)}
                                   <span className="text-xs text-muted-foreground mr-1">
                                     ({share.toFixed(0)}%)
                                   </span>
@@ -1534,12 +1534,12 @@ export default function ProductTree() {
                       <div className="pt-3 border-t border-border space-y-2">
                         <div className="flex justify-between font-semibold">
                           <span>{t("pages.productTree.totalDishCost")}</span>
-                          <span>&#8362;{currentCost.toFixed(2)}</span>
+                          <span>₪{currentCost.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between font-semibold">
                           <span>{t("pages.productTree.grossProfit")}</span>
                           <span className={currentProfit > 0 ? "text-emerald-600" : "text-red-600"}>
-                            &#8362;{currentProfit.toFixed(2)}
+                            ₪{currentProfit.toFixed(2)}
                           </span>
                         </div>
                         <div className="flex justify-between text-sm text-muted-foreground">

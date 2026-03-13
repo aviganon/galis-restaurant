@@ -512,6 +512,11 @@ export const translations = {
         date: "תאריך",
         status: "סטטוס",
         noOrdersMessage: "אין הזמנות. הזמנות ספקים יוצגו כאן כאשר יוגדרו במערכת.",
+        orderSuggestionsTitle: "המלצות להזמנה",
+        orderSuggestionsDesc: "לפי מלאי נוכחי ומינימום מלאי — מומלץ להזמין",
+        suggestedQty: "כמות מומלצת",
+        currentStock: "מלאי נוכחי",
+        noSuggestions: "המלאי תקין — אין המלצות להזמנה",
       },
       upload: {
         selectRestaurant: "בחר מסעדה",
@@ -1262,6 +1267,11 @@ export const translations = {
         date: "Date",
         status: "Status",
         noOrdersMessage: "No orders. Purchase orders will appear here when defined in the system.",
+        orderSuggestionsTitle: "Order suggestions",
+        orderSuggestionsDesc: "Based on current stock and minimum — recommended to order",
+        suggestedQty: "Suggested qty",
+        currentStock: "Current stock",
+        noSuggestions: "Stock is fine — no order suggestions",
       },
       upload: {
         selectRestaurant: "Select restaurant",

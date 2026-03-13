@@ -341,9 +341,9 @@ export function AdminPanel() {
   const [addIngredientName, setAddIngredientName] = useState("")
   const [addIngredientPrice, setAddIngredientPrice] = useState("")
   const [addIngredientUnit, setAddIngredientUnit] = useState("ק\"ג")
-  const [addIngredientWaste, setAddIngredientWaste] = useState("0")
-  const [addIngredientStock, setAddIngredientStock] = useState("0")
-  const [addIngredientMinStock, setAddIngredientMinStock] = useState("0")
+  const [addIngredientWaste, setAddIngredientWaste] = useState("")
+  const [addIngredientStock, setAddIngredientStock] = useState("")
+  const [addIngredientMinStock, setAddIngredientMinStock] = useState("")
   const [addIngredientSku, setAddIngredientSku] = useState("")
   const [addIngredientSupplier, setAddIngredientSupplier] = useState("")
   const [addIngredientSaving, setAddIngredientSaving] = useState(false)
@@ -351,9 +351,9 @@ export function AdminPanel() {
   const [editAdminIngredient, setEditAdminIngredient] = useState<IngredientRow | null>(null)
   const [editAdminIngPrice, setEditAdminIngPrice] = useState("")
   const [editAdminIngUnit, setEditAdminIngUnit] = useState("ק\"ג")
-  const [editAdminIngWaste, setEditAdminIngWaste] = useState("0")
-  const [editAdminIngStock, setEditAdminIngStock] = useState("0")
-  const [editAdminIngMinStock, setEditAdminIngMinStock] = useState("0")
+  const [editAdminIngWaste, setEditAdminIngWaste] = useState("")
+  const [editAdminIngStock, setEditAdminIngStock] = useState("")
+  const [editAdminIngMinStock, setEditAdminIngMinStock] = useState("")
   const [editAdminIngSupplier, setEditAdminIngSupplier] = useState("")
   const [editAdminIngSku, setEditAdminIngSku] = useState("")
   const [editAdminIngSaving, setEditAdminIngSaving] = useState(false)
@@ -782,9 +782,9 @@ export function AdminPanel() {
     setAddIngredientName("")
     setAddIngredientPrice("")
     setAddIngredientUnit("ק\"ג")
-    setAddIngredientWaste("0")
-    setAddIngredientStock("0")
-    setAddIngredientMinStock("0")
+    setAddIngredientWaste("")
+    setAddIngredientStock("")
+    setAddIngredientMinStock("")
     setAddIngredientSku("")
     setAddIngredientSupplier("")
   }
@@ -842,11 +842,11 @@ export function AdminPanel() {
 
   const openEditAdminIngredient = (ing: IngredientRow) => {
     setEditAdminIngredient(ing)
-    setEditAdminIngPrice(String(ing.price))
+    setEditAdminIngPrice(ing.price === 0 ? "" : String(ing.price))
     setEditAdminIngUnit(ing.unit || "ק\"ג")
-    setEditAdminIngWaste(String(ing.waste))
-    setEditAdminIngStock(String(ing.stock))
-    setEditAdminIngMinStock(String(ing.minStock))
+    setEditAdminIngWaste(ing.waste === 0 ? "" : String(ing.waste))
+    setEditAdminIngStock(ing.stock === 0 ? "" : String(ing.stock))
+    setEditAdminIngMinStock(ing.minStock === 0 ? "" : String(ing.minStock))
     setEditAdminIngSupplier(ing.supplier || "")
     setEditAdminIngSku(ing.sku || "")
     setEditAdminIngredientOpen(true)
@@ -2246,7 +2246,7 @@ export function AdminPanel() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>{t("pages.adminPanel.priceLabelNis")} *</Label>
-                <Input type="number" value={addIngredientPrice} onChange={(e) => setAddIngredientPrice(e.target.value)} placeholder="0" min={0} step={0.01} />
+                <Input type="text" inputMode="decimal" value={addIngredientPrice} onChange={(e) => setAddIngredientPrice(e.target.value)} placeholder="0" />
               </div>
               <div className="space-y-2">
                 <Label>{t("pages.adminPanel.unitUnit")}</Label>
@@ -2264,15 +2264,15 @@ export function AdminPanel() {
               </div>
               <div className="space-y-2">
                 <Label>{t("pages.adminPanel.wasteLabel")}</Label>
-                <Input type="number" value={addIngredientWaste} onChange={(e) => setAddIngredientWaste(e.target.value)} placeholder="0" min={0} max={100} step={0.1} />
+                <Input type="text" inputMode="decimal" value={addIngredientWaste} onChange={(e) => setAddIngredientWaste(e.target.value)} placeholder="0" />
               </div>
               <div className="space-y-2">
                 <Label>{t("pages.adminPanel.inventory")}</Label>
-                <Input type="number" value={addIngredientStock} onChange={(e) => setAddIngredientStock(e.target.value)} placeholder="0" min={0} />
+                <Input type="text" inputMode="numeric" value={addIngredientStock} onChange={(e) => setAddIngredientStock(e.target.value)} placeholder="0" />
               </div>
               <div className="space-y-2">
                 <Label>{t("pages.adminPanel.minStock")}</Label>
-                <Input type="number" value={addIngredientMinStock} onChange={(e) => setAddIngredientMinStock(e.target.value)} placeholder="0" min={0} />
+                <Input type="text" inputMode="numeric" value={addIngredientMinStock} onChange={(e) => setAddIngredientMinStock(e.target.value)} placeholder="0" />
               </div>
               <div className="space-y-2">
                 <Label>{t("pages.adminPanel.skuLabel")}</Label>
@@ -2328,7 +2328,7 @@ export function AdminPanel() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>מחיר ₪ *</Label>
-                <Input type="number" value={editAdminIngPrice} onChange={(e) => setEditAdminIngPrice(e.target.value)} min={0} step={0.01} />
+                <Input type="text" inputMode="decimal" value={editAdminIngPrice} onChange={(e) => setEditAdminIngPrice(e.target.value)} placeholder="0" />
               </div>
               <div className="space-y-2">
                 <Label>{t("pages.adminPanel.unitUnit")}</Label>
@@ -2346,15 +2346,15 @@ export function AdminPanel() {
               </div>
               <div className="space-y-2">
                 <Label>פחת %</Label>
-                <Input type="number" value={editAdminIngWaste} onChange={(e) => setEditAdminIngWaste(e.target.value)} min={0} max={100} step={0.1} />
+                <Input type="text" inputMode="decimal" value={editAdminIngWaste} onChange={(e) => setEditAdminIngWaste(e.target.value)} placeholder="0" />
               </div>
               <div className="space-y-2">
                 <Label>{t("pages.adminPanel.inventory")}</Label>
-                <Input type="number" value={editAdminIngStock} onChange={(e) => setEditAdminIngStock(e.target.value)} min={0} />
+                <Input type="text" inputMode="numeric" value={editAdminIngStock} onChange={(e) => setEditAdminIngStock(e.target.value)} placeholder="0" />
               </div>
               <div className="space-y-2">
                 <Label>{t("pages.adminPanel.minStock")}</Label>
-                <Input type="number" value={editAdminIngMinStock} onChange={(e) => setEditAdminIngMinStock(e.target.value)} min={0} />
+                <Input type="text" inputMode="numeric" value={editAdminIngMinStock} onChange={(e) => setEditAdminIngMinStock(e.target.value)} placeholder="0" />
               </div>
             </div>
             <div className="space-y-2">
@@ -2547,7 +2547,7 @@ export function AdminPanel() {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">{t("pages.adminPanel.pricePlaceholder")}</Label>
-                    <Input value={nsmItemPrice} onChange={(e) => setNsmItemPrice(e.target.value)} type="number" placeholder={t("pages.adminPanel.pricePlaceholder")} min={0} step={0.01} className="min-w-0" />
+                    <Input value={nsmItemPrice} onChange={(e) => setNsmItemPrice(e.target.value)} type="text" inputMode="decimal" placeholder={t("pages.adminPanel.pricePlaceholder")} className="min-w-0" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">{t("pages.adminPanel.unitUnit")}</Label>
@@ -2565,15 +2565,15 @@ export function AdminPanel() {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">{t("pages.adminPanel.wastePlaceholder")}</Label>
-                    <Input value={nsmItemWaste} onChange={(e) => setNsmItemWaste(e.target.value)} type="number" placeholder={t("pages.adminPanel.wastePlaceholder")} min={0} max={100} step={0.1} className="min-w-0" />
+                    <Input value={nsmItemWaste} onChange={(e) => setNsmItemWaste(e.target.value)} type="text" inputMode="decimal" placeholder={t("pages.adminPanel.wastePlaceholder")} className="min-w-0" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">{t("pages.adminPanel.inventory")}</Label>
-                    <Input value={nsmItemStock} onChange={(e) => setNsmItemStock(e.target.value)} type="number" placeholder={t("pages.adminPanel.inventory")} min={0} className="min-w-0" />
+                    <Input value={nsmItemStock} onChange={(e) => setNsmItemStock(e.target.value)} type="text" inputMode="numeric" placeholder={t("pages.adminPanel.inventory")} className="min-w-0" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">{t("pages.adminPanel.minStockPlaceholder")}</Label>
-                    <Input value={nsmItemMinStock} onChange={(e) => setNsmItemMinStock(e.target.value)} type="number" placeholder={t("pages.adminPanel.minStockPlaceholder")} min={0} className="min-w-0" />
+                    <Input value={nsmItemMinStock} onChange={(e) => setNsmItemMinStock(e.target.value)} type="text" inputMode="numeric" placeholder={t("pages.adminPanel.minStockPlaceholder")} className="min-w-0" />
                   </div>
                   <div className="space-y-1 sm:col-span-2">
                     <Label className="text-xs">{t("pages.adminPanel.skuPlaceholderShort")}</Label>

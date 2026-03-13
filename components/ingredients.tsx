@@ -135,7 +135,7 @@ function CheapestPricePopover({
           ? { price: wp.price, unit: wp.unit }
           : null
   const hasAny = gc || webPrice
-  const displayPrice = cheapest ? `₪${cheapest.price.toFixed(1)}/${cheapest.unit}` : null
+  const displayPrice = cheapest ? `₪${cheapest.price.toFixed(2)}/${cheapest.unit}` : null
   const isCheaper = ingredient.priceSource === "mine" && gc && pricePerKgFn(gc.price, gc.unit) < pricePerKgFn(ingredient.price, ingredient.unit)
   return (
     <Popover>
@@ -157,7 +157,7 @@ function CheapestPricePopover({
           {gc ? (
             <div className={cn("rounded-lg border p-3 text-sm", isCheaper && "bg-green-500/5 border-green-500/20 text-green-700 dark:text-green-400")}>
               <div className="text-xs font-medium text-muted-foreground mb-1">{t("pages.ingredients.fromSuppliers")}</div>
-              <div className="font-semibold">₪{gc.price.toFixed(1)}/{gc.unit}</div>
+              <div className="font-semibold">₪{gc.price.toFixed(2)}/{gc.unit}</div>
               {gc.supplier && <div className="text-primary text-xs mt-0.5">{t("pages.ingredients.at")} {gc.supplier}</div>}
             </div>
           ) : (
@@ -170,7 +170,7 @@ function CheapestPricePopover({
             <div className="space-y-3">
               <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3 text-sm text-blue-700 dark:text-blue-400">
                 <div className="text-xs font-medium text-muted-foreground mb-1">{t("pages.ingredients.fromInternet")}</div>
-                <div className="font-semibold">₪{webPrice.price.toFixed(1)}/{webPrice.unit}</div>
+                <div className="font-semibold">₪{webPrice.price.toFixed(2)}/{webPrice.unit}</div>
                 <div className="text-xs mt-0.5">{t("pages.ingredients.at")} {webPrice.store}</div>
               </div>
               <Button
@@ -225,10 +225,10 @@ export function Ingredients() {
   const [addIngName, setAddIngName] = useState("")
   const [addIngPrice, setAddIngPrice] = useState("")
   const [addIngUnit, setAddIngUnit] = useState("גרם")
-  const [addIngWaste, setAddIngWaste] = useState(0)
+  const [addIngWaste, setAddIngWaste] = useState("")
   const [addIngSupplier, setAddIngSupplier] = useState("")
-  const [addIngStock, setAddIngStock] = useState(0)
-  const [addIngMinStock, setAddIngMinStock] = useState(0)
+  const [addIngStock, setAddIngStock] = useState("")
+  const [addIngMinStock, setAddIngMinStock] = useState("")
   const [addIngSku, setAddIngSku] = useState("")
   const [addIngCategory, setAddIngCategory] = useState("אחר")
 
@@ -604,10 +604,10 @@ export function Ingredients() {
     setAddIngName("")
     setAddIngPrice("")
     setAddIngUnit("גרם")
-    setAddIngWaste(0)
+    setAddIngWaste("")
     setAddIngSupplier("")
-    setAddIngStock(0)
-    setAddIngMinStock(0)
+    setAddIngStock("")
+    setAddIngMinStock("")
     setAddIngSku("")
     setAddIngCategory("אחר")
   }
@@ -629,10 +629,10 @@ export function Ingredients() {
       await setDoc(doc(db, "restaurants", currentRestaurantId, "ingredients", name), {
         price: parseFloat(String(addIngPrice)) || 0,
         unit: addIngUnit,
-        waste: addIngWaste,
+        waste: parseFloat(String(addIngWaste)) || 0,
         supplier: addIngSupplier.trim() || "",
-        stock: addIngStock,
-        minStock: addIngMinStock,
+        stock: parseFloat(String(addIngStock)) || 0,
+        minStock: parseFloat(String(addIngMinStock)) || 0,
         sku: addIngSku.trim() || "",
         category: addIngCategory,
         lastUpdated: new Date().toISOString(),
@@ -667,11 +667,11 @@ export function Ingredients() {
   const openEditIngredient = (ing: Ingredient) => {
     setEditIngredient(ing)
     setEditIngSupplier(ing.supplier || "")
-    setEditIngPrice(String(ing.price))
+    setEditIngPrice(ing.price === 0 ? "" : String(ing.price))
     setEditIngUnit(ing.unit || "גרם")
-    setEditIngWaste(String(ing.waste))
-    setEditIngStock(String(ing.stock))
-    setEditIngMinStock(String(ing.minStock))
+    setEditIngWaste(ing.waste === 0 ? "" : String(ing.waste))
+    setEditIngStock(ing.stock === 0 ? "" : String(ing.stock))
+    setEditIngMinStock(ing.minStock === 0 ? "" : String(ing.minStock))
     setEditIngSku(ing.sku || "")
     setEditIngCategory(ing.category || "אחר")
     setEditIngredientOpen(true)
@@ -873,7 +873,7 @@ export function Ingredients() {
                 </div>
                 <div className={textAlign}>
                   <p className="text-sm text-muted-foreground">{t("pages.ingredients.inventoryValue")}</p>
-                  <p className="text-2xl font-bold">{stats.totalValue.toLocaleString()} ₪</p>
+                  <p className="text-2xl font-bold">₪{stats.totalValue.toLocaleString()}</p>
                 </div>
               </div>
             </CardContent>
@@ -913,7 +913,7 @@ export function Ingredients() {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="add-ing-price">{t("pages.ingredients.price")} ₪ *</Label>
-                        <Input id="add-ing-price" type="number" value={addIngPrice} onChange={(e) => setAddIngPrice(e.target.value)} placeholder="0" min={0} step={0.01} />
+                        <Input id="add-ing-price" type="text" inputMode="decimal" value={addIngPrice} onChange={(e) => setAddIngPrice(e.target.value)} placeholder="0" />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -930,7 +930,7 @@ export function Ingredients() {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="add-ing-waste">{t("pages.ingredients.waste")}</Label>
-                        <Input id="add-ing-waste" type="number" value={addIngWaste} onChange={(e) => setAddIngWaste(parseFloat(e.target.value) || 0)} placeholder="0" min={0} max={100} />
+                        <Input id="add-ing-waste" type="text" inputMode="decimal" value={addIngWaste} onChange={(e) => setAddIngWaste(e.target.value)} placeholder="0" />
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -945,11 +945,11 @@ export function Ingredients() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="add-ing-stock">{t("pages.ingredients.currentStock")}</Label>
-                        <Input id="add-ing-stock" type="number" value={addIngStock} onChange={(e) => setAddIngStock(parseFloat(e.target.value) || 0)} placeholder="0" min={0} />
+                        <Input id="add-ing-stock" type="text" inputMode="numeric" value={addIngStock} onChange={(e) => setAddIngStock(e.target.value)} placeholder="0" />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="add-ing-minstock">{t("pages.ingredients.minStockLabel")}</Label>
-                        <Input id="add-ing-minstock" type="number" value={addIngMinStock} onChange={(e) => setAddIngMinStock(parseFloat(e.target.value) || 0)} placeholder="0" min={0} />
+                        <Input id="add-ing-minstock" type="text" inputMode="numeric" value={addIngMinStock} onChange={(e) => setAddIngMinStock(e.target.value)} placeholder="0" />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -993,12 +993,11 @@ export function Ingredients() {
                       <div className="space-y-2">
                         <Label>מחיר ₪ *</Label>
                         <Input
-                          type="number"
+                          type="text"
+                          inputMode="decimal"
                           value={editIngPrice}
                           onChange={(e) => setEditIngPrice(e.target.value)}
                           placeholder="0"
-                          min={0}
-                          step={0.01}
                         />
                       </div>
                       <div className="space-y-2">
@@ -1015,33 +1014,31 @@ export function Ingredients() {
                       <div className="space-y-2">
                         <Label>פחת %</Label>
                         <Input
-                          type="number"
+                          type="text"
+                          inputMode="decimal"
                           value={editIngWaste}
                           onChange={(e) => setEditIngWaste(e.target.value)}
                           placeholder="0"
-                          min={0}
-                          max={100}
-                          step={0.1}
                         />
                       </div>
                       <div className="space-y-2">
                         <Label>מלאי</Label>
                         <Input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           value={editIngStock}
                           onChange={(e) => setEditIngStock(e.target.value)}
                           placeholder="0"
-                          min={0}
                         />
                       </div>
                       <div className="space-y-2">
                         <Label>מינ׳ מלאי</Label>
                         <Input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           value={editIngMinStock}
                           onChange={(e) => setEditIngMinStock(e.target.value)}
                           placeholder="0"
-                          min={0}
                         />
                       </div>
                       <div className="space-y-2">
@@ -1369,7 +1366,7 @@ export function Ingredients() {
                     const colSpan = displayColumnOrder.length
                     const cellByKey: Record<string, React.ReactNode> = {
                       name: <TableCell key="name" className={cn("font-medium", textAlign, densityCellClass)}>{isCompound && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded ml-1">🧪 מתכון</span>}{ingredient.name}</TableCell>,
-                      price: <TableCell key="price" className={cn(textAlign, "font-semibold", densityCellClass)}>{isCompound ? "—" : `${ingredient.price} ש"ח`}</TableCell>,
+                      price: <TableCell key="price" className={cn(textAlign, "font-semibold", densityCellClass)}>{isCompound ? "—" : `₪${Number(ingredient.price).toFixed(2)}`}</TableCell>,
                       source: <TableCell key="source" className={cn(textAlign, densityCellClass)}>{isCompound ? "—" : (ingredient.priceSource === "market" ? <Badge variant="secondary" className="text-xs whitespace-nowrap">מחיר שוק</Badge> : <Badge variant="outline" className="text-xs whitespace-nowrap">מחיר שלי</Badge>)}</TableCell>,
                       unit: <TableCell key="unit" className={cn(textAlign, densityCellClass)}>{ingredient.unit}</TableCell>,
                       waste: <TableCell key="waste" className={cn(textAlign, densityCellClass)}>{isCompound ? "—" : `${ingredient.waste}%`}</TableCell>,

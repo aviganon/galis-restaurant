@@ -21,9 +21,21 @@ import {
   DollarSign,
   Loader2,
   Search,
+  ShoppingCart,
+  Package,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { useTranslations } from "@/lib/use-translations"
+
+interface OrderSuggestion {
+  name: string
+  currentStock: number
+  minStock: number
+  suggestedQty: number
+  unit: string
+  price: number
+  supplier: string
+}
 
 interface PurchaseOrder {
   id: string
@@ -40,6 +52,7 @@ export function PurchaseOrders() {
   const t = useTranslations()
   const { currentRestaurantId } = useApp()
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
+  const [suggestions, setSuggestions] = useState<OrderSuggestion[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
 
@@ -51,10 +64,11 @@ export function PurchaseOrders() {
     setLoading(true)
     const load = async () => {
       try {
-        const purchaseOrdersRef = collection(db, "purchaseOrders")
-        const q = query(purchaseOrdersRef, where("restaurantId", "==", currentRestaurantId))
-        const snap = await getDocs(q)
-        const list: PurchaseOrder[] = snap.docs.map((d) => {
+        const [ordersSnap, ingSnap] = await Promise.all([
+          getDocs(query(collection(db, "purchaseOrders"), where("restaurantId", "==", currentRestaurantId))),
+          getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients")),
+        ])
+        const list: PurchaseOrder[] = ordersSnap.docs.map((d) => {
           const data = d.data()
           return {
             id: d.id,
@@ -68,8 +82,33 @@ export function PurchaseOrders() {
           }
         })
         setOrders(list)
+
+        const sugg: OrderSuggestion[] = []
+        ingSnap.forEach((d) => {
+          const data = d.data()
+          const stock = typeof data.stock === "number" ? data.stock : 0
+          const minStock = typeof data.minStock === "number" ? data.minStock : 0
+          const price = typeof data.price === "number" ? data.price : 0
+          const unit = (data.unit as string) || "ק\"ג"
+          const supplier = (data.supplier as string) || ""
+          if (stock < minStock || (stock === 0 && minStock === 0)) {
+            const suggestedQty = minStock > 0 ? minStock - stock : 1
+            sugg.push({
+              name: d.id,
+              currentStock: stock,
+              minStock,
+              suggestedQty,
+              unit,
+              price,
+              supplier: supplier || "—",
+            })
+          }
+        })
+        sugg.sort((a, b) => (a.supplier || "").localeCompare(b.supplier || ""))
+        setSuggestions(sugg)
       } catch {
         setOrders([])
+        setSuggestions([])
       } finally {
         setLoading(false)
       }
@@ -178,6 +217,59 @@ export function PurchaseOrders() {
           </CardContent>
         </Card>
       </div>
+
+      {suggestions.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-2 rounded-xl bg-amber-500/10">
+                <ShoppingCart className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <h2 className="font-bold text-lg">{t("pages.purchaseOrders.orderSuggestionsTitle")}</h2>
+                <p className="text-sm text-muted-foreground">{t("pages.purchaseOrders.orderSuggestionsDesc")}</p>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-right">{t("pages.ingredients.supplier")}</TableHead>
+                    <TableHead className="text-right">{t("pages.ingredients.ingredient")}</TableHead>
+                    <TableHead className="text-center">{t("pages.purchaseOrders.currentStock")}</TableHead>
+                    <TableHead className="text-center">{t("pages.ingredients.minStockLabel")}</TableHead>
+                    <TableHead className="text-center">{t("pages.purchaseOrders.suggestedQty")}</TableHead>
+                    <TableHead className="text-center">{t("pages.ingredients.unit")}</TableHead>
+                    <TableHead className="text-center">{t("pages.ingredients.price")}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {suggestions.map((s) => (
+                    <TableRow key={s.name} className="hover:bg-muted/50">
+                      <TableCell className="text-right">{s.supplier}</TableCell>
+                      <TableCell className="text-right font-medium">{s.name}</TableCell>
+                      <TableCell className="text-center">{s.currentStock}</TableCell>
+                      <TableCell className="text-center">{s.minStock}</TableCell>
+                      <TableCell className="text-center font-semibold">{s.suggestedQty}</TableCell>
+                      <TableCell className="text-center">{s.unit}</TableCell>
+                      <TableCell className="text-center">₪{(s.price * s.suggestedQty).toFixed(2)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {suggestions.length === 0 && (
+        <Card>
+          <CardContent className="p-6 flex items-center gap-3 text-muted-foreground">
+            <Package className="w-8 h-8 opacity-50" />
+            <p>{t("pages.purchaseOrders.noSuggestions")}</p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="p-4">
