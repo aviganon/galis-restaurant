@@ -51,7 +51,6 @@ import {
   ChevronDown,
 } from "lucide-react"
 import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -111,7 +110,7 @@ function CheapestPricePopover({
 }) {
   const gc = ingredient.globalCheapest
   const hasAny = gc || webPrice
-  const cheapestPrice = gc ? `${gc.price.toFixed(1)}/${gc.unit}` : null
+  const displayPrice = gc ? `₪${gc.price.toFixed(1)}/${gc.unit}` : (webPrice ? `₪${webPrice.price.toFixed(1)}/${webPrice.unit}` : null)
   const isCheaper = ingredient.priceSource === "mine" && gc && pricePerKgFn(gc.price, gc.unit) < pricePerKgFn(ingredient.price, ingredient.unit)
   return (
     <Popover>
@@ -124,26 +123,19 @@ function CheapestPricePopover({
             !hasAny && "text-muted-foreground"
           )}
         >
-          {hasAny ? (
-            <>
-              <span>הכי זול:</span>
-              {gc && <span>₪{cheapestPrice}</span>}
-              {gc?.supplier && <span className="text-primary">אצל {gc.supplier}</span>}
-              <ChevronDown className="w-3 h-3" />
-            </>
-          ) : (
-            <span>אין נתוני מחיר</span>
-          )}
+          {displayPrice || (hasAny ? "לחץ לצפייה" : "—")}
+          <ChevronDown className="w-3 h-3" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72">
-        <div className="space-y-3">
-          <p className="font-medium text-sm">{ingredient.name}</p>
-          {gc && (
+        <div className="space-y-2">
+          {gc ? (
             <div className={cn("text-sm", isCheaper && "text-green-600 dark:text-green-400 font-medium")}>
               <span className="text-muted-foreground">מהמערכת:</span> ₪{gc.price.toFixed(1)}/{gc.unit}
               {gc.supplier && <span className="text-primary"> אצל {gc.supplier}</span>}
             </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">מהמערכת: —</div>
           )}
           {webPrice ? (
             <div className="text-sm text-blue-600 dark:text-blue-400">
@@ -219,7 +211,6 @@ export function Ingredients() {
   const [recipes, setRecipes] = useState<{ id: string; isCompound?: boolean }[]>([])
   const [webPriceByIngredient, setWebPriceByIngredient] = useState<Record<string, { price: number; store: string; unit: string; source: string }>>({})
   const [webPriceLoading, setWebPriceLoading] = useState<string | null>(null)
-  const [showCheapestBelow, setShowCheapestBelow] = useState(false)
 
   const loadIngredients = useCallback(async () => {
     if (!currentRestaurantId) {
@@ -1106,13 +1097,7 @@ export function Ingredients() {
                 </SelectContent>
               </Select>
             )}
-            {isOwner && (
-              <label className="flex items-center gap-2 cursor-pointer text-sm whitespace-nowrap">
-                <Checkbox checked={showCheapestBelow} onCheckedChange={(c) => setShowCheapestBelow(!!c)} />
-                <span>מחיר הכי זול מתחת</span>
-              </label>
-            )}
-          </div>
+            </div>
         </CardContent>
       </Card>
 
@@ -1142,9 +1127,6 @@ export function Ingredients() {
                   </TableHead>
                   {isOwner && (
                     <TableHead className="text-right">מקור</TableHead>
-                  )}
-                  {isOwner && !showCheapestBelow && (
-                    <TableHead className="text-right">הכי זול אצל</TableHead>
                   )}
                   <TableHead
                     className="text-right cursor-pointer hover:bg-muted/50 select-none"
@@ -1203,7 +1185,7 @@ export function Ingredients() {
               <TableBody>
                 {filteredIngredients.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={isOwner ? (showCheapestBelow ? 11 : 12) : 9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={isOwner ? 11 : 9} className="text-center py-8 text-muted-foreground">
                       אין רכיבים. הוסף רכיבים דרך העלאה או עץ מוצר.
                     </TableCell>
                   </TableRow>
@@ -1212,7 +1194,7 @@ export function Ingredients() {
                     const isCompound = "isCompound" in ingredient && ingredient.isCompound
                     const stockStatus = isCompound ? { status: "מתכון", color: "bg-primary/10 text-primary", icon: ChefHat } : getStockStatus(ingredient)
                     const StatusIcon = stockStatus.icon
-                    const colSpan = isOwner ? (showCheapestBelow ? 11 : 12) : 9
+                    const colSpan = isOwner ? 11 : 9
                     return (
                       <React.Fragment key={ingredient.id}>
                       <motion.tr
@@ -1237,47 +1219,6 @@ export function Ingredients() {
                               ) : (
                                 <Badge variant="outline" className="text-xs whitespace-nowrap">מחיר שלי</Badge>
                               )
-                            )}
-                          </TableCell>
-                        )}
-                        {isOwner && !showCheapestBelow && (
-                          <TableCell className="text-right text-sm">
-                            {isCompound ? "—" : (
-                              <div className="space-y-2 min-w-[140px]">
-                                {ingredient.globalCheapest && (
-                                  <div className={cn(
-                                    ingredient.priceSource === "mine" &&
-                                    pricePerKg(ingredient.globalCheapest.price, ingredient.globalCheapest.unit) < pricePerKg(ingredient.price, ingredient.unit) &&
-                                    "text-green-600 dark:text-green-400 font-medium"
-                                  )}>
-                                    <span className="text-muted-foreground text-xs">מהמערכת:</span> ₪{ingredient.globalCheapest.price.toFixed(1)}/{ingredient.globalCheapest.unit}
-                                    {ingredient.globalCheapest.supplier && (
-                                      <span className="text-primary font-medium"> אצל {ingredient.globalCheapest.supplier}</span>
-                                    )}
-                                  </div>
-                                )}
-                                {webPriceByIngredient[ingredient.name] ? (
-                                  <div className="text-blue-600 dark:text-blue-400">
-                                    <span className="text-muted-foreground text-xs">מהאינטרנט (AI):</span> ₪{webPriceByIngredient[ingredient.name].price.toFixed(1)}/{webPriceByIngredient[ingredient.name].unit}
-                                    <span className="font-medium"> אצל {webPriceByIngredient[ingredient.name].store}</span>
-                                  </div>
-                                ) : (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 px-1 text-xs text-muted-foreground hover:text-primary"
-                                    onClick={() => fetchWebPrice(ingredient.name)}
-                                    disabled={webPriceLoading === ingredient.name}
-                                  >
-                                    {webPriceLoading === ingredient.name ? (
-                                      <Loader2 className="w-3 h-3 animate-spin ml-1" />
-                                    ) : (
-                                      <Globe className="w-3 h-3 ml-1" />
-                                    )}
-                                    בדוק באינטרנט
-                                  </Button>
-                                )}
-                              </div>
                             )}
                           </TableCell>
                         )}
@@ -1323,7 +1264,7 @@ export function Ingredients() {
                           </TableCell>
                         )}
                       </motion.tr>
-                      {showCheapestBelow && isOwner && !isCompound && (
+                      {isOwner && !isCompound && (
                         <TableRow className="bg-muted/30 hover:bg-muted/40">
                           <TableCell colSpan={colSpan} className="py-1.5 pr-4 text-right">
                             <CheapestPricePopover
