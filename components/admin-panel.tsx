@@ -137,15 +137,19 @@ function AdminCheapestPopover({
           <ChevronDown className="w-3 h-3" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-72">
-        <div className="space-y-2">
+      <PopoverContent align="start" className="w-80 p-4">
+        <div className="space-y-4">
           {gc ? (
-            <div className="text-sm text-muted-foreground">
-              <span className="text-muted-foreground">{t("pages.adminPanel.fromSuppliers")}:</span> ₪{gc.price.toFixed(1)}/{gc.unit}
-              {gc.supplier && <span className="text-primary font-medium"> {t("pages.ingredients.at")} {gc.supplier}</span>}
+            <div className="rounded-lg border p-3 text-sm">
+              <div className="text-xs font-medium text-muted-foreground mb-1">{t("pages.adminPanel.fromSuppliers")}</div>
+              <div className="font-semibold">₪{gc.price.toFixed(1)}/{gc.unit}</div>
+              {gc.supplier && <div className="text-primary text-xs mt-0.5">{t("pages.ingredients.at")} {gc.supplier}</div>}
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground">{t("pages.adminPanel.fromSuppliers")}: —</div>
+            <div className="rounded-lg border p-3 text-sm text-muted-foreground">
+              <div className="text-xs font-medium mb-1">{t("pages.adminPanel.fromSuppliers")}</div>
+              —
+            </div>
           )}
           <WebPriceCell
             ingredientName={ing.name}
@@ -218,30 +222,32 @@ function WebPriceCell({
   }, [ingredientName, onSaved])
   if (data) {
     return (
-      <div className="text-blue-600 dark:text-blue-400 text-xs space-y-1">
-        <div>
-          <span className="text-muted-foreground">{t("pages.adminPanel.fromInternet")}:</span> ₪{data.price.toFixed(1)}/{data.unit} {t("pages.ingredients.at")} {data.store}
+      <div className="space-y-3">
+        <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3 text-sm text-blue-700 dark:text-blue-400">
+          <div className="text-xs font-medium text-muted-foreground mb-1">{t("pages.adminPanel.fromInternet")}</div>
+          <div className="font-semibold">₪{data.price.toFixed(1)}/{data.unit}</div>
+          <div className="text-xs mt-0.5">{t("pages.ingredients.at")} {data.store}</div>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2">
           <Button
-            variant="link"
+            variant="default"
             size="sm"
-            className="h-auto p-0 text-xs text-primary"
+            className="flex-1"
             onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(ingredientName + " " + data.store + " מחיר קנייה")}`, "_blank")}
           >
+            <Globe className="w-4 h-4 ml-2" />
             {t("pages.adminPanel.buyOnline")} →
           </Button>
-          <Button variant="ghost" size="sm" className="h-6 px-1 text-xs" onClick={fetchWebPrice} disabled={loading}>
-            {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3 ml-1" />}
-            {t("pages.adminPanel.checkAgain")}
+          <Button variant="outline" size="sm" className="shrink-0" onClick={fetchWebPrice} disabled={loading}>
+            {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
           </Button>
         </div>
       </div>
     )
   }
   return (
-    <Button variant="ghost" size="sm" className="h-6 px-1 text-xs" onClick={fetchWebPrice} disabled={loading}>
-      {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Globe className="w-3 h-3 ml-1" />}
+    <Button variant="outline" size="sm" className="w-full" onClick={fetchWebPrice} disabled={loading}>
+      {loading ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <Globe className="w-3 h-3 ml-1" />}
       {t("pages.adminPanel.checkOnline")}
     </Button>
   )
@@ -394,9 +400,9 @@ export function AdminPanel() {
   const [editNsmItemName, setEditNsmItemName] = useState("")
   const [editNsmItemPrice, setEditNsmItemPrice] = useState("")
   const [editNsmItemUnit, setEditNsmItemUnit] = useState("ק\"ג")
-  const [editNsmItemWaste, setEditNsmItemWaste] = useState("0")
-  const [editNsmItemStock, setEditNsmItemStock] = useState("0")
-  const [editNsmItemMinStock, setEditNsmItemMinStock] = useState("0")
+  const [editNsmItemWaste, setEditNsmItemWaste] = useState("")
+  const [editNsmItemStock, setEditNsmItemStock] = useState("")
+  const [editNsmItemMinStock, setEditNsmItemMinStock] = useState("")
   const [editNsmItemSku, setEditNsmItemSku] = useState("")
   const [editIngredientSearchOpen, setEditIngredientSearchOpen] = useState(false)
 
@@ -1135,9 +1141,9 @@ export function AdminPanel() {
     setEditNsmItemName("")
     setEditNsmItemPrice("")
     setEditNsmItemUnit("ק\"ג")
-    setEditNsmItemWaste("0")
-    setEditNsmItemStock("0")
-    setEditNsmItemMinStock("0")
+    setEditNsmItemWaste("")
+    setEditNsmItemStock("")
+    setEditNsmItemMinStock("")
     setEditNsmItemSku("")
     setEditIngredientSearchOpen(false)
     setEditSupplierOpen(true)
@@ -1158,9 +1164,9 @@ export function AdminPanel() {
     setEditNsmItemName("")
     setEditNsmItemPrice("")
     setEditNsmItemUnit("ק\"ג")
-    setEditNsmItemWaste("0")
-    setEditNsmItemStock("0")
-    setEditNsmItemMinStock("0")
+    setEditNsmItemWaste("")
+    setEditNsmItemStock("")
+    setEditNsmItemMinStock("")
     setEditNsmItemSku("")
   }
 
@@ -2616,7 +2622,8 @@ export function AdminPanel() {
                 {editNsmItems.length === 0 && <p className="text-sm text-muted-foreground py-2">{t("pages.adminPanel.addIngredients")}</p>}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                <div className="relative">
+                <div className="relative space-y-1">
+                  <Label className="text-xs">{t("pages.adminPanel.searchOrEnterIngredient")}</Label>
                   <Input
                     value={editNsmItemName}
                     onChange={(e) => {
@@ -2662,8 +2669,13 @@ export function AdminPanel() {
                     )
                   })()}
                 </div>
-                <Input value={editNsmItemPrice} onChange={(e) => setEditNsmItemPrice(e.target.value)} type="number" placeholder={t("pages.adminPanel.pricePlaceholder")} min={0} step={0.01} className="min-w-0" />
-                <Select value={editNsmItemUnit} onValueChange={setEditNsmItemUnit}>
+                <div className="space-y-1">
+                  <Label className="text-xs">{t("pages.adminPanel.pricePlaceholder")}</Label>
+                  <Input value={editNsmItemPrice} onChange={(e) => setEditNsmItemPrice(e.target.value)} type="number" placeholder={t("pages.adminPanel.pricePlaceholder")} min={0} step={0.01} className="min-w-0" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">{t("pages.adminPanel.unitUnit")}</Label>
+                  <Select value={editNsmItemUnit} onValueChange={setEditNsmItemUnit}>
                   <SelectTrigger className="w-full min-w-0"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="גרם">{t("pages.adminPanel.unitGram")}</SelectItem>
@@ -2674,10 +2686,23 @@ export function AdminPanel() {
                     <SelectItem value="חבילה">{t("pages.adminPanel.unitPackage")}</SelectItem>
                   </SelectContent>
                 </Select>
-                <Input value={editNsmItemWaste} onChange={(e) => setEditNsmItemWaste(e.target.value)} type="number" placeholder={t("pages.adminPanel.wastePlaceholder")} min={0} max={100} step={0.1} className="min-w-0" />
-                <Input value={editNsmItemStock} onChange={(e) => setEditNsmItemStock(e.target.value)} type="number" placeholder={t("pages.adminPanel.inventory")} min={0} className="min-w-0" />
-                <Input value={editNsmItemMinStock} onChange={(e) => setEditNsmItemMinStock(e.target.value)} type="number" placeholder={t("pages.adminPanel.minStockPlaceholder")} min={0} className="min-w-0" />
-                <Input value={editNsmItemSku} onChange={(e) => setEditNsmItemSku(e.target.value)} placeholder={t("pages.adminPanel.skuPlaceholderShort")} className="min-w-0" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">{t("pages.adminPanel.wastePlaceholder")}</Label>
+                  <Input value={editNsmItemWaste} onChange={(e) => setEditNsmItemWaste(e.target.value)} type="number" placeholder={t("pages.adminPanel.wastePlaceholder")} min={0} max={100} step={0.1} className="min-w-0" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">{t("pages.adminPanel.inventory")}</Label>
+                  <Input value={editNsmItemStock} onChange={(e) => setEditNsmItemStock(e.target.value)} type="number" placeholder={t("pages.adminPanel.inventory")} min={0} className="min-w-0" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">{t("pages.adminPanel.minStockPlaceholder")}</Label>
+                  <Input value={editNsmItemMinStock} onChange={(e) => setEditNsmItemMinStock(e.target.value)} type="number" placeholder={t("pages.adminPanel.minStockPlaceholder")} min={0} className="min-w-0" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">{t("pages.adminPanel.skuPlaceholderShort")}</Label>
+                  <Input value={editNsmItemSku} onChange={(e) => setEditNsmItemSku(e.target.value)} placeholder={t("pages.adminPanel.skuPlaceholderShort")} className="min-w-0" />
+                </div>
                 <Button size="sm" onClick={addEditNsmItem} className="sm:col-span-2">➕ {t("pages.adminPanel.addIngredient")}</Button>
               </div>
             </div>

@@ -150,36 +150,42 @@ function CheapestPricePopover({
           <ChevronDown className="w-3 h-3" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-72">
-        <div className="space-y-2">
+      <PopoverContent align="start" className="w-80 p-4">
+        <div className="space-y-4">
           {gc ? (
-            <div className={cn("text-sm", isCheaper && "text-green-600 dark:text-green-400 font-medium")}>
-              <span className="text-muted-foreground">{t("pages.ingredients.fromSuppliers")}:</span> ₪{gc.price.toFixed(1)}/{gc.unit}
-              {gc.supplier && <span className="text-primary"> {t("pages.ingredients.at")} {gc.supplier}</span>}
+            <div className={cn("rounded-lg border p-3 text-sm", isCheaper && "bg-green-500/5 border-green-500/20 text-green-700 dark:text-green-400")}>
+              <div className="text-xs font-medium text-muted-foreground mb-1">{t("pages.ingredients.fromSuppliers")}</div>
+              <div className="font-semibold">₪{gc.price.toFixed(1)}/{gc.unit}</div>
+              {gc.supplier && <div className="text-primary text-xs mt-0.5">{t("pages.ingredients.at")} {gc.supplier}</div>}
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground">{t("pages.ingredients.fromSuppliers")}: —</div>
+            <div className="rounded-lg border p-3 text-sm text-muted-foreground">
+              <div className="text-xs font-medium mb-1">{t("pages.ingredients.fromSuppliers")}</div>
+              —
+            </div>
           )}
           {webPrice ? (
-            <div className="text-sm text-blue-600 dark:text-blue-400 space-y-1">
-              <div>
-                <span className="text-muted-foreground">{t("pages.ingredients.fromInternet")}:</span> ₪{webPrice.price.toFixed(1)}/{webPrice.unit}
-                <span className="font-medium"> {t("pages.ingredients.at")} {webPrice.store}</span>
+            <div className="space-y-3">
+              <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3 text-sm text-blue-700 dark:text-blue-400">
+                <div className="text-xs font-medium text-muted-foreground mb-1">{t("pages.ingredients.fromInternet")}</div>
+                <div className="font-semibold">₪{webPrice.price.toFixed(1)}/{webPrice.unit}</div>
+                <div className="text-xs mt-0.5">{t("pages.ingredients.at")} {webPrice.store}</div>
               </div>
               <Button
-                variant="link"
+                variant="default"
                 size="sm"
-                className="h-auto p-0 text-xs text-primary"
+                className="w-full"
                 onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(ingredient.name + " " + webPrice.store + " מחיר קנייה")}`, "_blank")}
               >
+                <Globe className="w-4 h-4 ml-2" />
                 {t("pages.ingredients.buyOnline")} →
               </Button>
             </div>
           ) : (
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="h-7 text-xs"
+              className="w-full"
               onClick={onFetchWebPrice}
               disabled={webPriceLoading}
             >
