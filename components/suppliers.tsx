@@ -52,6 +52,7 @@ import {
   Edit2,
 } from "lucide-react"
 import { toast } from "sonner"
+import { useTranslations } from "@/lib/use-translations"
 
 interface SupplierInfo {
   name: string
@@ -63,6 +64,7 @@ interface SupplierInfo {
 const isOwnerRole = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner"
 
 export function Suppliers() {
+  const t = useTranslations()
   const { currentRestaurantId, userRole, isSystemOwner, refreshIngredients, restaurants } = useApp()
   const isOwner = isOwnerRole(userRole, isSystemOwner)
   const [suppliers, setSuppliers] = useState<SupplierInfo[]>([])
@@ -141,12 +143,12 @@ export function Suppliers() {
         } catch (_) {}
       }
 
-      toast.success(`ספק "${name}" הוסר — הרכיבים נשארו עם ללא ספק וניתן לשייך להם ספק`)
+      toast.success(t("pages.suppliers.supplierRemoved").replace("{name}", name))
       setDeleteSupplierDialogOpen(false)
       setSelectedSupplierDetail(null)
       loadSuppliers()
     } catch (e) {
-      toast.error((e as Error)?.message || "שגיאה במחיקה")
+      toast.error((e as Error)?.message || t("pages.ingredients.deleteError"))
     } finally {
       setDeletingSupplierName(null)
     }
@@ -157,11 +159,11 @@ export function Suppliers() {
     setDeletingIngredientName(ingredientName)
     try {
       await deleteDoc(doc(db, "restaurants", currentRestaurantId, "ingredients", ingredientName))
-      toast.success(`רכיב "${ingredientName}" נמחק`)
+      toast.success(t("pages.ingredients.ingredientDeleted").replace("{name}", ingredientName))
       setSupplierDetailItems((prev) => prev.filter((i) => i.name !== ingredientName))
       loadSuppliers()
     } catch (e) {
-      toast.error((e as Error)?.message || "שגיאה במחיקה")
+      toast.error((e as Error)?.message || t("pages.ingredients.deleteError"))
     } finally {
       setDeletingIngredientName(null)
     }
@@ -199,7 +201,7 @@ export function Suppliers() {
         },
         { merge: true }
       )
-      toast.success(`רכיב "${editingIngredient.name}" עודכן`)
+      toast.success(t("pages.ingredients.ingredientUpdated").replace("{name}", editingIngredient.name))
       setSupplierDetailItems((prev) =>
         prev.map((i) =>
           i.name === editingIngredient.name
@@ -211,7 +213,7 @@ export function Suppliers() {
       loadSuppliers()
       refreshIngredients?.()
     } catch (e) {
-      toast.error((e as Error)?.message || "שגיאה בעדכון")
+      toast.error((e as Error)?.message || t("pages.settings.saveError"))
     } finally {
       setEditIngSaving(false)
     }
@@ -324,7 +326,7 @@ export function Suppliers() {
       setSupplierDetailItems(items)
     } catch (e) {
       console.error("load supplier detail:", e)
-      toast.error("שגיאה בטעינת פרטי הספק")
+      toast.error(t("pages.suppliers.loadError"))
     } finally {
       setSupplierDetailLoading(false)
     }
@@ -408,7 +410,7 @@ export function Suppliers() {
         }, { merge: true })
       })
       await batch.commit()
-      toast.success(`ספק ${supName} נוסף בהצלחה`)
+      toast.success(t("pages.suppliers.supplierAdded").replace("{name}", supName))
       setAddSupplierOpen(false)
       resetAddSupplierModal()
       loadSuppliers()
@@ -431,8 +433,8 @@ export function Suppliers() {
   if (!currentRestaurantId) {
     return (
       <div className="container mx-auto px-4 py-6">
-        <h1 className="text-2xl font-bold mb-1">ספקים</h1>
-        <p className="text-muted-foreground">בחר מסעדה</p>
+        <h1 className="text-2xl font-bold mb-1">{t("nav.suppliers")}</h1>
+        <p className="text-muted-foreground">{t("pages.suppliers.selectRestaurant")}</p>
       </div>
     )
   }
@@ -441,8 +443,8 @@ export function Suppliers() {
     <div className="container mx-auto px-4 py-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold mb-1">ספקים</h1>
-          <p className="text-muted-foreground">ספקים לפי רכיבים במערכת</p>
+          <h1 className="text-2xl md:text-3xl font-bold mb-1">{t("nav.suppliers")}</h1>
+          <p className="text-muted-foreground">{t("pages.suppliers.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={() => setAddSupplierOpen(true)}>
@@ -452,7 +454,7 @@ export function Suppliers() {
           <div className="relative flex-1 max-w-sm">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="חפש ספק..."
+            placeholder={t("pages.suppliers.searchPlaceholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pr-10"
@@ -464,12 +466,12 @@ export function Suppliers() {
       {filteredSuppliers.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center text-muted-foreground">
-            אין ספקים. ספקים מופיעים אוטומטית כאשר מוסיפים רכיבים עם שדה ספק.
+            {t("pages.suppliers.noSuppliersDesc")}
           </CardContent>
         </Card>
       ) : (
         <>
-          <p className="text-sm text-muted-foreground mb-4">לחץ על ספק כדי לראות את הפרטים והרכיבים שלו</p>
+          <p className="text-sm text-muted-foreground mb-4">{t("pages.suppliers.clickForDetails")}</p>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
             {filteredSuppliers.map((supplier) => (
               <Card
@@ -485,10 +487,10 @@ export function Suppliers() {
                   <Truck className="w-5 h-5 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold truncate">{supplier.name}</p>
+                  <p className="font-semibold truncate">{supplier.name === "ללא ספק" ? t("pages.suppliers.noSupplier") : supplier.name}</p>
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <Package className="w-3 h-3" />
-                    {supplier.products} רכיבים
+                    {supplier.products} {t("pages.suppliers.products")}
                     {supplier.source === "assigned" && (
                       <Badge variant="outline" className="mr-1 text-xs font-normal">שויך</Badge>
                     )}
@@ -519,7 +521,7 @@ export function Suppliers() {
                     onClick={() => setDeleteSupplierDialogOpen(true)}
                   >
                     <Trash2 className="w-4 h-4 ml-1" />
-                    מחק ספק
+                    {t("pages.suppliers.deleteSupplier")}
                   </Button>
                 )}
               </div>

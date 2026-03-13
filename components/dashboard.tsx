@@ -39,7 +39,7 @@ export function Dashboard() {
   const [inventoryValue, setInventoryValue] = useState(0)
   const [suppliersCount, setSuppliersCount] = useState(0)
   const [topDishes, setTopDishes] = useState<{ name: string; sales: number; revenue: number; margin: number }[]>([])
-  const [alerts, setAlerts] = useState<{ type: string; message: string; time: string }[]>([])
+  const [alerts, setAlerts] = useState<{ type: string; message?: string; messageKey?: string; count?: number; timeKey: string; id?: string }[]>([])
   const [avgFoodCost, setAvgFoodCost] = useState(0)
   const [totalRevenue, setTotalRevenue] = useState(0)
   const [totalCost, setTotalCost] = useState(0)
@@ -175,7 +175,7 @@ export function Dashboard() {
           setInventoryValue(0)
           setSuppliersCount(0)
           const alertList: { type: string; message: string; time: string; id?: string }[] = []
-          if (overTargetAll > 0) alertList.push({ type: "info", message: `${overTargetAll} ${t("pages.dashboard.dishesOverTargetMsg")}`, time: t("pages.now") })
+          if (overTargetAll > 0) alertList.push({ type: "info", messageKey: "pages.dashboard.dishesOverTargetMsg", count: overTargetAll, timeKey: "pages.now" })
           try {
             const notifSnap = await getDocs(
               query(
@@ -190,7 +190,7 @@ export function Dashboard() {
               .forEach((d) => {
                 const data = d.data()
                 const msg = `מסעדה "${data.restaurantName || data.restaurantId}" הסירה את הספק "${data.supplierName || ""}" ששויך על ידך`
-                alertList.unshift({ type: "warning", message: msg, time: t("pages.now"), id: d.id })
+                alertList.unshift({ type: "warning", message: msg, timeKey: "pages.now", id: d.id })
               })
           } catch (_) {}
           setAlerts(alertList)
@@ -332,10 +332,10 @@ export function Dashboard() {
         setProfitabilityDishes(withFoodCost.sort((a, b) => b.margin - a.margin).slice(0, 5))
 
         const alertList: { type: string; message: string; time: string }[] = []
-        if (outOfStock > 0) alertList.push({ type: "warning", message: `${outOfStock} ${t("pages.dashboard.outOfStockMsg")}`, time: t("pages.now") })
-        if (lowStock > 0) alertList.push({ type: "warning", message: `${lowStock} ${t("pages.dashboard.lowStockMsg")}`, time: t("pages.now") })
-        if (overTarget > 0) alertList.push({ type: "info", message: `${overTarget} ${t("pages.dashboard.dishesOverTargetMsg")}`, time: t("pages.now") })
-        if (delivered.length > 0) alertList.push({ type: "success", message: `${delivered.length} ${t("pages.dashboard.deliveredMsg")}`, time: t("pages.now") })
+        if (outOfStock > 0) alertList.push({ type: "warning", messageKey: "pages.dashboard.outOfStockMsg", count: outOfStock, timeKey: "pages.now" })
+        if (lowStock > 0) alertList.push({ type: "warning", messageKey: "pages.dashboard.lowStockMsg", count: lowStock, timeKey: "pages.now" })
+        if (overTarget > 0) alertList.push({ type: "info", messageKey: "pages.dashboard.dishesOverTargetMsg", count: overTarget, timeKey: "pages.now" })
+        if (delivered.length > 0) alertList.push({ type: "success", messageKey: "pages.dashboard.deliveredMsg", count: delivered.length, timeKey: "pages.now" })
         setAlerts(alertList)
       } catch (e) {
         console.error("load dashboard:", e)
@@ -344,7 +344,7 @@ export function Dashboard() {
       }
     }
     load()
-  }, [currentRestaurantId, isOwner, refreshKey, isOwnerDashboard, restaurants, t])
+  }, [currentRestaurantId, isOwner, refreshKey, isOwnerDashboard, restaurants])
 
   if (loading) {
     return (
@@ -545,7 +545,9 @@ export function Dashboard() {
               {alerts.length === 0 ? (
                 <p className="text-muted-foreground text-sm py-2">{t("pages.dashboard.noAlerts")}</p>
               ) : (
-                alerts.map((alert, i) => (
+                alerts.map((alert, i) => {
+                  const displayMessage = alert.message ?? (alert.messageKey && alert.count !== undefined ? `${alert.count} ${t(alert.messageKey)}` : alert.messageKey ? t(alert.messageKey) : "")
+                  return (
                   <div
                     key={alert.id ?? i}
                     className={cn(
@@ -556,8 +558,8 @@ export function Dashboard() {
                     )}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium mb-1">{alert.message}</p>
-                      <p className="text-xs opacity-70">{alert.time}</p>
+                      <p className="font-medium mb-1">{displayMessage}</p>
+                      <p className="text-xs opacity-70">{t(alert.timeKey)}</p>
                     </div>
                     {alert.id && (
                       <Button
@@ -570,7 +572,7 @@ export function Dashboard() {
                       </Button>
                     )}
                   </div>
-                ))
+                )})
               )}
             </CardContent>
           </Card>

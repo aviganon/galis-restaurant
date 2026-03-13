@@ -30,6 +30,7 @@ import {
   ArrowUp,
   Loader2,
 } from "lucide-react"
+import { useTranslations } from "@/lib/use-translations"
 
 interface InventoryItem {
   id: string
@@ -44,6 +45,7 @@ interface InventoryItem {
 const isOwnerRole = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner"
 
 export function Inventory() {
+  const t = useTranslations()
   const { currentRestaurantId, userRole, isSystemOwner } = useApp()
   const isOwner = isOwnerRole(userRole, isSystemOwner)
   const [items, setItems] = useState<InventoryItem[]>([])
@@ -99,10 +101,10 @@ export function Inventory() {
   }, [currentRestaurantId, isOwner])
 
   const getStockStatus = (item: InventoryItem) => {
-    if (item.currentStock === 0) return { status: "אזל", color: "bg-red-500", textColor: "text-red-600", icon: XCircle }
-    if (item.minStock > 0 && item.currentStock < item.minStock) return { status: "נמוך", color: "bg-amber-500", textColor: "text-amber-600", icon: AlertTriangle }
-    if (item.maxStock > 0 && item.currentStock >= item.maxStock * 0.8) return { status: "מלא", color: "bg-emerald-500", textColor: "text-emerald-600", icon: CheckCircle2 }
-    return { status: "תקין", color: "bg-blue-500", textColor: "text-blue-600", icon: CheckCircle2 }
+    if (item.currentStock === 0) return { status: t("pages.ingredients.stockOut"), color: "bg-red-500", textColor: "text-red-600", icon: XCircle }
+    if (item.minStock > 0 && item.currentStock < item.minStock) return { status: t("pages.ingredients.stockLow"), color: "bg-amber-500", textColor: "text-amber-600", icon: AlertTriangle }
+    if (item.maxStock > 0 && item.currentStock >= item.maxStock * 0.8) return { status: t("pages.inventory.stockFull"), color: "bg-emerald-500", textColor: "text-emerald-600", icon: CheckCircle2 }
+    return { status: t("pages.ingredients.stockOk"), color: "bg-blue-500", textColor: "text-blue-600", icon: CheckCircle2 }
   }
 
   const filteredItems = items.filter((item) => {
@@ -132,8 +134,8 @@ export function Inventory() {
   if (!currentRestaurantId) {
     return (
       <div className="p-4 md:p-6">
-        <h1 className="text-2xl font-bold mb-1">מלאי</h1>
-        <p className="text-muted-foreground">בחר מסעדה</p>
+        <h1 className="text-2xl font-bold mb-1">{t("nav.inventory")}</h1>
+        <p className="text-muted-foreground">{t("pages.inventory.selectRestaurant")}</p>
       </div>
     )
   }
@@ -149,7 +151,7 @@ export function Inventory() {
                   <Package className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">פריטים במלאי</p>
+                  <p className="text-sm text-muted-foreground">{t("pages.inventory.itemsInStock")}</p>
                   <p className="text-2xl font-bold">{stats.totalItems}</p>
                 </div>
               </div>
@@ -164,7 +166,7 @@ export function Inventory() {
                   <AlertTriangle className="w-5 h-5 text-amber-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">מלאי נמוך</p>
+                  <p className="text-sm text-muted-foreground">{t("pages.ingredients.lowStockLabel")}</p>
                   <p className="text-2xl font-bold">{stats.lowStock}</p>
                 </div>
               </div>
@@ -179,7 +181,7 @@ export function Inventory() {
                   <XCircle className="w-5 h-5 text-red-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">אזל מהמלאי</p>
+                  <p className="text-sm text-muted-foreground">{t("pages.ingredients.outOfStockLabel")}</p>
                   <p className="text-2xl font-bold">{stats.outOfStock}</p>
                 </div>
               </div>
@@ -192,25 +194,25 @@ export function Inventory() {
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex items-center gap-2 flex-1">
-              <span className="font-bold text-lg">ניהול מלאי</span>
-              <Badge variant="secondary">{filteredItems.length} פריטים</Badge>
+              <span className="font-bold text-lg">{t("pages.inventory.manageInventory")}</span>
+              <Badge variant="secondary">{filteredItems.length} {t("pages.inventory.itemsCount")}</Badge>
             </div>
           </div>
 
           <div className="flex flex-col md:flex-row gap-3 mt-4">
             <div className="relative flex-1">
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input placeholder="חפש פריט..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pr-10" />
+              <Input placeholder={t("pages.inventory.searchItem")} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pr-10" />
             </div>
             <Select value={stockFilter} onValueChange={setStockFilter}>
               <SelectTrigger className="w-full md:w-[150px]">
-                <SelectValue placeholder="סטטוס מלאי" />
+                <SelectValue placeholder={t("pages.ingredients.stockStatus")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">כל המלאי</SelectItem>
-                <SelectItem value="low">מלאי נמוך</SelectItem>
-                <SelectItem value="zero">אזל</SelectItem>
-                <SelectItem value="ok">תקין</SelectItem>
+                <SelectItem value="all">{t("pages.ingredients.allStock")}</SelectItem>
+                <SelectItem value="low">{t("pages.ingredients.lowStockLabel")}</SelectItem>
+                <SelectItem value="zero">{t("pages.ingredients.stockOut")}</SelectItem>
+                <SelectItem value="ok">{t("pages.ingredients.stockOk")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -221,7 +223,7 @@ export function Inventory() {
         {filteredItems.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center text-muted-foreground">
-              אין פריטים במלאי. הוסף רכיבים בהעלאה או בעץ מוצר.
+              {t("pages.inventory.noItemsMessage")}
             </CardContent>
           </Card>
         ) : (
@@ -247,7 +249,7 @@ export function Inventory() {
                     <div className="space-y-3">
                       <div>
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="text-muted-foreground">כמות במלאי</span>
+                          <span className="text-muted-foreground">{t("pages.inventory.quantityInStock")}</span>
                           <span className={`font-bold ${stockStatus.textColor}`}>
                             {item.currentStock} / {item.maxStock || "—"} {item.unit}
                           </span>
@@ -256,7 +258,7 @@ export function Inventory() {
                       </div>
 
                       <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">מינימום</span>
+                        <span className="text-muted-foreground">{t("pages.ingredients.minStockLabel")}</span>
                         <span>{item.minStock} {item.unit}</span>
                       </div>
                     </div>

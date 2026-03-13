@@ -56,6 +56,7 @@ import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { downloadExcel } from "@/lib/export-excel"
 import { fetchWebPriceForIngredient } from "@/lib/ai-extract"
+import { useTranslations } from "@/lib/use-translations"
 
 /** מחיר הכי זול גלובלי — לבעלים להשוואה */
 interface GlobalCheapest {
@@ -101,12 +102,14 @@ function CheapestPricePopover({
   onFetchWebPrice,
   webPriceLoading,
   pricePerKgFn,
+  t,
 }: {
   ingredient: Ingredient
   webPrice?: { price: number; store: string; unit: string; source: string }
   onFetchWebPrice: () => void
   webPriceLoading: boolean
   pricePerKgFn: (p: number, u: string) => number
+  t: (key: string) => string
 }) {
   const gc = ingredient.globalCheapest
   const wp = webPrice
@@ -134,7 +137,7 @@ function CheapestPricePopover({
             !hasAny && "text-muted-foreground"
           )}
         >
-          {displayPrice || (hasAny ? "לחץ לצפייה" : "—")}
+          {displayPrice || (hasAny ? t("pages.ingredients.clickToView") : "—")}
           <ChevronDown className="w-3 h-3" />
         </button>
       </PopoverTrigger>
@@ -142,17 +145,17 @@ function CheapestPricePopover({
         <div className="space-y-2">
           {gc ? (
             <div className={cn("text-sm", isCheaper && "text-green-600 dark:text-green-400 font-medium")}>
-              <span className="text-muted-foreground">מהספקים:</span> ₪{gc.price.toFixed(1)}/{gc.unit}
-              {gc.supplier && <span className="text-primary"> אצל {gc.supplier}</span>}
+              <span className="text-muted-foreground">{t("pages.ingredients.fromSuppliers")}:</span> ₪{gc.price.toFixed(1)}/{gc.unit}
+              {gc.supplier && <span className="text-primary"> {t("pages.ingredients.at")} {gc.supplier}</span>}
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground">מהספקים: —</div>
+            <div className="text-sm text-muted-foreground">{t("pages.ingredients.fromSuppliers")}: —</div>
           )}
           {webPrice ? (
             <div className="text-sm text-blue-600 dark:text-blue-400 space-y-1">
               <div>
-                <span className="text-muted-foreground">מהאינטרנט:</span> ₪{webPrice.price.toFixed(1)}/{webPrice.unit}
-                <span className="font-medium"> אצל {webPrice.store}</span>
+                <span className="text-muted-foreground">{t("pages.ingredients.fromInternet")}:</span> ₪{webPrice.price.toFixed(1)}/{webPrice.unit}
+                <span className="font-medium"> {t("pages.ingredients.at")} {webPrice.store}</span>
               </div>
               <Button
                 variant="link"
@@ -160,7 +163,7 @@ function CheapestPricePopover({
                 className="h-auto p-0 text-xs text-primary"
                 onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(ingredient.name + " " + webPrice.store + " מחיר קנייה")}`, "_blank")}
               >
-                לקנייה באינטרנט →
+                {t("pages.ingredients.buyOnline")} →
               </Button>
             </div>
           ) : (
@@ -172,7 +175,7 @@ function CheapestPricePopover({
               disabled={webPriceLoading}
             >
               {webPriceLoading ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <Globe className="w-3 h-3 ml-1" />}
-              בדוק באינטרנט
+              {t("pages.ingredients.checkOnline")}
             </Button>
           )}
         </div>
@@ -182,6 +185,9 @@ function CheapestPricePopover({
 }
 
 export function Ingredients() {
+  const t = useTranslations()
+  const tRef = React.useRef(t)
+  tRef.current = t
   const { currentRestaurantId, setCurrentPage, userRole, isSystemOwner, refreshIngredients } = useApp()
   const isOwner = isOwnerRole(userRole, isSystemOwner)
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
@@ -358,7 +364,7 @@ export function Ingredients() {
       }
     } catch (e) {
       console.error("load ingredients:", e)
-      toast.error("שגיאה בטעינת רכיבים")
+      toast.error(tRef.current("pages.ingredients.loadError"))
     } finally {
       setLoading(false)
     }
@@ -403,10 +409,10 @@ export function Ingredients() {
           //
         }
       } else {
-        toast.error("לא הצלחתי למצוא מחיר באינטרנט")
+        toast.error(tRef.current("pages.ingredients.priceCheckFailed"))
       }
     } catch (e) {
-      toast.error((e as Error)?.message || "שגיאה בבדיקת מחיר")
+      toast.error((e as Error)?.message || tRef.current("pages.ingredients.priceCheckError"))
     } finally {
       setWebPriceLoading(null)
     }
@@ -433,7 +439,7 @@ export function Ingredients() {
   const addCompoundItem = () => {
     const name = compoundItemName.trim()
     if (!name) {
-      toast.error("בחר רכיב")
+      toast.error(t("pages.ingredients.selectIngredient"))
       return
     }
     const isSubRecipe = recipes.some((r) => r.id === name && r.isCompound)
@@ -453,11 +459,11 @@ export function Ingredients() {
     setDeletingIngredientId(`recipe-${recipeName}`)
     try {
       await deleteDoc(doc(db, "restaurants", currentRestaurantId, "recipes", recipeName))
-      toast.success(`מתכון "${recipeName}" נמחק`)
+      toast.success(t("pages.ingredients.recipeDeleted").replace("{name}", recipeName))
       setRecipes((prev) => prev.filter((r) => r.id !== recipeName))
       refreshIngredients?.()
     } catch (e) {
-      toast.error((e as Error)?.message || "שגיאה במחיקה")
+      toast.error((e as Error)?.message || t("pages.ingredients.deleteError"))
     } finally {
       setDeletingIngredientId(null)
     }
@@ -466,17 +472,17 @@ export function Ingredients() {
   const handleSaveCompound = async () => {
     const name = compoundName.trim()
     if (!name) {
-      toast.error("הזן שם מתכון")
+      toast.error(t("pages.ingredients.enterRecipeName"))
       return
     }
     if (compoundItems.length === 0) {
-      toast.error("הוסף לפחות רכיב אחד")
+      toast.error(t("pages.ingredients.addAtLeastOne"))
       return
     }
     if (!currentRestaurantId) return
     const exists = ingredients.some((i) => i.name === name) || recipes.some((r) => r.id === name)
     if (exists) {
-      toast.error("שם זה כבר קיים")
+      toast.error(t("pages.ingredients.nameExists"))
       return
     }
     setCompoundSaving(true)
@@ -489,7 +495,7 @@ export function Ingredients() {
         yieldUnit: compoundYieldUnit,
         ingredients: compoundItems.map((i) => ({ name: i.name, qty: i.qty, unit: i.unit, waste: i.waste || 0, isSubRecipe: !!i.isSubRecipe })),
       }, { merge: true })
-      toast.success(`מתכון "${name}" נוצר — ניתן לשייך למנות בעץ מוצר`)
+      toast.success(t("pages.ingredients.recipeCreated").replace("{name}", name))
       setCompoundOpen(false)
       setCompoundName("")
       setCompoundYieldQty(1)
@@ -522,13 +528,13 @@ export function Ingredients() {
   const handleSaveAddIngredient = async () => {
     const name = addIngName.trim()
     if (!name) {
-      toast.error("הזן שם רכיב")
+      toast.error(t("pages.ingredients.enterIngredientName"))
       return
     }
     if (!currentRestaurantId) return
     const exists = ingredients.some((i) => i.name === name)
     if (exists) {
-      toast.error("רכיב בשם זה כבר קיים")
+      toast.error(t("pages.ingredients.ingredientExists"))
       return
     }
     setAddIngSaving(true)
@@ -544,7 +550,7 @@ export function Ingredients() {
         category: addIngCategory,
         lastUpdated: new Date().toISOString(),
       }, { merge: true })
-      toast.success(`רכיב "${name}" נוסף בהצלחה`)
+      toast.success(t("pages.ingredients.ingredientAdded").replace("{name}", name))
       setIsAddDialogOpen(false)
       resetAddIngForm()
       loadIngredients()
@@ -561,11 +567,11 @@ export function Ingredients() {
     setDeletingIngredientId(ing.id)
     try {
       await deleteDoc(doc(db, "restaurants", currentRestaurantId, "ingredients", ing.id))
-      toast.success(`רכיב "${ing.name}" נמחק`)
+      toast.success(t("pages.ingredients.ingredientDeleted").replace("{name}", ing.name))
       loadIngredients()
       refreshIngredients?.()
     } catch (e) {
-      toast.error((e as Error)?.message || "שגיאה במחיקה")
+      toast.error((e as Error)?.message || t("pages.ingredients.deleteError"))
     } finally {
       setDeletingIngredientId(null)
     }
@@ -603,7 +609,7 @@ export function Ingredients() {
         supplier: editIngSupplier.trim() || "",
         lastUpdated: new Date().toISOString(),
       }, { merge: true })
-      toast.success(`רכיב "${editIngredient.name}" עודכן`)
+      toast.success(t("pages.ingredients.ingredientUpdated").replace("{name}", editIngredient.name))
       setEditIngredientOpen(false)
       setEditIngredient(null)
       loadIngredients()
@@ -616,9 +622,9 @@ export function Ingredients() {
   }
 
   const getStockStatus = (ingredient: Ingredient) => {
-    if (ingredient.stock === 0) return { status: "אזל", color: "bg-red-100 text-red-700", icon: XCircle }
-    if (ingredient.minStock > 0 && ingredient.stock < ingredient.minStock) return { status: "נמוך", color: "bg-amber-100 text-amber-700", icon: AlertTriangle }
-    return { status: "תקין", color: "bg-emerald-100 text-emerald-700", icon: CheckCircle2 }
+    if (ingredient.stock === 0) return { status: t("pages.ingredients.stockOut"), sortKey: "out", color: "bg-red-100 text-red-700", icon: XCircle }
+    if (ingredient.minStock > 0 && ingredient.stock < ingredient.minStock) return { status: t("pages.ingredients.stockLow"), sortKey: "low", color: "bg-amber-100 text-amber-700", icon: AlertTriangle }
+    return { status: t("pages.ingredients.stockOk"), sortKey: "ok", color: "bg-emerald-100 text-emerald-700", icon: CheckCircle2 }
   }
 
   const compoundRecipesForList = recipes
@@ -631,7 +637,7 @@ export function Ingredients() {
       waste: 0,
       stock: 0,
       minStock: 0,
-      supplier: "מתכון מורכב",
+      supplier: t("pages.ingredients.compoundRecipe"),
       sku: "",
       category: "אחר",
       isCompound: true as const,
@@ -690,8 +696,8 @@ export function Ingredients() {
         case "sku":
           return (a.sku || "").localeCompare(b.sku || "", "he")
         case "status": {
-          const statusA = a.isCompound ? "מתכון" : getStockStatus(a).status
-          const statusB = b.isCompound ? "מתכון" : getStockStatus(b).status
+          const statusA = a.isCompound ? "compound" : getStockStatus(a).sortKey
+          const statusB = b.isCompound ? "compound" : getStockStatus(b).sortKey
           return (statusA || "").localeCompare(statusB || "", "he")
         }
         default:
@@ -717,8 +723,8 @@ export function Ingredients() {
   if (!currentRestaurantId) {
     return (
       <div className="p-4 md:p-6">
-        <h1 className="text-2xl font-bold mb-1">רכיבים</h1>
-        <p className="text-muted-foreground">בחר מסעדה כדי לראות רכיבים</p>
+        <h1 className="text-2xl font-bold mb-1">{t("nav.ingredients")}</h1>
+        <p className="text-muted-foreground">{t("pages.ingredients.selectRestaurant")}</p>
       </div>
     )
   }
@@ -734,7 +740,7 @@ export function Ingredients() {
                   <Package className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">סה"כ רכיבים</p>
+                  <p className="text-sm text-muted-foreground">{t("pages.ingredients.totalIngredients")}</p>
                   <p className="text-2xl font-bold">{stats.total}</p>
                 </div>
               </div>
@@ -749,7 +755,7 @@ export function Ingredients() {
                   <AlertTriangle className="w-5 h-5 text-amber-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">מלאי נמוך</p>
+                  <p className="text-sm text-muted-foreground">{t("pages.ingredients.lowStockLabel")}</p>
                   <p className="text-2xl font-bold">{stats.lowStock}</p>
                 </div>
               </div>
@@ -764,7 +770,7 @@ export function Ingredients() {
                   <XCircle className="w-5 h-5 text-red-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">אזל מהמלאי</p>
+                  <p className="text-sm text-muted-foreground">{t("pages.ingredients.outOfStockLabel")}</p>
                   <p className="text-2xl font-bold">{stats.outOfStock}</p>
                 </div>
               </div>
@@ -779,8 +785,8 @@ export function Ingredients() {
                   <TrendingUp className="w-5 h-5 text-emerald-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">שווי מלאי</p>
-                  <p className="text-2xl font-bold">{stats.totalValue.toLocaleString()} ש"ח</p>
+                  <p className="text-sm text-muted-foreground">{t("pages.ingredients.inventoryValue")}</p>
+                  <p className="text-2xl font-bold">{stats.totalValue.toLocaleString()} ₪</p>
                 </div>
               </div>
             </CardContent>
@@ -792,40 +798,40 @@ export function Ingredients() {
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex items-center gap-2 flex-1">
-              <span className="font-bold text-lg">ניהול רכיבים</span>
-              <Badge variant="secondary">{filteredIngredients.length} רכיבים</Badge>
+              <span className="font-bold text-lg">{t("pages.ingredients.manageIngredients")}</span>
+              <Badge variant="secondary">{filteredIngredients.length} {t("pages.ingredients.ingredients")}</Badge>
             </div>
             <div className="flex gap-2 flex-wrap">
               <Button variant="outline" className="rounded-full" onClick={() => setCompoundOpen(true)}>
                 <ChefHat className="w-4 h-4 ml-2" />
-                מתכון חדש
+                {t("pages.ingredients.newRecipe")}
               </Button>
               <Dialog open={isAddDialogOpen} onOpenChange={(o) => { setIsAddDialogOpen(o); if (!o) resetAddIngForm() }}>
                 <DialogTrigger asChild>
                   <Button className="rounded-full">
                     <Plus className="w-4 h-4 ml-2" />
-                    רכיב חדש
+                    {t("pages.ingredients.newIngredient")}
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>➕ רכיב חדש</DialogTitle>
-                    <p className="text-sm text-muted-foreground">הוסף רכיב לרשימת המסעדה</p>
+                    <DialogTitle>➕ {t("pages.ingredients.newIngredient")}</DialogTitle>
+                    <p className="text-sm text-muted-foreground">{t("pages.ingredients.addIngredientDesc")}</p>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="add-ing-name">שם הרכיב *</Label>
-                        <Input id="add-ing-name" value={addIngName} onChange={(e) => setAddIngName(e.target.value)} placeholder="למשל: קמח, שמן" />
+                        <Label htmlFor="add-ing-name">{t("pages.ingredients.ingredientName")} *</Label>
+                        <Input id="add-ing-name" value={addIngName} onChange={(e) => setAddIngName(e.target.value)} placeholder={t("pages.ingredients.namePlaceholder")} />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="add-ing-price">מחיר ₪ *</Label>
+                        <Label htmlFor="add-ing-price">{t("pages.ingredients.price")} ₪ *</Label>
                         <Input id="add-ing-price" type="number" value={addIngPrice} onChange={(e) => setAddIngPrice(e.target.value)} placeholder="0" min={0} step={0.01} />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="add-ing-unit">יחידה</Label>
+                        <Label htmlFor="add-ing-unit">{t("pages.ingredients.unit")}</Label>
                         <Select value={addIngUnit} onValueChange={setAddIngUnit}>
                           <SelectTrigger id="add-ing-unit"><SelectValue /></SelectTrigger>
                           <SelectContent>
@@ -836,13 +842,13 @@ export function Ingredients() {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="add-ing-waste">פחת %</Label>
+                        <Label htmlFor="add-ing-waste">{t("pages.ingredients.waste")}</Label>
                         <Input id="add-ing-waste" type="number" value={addIngWaste} onChange={(e) => setAddIngWaste(parseFloat(e.target.value) || 0)} placeholder="0" min={0} max={100} />
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="add-ing-supplier">ספק</Label>
-                      <Input id="add-ing-supplier" value={addIngSupplier} onChange={(e) => setAddIngSupplier(e.target.value)} placeholder="שם הספק" list="add-ing-supplier-list" />
+                      <Label htmlFor="add-ing-supplier">{t("pages.ingredients.supplier")}</Label>
+                      <Input id="add-ing-supplier" value={addIngSupplier} onChange={(e) => setAddIngSupplier(e.target.value)} placeholder={t("pages.ingredients.supplierPlaceholder")} list="add-ing-supplier-list" />
                       <datalist id="add-ing-supplier-list">
                         {suppliers.filter((s) => s !== "כל הספקים").map((s) => (
                           <option key={s} value={s} />
@@ -851,18 +857,18 @@ export function Ingredients() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="add-ing-stock">מלאי נוכחי</Label>
+                        <Label htmlFor="add-ing-stock">{t("pages.ingredients.currentStock")}</Label>
                         <Input id="add-ing-stock" type="number" value={addIngStock} onChange={(e) => setAddIngStock(parseFloat(e.target.value) || 0)} placeholder="0" min={0} />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="add-ing-minstock">מינימום מלאי</Label>
+                        <Label htmlFor="add-ing-minstock">{t("pages.ingredients.minStockLabel")}</Label>
                         <Input id="add-ing-minstock" type="number" value={addIngMinStock} onChange={(e) => setAddIngMinStock(parseFloat(e.target.value) || 0)} placeholder="0" min={0} />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="add-ing-sku">מק״ט</Label>
-                        <Input id="add-ing-sku" value={addIngSku} onChange={(e) => setAddIngSku(e.target.value)} placeholder="קוד מוצר" />
+                        <Input id="add-ing-sku" value={addIngSku} onChange={(e) => setAddIngSku(e.target.value)} placeholder={t("pages.ingredients.skuPlaceholder")} />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="add-ing-category">קטגוריה</Label>
@@ -878,10 +884,10 @@ export function Ingredients() {
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>ביטול</Button>
+                    <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>{t("pages.settings.cancel")}</Button>
                     <Button onClick={handleSaveAddIngredient} disabled={addIngSaving}>
                       {addIngSaving ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : null}
-                      שמור רכיב
+                      {t("pages.ingredients.saveIngredient")}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -890,9 +896,9 @@ export function Ingredients() {
               <Dialog open={editIngredientOpen} onOpenChange={(o) => { setEditIngredientOpen(o); if (!o) setEditIngredient(null) }}>
                 <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>עריכת רכיב</DialogTitle>
+                    <DialogTitle>{t("pages.ingredients.editIngredient")}</DialogTitle>
                     <p className="text-sm text-muted-foreground">
-                      {editIngredient && `רכיב: ${editIngredient.name}`}
+                      {editIngredient && `${t("pages.ingredients.ingredient")}: ${editIngredient.name}`}
                     </p>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
@@ -1096,7 +1102,7 @@ export function Ingredients() {
                     "סטטוס": "isCompound" in i && i.isCompound ? "מתכון" : i.stock === 0 ? "אזל" : i.minStock > 0 && i.stock < i.minStock ? "נמוך" : "תקין",
                   }))
                   downloadExcel(rows, `רכיבים_${new Date().toISOString().slice(0, 10)}`, "רכיבים")
-                  toast.success("הקובץ הורד")
+                  toast.success(t("pages.ingredients.fileDownloaded"))
                 }}
               >
                 <Download className="w-4 h-4 ml-2" />
@@ -1109,7 +1115,7 @@ export function Ingredients() {
             <div className="relative flex-1">
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="חיפוש מהיר: רכיב, מק״ט..."
+                placeholder={t("pages.ingredients.searchPlaceholder")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pr-10"
@@ -1121,30 +1127,30 @@ export function Ingredients() {
               </SelectTrigger>
               <SelectContent>
                 {[...suppliers, ...(recipes.some((r) => r.isCompound) && !suppliers.includes("מתכון מורכב") ? ["מתכון מורכב"] : [])].map((sup) => (
-                  <SelectItem key={sup} value={sup}>{sup}</SelectItem>
+                  <SelectItem key={sup} value={sup}>{sup === "כל הספקים" ? t("pages.ingredients.allSuppliers") : sup === "מתכון מורכב" ? t("pages.ingredients.compoundRecipe") : sup}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Select value={stockFilter} onValueChange={setStockFilter}>
               <SelectTrigger className="w-full sm:w-[140px]">
-                <SelectValue placeholder="סטטוס מלאי" />
+                <SelectValue placeholder={t("pages.ingredients.stockStatus")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">כל המלאי</SelectItem>
-                <SelectItem value="low">מלאי נמוך</SelectItem>
-                <SelectItem value="zero">אזל</SelectItem>
-                <SelectItem value="ok">תקין</SelectItem>
+                <SelectItem value="all">{t("pages.ingredients.allStock")}</SelectItem>
+                <SelectItem value="low">{t("pages.ingredients.lowStockLabel")}</SelectItem>
+                <SelectItem value="zero">{t("pages.ingredients.stockOut")}</SelectItem>
+                <SelectItem value="ok">{t("pages.ingredients.stockOk")}</SelectItem>
               </SelectContent>
             </Select>
             {isOwner && (
               <Select value={priceSourceFilter} onValueChange={(v) => setPriceSourceFilter(v as "all" | "mine" | "market")}>
                 <SelectTrigger className="w-full sm:w-[140px]">
-                  <SelectValue placeholder="מקור מחיר" />
+                  <SelectValue placeholder={t("pages.ingredients.priceSource")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">כל המחירים</SelectItem>
-                  <SelectItem value="mine">מחיר שלי</SelectItem>
-                  <SelectItem value="market">מחיר שוק</SelectItem>
+                  <SelectItem value="all">{t("pages.ingredients.allPrices")}</SelectItem>
+                  <SelectItem value="mine">{t("pages.ingredients.myPrice")}</SelectItem>
+                  <SelectItem value="market">{t("pages.ingredients.marketPrice")}</SelectItem>
                 </SelectContent>
               </Select>
             )}
@@ -1163,7 +1169,7 @@ export function Ingredients() {
                     onClick={() => setSortBy((s) => (s === "name" ? "name_desc" : "name"))}
                   >
                     <span className="flex items-center justify-end gap-1">
-                      שם הרכיב
+                      {t("pages.ingredients.ingredientName")}
                       {(sortBy === "name" || sortBy === "name_desc") && (sortBy === "name" ? <TrendingDown className="w-3.5 h-3.5" /> : <TrendingUp className="w-3.5 h-3.5" />)}
                     </span>
                   </TableHead>
@@ -1172,25 +1178,25 @@ export function Ingredients() {
                     onClick={() => setSortBy((s) => (s === "price_asc" ? "price_desc" : "price_asc"))}
                   >
                     <span className="flex items-center justify-end gap-1">
-                      מחיר
+                      {t("pages.ingredients.price")}
                       {(sortBy === "price_asc" || sortBy === "price_desc") && (sortBy === "price_desc" ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />)}
                     </span>
                   </TableHead>
                   {isOwner && (
-                    <TableHead className="text-right">מקור</TableHead>
+                    <TableHead className="text-right">{t("pages.ingredients.source")}</TableHead>
                   )}
                   <TableHead
                     className="text-right cursor-pointer hover:bg-muted/50 select-none"
                     onClick={() => setSortBy("unit")}
                   >
-                    <span className="flex items-center justify-end gap-1">יחידה</span>
+                    <span className="flex items-center justify-end gap-1">{t("pages.ingredients.unit")}</span>
                   </TableHead>
                   <TableHead
                     className="text-right cursor-pointer hover:bg-muted/50 select-none"
                     onClick={() => setSortBy((s) => (s === "waste_asc" ? "waste_desc" : "waste_asc"))}
                   >
                     <span className="flex items-center justify-end gap-1">
-                      פחת %
+                      {t("pages.ingredients.waste")}
                       {(sortBy === "waste_asc" || sortBy === "waste_desc") && (sortBy === "waste_desc" ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />)}
                     </span>
                   </TableHead>
@@ -1199,7 +1205,7 @@ export function Ingredients() {
                     onClick={() => setSortBy((s) => (s === "stock_asc" ? "stock_desc" : "stock_asc"))}
                   >
                     <span className="flex items-center justify-end gap-1">
-                      מלאי
+                      {t("pages.ingredients.stock")}
                       {(sortBy === "stock_asc" || sortBy === "stock_desc") && (sortBy === "stock_desc" ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />)}
                     </span>
                   </TableHead>
@@ -1324,6 +1330,7 @@ export function Ingredients() {
                               onFetchWebPrice={() => fetchWebPrice(ingredient.name)}
                               webPriceLoading={webPriceLoading === ingredient.name}
                               pricePerKgFn={pricePerKg}
+                              t={t}
                             />
                           </TableCell>
                         </TableRow>

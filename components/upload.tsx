@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { toast } from "sonner"
 import { downloadExcelFromArrays } from "@/lib/export-excel"
+import { useTranslations } from "@/lib/use-translations"
 import {
   Upload as UploadIcon,
   FileSpreadsheet,
@@ -70,12 +71,12 @@ function formatTime(): string {
   return `היום ${d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}`
 }
 
-const uploadTypes = [
-  { id: "prices", label: "מחירון ספקים", icon: FileSpreadsheet, description: "עדכון מחירי רכיבים מקובץ Excel" },
-  { id: "invoice", label: "חשבונית ספק", icon: FileText, description: "סריקת חשבונית והכנסת נתונים" },
-  { id: "recipe", label: "מתכון מתמונה", icon: Camera, description: "זיהוי מתכון מתמונה באמצעות AI" },
-  { id: "sales", label: "דוח מכירות", icon: FileSpreadsheet, description: "ייבוא דוח מכירות לעדכון כמויות ומחירים" },
-  { id: "inventory", label: "ספירת מלאי", icon: FileSpreadsheet, description: "עדכון כמויות מלאי מקובץ" },
+const getUploadTypes = (t: (k: string) => string) => [
+  { id: "prices", label: t("pages.upload.pricesLabel"), icon: FileSpreadsheet, description: t("pages.upload.pricesDesc") },
+  { id: "invoice", label: t("pages.upload.invoiceLabel"), icon: FileText, description: t("pages.upload.invoiceDesc") },
+  { id: "recipe", label: t("pages.upload.recipeLabel"), icon: Camera, description: t("pages.upload.recipeDesc") },
+  { id: "sales", label: t("pages.upload.salesLabel"), icon: FileSpreadsheet, description: t("pages.upload.salesDesc") },
+  { id: "inventory", label: t("pages.upload.inventoryLabel"), icon: FileSpreadsheet, description: t("pages.upload.inventoryDesc") },
 ]
 
 const AI_ACCEPT = ".xlsx,.xls,.csv,.pdf,.rtf,image/*"
@@ -84,7 +85,9 @@ const VAT_RATE = 1.17
 const isOwnerRole = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner"
 
 export function Upload() {
+  const t = useTranslations()
   const { currentRestaurantId, userRole, isSystemOwner, refreshIngredients, restaurants } = useApp()
+  const uploadTypes = getUploadTypes(t)
   const isOwner = isOwnerRole(userRole, isSystemOwner)
   const [isDragging, setIsDragging] = useState(false)
   const [selectedType, setSelectedType] = useState<string | null>(null)

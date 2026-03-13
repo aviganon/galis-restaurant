@@ -1,5 +1,6 @@
 "use client"
 
+import { useTransition } from "react"
 import { useLanguage } from "@/contexts/language-context"
 import { Button } from "@/components/ui/button"
 import { Languages } from "lucide-react"
@@ -12,12 +13,19 @@ interface LanguageSwitcherProps {
 
 export function LanguageSwitcher({ variant = "dark" }: LanguageSwitcherProps) {
   const { locale, setLocale } = useLanguage()
+  const [, startTransition] = useTransition()
+
+  const handleSwitch = () => {
+    startTransition(() => {
+      setLocale(locale === "he" ? "en" : "he")
+    })
+  }
 
   return (
     <Button
       variant="ghost"
       size="sm"
-      onClick={() => setLocale(locale === "he" ? "en" : "he")}
+      onClick={handleSwitch}
       className={cn(
         "gap-1.5",
         variant === "dark"

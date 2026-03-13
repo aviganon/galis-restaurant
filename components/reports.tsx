@@ -21,12 +21,14 @@ import {
 import { cn } from "@/lib/utils"
 import { downloadExcel } from "@/lib/export-excel"
 import { toast } from "sonner"
+import { useTranslations } from "@/lib/use-translations"
 
 const VAT_RATE = 1.17
 
 const isOwnerRole = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner"
 
 export function Reports() {
+  const t = useTranslations()
   const { currentRestaurantId, userRole, isSystemOwner } = useApp()
   const isOwner = isOwnerRole(userRole, isSystemOwner)
   const [loading, setLoading] = useState(true)
@@ -117,8 +119,8 @@ export function Reports() {
   if (!currentRestaurantId) {
     return (
       <div className="container mx-auto px-4 py-6">
-        <h1 className="text-2xl font-bold mb-1">דוחות</h1>
-        <p className="text-muted-foreground">בחר מסעדה</p>
+        <h1 className="text-2xl font-bold mb-1">{t("nav.reports")}</h1>
+        <p className="text-muted-foreground">{t("pages.reports.selectRestaurant")}</p>
       </div>
     )
   }
@@ -129,8 +131,8 @@ export function Reports() {
     <div className="container mx-auto px-4 py-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold mb-1">דוחות וניתוח</h1>
-          <p className="text-muted-foreground">סקירת ביצועים וניתוח פיננסי</p>
+          <h1 className="text-2xl md:text-3xl font-bold mb-1">{t("pages.reports.title")}</h1>
+          <p className="text-muted-foreground">{t("pages.reports.subtitle")}</p>
         </div>
         <div className="flex gap-2">
           <Button
@@ -138,15 +140,15 @@ export function Reports() {
             className="rounded-xl"
             onClick={() => {
               const rows = [
-                { "תאריך": new Date().toLocaleDateString("he-IL"), "הכנסות": totalRevenue, "עלות מזון": totalCost, "מרווח %": margin.toFixed(1) },
-                ...topDishes.map((d) => ({ "מנה": d.name, "הכנסה": d.revenue, "שינוי %": d.growth })),
+                { [t("pages.purchaseOrders.date")]: new Date().toLocaleDateString("he-IL"), [t("pages.reports.revenue")]: totalRevenue, [t("pages.reports.foodCost")]: totalCost, [t("pages.reports.margin")]: margin.toFixed(1) },
+                ...topDishes.map((d) => ({ [t("pages.menuCosts.dish")]: d.name, [t("pages.reports.revenue")]: d.revenue, [t("pages.reports.growth")]: d.growth })),
               ]
-              downloadExcel(rows, `דוח_${new Date().toISOString().slice(0, 10)}`, "דוח")
-              toast.success("הקובץ הורד")
+              downloadExcel(rows, `report_${new Date().toISOString().slice(0, 10)}`, "report")
+              toast.success(t("pages.ingredients.fileDownloaded"))
             }}
           >
             <Download className="w-4 h-4 ml-2" />
-            ייצוא Excel
+            {t("pages.reports.exportExcel")}
           </Button>
         </div>
       </div>
@@ -162,7 +164,7 @@ export function Reports() {
               </Badge>
             </div>
             <p className="text-2xl font-bold">₪{totalRevenue.toLocaleString()}</p>
-            <p className="text-sm text-muted-foreground">הכנסות</p>
+            <p className="text-sm text-muted-foreground">{t("pages.reports.revenue")}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
@@ -171,7 +173,7 @@ export function Reports() {
               <ShoppingCart className="w-5 h-5 text-muted-foreground" />
             </div>
             <p className="text-2xl font-bold">₪{totalCost.toLocaleString()}</p>
-            <p className="text-sm text-muted-foreground">עלות מזון</p>
+            <p className="text-sm text-muted-foreground">{t("pages.reports.foodCost")}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
@@ -180,7 +182,7 @@ export function Reports() {
               <PieChart className="w-5 h-5 text-muted-foreground" />
             </div>
             <p className="text-2xl font-bold">{margin.toFixed(1)}%</p>
-            <p className="text-sm text-muted-foreground">מרווח גולמי</p>
+            <p className="text-sm text-muted-foreground">{t("pages.reports.grossMargin")}</p>
           </CardContent>
         </Card>
       </div>
@@ -189,20 +191,20 @@ export function Reports() {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg font-semibold flex items-center gap-2">
             <Utensils className="w-5 h-5 text-muted-foreground" />
-            מנות מובילות
+            {t("pages.reports.topDishes")}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {topDishes.length === 0 ? (
-            <p className="text-muted-foreground text-sm">אין נתוני מכירות. העלה דוח מכירות בהעלאה.</p>
+            <p className="text-muted-foreground text-sm">{t("pages.reports.noSalesData")}</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="text-xs text-muted-foreground border-b">
-                    <th className="text-right pb-3 font-medium">מנה</th>
-                    <th className="text-center pb-3 font-medium">הכנסה</th>
-                    <th className="text-center pb-3 font-medium">שינוי</th>
+                    <th className="text-right pb-3 font-medium">{t("pages.menuCosts.dish")}</th>
+                    <th className="text-center pb-3 font-medium">{t("pages.reports.revenue")}</th>
+                    <th className="text-center pb-3 font-medium">{t("pages.reports.change")}</th>
                   </tr>
                 </thead>
                 <tbody>

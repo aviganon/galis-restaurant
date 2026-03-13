@@ -23,6 +23,7 @@ import {
   Search,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { useTranslations } from "@/lib/use-translations"
 
 interface PurchaseOrder {
   id: string
@@ -36,6 +37,7 @@ interface PurchaseOrder {
 }
 
 export function PurchaseOrders() {
+  const t = useTranslations()
   const { currentRestaurantId } = useApp()
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
   const [loading, setLoading] = useState(true)
@@ -78,15 +80,15 @@ export function PurchaseOrders() {
   const getStatusConfig = (status: string) => {
     switch (status) {
       case "draft":
-        return { label: "טיוטה", color: "bg-gray-100 text-gray-700", icon: FileText }
+        return { label: t("pages.purchaseOrders.draft"), color: "bg-gray-100 text-gray-700", icon: FileText }
       case "sent":
-        return { label: "נשלח", color: "bg-blue-100 text-blue-700", icon: Clock }
+        return { label: t("pages.purchaseOrders.sent"), color: "bg-blue-100 text-blue-700", icon: Clock }
       case "confirmed":
-        return { label: "אושר", color: "bg-emerald-100 text-emerald-700", icon: CheckCircle2 }
+        return { label: t("pages.purchaseOrders.confirmed"), color: "bg-emerald-100 text-emerald-700", icon: CheckCircle2 }
       case "delivered":
-        return { label: "התקבל", color: "bg-purple-100 text-purple-700", icon: CheckCircle2 }
+        return { label: t("pages.purchaseOrders.delivered"), color: "bg-purple-100 text-purple-700", icon: CheckCircle2 }
       case "cancelled":
-        return { label: "בוטל", color: "bg-red-100 text-red-700", icon: FileText }
+        return { label: t("pages.purchaseOrders.cancelled"), color: "bg-red-100 text-red-700", icon: FileText }
       default:
         return { label: status, color: "bg-gray-100 text-gray-700", icon: FileText }
     }
@@ -114,8 +116,8 @@ export function PurchaseOrders() {
   if (!currentRestaurantId) {
     return (
       <div className="p-4 md:p-6">
-        <h1 className="text-2xl font-bold mb-1">הזמנות ספקים</h1>
-        <p className="text-muted-foreground">בחר מסעדה</p>
+        <h1 className="text-2xl font-bold mb-1">{t("nav.purchaseOrders")}</h1>
+        <p className="text-muted-foreground">{t("pages.purchaseOrders.selectRestaurant")}</p>
       </div>
     )
   }
@@ -130,7 +132,7 @@ export function PurchaseOrders() {
                 <FileText className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">סה"כ הזמנות</p>
+                <p className="text-sm text-muted-foreground">{t("pages.purchaseOrders.ordersTotal")}</p>
                 <p className="text-2xl font-bold">{stats.total}</p>
               </div>
             </div>
@@ -143,7 +145,7 @@ export function PurchaseOrders() {
                 <Clock className="w-5 h-5 text-amber-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">בהמתנה</p>
+                <p className="text-sm text-muted-foreground">{t("pages.purchaseOrders.pending")}</p>
                 <p className="text-2xl font-bold">{stats.pending}</p>
               </div>
             </div>
@@ -156,7 +158,7 @@ export function PurchaseOrders() {
                 <CheckCircle2 className="w-5 h-5 text-emerald-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">התקבלו</p>
+                <p className="text-sm text-muted-foreground">{t("pages.purchaseOrders.deliveredCount")}</p>
                 <p className="text-2xl font-bold">{stats.delivered}</p>
               </div>
             </div>
@@ -169,7 +171,7 @@ export function PurchaseOrders() {
                 <DollarSign className="w-5 h-5 text-blue-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">סה"כ להזמנות</p>
+                <p className="text-sm text-muted-foreground">{t("pages.purchaseOrders.ordersValue")}</p>
                 <p className="text-2xl font-bold">{stats.totalValue.toLocaleString()} ש"ח</p>
               </div>
             </div>
@@ -181,8 +183,8 @@ export function PurchaseOrders() {
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex items-center gap-2 flex-1">
-              <span className="font-bold text-lg">הזמנות ספקים</span>
-              <Badge variant="secondary">{filteredOrders.length} הזמנות</Badge>
+              <span className="font-bold text-lg">{t("pages.purchaseOrders.ordersTitle")}</span>
+              <Badge variant="secondary">{filteredOrders.length} {t("pages.purchaseOrders.ordersCount")}</Badge>
             </div>
           </div>
 
@@ -190,7 +192,7 @@ export function PurchaseOrders() {
             <div className="relative flex-1">
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="חפש לפי מספר הזמנה או ספק..."
+                placeholder={t("pages.purchaseOrders.searchPlaceholder")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pr-10"
@@ -206,19 +208,19 @@ export function PurchaseOrders() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-right">מספר הזמנה</TableHead>
-                  <TableHead className="text-right">ספק</TableHead>
-                  <TableHead className="text-center">פריטים</TableHead>
-                  <TableHead className="text-center">סכום</TableHead>
-                  <TableHead className="text-center">תאריך</TableHead>
-                  <TableHead className="text-center">סטטוס</TableHead>
+                  <TableHead className="text-right">{t("pages.purchaseOrders.orderNumber")}</TableHead>
+                  <TableHead className="text-right">{t("pages.ingredients.supplier")}</TableHead>
+                  <TableHead className="text-center">{t("pages.purchaseOrders.items")}</TableHead>
+                  <TableHead className="text-center">{t("pages.purchaseOrders.amount")}</TableHead>
+                  <TableHead className="text-center">{t("pages.purchaseOrders.date")}</TableHead>
+                  <TableHead className="text-center">{t("pages.purchaseOrders.status")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredOrders.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      אין הזמנות. הזמנות ספקים יוצגו כאן כאשר יוגדרו במערכת.
+                      {t("pages.purchaseOrders.noOrdersMessage")}
                     </TableCell>
                   </TableRow>
                 ) : (

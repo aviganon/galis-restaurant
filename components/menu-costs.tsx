@@ -39,6 +39,7 @@ import {
 import { cn } from "@/lib/utils"
 import { downloadExcel } from "@/lib/export-excel"
 import { toast } from "sonner"
+import { useTranslations } from "@/lib/use-translations"
 
 const VAT_RATE = 1.17
 
@@ -58,6 +59,7 @@ interface MenuItem {
 const isOwnerRole = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner"
 
 export function MenuCosts() {
+  const t = useTranslations()
   const { currentRestaurantId, userRole, isSystemOwner, refreshIngredientsKey } = useApp()
   const isOwner = isOwnerRole(userRole, isSystemOwner)
   const [items, setItems] = useState<MenuItem[]>([])
@@ -173,15 +175,15 @@ export function MenuCosts() {
   const getStatusConfig = (status: string) => {
     switch (status) {
       case "excellent":
-        return { label: "מצוין", color: "bg-emerald-100 text-emerald-700", icon: CheckCircle2 }
+        return { label: t("pages.menuCosts.excellent"), color: "bg-emerald-100 text-emerald-700", icon: CheckCircle2 }
       case "good":
-        return { label: "טוב", color: "bg-blue-100 text-blue-700", icon: TrendingUp }
+        return { label: t("pages.menuCosts.good"), color: "bg-blue-100 text-blue-700", icon: TrendingUp }
       case "warning":
-        return { label: "לבדיקה", color: "bg-amber-100 text-amber-700", icon: AlertTriangle }
+        return { label: t("pages.menuCosts.checkReview"), color: "bg-amber-100 text-amber-700", icon: AlertTriangle }
       case "critical":
-        return { label: "בעייתי", color: "bg-red-100 text-red-700", icon: TrendingDown }
+        return { label: t("pages.menuCosts.problematic"), color: "bg-red-100 text-red-700", icon: TrendingDown }
       default:
-        return { label: "לא ידוע", color: "bg-gray-100 text-gray-700", icon: AlertTriangle }
+        return { label: t("pages.menuCosts.unknown"), color: "bg-gray-100 text-gray-700", icon: AlertTriangle }
     }
   }
 
@@ -228,8 +230,8 @@ export function MenuCosts() {
   if (!currentRestaurantId) {
     return (
       <div className="p-4 md:p-6">
-        <h1 className="text-2xl font-bold mb-1">עלויות תפריט</h1>
-        <p className="text-muted-foreground">בחר מסעדה</p>
+        <h1 className="text-2xl font-bold mb-1">{t("nav.menuCosts")}</h1>
+        <p className="text-muted-foreground">{t("pages.menuCosts.selectRestaurant")}</p>
       </div>
     )
   }
@@ -245,7 +247,7 @@ export function MenuCosts() {
                   <UtensilsCrossed className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">מנות בתפריט</p>
+                  <p className="text-sm text-muted-foreground">{t("pages.menuCosts.menuItems")}</p>
                   <p className="text-2xl font-bold">{stats.totalItems}</p>
                 </div>
               </div>
@@ -260,7 +262,7 @@ export function MenuCosts() {
                   <Percent className="w-5 h-5 text-amber-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">עלות מזון ממוצעת</p>
+                  <p className="text-sm text-muted-foreground">{t("pages.menuCosts.avgFoodCost")}</p>
                   <p className="text-2xl font-bold">{stats.avgFoodCost.toFixed(1)}%</p>
                 </div>
               </div>
@@ -275,7 +277,7 @@ export function MenuCosts() {
                   <DollarSign className="w-5 h-5 text-emerald-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">רווח ברוטו</p>
+                  <p className="text-sm text-muted-foreground">{t("pages.menuCosts.grossProfit")}</p>
                   <p className="text-2xl font-bold">{stats.totalProfit.toLocaleString()} ש"ח</p>
                 </div>
               </div>
@@ -290,7 +292,7 @@ export function MenuCosts() {
                   <AlertTriangle className="w-5 h-5 text-red-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">מנות לבדיקה</p>
+                  <p className="text-sm text-muted-foreground">{t("pages.menuCosts.dishesToReview")}</p>
                   <p className="text-2xl font-bold">{stats.criticalItems}</p>
                 </div>
               </div>
@@ -303,8 +305,8 @@ export function MenuCosts() {
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex items-center gap-2 flex-1">
-              <span className="font-bold text-lg">עלויות תפריט</span>
-              <Badge variant="secondary">{filteredItems.length} מנות</Badge>
+              <span className="font-bold text-lg">{t("nav.menuCosts")}</span>
+              <Badge variant="secondary">{filteredItems.length} {t("pages.menuCosts.dish")}</Badge>
             </div>
             <Button
               variant="outline"
@@ -321,11 +323,11 @@ export function MenuCosts() {
                   "סטטוס": i.status === "excellent" ? "מצוין" : i.status === "good" ? "טוב" : i.status === "warning" ? "אזהרה" : "קריטי",
                 }))
                 downloadExcel(rows, `עלויות_תפריט_${new Date().toISOString().slice(0, 10)}`, "עלויות")
-                toast.success("הקובץ הורד")
+                toast.success(t("pages.ingredients.fileDownloaded"))
               }}
             >
               <Download className="w-4 h-4 ml-2" />
-              ייצוא דוח
+              {t("pages.menuCosts.exportReport")}
             </Button>
           </div>
 
@@ -333,7 +335,7 @@ export function MenuCosts() {
             <div className="relative flex-1">
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="חפש מנה..."
+                placeholder={t("pages.menuCosts.searchPlaceholder")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pr-10"
@@ -353,14 +355,14 @@ export function MenuCosts() {
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full md:w-[150px]">
-                <SelectValue placeholder="סטטוס" />
+                <SelectValue placeholder={t("pages.menuCosts.status")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">כל הסטטוסים</SelectItem>
-                <SelectItem value="excellent">מצוין</SelectItem>
-                <SelectItem value="good">טוב</SelectItem>
-                <SelectItem value="warning">לבדיקה</SelectItem>
-                <SelectItem value="critical">בעייתי</SelectItem>
+                <SelectItem value="all">{t("pages.menuCosts.allStatuses")}</SelectItem>
+                <SelectItem value="excellent">{t("pages.menuCosts.excellent")}</SelectItem>
+                <SelectItem value="good">{t("pages.menuCosts.good")}</SelectItem>
+                <SelectItem value="warning">{t("pages.menuCosts.checkReview")}</SelectItem>
+                <SelectItem value="critical">{t("pages.menuCosts.problematic")}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={sortBy} onValueChange={setSortBy}>
@@ -400,7 +402,7 @@ export function MenuCosts() {
                 {filteredItems.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      אין מנות. הוסף מתכונים בעץ מוצר.
+                      {t("pages.menuCosts.noItems")}. {t("pages.recipes.addInProductTree")}
                     </TableCell>
                   </TableRow>
                 ) : (
