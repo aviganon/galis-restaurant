@@ -2430,7 +2430,7 @@ export function AdminPanel() {
       </AlertDialog>
 
       <Dialog open={addSupplierOpen} onOpenChange={(o) => { setAddSupplierOpen(o); if (!o) resetAddSupplierModal() }}>
-        <DialogContent className="w-[calc(100vw-1rem)] max-w-[min(98vw,100rem)] max-h-[90dvh] overflow-hidden flex flex-col p-4 sm:p-6">
+        <DialogContent className="!max-w-[min(98vw,100rem)] w-[calc(100vw-1rem)] sm:!max-w-[min(98vw,100rem)] max-h-[90dvh] overflow-hidden flex flex-col p-4 sm:p-6">
           <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <span className="text-2xl">🏭</span>
