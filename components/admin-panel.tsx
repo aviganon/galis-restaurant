@@ -2028,97 +2028,75 @@ export function AdminPanel() {
                 <CardHeader>
                   <CardTitle className={textAlign}>{t("pages.adminPanel.globalIngredients")}</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="w-full overflow-x-hidden overflow-y-auto max-h-[min(60vh,600px)] rounded-lg border">
-                  <Table className="table-fixed w-full text-sm" style={{ tableLayout: "fixed" }}>
+                <CardContent className="space-y-4">
+                  {/* Toolbar */}
+                  <div className={`flex flex-wrap items-center gap-2 ${justify}`}>
+                    <div className="relative flex-1 min-w-[140px] max-w-[220px]">
+                      <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        value={ingredientsSearchText}
+                        onChange={(e) => setIngredientsSearchText(e.target.value)}
+                        placeholder={t("pages.adminPanel.searchPlaceholder")}
+                        className={`h-9 pr-9 ${textAlign}`}
+                      />
+                      {ingredientsSearchText && (
+                        <Button variant="ghost" size="icon" className="absolute left-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={() => setIngredientsSearchText("")} title={t("pages.adminPanel.clear")}>
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                    <Button size="sm" onClick={() => { setAddIngredientSupplier(""); setAddIngredientOpen(true) }}>
+                      <Plus className="w-4 h-4 ml-1" />
+                      {t("pages.adminPanel.addIngredient")}
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      {filteredAndSortedIngredients.length === (ingredientsList?.length ?? 0)
+                        ? `${ingredientsList?.length ?? 0} ${t("pages.adminPanel.ingredientsCount")}`
+                        : `${t("pages.adminPanel.showingCount")} ${filteredAndSortedIngredients.length} ${t("pages.adminPanel.of")} ${ingredientsList?.length ?? 0}`}
+                    </span>
+                    <Button variant="outline" size="sm" className="h-9 w-9 p-0" title={t("pages.adminPanel.rowDensity")} onClick={() => setIngredientsRowDensityAndStore(ingredientsRowDensity === "compact" ? "normal" : ingredientsRowDensity === "normal" ? "expanded" : "compact")}>
+                      {ingredientsRowDensity === "compact" ? <Rows2 className="w-4 h-4" /> : ingredientsRowDensity === "expanded" ? <Rows4 className="w-4 h-4" /> : <Rows3 className="w-4 h-4" />}
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-9 w-9 p-0" title={t("pages.adminPanel.tableDisplay")}>
+                          <Columns3 className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align={isRtl ? "start" : "end"} className="min-w-[180px]">
+                        <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{t("pages.adminPanel.rowDensity")}</div>
+                        {(["compact", "normal", "expanded"] as RowDensity[]).map((d) => (
+                          <DropdownMenuCheckboxItem key={d} checked={ingredientsRowDensity === d} onCheckedChange={() => setIngredientsRowDensityAndStore(d)}>
+                            {d === "compact" ? t("pages.adminPanel.densityCompact") : d === "expanded" ? t("pages.adminPanel.densityExpanded") : t("pages.adminPanel.densityNormal")}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                        <div className="border-t my-1" />
+                        <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{t("pages.adminPanel.showHideColumns")}</div>
+                        {defaultColumnOrder.map((k) => {
+                          const isVisible = ingredientsColumnVisibility[k] !== false
+                          const colLabels: Record<string, string> = { name: t("pages.adminPanel.ingredientLabel"), price: t("pages.adminPanel.priceLabel"), cheapest: t("pages.adminPanel.cheapest"), sku: t("pages.adminPanel.skuLabel"), status: t("pages.adminPanel.statusLabel"), source: t("pages.adminPanel.sourceLabel"), supplier: t("pages.adminPanel.supplierLabel"), minStock: t("pages.adminPanel.minStockLabel"), stock: t("pages.adminPanel.inventory"), waste: t("pages.adminPanel.wasteLabel"), unit: t("pages.adminPanel.unitUnit") }
+                          const label = colLabels[k] || k
+                          return (
+                            <DropdownMenuCheckboxItem key={k} checked={isVisible} onCheckedChange={() => toggleIngredientsColumnVisibility(k)}>
+                              {label}
+                            </DropdownMenuCheckboxItem>
+                          )
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+
+                  {/* Table */}
+                  <div className="rounded-lg border overflow-auto max-h-[min(55vh,520px)]">
+                  <Table className="w-full text-sm">
                     <colgroup>
-                      <col style={{ width: "14%" }} />
-                      <col style={{ width: "6%" }} />
-                      <col style={{ width: "8%" }} />
-                      <col style={{ width: "7%" }} />
-                      <col style={{ width: "6%" }} />
-                      <col style={{ width: "7%" }} />
-                      <col style={{ width: "9%" }} />
-                      <col style={{ width: "5%" }} />
-                      <col style={{ width: "5%" }} />
-                      <col style={{ width: "5%" }} />
-                      <col style={{ width: "6%" }} />
-                      <col style={{ width: "4%" }} />
+                      {visibleColumnOrder.map((k) => (
+                        <col key={k} className={k === "name" ? "min-w-[140px]" : k === "supplier" ? "min-w-[100px]" : k === "cheapest" ? "min-w-[90px]" : ""} />
+                      ))}
+                      <col className="w-20" />
                     </colgroup>
-                    <TableHeader className="sticky top-0 z-10 bg-background [&_tr]:bg-background [&_tr]:border-b">
-                      <TableRow className="bg-muted/50 hover:bg-muted/50 border-b">
-                        <TableHead className={`${textAlign} p-1.5 align-middle min-w-[160px]`}>
-                          <div className={`flex items-center gap-1.5 min-w-0 ${justify}`}>
-                            <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                            <Input
-                              value={ingredientsSearchText}
-                              onChange={(e) => setIngredientsSearchText(e.target.value)}
-                              placeholder={t("pages.adminPanel.searchPlaceholder")}
-                              className={`h-7 ${textAlign} flex-1 min-w-[72px] text-xs`}
-                            />
-                            {ingredientsSearchText && (
-                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0" onClick={() => setIngredientsSearchText("")} title={t("pages.adminPanel.clear")}>
-                                <X className="w-3 h-3" />
-                              </Button>
-                            )}
-                            <Button
-                              size="sm"
-                              className="h-7 shrink-0 text-xs px-1.5"
-                              onClick={() => { setAddIngredientSupplier(""); setAddIngredientOpen(true) }}
-                            >
-                              <Plus className="w-3.5 h-3.5 ml-0.5" />
-                              {t("pages.adminPanel.addIngredient")}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0 shrink-0"
-                              title={t("pages.adminPanel.rowDensity")}
-                              onClick={() => setIngredientsRowDensityAndStore(ingredientsRowDensity === "compact" ? "normal" : ingredientsRowDensity === "normal" ? "expanded" : "compact")}
-                            >
-                              {ingredientsRowDensity === "compact" ? <Rows2 className="w-4 h-4" /> : ingredientsRowDensity === "expanded" ? <Rows4 className="w-4 h-4" /> : <Rows3 className="w-4 h-4" />}
-                            </Button>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" title={t("pages.adminPanel.tableDisplay")}>
-                                  <Columns3 className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align={isRtl ? "start" : "end"} className="min-w-[180px]">
-                                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{t("pages.adminPanel.rowDensity")}</div>
-                                {(["compact", "normal", "expanded"] as RowDensity[]).map((d) => (
-                                  <DropdownMenuCheckboxItem key={d} checked={ingredientsRowDensity === d} onCheckedChange={() => setIngredientsRowDensityAndStore(d)}>
-                                    {d === "compact" ? t("pages.adminPanel.densityCompact") : d === "expanded" ? t("pages.adminPanel.densityExpanded") : t("pages.adminPanel.densityNormal")}
-                                  </DropdownMenuCheckboxItem>
-                                ))}
-                                <div className="border-t my-1" />
-                                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{t("pages.adminPanel.showHideColumns")}</div>
-                                {defaultColumnOrder.map((k) => {
-                                  const isVisible = ingredientsColumnVisibility[k] !== false
-                                  const colLabels: Record<string, string> = { name: t("pages.adminPanel.ingredientLabel"), price: t("pages.adminPanel.priceLabel"), cheapest: t("pages.adminPanel.cheapest"), sku: t("pages.adminPanel.skuLabel"), status: t("pages.adminPanel.statusLabel"), source: t("pages.adminPanel.sourceLabel"), supplier: t("pages.adminPanel.supplierLabel"), minStock: t("pages.adminPanel.minStockLabel"), stock: t("pages.adminPanel.inventory"), waste: t("pages.adminPanel.wasteLabel"), unit: t("pages.adminPanel.unitUnit") }
-                                  const label = colLabels[k] || k
-                                  return (
-                                    <DropdownMenuCheckboxItem
-                                      key={k}
-                                      checked={isVisible}
-                                      onCheckedChange={() => toggleIngredientsColumnVisibility(k)}
-                                    >
-                                      {label}
-                                    </DropdownMenuCheckboxItem>
-                                  )
-                                })}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </TableHead>
-                        <TableHead className={`${textAlign} ${densityCellClass} align-middle text-xs text-muted-foreground`}>
-                          {filteredAndSortedIngredients.length === (ingredientsList?.length ?? 0)
-                            ? `${ingredientsList?.length ?? 0} ${t("pages.adminPanel.ingredientsCount")}`
-                            : `${t("pages.adminPanel.showingCount")} ${filteredAndSortedIngredients.length} ${t("pages.adminPanel.of")} ${ingredientsList?.length ?? 0}`}
-                        </TableHead>
-                        <TableHead colSpan={10} className="p-0" />
-                      </TableRow>
-                      <TableRow>
+                    <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
+                      <TableRow className="border-b">
                         {visibleColumnOrder.map((key, colIndex) => {
                           if (key === "cheapest") {
                             return (
@@ -2243,7 +2221,7 @@ export function AdminPanel() {
                   </Table>
                   </div>
                   {filteredAndSortedIngredients.length === 0 && !loadingSystemOwner && (
-                    <p className="text-muted-foreground py-4">
+                    <p className="text-muted-foreground text-center py-8 text-sm">
                       {(ingredientsList?.length ?? 0) === 0 ? t("pages.adminPanel.noIngredients") : t("pages.adminPanel.noResults")}
                     </p>
                   )}
