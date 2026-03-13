@@ -2085,7 +2085,7 @@ export function AdminPanel() {
 
                   {/* Table */}
                   <div className="rounded-lg border overflow-auto max-h-[min(55vh,520px)]" dir={dir}>
-                  <Table className="w-full text-sm">
+                  <Table className="w-full min-w-full table-fixed text-sm">
                     <colgroup>
                       {visibleColumnOrder.map((k) => (
                         <col key={k} className={k === "name" ? "min-w-[140px]" : k === "supplier" ? "min-w-[100px]" : k === "cheapest" ? "min-w-[90px]" : ""} />
