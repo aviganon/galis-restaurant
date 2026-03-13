@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Heebo } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
+import { LanguageProvider } from '@/contexts/language-context'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
@@ -47,11 +48,20 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="he" dir="rtl">
+    <html lang="he" dir="rtl" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var s=localStorage.getItem("restaurant-pro-locale");if(s==="en"){document.documentElement.dir="ltr";document.documentElement.lang="en";}})();`,
+          }}
+        />
+      </head>
       <body className={`${heebo.variable} font-sans antialiased`}>
         <ThemeProvider>
-          {children}
-          <Toaster position="top-center" dir="rtl" richColors closeButton />
+          <LanguageProvider>
+            {children}
+            <Toaster position="top-center" richColors closeButton />
+          </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

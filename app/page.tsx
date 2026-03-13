@@ -24,6 +24,7 @@ import { AdminPanel } from "@/components/admin-panel"
 import { AppProvider, type UserPermissions } from "@/contexts/app-context"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { useTranslations } from "@/lib/use-translations"
 
 const pageVariants = {
   initial: { opacity: 0, x: 20 },
@@ -32,11 +33,12 @@ const pageVariants = {
 }
 
 export default function Home() {
+  const t = useTranslations()
   const [authLoading, setAuthLoading] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userRole, setUserRole] = useState<"admin" | "owner" | "manager" | "user">("owner")
   const [currentPage, setCurrentPage] = useState("dashboard")
-  const [currentRestaurant, setCurrentRestaurant] = useState("טוען...")
+  const [currentRestaurant, setCurrentRestaurant] = useState(() => t("common.loading"))
   const [currentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null)
   const [restaurants, setRestaurants] = useState<{ id: string; name: string; branch?: string; emoji?: string }[]>([])
   const [isSystemOwner, setIsSystemOwner] = useState(false)
@@ -158,7 +160,7 @@ export default function Home() {
             setCurrentRestaurant(first.emoji ? `${first.emoji} ${first.name}` : first.name)
             setCurrentRestaurantId(first.id)
           } else {
-            setCurrentRestaurant("אין מסעדות — הוסף מסעדה")
+            setCurrentRestaurant(t("app.noRestaurants"))
           }
         } else if (userRestaurantId) {
           const restDoc = await getDoc(doc(db, restaurantsCollection, userRestaurantId))
@@ -213,11 +215,11 @@ export default function Home() {
             setUserPermissions(defaultPermissions)
           } else {
             setRestaurants([])
-            setCurrentRestaurant("אין מסעדה")
+            setCurrentRestaurant(t("app.noRestaurantLabel"))
           }
         } else {
           setRestaurants([])
-          setCurrentRestaurant("אין מסעדה")
+          setCurrentRestaurant(t("app.noRestaurantLabel"))
         }
         setIsLoggedIn(true)
       } catch (err) {
@@ -290,7 +292,7 @@ export default function Home() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">טוען...</div>
+        <div className="animate-pulse text-muted-foreground">{t("common.loading")}</div>
       </div>
     )
   }
@@ -303,15 +305,15 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
         <div className="max-w-md text-center space-y-6">
-          <h1 className="text-2xl font-bold">אין לך מסעדה</h1>
+          <h1 className="text-2xl font-bold">{t("app.noRestaurant")}</h1>
           <p className="text-muted-foreground">
-            כדי להקים מסעדה ולהיות המנהל שלה, הירשם במסך הכניסה עם קוד הזמנה שמנהל או בעלים נתן לך.
+            {t("app.noRestaurantDesc")}
           </p>
           <p className="text-sm text-muted-foreground">
-            אחרי ההרשמה עם הקוד תוכל ליצור מסעדה חדשה ולנהל אותה.
+            {t("app.noRestaurantHint")}
           </p>
           <Button onClick={handleLogout} variant="outline" className="rounded-full">
-            חזרה למסך הכניסה
+            {t("common.backToLogin")}
           </Button>
         </div>
       </div>
@@ -322,8 +324,8 @@ export default function Home() {
     if (isRestrictedPage && !canAccessPage(currentPage)) {
       return (
         <div className="container mx-auto px-4 py-16 text-center">
-          <p className="text-lg text-muted-foreground mb-2">אין הרשאה לצפייה בדף זה</p>
-          <p className="text-sm text-muted-foreground">נתונים אלה זמינים לבעלים בלבד</p>
+          <p className="text-lg text-muted-foreground mb-2">{t("app.noPermission")}</p>
+          <p className="text-sm text-muted-foreground">{t("app.noPermissionHint")}</p>
         </div>
       )
     }
@@ -377,9 +379,9 @@ export default function Home() {
       
       {impersonatingRestaurant && (
         <div className="fixed top-0 md:top-16 left-0 right-0 z-40 flex items-center justify-center gap-3 py-2 bg-amber-500/90 text-amber-950 text-sm font-medium">
-          <span>🎭 מתחזה כמסעדה: {impersonatingRestaurant.name}</span>
+          <span>🎭 {t("nav.impersonating")}: {impersonatingRestaurant.name}</span>
           <Button size="sm" variant="secondary" className="h-7 px-3" onClick={handleStopImpersonate}>
-            חזור למצב רגיל
+            {t("nav.backToNormal")}
           </Button>
         </div>
       )}

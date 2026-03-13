@@ -26,6 +26,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { LanguageSwitcher } from "@/components/language-switcher"
+import { useTranslations } from "@/lib/use-translations"
 
 type Restaurant = { id: string; name: string; branch?: string; emoji?: string }
 
@@ -47,35 +49,44 @@ const hasFullMenu = (role: string, isSystemOwner?: boolean) =>
 const userCanSee = (perms: UserPermissions | undefined, key: keyof UserPermissions) => perms?.[key] !== false
 const userCanSeeOptIn = (perms: UserPermissions | undefined, key: keyof UserPermissions) => !!perms?.[key]
 
-// בעלים: כשלא מתחזה — רק פאנל מנהל. במצב התחזה — תפריט המסעדה (בלי פאנל מנהל)
-// מנהל/משתמש: תמיד תפריט המסעדה (לפי הרשאות)
-const mainNavItems = (userRole: string, perms?: UserPermissions, isSystemOwner?: boolean, isImpersonating?: boolean) => {
+const mainNavItems = (
+  t: (k: string) => string,
+  userRole: string,
+  perms?: UserPermissions,
+  isSystemOwner?: boolean,
+  isImpersonating?: boolean
+) => {
   const full = hasFullMenu(userRole, isSystemOwner)
   const items: { id: string; label: string; icon: typeof LayoutDashboard }[] = []
-
   if (isSystemOwner && !isImpersonating) {
-    items.push({ id: "dashboard", label: "📊 לוח בקרה", icon: LayoutDashboard })
-    items.push({ id: "admin-panel", label: "🛡️ פאנל מנהל", icon: Shield })
+    items.push({ id: "dashboard", label: t("nav.dashboard"), icon: LayoutDashboard })
+    items.push({ id: "admin-panel", label: t("nav.adminPanel"), icon: Shield })
     return items
   }
-  if (full || userCanSee(perms, "canSeeDashboard")) items.push({ id: "dashboard", label: "📊 לוח בקרה", icon: LayoutDashboard })
-  if (full || userCanSee(perms, "canSeeProductTree")) items.push({ id: "calc", label: "🧮 עץ מוצר", icon: Calculator })
-  if (full && !isImpersonating) items.push({ id: "admin-panel", label: "🛡️ פאנל מנהל", icon: Shield })
-  if (full || userCanSee(perms, "canSeeIngredients")) items.push({ id: "ingredients", label: "רכיבים", icon: ChefHat })
-  if (full || userCanSeeOptIn(perms, "canSeeCosts")) items.push({ id: "menu", label: "עלויות תפריט", icon: UtensilsCrossed })
-  if (full || userCanSee(perms, "canSeeSuppliers")) items.push({ id: "suppliers", label: "ספקים", icon: Truck })
+  if (full || userCanSee(perms, "canSeeDashboard")) items.push({ id: "dashboard", label: t("nav.dashboard"), icon: LayoutDashboard })
+  if (full || userCanSee(perms, "canSeeProductTree")) items.push({ id: "calc", label: t("nav.productTree"), icon: Calculator })
+  if (full && !isImpersonating) items.push({ id: "admin-panel", label: t("nav.adminPanel"), icon: Shield })
+  if (full || userCanSee(perms, "canSeeIngredients")) items.push({ id: "ingredients", label: t("nav.ingredients"), icon: ChefHat })
+  if (full || userCanSeeOptIn(perms, "canSeeCosts")) items.push({ id: "menu", label: t("nav.menuCosts"), icon: UtensilsCrossed })
+  if (full || userCanSee(perms, "canSeeSuppliers")) items.push({ id: "suppliers", label: t("nav.suppliers"), icon: Truck })
   return items
 }
 
-const moreNavItems = (userRole: string, perms?: UserPermissions, isSystemOwner?: boolean, isImpersonating?: boolean) => {
+const moreNavItems = (
+  t: (k: string) => string,
+  userRole: string,
+  perms?: UserPermissions,
+  isSystemOwner?: boolean,
+  isImpersonating?: boolean
+) => {
   const full = hasFullMenu(userRole, isSystemOwner)
   const items: { id: string; label: string; icon: typeof Package }[] = []
   if (isSystemOwner && !isImpersonating) return items
-  if (full || userCanSee(perms, "canSeeInventory")) items.push({ id: "inventory", label: "מלאי", icon: Package })
-  if (full || userCanSee(perms, "canSeePurchaseOrders")) items.push({ id: "purchase-orders", label: "הזמנות ספקים", icon: ClipboardList })
-  if (full || userCanSee(perms, "canSeeUpload")) items.push({ id: "upload", label: "העלאה", icon: Upload })
-  if (full || userCanSeeOptIn(perms, "canSeeReports")) items.push({ id: "reports", label: "דוחות", icon: BarChart3 })
-  if (full || userCanSeeOptIn(perms, "canSeeSettings")) items.push({ id: "settings", label: "הגדרות", icon: Settings })
+  if (full || userCanSee(perms, "canSeeInventory")) items.push({ id: "inventory", label: t("nav.inventory"), icon: Package })
+  if (full || userCanSee(perms, "canSeePurchaseOrders")) items.push({ id: "purchase-orders", label: t("nav.purchaseOrders"), icon: ClipboardList })
+  if (full || userCanSee(perms, "canSeeUpload")) items.push({ id: "upload", label: t("nav.upload"), icon: Upload })
+  if (full || userCanSeeOptIn(perms, "canSeeReports")) items.push({ id: "reports", label: t("nav.reports"), icon: BarChart3 })
+  if (full || userCanSeeOptIn(perms, "canSeeSettings")) items.push({ id: "settings", label: t("nav.settings"), icon: Settings })
   return items
 }
 
@@ -91,6 +102,7 @@ export function DesktopNav({
   onLogout,
   isImpersonating
 }: DesktopNavProps) {
+  const t = useTranslations()
   return (
     <nav className="hidden md:flex fixed top-0 inset-x-0 z-50 h-16 bg-primary text-primary-foreground border-b border-primary-foreground/10">
       <div className="container mx-auto px-4 flex items-center justify-between">
@@ -121,7 +133,7 @@ export function DesktopNav({
 
         {/* Nav Items */}
         <div className="flex items-center gap-1">
-          {mainNavItems(userRole, userPermissions, isSystemOwner, isImpersonating).map((item) => (
+          {mainNavItems(t, userRole, userPermissions, isSystemOwner, isImpersonating).map((item) => (
             <button
               key={item.id}
               type="button"
@@ -138,26 +150,25 @@ export function DesktopNav({
             </button>
           ))}
           
-          {/* More Dropdown — מוסתר לבעלים כשלא מתחזה (אין פריטים) */}
-          {moreNavItems(userRole, userPermissions, isSystemOwner, isImpersonating).length > 0 && (
+          {moreNavItems(t, userRole, userPermissions, isSystemOwner, isImpersonating).length > 0 && (
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button 
                   variant="ghost" 
                   className={cn(
                     "h-9 px-3 gap-2 rounded-full",
-                    moreNavItems(userRole, userPermissions, isSystemOwner, isImpersonating).some((i) => i.id === currentPage)
+                    moreNavItems(t, userRole, userPermissions, isSystemOwner, isImpersonating).some((i) => i.id === currentPage)
                       ? "bg-primary-foreground/20 text-primary-foreground"
                       : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
                   )}
                 >
                   <Menu className="w-4 h-4" />
-                  עוד
+                  {t("common.more")}
                   <ChevronDown className="w-4 h-4 opacity-60" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                {moreNavItems(userRole, userPermissions, isSystemOwner, isImpersonating).map((item) => (
+                {moreNavItems(t, userRole, userPermissions, isSystemOwner, isImpersonating).map((item) => (
                   <DropdownMenuItem 
                     key={item.id}
                     onSelect={() => setCurrentPage(item.id)}
@@ -175,16 +186,19 @@ export function DesktopNav({
           )}
         </div>
 
-        {/* Logout */}
-        <Button 
-          variant="ghost" 
-          size="sm"
-          onClick={onLogout}
-          className="text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
-        >
-          <LogOut className="w-4 h-4 ml-2" />
-          יציאה
-        </Button>
+        {/* שפת ממשק + יציאה — בפינה השמאלית */}
+        <div className="flex items-center gap-1">
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={onLogout}
+            className="text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+          >
+            <LogOut className="w-4 h-4 ml-2" />
+            {t("common.logout")}
+          </Button>
+          <LanguageSwitcher />
+        </div>
       </div>
     </nav>
   )

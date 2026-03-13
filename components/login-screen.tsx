@@ -31,15 +31,20 @@ import {
   Volume2,
   VolumeX
 } from "lucide-react"
+import { LanguageSwitcher } from "@/components/language-switcher"
+import { useTranslations } from "@/lib/use-translations"
 
 interface LoginScreenProps {}
 
-const features = [
-  { icon: BarChart3, title: "דשבורד חי", desc: "ניתוח נתונים בזמן אמת" },
-  { icon: ChefHat, title: "ניהול מתכונים", desc: "עץ מוצר מתקדם" },
-  { icon: Users, title: "ספקים", desc: "ניהול ומעקב הזמנות" },
-  { icon: TrendingUp, title: "רווחיות", desc: "מעקב עלויות והכנסות" }
-]
+const authErrorToKey: Record<string, string> = {
+  "auth/invalid-credential": "authErrors.invalidCredential",
+  "auth/invalid-email": "authErrors.invalidEmail",
+  "auth/user-disabled": "authErrors.userDisabled",
+  "auth/user-not-found": "authErrors.userNotFound",
+  "auth/wrong-password": "authErrors.wrongPassword",
+  "auth/operation-not-allowed": "authErrors.operationNotAllowed",
+  "auth/too-many-requests": "authErrors.tooManyRequests",
+}
 
 // Animation variants
 const fadeInUp = {
@@ -61,6 +66,7 @@ const scaleIn = {
 }
 
 export function LoginScreen(_props: LoginScreenProps) {
+  const t = useTranslations()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [inviteCode, setInviteCode] = useState("")
@@ -75,6 +81,13 @@ export function LoginScreen(_props: LoginScreenProps) {
   const [showVideo, setShowVideo] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const heroRef = useRef<HTMLDivElement>(null)
+
+  const features = [
+    { icon: BarChart3, titleKey: "login.feature1Title", descKey: "login.feature1Desc" },
+    { icon: ChefHat, titleKey: "login.feature2Title", descKey: "login.feature2Desc" },
+    { icon: Users, titleKey: "login.feature3Title", descKey: "login.feature3Desc" },
+    { icon: TrendingUp, titleKey: "login.feature4Title", descKey: "login.feature4Desc" },
+  ]
   
   const { scrollYProgress } = useScroll({
     target: heroRef,
@@ -85,17 +98,9 @@ export function LoginScreen(_props: LoginScreenProps) {
   const heroScale = useTransform(scrollYProgress, [0, 0.5], [1, 1.1])
   const heroY = useTransform(scrollYProgress, [0, 0.5], [0, 100])
 
-  const getAuthErrorHebrew = (code: string) => {
-    const map: Record<string, string> = {
-      "auth/invalid-credential": "אימייל או סיסמה שגויים",
-      "auth/invalid-email": "כתובת אימייל לא תקינה",
-      "auth/user-disabled": "החשבון הושבת",
-      "auth/user-not-found": "לא נמצא משתמש עם אימייל זה",
-      "auth/wrong-password": "סיסמה שגויה",
-      "auth/operation-not-allowed": "כניסה באימייל/סיסמה לא מופעלת. בדוק Firebase Console → Authentication → Sign-in method",
-      "auth/too-many-requests": "יותר מדי ניסיונות. נסה שוב מאוחר יותר",
-    }
-    return map[code] || "שגיאה בהתחברות"
+  const getAuthError = (code: string) => {
+    const key = authErrorToKey[code]
+    return key ? t(key) : t("authErrors.default")
   }
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -106,7 +111,7 @@ export function LoginScreen(_props: LoginScreenProps) {
       await signInWithEmailAndPassword(auth, email, password)
     } catch (err: unknown) {
       const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
-      setError(getAuthErrorHebrew(code) || (err instanceof Error ? err.message : "שגיאה בהתחברות"))
+      setError(getAuthError(code) || (err instanceof Error ? err.message : t("authErrors.default")))
     } finally {
       setIsLoading(false)
     }
@@ -114,18 +119,18 @@ export function LoginScreen(_props: LoginScreenProps) {
 
   const handleForgotPassword = async () => {
     if (!email.trim()) {
-      setError("הזן את האימייל שלך כדי לאפס סיסמה")
+      setError(t("login.enterEmailForReset"))
       return
     }
     setError("")
     setIsLoading(true)
     try {
       await sendPasswordResetEmail(auth, email.trim())
-      setError("נשלח אימייל לאיפוס סיסמה — בדוק את תיבת הדואר")
+      setError(t("login.resetEmailSent"))
     } catch (err: unknown) {
       const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
-      if (code === "auth/user-not-found") setError("לא נמצא משתמש עם אימייל זה")
-      else setError(getAuthErrorHebrew(code) || "שגיאה בשליחת אימייל")
+      if (code === "auth/user-not-found") setError(t("login.userNotFound"))
+      else setError(getAuthError(code) || t("authErrors.resetError"))
     } finally {
       setIsLoading(false)
     }
@@ -140,15 +145,15 @@ export function LoginScreen(_props: LoginScreenProps) {
     const em = registerEmail.trim()
     const pw = registerPassword
     if (!code) {
-      setError("הזן קוד הזמנה")
+      setError(t("login.enterInviteCode"))
       return
     }
     if (!em || !pw) {
-      setError("הזן אימייל וסיסמה")
+      setError(t("login.enterEmailPassword"))
       return
     }
     if (pw.length < 6) {
-      setError("הסיסמה חייבת להכיל לפחות 6 תווים")
+      setError(t("login.passwordMinLength"))
       return
     }
     setIsLoading(true)
@@ -157,7 +162,7 @@ export function LoginScreen(_props: LoginScreenProps) {
       const codeRef = doc(db, inviteCodesCollection, code)
       const codeSnap = await getDoc(codeRef)
       if (!codeSnap.exists()) {
-        setError("קוד הזמנה לא תקין")
+        setError(t("login.invalidCode"))
         setIsLoading(false)
         return
       }
@@ -165,12 +170,12 @@ export function LoginScreen(_props: LoginScreenProps) {
       const codeType = codeData?.[inviteCodeFields.type]
       const used = codeData?.[inviteCodeFields.used]
       if (used) {
-        setError("קוד הזמנה כבר נוצל")
+        setError(t("login.codeUsed"))
         setIsLoading(false)
         return
       }
       if (codeType !== "manager") {
-        setError("קוד זה לא מאפשר הקמת מסעדה. פנה למנהל לקבלת קוד מתאים.")
+        setError(t("login.codeNoRestaurant"))
         setIsLoading(false)
         return
       }
@@ -179,14 +184,14 @@ export function LoginScreen(_props: LoginScreenProps) {
       if (existingRestId) {
         const restSnap = await getDoc(doc(db, restaurantsCollection, existingRestId))
         if (!restSnap.exists()) {
-          setError("המסעדה לא נמצאה")
+          setError(t("login.restaurantNotFound"))
           setIsLoading(false)
           return
         }
         restId = existingRestId
       } else {
         if (!name) {
-          setError("הזן שם מסעדה")
+          setError(t("login.enterRestaurantName"))
           setIsLoading(false)
           return
         }
@@ -216,9 +221,9 @@ export function LoginScreen(_props: LoginScreenProps) {
     } catch (err: unknown) {
       const authCode = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
       if (authCode === "auth/email-already-in-use") {
-        setError("אימייל זה כבר רשום במערכת")
+        setError(t("login.emailInUse"))
       } else {
-        setError(err instanceof Error ? err.message : "שגיאה בהרשמה")
+        setError(err instanceof Error ? err.message : t("authErrors.default"))
       }
     } finally {
       setIsLoading(false)
@@ -253,27 +258,35 @@ export function LoginScreen(_props: LoginScreenProps) {
             <span className="font-bold text-lg">Restaurant Pro</span>
           </motion.div>
           <nav className="hidden md:flex items-center gap-6 text-sm">
-            {["תכונות", "מסעדות", "אודות", "צור קשר"].map((item, i) => (
+            {[
+              { key: "login.features", id: "features" },
+              { key: "login.restaurants", id: "restaurants" },
+              { key: "login.about", id: "about" },
+              { key: "login.contact", id: "contact" },
+            ].map(({ key, id }) => (
               <motion.a 
-                key={item}
-                href={`#${["features", "restaurants", "about", "contact"][i]}`}
+                key={key}
+                href={`#${id}`}
                 className="text-muted-foreground hover:text-foreground transition-colors"
                 whileHover={{ y: -2 }}
                 whileTap={{ y: 0 }}
               >
-                {item}
+                {t(key)}
               </motion.a>
             ))}
           </nav>
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button 
-              variant="outline" 
-              className="hidden md:flex rounded-full"
-              onClick={() => document.getElementById('auth-section')?.scrollIntoView({ behavior: 'smooth' })}
-            >
-              כניסה למערכת
-            </Button>
-          </motion.div>
+          <div className="flex items-center gap-2">
+            <LanguageSwitcher variant="light" />
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button 
+                variant="outline" 
+                className="hidden md:flex rounded-full"
+                onClick={() => document.getElementById('auth-section')?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                {t("login.signIn")}
+              </Button>
+            </motion.div>
+          </div>
         </div>
       </motion.header>
 
@@ -319,7 +332,7 @@ export function LoginScreen(_props: LoginScreenProps) {
             <motion.div variants={fadeInUp}>
               <Badge className="mb-6 rounded-full px-4 py-1.5 text-sm font-medium bg-secondary/80 backdrop-blur-sm text-secondary-foreground">
                 <Sparkles className="w-4 h-4 ml-2 animate-pulse" />
-                מערכת ניהול מסעדות מתקדמת
+                {t("login.badge")}
               </Badge>
             </motion.div>
             
@@ -327,18 +340,18 @@ export function LoginScreen(_props: LoginScreenProps) {
               variants={fadeInUp}
               className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 text-balance"
             >
-              ניהול מסעדות
+              {t("login.heroTitle")}
               <br />
-              <span className="text-muted-foreground">ברמה אחרת</span>
+              <span className="text-muted-foreground">{t("login.heroSubtitle")}</span>
             </motion.h1>
             
             <motion.p 
               variants={fadeInUp}
               className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto text-pretty"
             >
-              עלויות · מתכונים · ספקים · ניתוח פיננסי בזמן אמת
+              {t("login.heroDesc")}
               <br />
-              הכל במקום אחד, נגיש מכל מכשיר
+              {t("login.heroDesc2")}
             </motion.p>
 
             <motion.div 
@@ -351,7 +364,7 @@ export function LoginScreen(_props: LoginScreenProps) {
                   className="rounded-full px-8 text-base shadow-lg shadow-primary/25"
                   onClick={() => document.getElementById('auth-section')?.scrollIntoView({ behavior: 'smooth' })}
                 >
-                  התחל עכשיו
+                  {t("login.startNow")}
                   <ArrowLeft className="w-4 h-4 mr-2" />
                 </Button>
               </motion.div>
@@ -363,7 +376,7 @@ export function LoginScreen(_props: LoginScreenProps) {
                   onClick={() => setShowVideo(true)}
                 >
                   <Play className="w-4 h-4 ml-2" />
-                  צפה בהדגמה
+                  {t("login.watchDemo")}
                 </Button>
               </motion.div>
             </motion.div>
@@ -426,9 +439,9 @@ export function LoginScreen(_props: LoginScreenProps) {
       <section id="features" className="py-16 md:py-24 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-2xl md:text-3xl font-bold mb-4">הכלים שיעזרו לך להצליח</h2>
+            <h2 className="text-2xl md:text-3xl font-bold mb-4">{t("login.toolsTitle")}</h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
-              מערכת מקיפה לניהול כל היבטי המסעדה שלך
+              {t("login.toolsDesc")}
             </p>
           </div>
           
@@ -439,8 +452,8 @@ export function LoginScreen(_props: LoginScreenProps) {
                   <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
                     <feature.icon className="w-6 h-6 text-primary" />
                   </div>
-                  <h3 className="font-semibold mb-1">{feature.title}</h3>
-                  <p className="text-sm text-muted-foreground">{feature.desc}</p>
+                  <h3 className="font-semibold mb-1">{t(feature.titleKey)}</h3>
+                  <p className="text-sm text-muted-foreground">{t(feature.descKey)}</p>
                 </CardContent>
               </Card>
             ))}
@@ -448,23 +461,23 @@ export function LoginScreen(_props: LoginScreenProps) {
         </div>
       </section>
 
-      {/* Recommended Restaurants - אין נתונים */}
+      {/* Recommended Restaurants */}
       <section id="restaurants" className="py-16 md:py-24">
         <div className="container mx-auto px-4">
           <div className="text-center">
-            <h2 className="text-2xl md:text-3xl font-bold mb-4">מסעדות</h2>
-            <p className="text-muted-foreground">אין נתונים להצגה</p>
+            <h2 className="text-2xl md:text-3xl font-bold mb-4">{t("login.restaurants")}</h2>
+            <p className="text-muted-foreground">{t("login.noData")}</p>
           </div>
         </div>
       </section>
 
-      {/* Testimonials - אין נתונים */}
+      {/* Testimonials */}
       <section className="py-16 md:py-24 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="text-center">
             <Quote className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-            <h2 className="text-2xl md:text-3xl font-bold mb-4">המלצות</h2>
-            <p className="text-muted-foreground">אין נתונים להצגה</p>
+            <h2 className="text-2xl md:text-3xl font-bold mb-4">{t("login.testimonials")}</h2>
+            <p className="text-muted-foreground">{t("login.noData")}</p>
           </div>
         </div>
       </section>
@@ -475,20 +488,15 @@ export function LoginScreen(_props: LoginScreenProps) {
           <div className="max-w-4xl mx-auto">
             <div className="grid md:grid-cols-2 gap-12 items-center">
               <div>
-                <h2 className="text-2xl md:text-3xl font-bold mb-6">אודות Restaurant Pro</h2>
+                <h2 className="text-2xl md:text-3xl font-bold mb-6">{t("login.aboutTitle")}</h2>
                 <p className="text-muted-foreground mb-6 leading-relaxed">
-                  Restaurant Pro הוקמה ב-2020 מתוך הבנה עמוקה של הצרכים הייחודיים של תעשיית המסעדנות בישראל. 
-                  המערכת פותחה על ידי צוות של מומחים בתחום הקולינריה והטכנולוגיה.
+                  {t("login.aboutText")}
                 </p>
                 <ul className="space-y-3">
-                  {[
-                    "ניסיון בתעשיית המזון",
-                    "תמיכה טכנית",
-                    "עדכונים ושיפורים שוטפים"
-                  ].map((item, i) => (
-                    <li key={i} className="flex items-center gap-3">
+                  {["login.about1", "login.about2", "login.about3"].map((key) => (
+                    <li key={key} className="flex items-center gap-3">
                       <CheckCircle2 className="w-5 h-5 text-green-600" />
-                      <span>{item}</span>
+                      <span>{t(key)}</span>
                     </li>
                   ))}
                 </ul>
@@ -517,18 +525,18 @@ export function LoginScreen(_props: LoginScreenProps) {
                     <UtensilsCrossed className="w-8 h-8 text-primary-foreground" />
                   </div>
                   <h2 className="text-2xl font-bold">Restaurant Pro</h2>
-                  <p className="text-sm text-muted-foreground mt-1">מערכת ניהול מסעדות מתקדמת</p>
+                  <p className="text-sm text-muted-foreground mt-1">{t("login.systemDesc")}</p>
                 </div>
 
                 <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setError("") }} className="w-full">
                   <TabsList className="grid grid-cols-2 mb-6 w-full">
                     <TabsTrigger value="login" className="rounded-lg">
                       <Lock className="w-4 h-4 ml-2" />
-                      כניסה
+                      {t("login.loginTab")}
                     </TabsTrigger>
                     <TabsTrigger value="register" className="rounded-lg">
                       <Building2 className="w-4 h-4 ml-2" />
-                      הרשמה
+                      {t("login.registerTab")}
                     </TabsTrigger>
                   </TabsList>
 
@@ -540,7 +548,7 @@ export function LoginScreen(_props: LoginScreenProps) {
                         </div>
                       )}
                       <div className="space-y-2">
-                        <label htmlFor="login-email" className="text-sm font-medium">אימייל</label>
+                        <label htmlFor="login-email" className="text-sm font-medium">{t("login.email")}</label>
                         <div className="relative">
                           <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                           <Input
@@ -558,7 +566,7 @@ export function LoginScreen(_props: LoginScreenProps) {
                       </div>
 
                       <div className="space-y-2">
-                        <label htmlFor="login-password" className="text-sm font-medium">סיסמה</label>
+                        <label htmlFor="login-password" className="text-sm font-medium">{t("login.password")}</label>
                         <div className="relative">
                           <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                           <Input
@@ -576,16 +584,16 @@ export function LoginScreen(_props: LoginScreenProps) {
 
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" id="remember" name="remember" className="rounded" />
-                        <span className="text-sm text-muted-foreground">השאר אותי מחובר</span>
+                        <span className="text-sm text-muted-foreground">{t("login.rememberMe")}</span>
                       </label>
 
                       <Button type="submit" className="w-full h-12 rounded-xl text-base" disabled={isLoading}>
-                        {isLoading ? "מתחבר..." : "כניסה למערכת"}
+                        {isLoading ? t("login.loggingIn") : t("login.loginBtn")}
                         {!isLoading && <ArrowLeft className="w-4 h-4 mr-2" />}
                       </Button>
 
                       <button type="button" onClick={handleForgotPassword} disabled={isLoading} className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors">
-                        שכחתי סיסמה
+                        {t("login.forgotPassword")}
                       </button>
                     </form>
                   </TabsContent>
@@ -598,7 +606,7 @@ export function LoginScreen(_props: LoginScreenProps) {
                         </div>
                       )}
                       <div className="space-y-2">
-                        <label htmlFor="register-invite-code" className="text-sm font-medium">קוד הזמנה</label>
+                        <label htmlFor="register-invite-code" className="text-sm font-medium">{t("login.inviteCode")}</label>
                         <Input
                           id="register-invite-code"
                           value={inviteCode}
@@ -608,18 +616,18 @@ export function LoginScreen(_props: LoginScreenProps) {
                           dir="ltr"
                           autoComplete="one-time-code"
                         />
-                        <p className="text-xs text-muted-foreground">קוד שמנהל או בעלים נתן לך</p>
+                        <p className="text-xs text-muted-foreground">{t("login.inviteCodeHint")}</p>
                       </div>
 
                       <div className="space-y-2">
-                        <label htmlFor="register-restaurant-name" className="text-sm font-medium">שם המסעדה (רק לקוד להקמת מסעדה חדשה)</label>
+                        <label htmlFor="register-restaurant-name" className="text-sm font-medium">{t("login.restaurantName")}</label>
                         <div className="relative">
                           <Building2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                           <Input
                             id="register-restaurant-name"
                             value={restaurantName}
                             onChange={(e) => setRestaurantName(e.target.value)}
-                            placeholder="השאר ריק אם הקוד למסעדה קיימת"
+                            placeholder={t("login.restaurantNamePlaceholder")}
                             className="pr-10 h-12 rounded-xl"
                             autoComplete="organization"
                           />
@@ -627,14 +635,14 @@ export function LoginScreen(_props: LoginScreenProps) {
                       </div>
 
                       <div className="space-y-2">
-                        <label htmlFor="register-branch" className="text-sm font-medium">סניף / כתובת (אופציונלי)</label>
+                        <label htmlFor="register-branch" className="text-sm font-medium">{t("login.branch")}</label>
                         <div className="relative">
                           <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                           <Input
                             id="register-branch"
                             value={branch}
                             onChange={(e) => setBranch(e.target.value)}
-                            placeholder="תל אביב - הנמל"
+                            placeholder={t("login.branchPlaceholder")}
                             className="pr-10 h-12 rounded-xl"
                             autoComplete="street-address"
                           />
@@ -642,7 +650,7 @@ export function LoginScreen(_props: LoginScreenProps) {
                       </div>
 
                       <div className="space-y-2">
-                        <label htmlFor="register-email" className="text-sm font-medium">אימייל</label>
+                        <label htmlFor="register-email" className="text-sm font-medium">{t("login.email")}</label>
                         <div className="relative">
                           <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                           <Input
@@ -659,7 +667,7 @@ export function LoginScreen(_props: LoginScreenProps) {
                       </div>
 
                       <div className="space-y-2">
-                        <label htmlFor="register-password" className="text-sm font-medium">סיסמה</label>
+                        <label htmlFor="register-password" className="text-sm font-medium">{t("login.password")}</label>
                         <div className="relative">
                           <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                           <Input
@@ -667,7 +675,7 @@ export function LoginScreen(_props: LoginScreenProps) {
                             type="password"
                             value={registerPassword}
                             onChange={(e) => setRegisterPassword(e.target.value)}
-                            placeholder="לפחות 6 תווים"
+                            placeholder="6+"
                             className="pr-10 h-12 rounded-xl"
                             autoComplete="new-password"
                           />
@@ -675,7 +683,7 @@ export function LoginScreen(_props: LoginScreenProps) {
                       </div>
 
                       <Button type="submit" className="w-full h-12 rounded-xl text-base" disabled={isLoading}>
-                        {isLoading ? "יוצר חשבון..." : "הקמת מסעדה חדשה"}
+                        {isLoading ? t("login.creatingAccount") : t("login.createAccount")}
                         <ArrowLeft className="w-4 h-4 mr-2" />
                       </Button>
                     </form>
@@ -691,9 +699,9 @@ export function LoginScreen(_props: LoginScreenProps) {
       <section id="contact" className="py-16 md:py-24">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
-            <h2 className="text-2xl md:text-3xl font-bold mb-4">צור קשר</h2>
+            <h2 className="text-2xl md:text-3xl font-bold mb-4">{t("login.contactTitle")}</h2>
             <p className="text-muted-foreground mb-8">
-              יש לך שאלות? נשמח לעזור!
+              {t("login.contactDesc")}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button variant="outline" size="lg" className="rounded-full" asChild>
@@ -724,7 +732,7 @@ export function LoginScreen(_props: LoginScreenProps) {
               <span className="font-semibold">Restaurant Pro</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              © 2026 Restaurant Pro. כל הזכויות שמורות.
+              {t("login.footerRights")}
             </p>
           </div>
         </div>

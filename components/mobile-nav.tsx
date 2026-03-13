@@ -18,6 +18,8 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { UserPermissions } from "@/contexts/app-context"
+import { LanguageSwitcher } from "@/components/language-switcher"
+import { useTranslations } from "@/lib/use-translations"
 
 interface MobileNavProps {
   currentPage: string
@@ -33,39 +35,51 @@ const hasFullMenu = (role: string, isSystemOwner?: boolean) =>
 const userCanSee = (perms: UserPermissions | undefined, key: keyof UserPermissions) => perms?.[key] !== false
 const userCanSeeOptIn = (perms: UserPermissions | undefined, key: keyof UserPermissions) => !!perms?.[key]
 
-// בעלים: כשלא מתחזה — רק פאנל. במצב התחזה — תפריט המסעדה
-const mainItems = (userRole: string, perms?: UserPermissions, isSystemOwner?: boolean, isImpersonating?: boolean) => {
+const mainItems = (
+  t: (k: string) => string,
+  userRole: string,
+  perms?: UserPermissions,
+  isSystemOwner?: boolean,
+  isImpersonating?: boolean
+) => {
   const full = hasFullMenu(userRole, isSystemOwner)
   const items: { id: string; label: string; icon: typeof LayoutDashboard }[] = []
   if (isSystemOwner && !isImpersonating) {
-    items.push({ id: "dashboard", label: "📊 לוח בקרה", icon: LayoutDashboard })
-    items.push({ id: "admin-panel", label: "🛡️ פאנל", icon: Shield })
+    items.push({ id: "dashboard", label: t("nav.dashboard"), icon: LayoutDashboard })
+    items.push({ id: "admin-panel", label: t("nav.adminPanelShort"), icon: Shield })
     return items
   }
-  if (full || userCanSee(perms, "canSeeDashboard")) items.push({ id: "dashboard", label: "📊 לוח בקרה", icon: LayoutDashboard })
-  if (full || userCanSee(perms, "canSeeProductTree")) items.push({ id: "calc", label: "🧮 עץ מוצר", icon: Calculator })
-  if (full && !isImpersonating) items.push({ id: "admin-panel", label: "🛡️ פאנל", icon: Shield })
-  if (full || userCanSee(perms, "canSeeIngredients")) items.push({ id: "ingredients", label: "רכיבים", icon: ChefHat })
-  if (full || userCanSee(perms, "canSeeInventory")) items.push({ id: "inventory", label: "מלאי", icon: Package })
-  items.push({ id: "more", label: "עוד", icon: Menu })
+  if (full || userCanSee(perms, "canSeeDashboard")) items.push({ id: "dashboard", label: t("nav.dashboard"), icon: LayoutDashboard })
+  if (full || userCanSee(perms, "canSeeProductTree")) items.push({ id: "calc", label: t("nav.productTree"), icon: Calculator })
+  if (full && !isImpersonating) items.push({ id: "admin-panel", label: t("nav.adminPanelShort"), icon: Shield })
+  if (full || userCanSee(perms, "canSeeIngredients")) items.push({ id: "ingredients", label: t("nav.ingredients"), icon: ChefHat })
+  if (full || userCanSee(perms, "canSeeInventory")) items.push({ id: "inventory", label: t("nav.inventory"), icon: Package })
+  items.push({ id: "more", label: t("common.more"), icon: Menu })
   return items
 }
 
-const moreItems = (userRole: string, perms?: UserPermissions, isSystemOwner?: boolean, isImpersonating?: boolean) => {
+const moreItems = (
+  t: (k: string) => string,
+  userRole: string,
+  perms?: UserPermissions,
+  isSystemOwner?: boolean,
+  isImpersonating?: boolean
+) => {
   const full = hasFullMenu(userRole, isSystemOwner)
   const items: { id: string; label: string; icon: typeof Package }[] = []
   if (isSystemOwner && !isImpersonating) return items
-  if (full && !isImpersonating) items.push({ id: "admin-panel", label: "🛡️ פאנל מנהל", icon: Shield })
-  if (full || userCanSeeOptIn(perms, "canSeeCosts")) items.push({ id: "menu", label: "עלויות תפריט", icon: UtensilsCrossed })
-  if (full || userCanSee(perms, "canSeeSuppliers")) items.push({ id: "suppliers", label: "ספקים", icon: Truck })
-  if (full || userCanSee(perms, "canSeePurchaseOrders")) items.push({ id: "purchase-orders", label: "הזמנות ספקים", icon: ClipboardList })
-  if (full || userCanSee(perms, "canSeeUpload")) items.push({ id: "upload", label: "העלאה", icon: Upload })
-  if (full || userCanSeeOptIn(perms, "canSeeReports")) items.push({ id: "reports", label: "דוחות", icon: BarChart3 })
-  if (full || userCanSeeOptIn(perms, "canSeeSettings")) items.push({ id: "settings", label: "הגדרות", icon: Settings })
+  if (full && !isImpersonating) items.push({ id: "admin-panel", label: t("nav.adminPanel"), icon: Shield })
+  if (full || userCanSeeOptIn(perms, "canSeeCosts")) items.push({ id: "menu", label: t("nav.menuCosts"), icon: UtensilsCrossed })
+  if (full || userCanSee(perms, "canSeeSuppliers")) items.push({ id: "suppliers", label: t("nav.suppliers"), icon: Truck })
+  if (full || userCanSee(perms, "canSeePurchaseOrders")) items.push({ id: "purchase-orders", label: t("nav.purchaseOrders"), icon: ClipboardList })
+  if (full || userCanSee(perms, "canSeeUpload")) items.push({ id: "upload", label: t("nav.upload"), icon: Upload })
+  if (full || userCanSeeOptIn(perms, "canSeeReports")) items.push({ id: "reports", label: t("nav.reports"), icon: BarChart3 })
+  if (full || userCanSeeOptIn(perms, "canSeeSettings")) items.push({ id: "settings", label: t("nav.settings"), icon: Settings })
   return items
 }
 
 export function MobileNav({ currentPage, setCurrentPage, userRole, isSystemOwner, userPermissions, isImpersonating }: MobileNavProps) {
+  const t = useTranslations()
   const [showMore, setShowMore] = useState(false)
 
   const handleClick = (id: string) => {
@@ -82,7 +96,7 @@ export function MobileNav({ currentPage, setCurrentPage, userRole, isSystemOwner
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 inset-x-0 z-50 md:hidden bg-primary/95 backdrop-blur-xl border-t border-primary-foreground/10 safe-area-pb">
         <div className="flex items-stretch h-16">
-          {mainItems(userRole, userPermissions, isSystemOwner, isImpersonating).map((item) => {
+          {mainItems(t, userRole, userPermissions, isSystemOwner, isImpersonating).map((item) => {
             const isActive = item.id === "more" ? showMore : currentPage === item.id
             
             return (
@@ -126,7 +140,8 @@ export function MobileNav({ currentPage, setCurrentPage, userRole, isSystemOwner
             
             <div className="p-4 pb-safe">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xs font-bold text-primary-foreground/50 tracking-wider">אפשרויות נוספות</h3>
+                <LanguageSwitcher />
+                <h3 className="text-xs font-bold text-primary-foreground/50 tracking-wider">{t("nav.moreOptions")}</h3>
                 <button 
                   onClick={() => setShowMore(false)}
                   className="w-8 h-8 rounded-full bg-primary-foreground/10 flex items-center justify-center"
@@ -136,7 +151,7 @@ export function MobileNav({ currentPage, setCurrentPage, userRole, isSystemOwner
               </div>
               
               <div className="grid grid-cols-3 gap-3 max-h-[50vh] overflow-y-auto hide-scrollbar">
-                {moreItems(userRole, userPermissions, isSystemOwner, isImpersonating).map((item) => (
+                {moreItems(t, userRole, userPermissions, isSystemOwner, isImpersonating).map((item) => (
                   <button
                     key={item.id}
                     type="button"
