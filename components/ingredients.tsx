@@ -138,9 +138,19 @@ function CheapestPricePopover({
             <div className="text-sm text-muted-foreground">מהמערכת: —</div>
           )}
           {webPrice ? (
-            <div className="text-sm text-blue-600 dark:text-blue-400">
-              <span className="text-muted-foreground">מהאינטרנט:</span> ₪{webPrice.price.toFixed(1)}/{webPrice.unit}
-              <span className="font-medium"> אצל {webPrice.store}</span>
+            <div className="text-sm text-blue-600 dark:text-blue-400 space-y-1">
+              <div>
+                <span className="text-muted-foreground">מהאינטרנט:</span> ₪{webPrice.price.toFixed(1)}/{webPrice.unit}
+                <span className="font-medium"> אצל {webPrice.store}</span>
+              </div>
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto p-0 text-xs text-primary"
+                onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(ingredient.name + " " + webPrice.store + " מחיר קנייה")}`, "_blank")}
+              >
+                לקנייה באינטרנט →
+              </Button>
             </div>
           ) : (
             <Button
