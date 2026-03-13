@@ -1159,10 +1159,9 @@ export function Ingredients() {
                         {isOwner && (
                           <TableCell className="text-right text-sm">
                             {isCompound ? "—" : (
-                              <div className="flex flex-col gap-1.5 min-w-[160px]">
+                              <div className="space-y-1 min-w-[140px]">
                                 {ingredient.globalCheapest && (
                                   <div className={cn(
-                                    "block",
                                     ingredient.priceSource === "mine" &&
                                     pricePerKg(ingredient.globalCheapest.price, ingredient.globalCheapest.unit) < pricePerKg(ingredient.price, ingredient.unit) &&
                                     "text-green-600 dark:text-green-400 font-medium"
@@ -1174,7 +1173,7 @@ export function Ingredients() {
                                   </div>
                                 )}
                                 {webPriceByIngredient[ingredient.name] ? (
-                                  <div className="text-blue-600 dark:text-blue-400 block">
+                                  <div className="text-blue-600 dark:text-blue-400">
                                     <span className="text-muted-foreground text-xs">מהאינטרנט (AI):</span> ₪{webPriceByIngredient[ingredient.name].price.toFixed(1)}/{webPriceByIngredient[ingredient.name].unit}
                                     <span className="font-medium"> אצל {webPriceByIngredient[ingredient.name].store}</span>
                                   </div>
