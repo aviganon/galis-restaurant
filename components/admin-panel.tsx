@@ -1947,7 +1947,7 @@ export function AdminPanel() {
                   <div className="w-full overflow-x-hidden overflow-y-auto max-h-[min(60vh,600px)] rounded-lg border" dir="rtl">
                   <Table className="table-fixed w-full text-sm" style={{ tableLayout: "fixed" }}>
                     <colgroup>
-                      <col style={{ width: "14%" }} />
+                      <col style={{ width: "22%" }} />
                       <col style={{ width: "6%" }} />
                       <col style={{ width: "8%" }} />
                       <col style={{ width: "7%" }} />
@@ -1963,37 +1963,37 @@ export function AdminPanel() {
                     <TableHeader className="sticky top-0 z-10 bg-background [&_tr]:bg-background [&_tr]:border-b">
                       <TableRow className="bg-muted/50 hover:bg-muted/50 border-b">
                         <TableHead className="text-right p-2 align-middle">
-                          <div className="flex items-center gap-2">
-                            <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-                            <Input
-                              value={ingredientsSearchText}
-                              onChange={(e) => setIngredientsSearchText(e.target.value)}
-                              placeholder="חיפוש לפי שם, ספק, מק״ט..."
-                              className="h-9 text-right flex-1 min-w-0"
-                            />
-                            {ingredientsSearchText && (
-                              <Button variant="ghost" size="sm" className="h-8 shrink-0" onClick={() => setIngredientsSearchText("")}>
-                                נקה
-                              </Button>
-                            )}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <div className="flex items-center gap-1.5 flex-1 min-w-[120px]">
+                              <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+                              <Input
+                                value={ingredientsSearchText}
+                                onChange={(e) => setIngredientsSearchText(e.target.value)}
+                                placeholder="חיפוש רכיב..."
+                                className="h-8 text-right flex-1 min-w-0 text-sm"
+                              />
+                              {ingredientsSearchText && (
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={() => setIngredientsSearchText("")} title="נקה">
+                                  <X className="w-3.5 h-3.5" />
+                                </Button>
+                              )}
+                            </div>
                             <Button
                               size="sm"
-                              className="h-9 shrink-0"
+                              className="h-8 shrink-0 text-xs"
                               onClick={() => { setAddIngredientSupplier(""); setAddIngredientOpen(true) }}
                             >
                               <Plus className="w-4 h-4 ml-1" />
-                              הוסף רכיב
+                              הוסף
                             </Button>
                           </div>
                         </TableHead>
-                        <TableHead className="text-right p-2 align-middle">
-                          <span className="text-muted-foreground text-xs">
-                            {filteredAndSortedIngredients.length === (ingredientsList?.length ?? 0)
-                              ? `${ingredientsList?.length ?? 0} רכיבים`
-                              : `מציג ${filteredAndSortedIngredients.length} מתוך ${ingredientsList?.length ?? 0}`}
-                          </span>
+                        <TableHead className="text-right p-2 align-middle text-xs text-muted-foreground">
+                          {filteredAndSortedIngredients.length === (ingredientsList?.length ?? 0)
+                            ? `${ingredientsList?.length ?? 0} רכיבים`
+                            : `מציג ${filteredAndSortedIngredients.length} מתוך ${ingredientsList?.length ?? 0}`}
                         </TableHead>
-                        <TableHead colSpan={10} className="text-right p-2 align-middle" />
+                        <TableHead colSpan={10} className="p-0" />
                       </TableRow>
                       <TableRow>
                         {(["name", "price", "cheapest", "sku", "status", "source", "supplier", "minStock", "stock", "waste", "unit"] as const).map((key) => {
