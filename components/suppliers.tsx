@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import dynamic from "next/dynamic"
 import { collection, getDocs, doc, getDoc, setDoc, writeBatch, deleteDoc, addDoc } from "firebase/firestore"
 import { motion } from "framer-motion"
 import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplier-ingredients"
@@ -55,8 +56,12 @@ import {
   Upload as UploadIcon,
   FileText,
 } from "lucide-react"
-import { FilePreviewModal } from "@/components/file-preview-modal"
 import type { ExtractedSupplierItem } from "@/lib/ai-extract"
+
+const FilePreviewModal = dynamic(
+  () => import("@/components/file-preview-modal").then((m) => ({ default: m.FilePreviewModal })),
+  { ssr: false }
+)
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
 
@@ -69,7 +74,7 @@ interface SupplierInfo {
 
 const isOwnerRole = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner"
 
-export function Suppliers() {
+export default function Suppliers() {
   const t = useTranslations()
   const { currentRestaurantId, userRole, isSystemOwner, refreshIngredients, restaurants } = useApp()
   const isOwner = isOwnerRole(userRole, isSystemOwner)
