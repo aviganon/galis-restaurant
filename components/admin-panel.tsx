@@ -2629,10 +2629,10 @@ export function AdminPanel() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                מפתח זה נשמר ב-Firestore ומשמש לניתוח קבצים (מחירונים, תפריטים, חשבוניות) ובדיקת מחירים באינטרנט באמצעות AI.
+                {t("pages.adminPanel.apiKeyDesc")}
               </p>
               <p className="text-xs text-muted-foreground">
-                איפה נרשמים:{" "}
+                {t("pages.adminPanel.whereToRegister")}{" "}
                 <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                   Anthropic (Claude)
                 </a>
@@ -2640,28 +2640,28 @@ export function AdminPanel() {
                 <a href="https://serper.dev/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                   Serper
                 </a>
-                {" "}(חיפוש באינטרנט — לפריסה בשרת)
+                {" "}({t("pages.adminPanel.serperSearchDesc")})
               </p>
               {loading ? (
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  טוען...
+                  {t("common.loading")}
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <Label htmlFor="claude-api-key">מפתח</Label>
+                  <Label htmlFor="claude-api-key">{t("pages.adminPanel.keyLabel")}</Label>
                   <Input
                     id="claude-api-key"
                     name="claudeApiKey"
                     type="password"
-                    placeholder={apiKey ? "מפתח מוגדר — הזן להחלפה" : "sk-ant-..."}
+                    placeholder={apiKey ? t("pages.adminPanel.keyPlaceholderSet") : t("pages.adminPanel.keyPlaceholderNew")}
                     className="font-mono"
                     autoComplete="off"
                   />
                   <div className="flex flex-wrap gap-2 items-center">
                     <Button onClick={handleSaveKey} disabled={saving}>
                       {saving ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : null}
-                      שמור
+                      {t("pages.adminPanel.save")}
                     </Button>
                     {apiKey && (
                       <>

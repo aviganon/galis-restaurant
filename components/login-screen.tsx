@@ -29,7 +29,8 @@ import {
   CheckCircle2,
   Play,
   Volume2,
-  VolumeX
+  VolumeX,
+  Star
 } from "lucide-react"
 import { LanguageSwitcher } from "@/components/language-switcher"
 import { useTranslations } from "@/lib/use-translations"
@@ -464,9 +465,45 @@ export function LoginScreen(_props: LoginScreenProps) {
       {/* Recommended Restaurants */}
       <section id="restaurants" className="py-16 md:py-24">
         <div className="container mx-auto px-4">
-          <div className="text-center">
-            <h2 className="text-2xl md:text-3xl font-bold mb-4">{t("login.restaurants")}</h2>
-            <p className="text-muted-foreground">{t("login.noData")}</p>
+          <div className="text-center mb-12">
+            <h2 className="text-2xl md:text-3xl font-bold mb-4">{t("login.recommendedRestaurants")}</h2>
+            <p className="text-muted-foreground max-w-xl mx-auto">{t("login.recommendedRestaurantsSubtitle")}</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { nameKey: "login.rest1Name", locationKey: "login.rest1Location", rating: 4.9, reviews: 1250, image: "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=400&h=300&fit=crop", badgeKey: "login.badgePopular" },
+              { nameKey: "login.rest2Name", locationKey: "login.rest2Location", rating: 4.8, reviews: 890, image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=300&fit=crop", badgeKey: "login.badgeNew" },
+              { nameKey: "login.rest3Name", locationKey: "login.rest3Location", rating: 4.7, reviews: 650, image: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=400&h=300&fit=crop", badgeKey: "login.badgeRecommended" },
+              { nameKey: "login.rest4Name", locationKey: "login.rest4Location", rating: 4.6, reviews: 1100, image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop", badgeKey: "login.badgeRecommended" },
+            ].map((restaurant, i) => (
+              <Card key={i} className="overflow-hidden border-0 shadow-sm hover:shadow-lg transition-all group cursor-pointer">
+                <div className="relative h-48 overflow-hidden">
+                  <Image
+                    src={restaurant.image}
+                    alt={t(restaurant.nameKey)}
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  <Badge className="absolute top-3 right-3 rounded-full bg-background/90 text-foreground backdrop-blur-sm">
+                    {t(restaurant.badgeKey)}
+                  </Badge>
+                </div>
+                <CardContent className="p-4">
+                  <h3 className="font-semibold text-lg mb-1">{t(restaurant.nameKey)}</h3>
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
+                    <MapPin className="w-3.5 h-3.5" />
+                    {t(restaurant.locationKey)}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                      <span className="font-medium">{restaurant.rating}</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">({restaurant.reviews.toLocaleString()} {t("login.reviews")})</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
       </section>
@@ -474,10 +511,30 @@ export function LoginScreen(_props: LoginScreenProps) {
       {/* Testimonials */}
       <section className="py-16 md:py-24 bg-muted/30">
         <div className="container mx-auto px-4">
-          <div className="text-center">
-            <Quote className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-            <h2 className="text-2xl md:text-3xl font-bold mb-4">{t("login.testimonials")}</h2>
-            <p className="text-muted-foreground">{t("login.noData")}</p>
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-12">
+              <Quote className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+              <h2 className="text-2xl md:text-3xl font-bold">{t("login.whatCustomersSay")}</h2>
+            </div>
+            <div className="grid md:grid-cols-2 gap-6">
+              {[
+                { quoteKey: "login.testimonial1Quote", authorKey: "login.testimonial1Author", roleKey: "login.testimonial1Role", avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop" },
+                { quoteKey: "login.testimonial2Quote", authorKey: "login.testimonial2Author", roleKey: "login.testimonial2Role", avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop" },
+              ].map((tst, i) => (
+                <Card key={i} className="border-0 shadow-sm">
+                  <CardContent className="p-6">
+                    <p className="text-lg mb-6 leading-relaxed">&quot;{t(tst.quoteKey)}&quot;</p>
+                    <div className="flex items-center gap-4">
+                      <Image src={tst.avatar} alt={t(tst.authorKey)} width={48} height={48} className="rounded-full object-cover" />
+                      <div>
+                        <p className="font-semibold">{t(tst.authorKey)}</p>
+                        <p className="text-sm text-muted-foreground">{t(tst.roleKey)}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
         </div>
       </section>
