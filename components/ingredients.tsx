@@ -51,10 +51,6 @@ import {
   ChevronDown,
   GripVertical,
   Columns3,
-  EyeOff,
-  Rows2,
-  Rows3,
-  Rows4,
 } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -69,6 +65,7 @@ import { toast } from "sonner"
 import { downloadExcel } from "@/lib/export-excel"
 import { fetchWebPriceForIngredient } from "@/lib/ai-extract"
 import { useTranslations } from "@/lib/use-translations"
+import { useLanguage } from "@/contexts/language-context"
 
 /** מחיר הכי זול גלובלי — לבעלים להשוואה */
 interface GlobalCheapest {
@@ -198,6 +195,10 @@ function CheapestPricePopover({
 
 export function Ingredients() {
   const t = useTranslations()
+  const { dir } = useLanguage()
+  const isRtl = dir === "rtl"
+  const textAlign = isRtl ? "text-right" : "text-left"
+  const justify = isRtl ? "justify-end" : "justify-start"
   const tRef = React.useRef(t)
   tRef.current = t
   const { currentRestaurantId, setCurrentPage, userRole, isSystemOwner, refreshIngredients } = useApp()
@@ -805,16 +806,16 @@ export function Ingredients() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6" dir={dir}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center gap-3">
+              <div className={cn("flex items-center gap-3", isRtl && "flex-row-reverse")}>
                 <div className="p-2 rounded-xl bg-primary/10">
                   <Package className="w-5 h-5 text-primary" />
                 </div>
-                <div>
+                <div className={textAlign}>
                   <p className="text-sm text-muted-foreground">{t("pages.ingredients.totalIngredients")}</p>
                   <p className="text-2xl font-bold">{stats.total}</p>
                 </div>
@@ -825,11 +826,11 @@ export function Ingredients() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center gap-3">
+              <div className={cn("flex items-center gap-3", isRtl && "flex-row-reverse")}>
                 <div className="p-2 rounded-xl bg-amber-500/10">
                   <AlertTriangle className="w-5 h-5 text-amber-500" />
                 </div>
-                <div>
+                <div className={textAlign}>
                   <p className="text-sm text-muted-foreground">{t("pages.ingredients.lowStockLabel")}</p>
                   <p className="text-2xl font-bold">{stats.lowStock}</p>
                 </div>
@@ -840,11 +841,11 @@ export function Ingredients() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center gap-3">
+              <div className={cn("flex items-center gap-3", isRtl && "flex-row-reverse")}>
                 <div className="p-2 rounded-xl bg-red-500/10">
                   <XCircle className="w-5 h-5 text-red-500" />
                 </div>
-                <div>
+                <div className={textAlign}>
                   <p className="text-sm text-muted-foreground">{t("pages.ingredients.outOfStockLabel")}</p>
                   <p className="text-2xl font-bold">{stats.outOfStock}</p>
                 </div>
@@ -855,11 +856,11 @@ export function Ingredients() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center gap-3">
+              <div className={cn("flex items-center gap-3", isRtl && "flex-row-reverse")}>
                 <div className="p-2 rounded-xl bg-emerald-500/10">
                   <TrendingUp className="w-5 h-5 text-emerald-500" />
                 </div>
-                <div>
+                <div className={textAlign}>
                   <p className="text-sm text-muted-foreground">{t("pages.ingredients.inventoryValue")}</p>
                   <p className="text-2xl font-bold">{stats.totalValue.toLocaleString()} ₪</p>
                 </div>
@@ -871,12 +872,12 @@ export function Ingredients() {
 
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex items-center gap-2 flex-1">
-              <span className="font-bold text-lg">{t("pages.ingredients.manageIngredients")}</span>
+          <div className="flex flex-col md:flex-row gap-4" dir={dir}>
+            <div className={cn("flex items-center gap-2 flex-1", isRtl && "flex-row-reverse")}>
+              <span className={cn("font-bold text-lg", textAlign)}>{t("pages.ingredients.manageIngredients")}</span>
               <Badge variant="secondary">{filteredIngredients.length} {t("pages.ingredients.ingredients")}</Badge>
             </div>
-            <div className="flex gap-2 flex-wrap">
+            <div className={cn("flex gap-2 flex-wrap", isRtl && "flex-row-reverse")}>
               <Button variant="outline" className="rounded-full" onClick={() => setCompoundOpen(true)}>
                 <ChefHat className="w-4 h-4 ml-2" />
                 {t("pages.ingredients.newRecipe")}
@@ -1186,18 +1187,18 @@ export function Ingredients() {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2 mt-4" dir="rtl">
+          <div className="flex flex-col sm:flex-row gap-2 mt-4" dir={dir}>
             <div className="relative flex-1">
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className={cn("absolute top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground", isRtl ? "right-3" : "left-3")} />
               <Input
                 placeholder={t("pages.ingredients.searchPlaceholder")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pr-10"
+                className={cn(isRtl ? "pr-10" : "pl-10", textAlign)}
               />
             </div>
             <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-              <SelectTrigger className="w-full sm:w-[140px]">
+              <SelectTrigger className={cn("w-full sm:w-[140px]", textAlign)}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1207,7 +1208,7 @@ export function Ingredients() {
               </SelectContent>
             </Select>
             <Select value={stockFilter} onValueChange={setStockFilter}>
-              <SelectTrigger className="w-full sm:w-[140px]">
+              <SelectTrigger className={cn("w-full sm:w-[140px]", textAlign)}>
                 <SelectValue placeholder={t("pages.ingredients.stockStatus")} />
               </SelectTrigger>
               <SelectContent>
@@ -1219,7 +1220,7 @@ export function Ingredients() {
             </Select>
             {isOwner && (
               <Select value={priceSourceFilter} onValueChange={(v) => setPriceSourceFilter(v as "all" | "mine" | "market")}>
-                <SelectTrigger className="w-full sm:w-[140px]">
+                <SelectTrigger className={cn("w-full sm:w-[140px]", textAlign)}>
                   <SelectValue placeholder={t("pages.ingredients.priceSource")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -1229,15 +1230,6 @@ export function Ingredients() {
                 </SelectContent>
               </Select>
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-9 w-9 p-0 shrink-0"
-              title={t("pages.ingredients.rowDensity")}
-              onClick={() => setRowDensityAndStore(rowDensity === "compact" ? "normal" : rowDensity === "normal" ? "expanded" : "compact")}
-            >
-              {rowDensity === "compact" ? <Rows2 className="w-4 h-4" /> : rowDensity === "expanded" ? <Rows4 className="w-4 h-4" /> : <Rows3 className="w-4 h-4" />}
-            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="h-9 w-9 p-0 shrink-0" title={t("pages.ingredients.tableDisplay")}>
@@ -1283,7 +1275,7 @@ export function Ingredients() {
 
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto" dir="rtl">
+          <div className="overflow-x-auto" dir={dir}>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1317,7 +1309,7 @@ export function Ingredients() {
                     return (
                       <TableHead
                         key={key}
-                        className={cn("text-right", densityCellClass, isSortable && "cursor-pointer hover:bg-muted/50 select-none")}
+                        className={cn(textAlign, densityCellClass, isSortable && "cursor-pointer hover:bg-muted/50 select-none")}
                         draggable
                         title={t("pages.ingredients.dragToReorderColumns")}
                         onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(colIndex)); e.dataTransfer.effectAllowed = "move" }}
@@ -1337,7 +1329,7 @@ export function Ingredients() {
                           else setSortBy(sortKey)
                         }}
                       >
-                        <span className="flex items-center justify-end gap-1">
+                        <span className={cn("flex items-center gap-1", justify)}>
                           <GripVertical className="w-3 h-3 text-muted-foreground/60 cursor-grab active:cursor-grabbing shrink-0" />
                           {labels[key] || key}
                           {key === "name" && (sortBy === "name" || sortBy === "name_desc") && (sortBy === "name" ? <TrendingDown className="w-3.5 h-3.5" /> : <TrendingUp className="w-3.5 h-3.5" />)}
@@ -1345,9 +1337,6 @@ export function Ingredients() {
                           {key === "waste" && (sortBy === "waste_asc" || sortBy === "waste_desc") && (sortBy === "waste_desc" ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />)}
                           {key === "stock" && (sortBy === "stock_asc" || sortBy === "stock_desc") && (sortBy === "stock_desc" ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />)}
                           {key === "minStock" && (sortBy === "minStock_asc" || sortBy === "minStock_desc") && (sortBy === "minStock_desc" ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />)}
-                          <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 opacity-60 hover:opacity-100" onClick={(e) => { e.stopPropagation(); toggleColumnVisibility(key) }} title={t("pages.ingredients.hideColumn")}>
-                            <EyeOff className="w-3 h-3" />
-                          </Button>
                         </span>
                       </TableHead>
                     )
@@ -1368,18 +1357,18 @@ export function Ingredients() {
                     const StatusIcon = stockStatus.icon
                     const colSpan = displayColumnOrder.length
                     const cellByKey: Record<string, React.ReactNode> = {
-                      name: <TableCell key="name" className={cn("font-medium text-right", densityCellClass)}>{isCompound && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded ml-1">🧪 מתכון</span>}{ingredient.name}</TableCell>,
-                      price: <TableCell key="price" className={cn("text-right font-semibold", densityCellClass)}>{isCompound ? "—" : `${ingredient.price} ש"ח`}</TableCell>,
-                      source: <TableCell key="source" className={cn("text-right", densityCellClass)}>{isCompound ? "—" : (ingredient.priceSource === "market" ? <Badge variant="secondary" className="text-xs whitespace-nowrap">מחיר שוק</Badge> : <Badge variant="outline" className="text-xs whitespace-nowrap">מחיר שלי</Badge>)}</TableCell>,
-                      unit: <TableCell key="unit" className={cn("text-right", densityCellClass)}>{ingredient.unit}</TableCell>,
-                      waste: <TableCell key="waste" className={cn("text-right", densityCellClass)}>{isCompound ? "—" : `${ingredient.waste}%`}</TableCell>,
-                      stock: <TableCell key="stock" className={cn("text-right font-semibold", densityCellClass)}>{isCompound ? "—" : ingredient.stock}</TableCell>,
-                      minStock: <TableCell key="minStock" className={cn("text-right text-muted-foreground", densityCellClass)}>{isCompound ? "—" : ingredient.minStock}</TableCell>,
-                      supplier: <TableCell key="supplier" className={cn("text-right", densityCellClass)}><Badge variant="outline">{ingredient.supplier || "—"}</Badge></TableCell>,
-                      sku: <TableCell key="sku" className={cn("text-right text-muted-foreground text-sm", densityCellClass)}>{ingredient.sku || "—"}</TableCell>,
-                      status: <TableCell key="status" className={cn("text-right", densityCellClass)}><Badge className={stockStatus.color}><StatusIcon className="w-3 h-3 ml-1" />{stockStatus.status}</Badge></TableCell>,
-                      actions: <TableCell key="actions" className={cn("text-right", densityCellClass)}>
-                        <div className="flex gap-1 justify-end">
+                      name: <TableCell key="name" className={cn("font-medium", textAlign, densityCellClass)}>{isCompound && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded ml-1">🧪 מתכון</span>}{ingredient.name}</TableCell>,
+                      price: <TableCell key="price" className={cn(textAlign, "font-semibold", densityCellClass)}>{isCompound ? "—" : `${ingredient.price} ש"ח`}</TableCell>,
+                      source: <TableCell key="source" className={cn(textAlign, densityCellClass)}>{isCompound ? "—" : (ingredient.priceSource === "market" ? <Badge variant="secondary" className="text-xs whitespace-nowrap">מחיר שוק</Badge> : <Badge variant="outline" className="text-xs whitespace-nowrap">מחיר שלי</Badge>)}</TableCell>,
+                      unit: <TableCell key="unit" className={cn(textAlign, densityCellClass)}>{ingredient.unit}</TableCell>,
+                      waste: <TableCell key="waste" className={cn(textAlign, densityCellClass)}>{isCompound ? "—" : `${ingredient.waste}%`}</TableCell>,
+                      stock: <TableCell key="stock" className={cn(textAlign, "font-semibold", densityCellClass)}>{isCompound ? "—" : ingredient.stock}</TableCell>,
+                      minStock: <TableCell key="minStock" className={cn(textAlign, "text-muted-foreground", densityCellClass)}>{isCompound ? "—" : ingredient.minStock}</TableCell>,
+                      supplier: <TableCell key="supplier" className={cn(textAlign, densityCellClass)}><Badge variant="outline">{ingredient.supplier || "—"}</Badge></TableCell>,
+                      sku: <TableCell key="sku" className={cn(textAlign, "text-muted-foreground text-sm", densityCellClass)}>{ingredient.sku || "—"}</TableCell>,
+                      status: <TableCell key="status" className={cn(textAlign, densityCellClass)}><Badge className={stockStatus.color}><StatusIcon className="w-3 h-3 ml-1" />{stockStatus.status}</Badge></TableCell>,
+                      actions: <TableCell key="actions" className={cn(textAlign, densityCellClass)}>
+                        <div className={cn("flex gap-1", justify)}>
                           {!isCompound && (
                             <Button size="sm" variant="ghost" onClick={() => openEditIngredient(ingredient)} className="h-8 w-8 p-0" title="ערוך רכיב">
                               <Edit2 className="w-4 h-4" />
@@ -1404,7 +1393,7 @@ export function Ingredients() {
                       </motion.tr>
                       {isOwner && !isCompound && (
                         <TableRow className="bg-muted/30 hover:bg-muted/40">
-                          <TableCell colSpan={displayColumnOrder.length} className="py-1.5 pr-4 text-right">
+                          <TableCell colSpan={displayColumnOrder.length} className={cn("py-1.5 pr-4", textAlign)}>
                             <CheapestPricePopover
                               ingredient={ingredient}
                               webPrice={webPriceByIngredient[ingredient.name]}

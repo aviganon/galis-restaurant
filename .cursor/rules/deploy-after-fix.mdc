@@ -1,24 +1,23 @@
 ---
-description: Deploy policy - run deploy automatically at end of every request
+description: Deploy policy - run deploy at end of every conversation
 alwaysApply: true
 ---
 
 # Deploy Policy
 
-**חובה להריץ deploy אוטומטית בסוף כל בקשה** – ללא יוצא מן הכלל.
+**חובה להריץ deploy אוטומטית בסוף כל שיחה** – ללא יוצא מן הכלל.
 
-לאחר כל שיחה שבה בוצעו שינויים בקוד (עריכות, תיקונים, הוספות), הרץ בסיום:
+לאחר כל שיחה (במיוחד כשבוצעו שינויים בקוד), הרץ בסיום:
 
 ```bash
-cd "/Users/aviganonm5/Library/Mobile Documents/com~apple~CloudDocs/cursor" && npm run build && firebase deploy
+npm run deploy
 ```
 
-זה כולל: `npm run build` + `firebase deploy` (hosting + firestore).
+(מתוך תיקיית הפרויקט: `galis-restaurant`)
 
 **מתי להריץ:**
-- אחרי כל עריכה בקוד
-- אחרי תיקון שגיאות
-- אחרי הוספת פיצ'רים
-- אחרי כל בקשה שהשפיעה על קבצים בפרויקט
+- אחרי כל שיחה — גם אם לא ביקש במפורש
+- אחרי עריכות, תיקונים, הוספות פיצ'רים
+- בסיום כל תגובה שמשנה קבצים
 
-**אל תדלג** – הרץ deploy בסוף התגובה, גם אם המשתמש לא ביקש במפורש.
+**אל תדלג** – הרץ deploy בסוף השיחה.

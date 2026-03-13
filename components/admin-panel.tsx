@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from "react"
-import { Shield, Key, Loader2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown, GripVertical, Columns3, Eye, EyeOff, Rows2, Rows3, Rows4 } from "lucide-react"
+import { Shield, Key, Loader2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown, GripVertical, Columns3 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -2054,9 +2054,6 @@ export function AdminPanel() {
                         ? `${ingredientsList?.length ?? 0} ${t("pages.adminPanel.ingredientsCount")}`
                         : `${t("pages.adminPanel.showingCount")} ${filteredAndSortedIngredients.length} ${t("pages.adminPanel.of")} ${ingredientsList?.length ?? 0}`}
                     </span>
-                    <Button variant="outline" size="sm" className="h-9 w-9 p-0" title={t("pages.adminPanel.rowDensity")} onClick={() => setIngredientsRowDensityAndStore(ingredientsRowDensity === "compact" ? "normal" : ingredientsRowDensity === "normal" ? "expanded" : "compact")}>
-                      {ingredientsRowDensity === "compact" ? <Rows2 className="w-4 h-4" /> : ingredientsRowDensity === "expanded" ? <Rows4 className="w-4 h-4" /> : <Rows3 className="w-4 h-4" />}
-                    </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" size="sm" className="h-9 w-9 p-0" title={t("pages.adminPanel.tableDisplay")}>
@@ -2116,9 +2113,6 @@ export function AdminPanel() {
                                 <span className={`flex items-center gap-1 ${justify}`}>
                                   <GripVertical className="w-3 h-3 text-muted-foreground/60 cursor-grab active:cursor-grabbing shrink-0" />
                                   {t("pages.adminPanel.cheapest")}
-                                  <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 opacity-60 hover:opacity-100" onClick={(e) => { e.stopPropagation(); toggleIngredientsColumnVisibility("cheapest") }} title={t("pages.adminPanel.hideColumn")}>
-                                    <EyeOff className="w-3 h-3" />
-                                  </Button>
                                 </span>
                               </TableHead>
                             )
@@ -2156,9 +2150,6 @@ export function AdminPanel() {
                                   ingredientsSortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
                                 )}
                                 {ingredientsSortBy !== key && isSortable && <ArrowUpDown className="w-3 h-3 opacity-40" />}
-                                <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 opacity-60 hover:opacity-100" onClick={(e) => { e.stopPropagation(); toggleIngredientsColumnVisibility(key) }} title={t("pages.adminPanel.hideColumn")}>
-                                  <EyeOff className="w-3 h-3" />
-                                </Button>
                               </span>
                             </TableHead>
                           )
