@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { Shield, Key, Loader2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown } from "lucide-react"
+import React, { useState, useEffect, useCallback } from "react"
+import { Shield, Key, Loader2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown, GripVertical } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -276,6 +276,21 @@ export function AdminPanel() {
   const [ingredientsSearchText, setIngredientsSearchText] = useState("")
   const [ingredientsSortBy, setIngredientsSortBy] = useState<keyof IngredientRow | "">("")
   const [ingredientsSortDir, setIngredientsSortDir] = useState<"asc" | "desc">("asc")
+  const INGREDIENTS_COLUMN_ORDER_KEY = "admin-ingredients-column-order"
+  const defaultColumnOrder = ["name", "price", "cheapest", "sku", "status", "source", "supplier", "minStock", "stock", "waste", "unit"] as const
+  const [ingredientsColumnOrder, setIngredientsColumnOrder] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [...defaultColumnOrder]
+    try {
+      const stored = localStorage.getItem(INGREDIENTS_COLUMN_ORDER_KEY)
+      if (stored) {
+        const parsed = JSON.parse(stored) as string[]
+        const valid = defaultColumnOrder.filter((c) => parsed.includes(c))
+        const missing = defaultColumnOrder.filter((c) => !parsed.includes(c))
+        if (valid.length + missing.length === defaultColumnOrder.length) return [...valid, ...missing]
+      }
+    } catch (_) {}
+    return [...defaultColumnOrder]
+  })
 
   const [suppliersSearchText, setSuppliersSearchText] = useState("")
   const [suppliersFilterAssigned, setSuppliersFilterAssigned] = useState<string>("__all__")
@@ -697,6 +712,19 @@ export function AdminPanel() {
     }
     return list
   })()
+
+  const handleIngredientsColumnReorder = useCallback((fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return
+    setIngredientsColumnOrder((prev) => {
+      const next = [...prev]
+      const [removed] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, removed)
+      try {
+        localStorage.setItem(INGREDIENTS_COLUMN_ORDER_KEY, JSON.stringify(next))
+      } catch (_) {}
+      return next
+    })
+  }, [])
 
   const resetAddIngredientModal = () => {
     setAddIngredientName("")
@@ -2006,9 +2034,28 @@ export function AdminPanel() {
                         <TableHead colSpan={10} className="p-0" />
                       </TableRow>
                       <TableRow>
-                        {(["name", "price", "cheapest", "sku", "status", "source", "supplier", "minStock", "stock", "waste", "unit"] as const).map((key) => {
+                        {ingredientsColumnOrder.map((key, colIndex) => {
                           if (key === "cheapest") {
-                            return <TableHead key="cheapest" className={textAlign}>{t("pages.adminPanel.cheapest")}</TableHead>
+                            return (
+                              <TableHead
+                                key="cheapest"
+                                className={`${textAlign} select-none`}
+                                draggable
+                                title={t("pages.adminPanel.dragToReorderColumns")}
+                                onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(colIndex)); e.dataTransfer.effectAllowed = "move" }}
+                                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move" }}
+                                onDrop={(e) => {
+                                  e.preventDefault()
+                                  const from = parseInt(e.dataTransfer.getData("text/plain"), 10)
+                                  if (!isNaN(from)) handleIngredientsColumnReorder(from, colIndex)
+                                }}
+                              >
+                                <span className={`flex items-center gap-1 ${justify}`}>
+                                  <GripVertical className="w-3 h-3 text-muted-foreground/60 cursor-grab active:cursor-grabbing shrink-0" />
+                                  {t("pages.adminPanel.cheapest")}
+                                </span>
+                              </TableHead>
+                            )
                           }
                           const labels: Record<string, string> = { name: t("pages.adminPanel.ingredientLabel"), price: t("pages.adminPanel.priceLabel"), unit: t("pages.adminPanel.unitUnit"), waste: t("pages.adminPanel.wasteLabel"), stock: t("pages.adminPanel.inventory"), minStock: t("pages.adminPanel.minStockLabel"), supplier: t("pages.adminPanel.supplierLabel"), sku: t("pages.adminPanel.skuLabel"), source: t("pages.adminPanel.sourceLabel"), status: t("pages.adminPanel.statusLabel") }
                           const isSortable = ["name", "price", "unit", "waste", "stock", "minStock", "supplier", "sku", "source", "status"].includes(key)
@@ -2016,6 +2063,15 @@ export function AdminPanel() {
                             <TableHead
                               key={key}
                               className={`${textAlign} ${isSortable ? "cursor-pointer hover:bg-muted/50 select-none" : ""}`}
+                              draggable
+                              title={t("pages.adminPanel.dragToReorderColumns")}
+                              onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(colIndex)); e.dataTransfer.effectAllowed = "move" }}
+                              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move" }}
+                              onDrop={(e) => {
+                                e.preventDefault()
+                                const from = parseInt(e.dataTransfer.getData("text/plain"), 10)
+                                if (!isNaN(from)) handleIngredientsColumnReorder(from, colIndex)
+                              }}
                               onClick={() => {
                                 if (!isSortable) return
                                 if (ingredientsSortBy === key) {
@@ -2028,6 +2084,7 @@ export function AdminPanel() {
                               }}
                             >
                               <span className={`flex items-center gap-1 ${justify}`}>
+                                <GripVertical className="w-3 h-3 text-muted-foreground/60 cursor-grab active:cursor-grabbing shrink-0" />
                                 {labels[key] || key}
                                 {ingredientsSortBy === key && (
                                   ingredientsSortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
@@ -2041,28 +2098,32 @@ export function AdminPanel() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {[...filteredAndSortedIngredients].reverse().map((ing) => (
-                        <TableRow key={`${ing.source}-${ing.id}`}>
-                          <TableCell className={`font-medium ${textAlign} truncate`} title={ing.name}>{ing.name}</TableCell>
-                          <TableCell className={textAlign}>₪{ing.price.toFixed(2)}</TableCell>
-                          <TableCell className={`${textAlign} text-sm`}>
+                      {[...filteredAndSortedIngredients].reverse().map((ing) => {
+                        const cellByKey: Record<string, React.ReactNode> = {
+                          name: <TableCell key="name" className={`font-medium ${textAlign} truncate`} title={ing.name}>{ing.name}</TableCell>,
+                          price: <TableCell key="price" className={textAlign}>₪{ing.price.toFixed(2)}</TableCell>,
+                          cheapest: <TableCell key="cheapest" className={`${textAlign} text-sm`}>
                             <AdminCheapestPopover
                               ing={ing}
                               webPrice={webPriceByIngredient[ing.name]}
                               onWebPriceSaved={(d) => setWebPriceByIngredient((prev) => ({ ...prev, [ing.name]: d }))}
                               t={t}
                             />
-                          </TableCell>
-                          <TableCell className={`${textAlign} truncate`} title={ing.sku || undefined}>{ing.sku || "—"}</TableCell>
-                          <TableCell className={textAlign}>
+                          </TableCell>,
+                          sku: <TableCell key="sku" className={`${textAlign} truncate`} title={ing.sku || undefined}>{ing.sku || "—"}</TableCell>,
+                          status: <TableCell key="status" className={textAlign}>
                             <Badge variant={ing.status === "שויך" ? "default" : "secondary"}>{ing.status === "שויך" ? t("pages.adminPanel.assigned") : t("pages.adminPanel.pending")}</Badge>
-                          </TableCell>
-                          <TableCell className={textAlign}>{ing.source === "global" ? t("pages.adminPanel.global") : t("pages.adminPanel.restaurant")}</TableCell>
-                          <TableCell className={`${textAlign} truncate`} title={ing.supplier || undefined}>{ing.supplier || "—"}</TableCell>
-                          <TableCell className={textAlign}>{ing.minStock}</TableCell>
-                          <TableCell className={textAlign}>{ing.stock}</TableCell>
-                          <TableCell className={textAlign}>{ing.waste}%</TableCell>
-                          <TableCell className={textAlign}>{ing.unit}</TableCell>
+                          </TableCell>,
+                          source: <TableCell key="source" className={textAlign}>{ing.source === "global" ? t("pages.adminPanel.global") : t("pages.adminPanel.restaurant")}</TableCell>,
+                          supplier: <TableCell key="supplier" className={`${textAlign} truncate`} title={ing.supplier || undefined}>{ing.supplier || "—"}</TableCell>,
+                          minStock: <TableCell key="minStock" className={textAlign}>{ing.minStock}</TableCell>,
+                          stock: <TableCell key="stock" className={textAlign}>{ing.stock}</TableCell>,
+                          waste: <TableCell key="waste" className={textAlign}>{ing.waste}%</TableCell>,
+                          unit: <TableCell key="unit" className={textAlign}>{ing.unit}</TableCell>,
+                        }
+                        return (
+                        <TableRow key={`${ing.source}-${ing.id}`}>
+                          {ingredientsColumnOrder.map((k) => cellByKey[k] ? <React.Fragment key={k}>{cellByKey[k]}</React.Fragment> : null)}
                           <TableCell className={textAlign}>
                             <div className={`flex gap-1 ${justify}`}>
                               <Button
@@ -2085,7 +2146,8 @@ export function AdminPanel() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        )
+                      })}
                     </TableBody>
                   </Table>
                   </div>
