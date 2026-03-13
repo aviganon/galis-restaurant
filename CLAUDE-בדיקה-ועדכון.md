@@ -52,7 +52,7 @@ cd "/Users/aviganonm5/Library/Mobile Documents/com~apple~CloudDocs/cursor" && np
 | **Deploy ל-Firebase** | הרצת `npm run deploy` — האתר ב־galis-6ebbc.web.app |
 | **Push ל-GitHub** | כל השינויים נדחפו ל־aviganon/galis-restaurant |
 
-**לא בוצע (דורש פעולה ידנית):** הוספת משתני Firebase ב-Vercel Dashboard — ה-build יצליח גם בלי, אבל ההתחברות לא תעבוד עד שיוספו.
+**בוצע (Claude בדפדפן):** 6 משתני Firebase נוספו ל-Vercel ✅ — ההתחברות ו"בדוק באינטרנט" עובדים ב־galis-restaurant.vercel.app
 
 ---
 
@@ -116,7 +116,7 @@ cd "/Users/aviganonm5/Library/Mobile Documents/com~apple~CloudDocs/cursor" && np
 
 ## 3. משתני סביבה — Vercel
 
-**ה-build יצליח גם בלי** (יש placeholder). **כדי שההתחברות תעבוד** הוסף ב־Vercel → Settings → Environment Variables:
+**כבר הוגדרו** ✅ (6 משתני Firebase + ANTHROPIC_API_KEY + SERPER_API_KEY). אם צריך להוסיף — Vercel → Settings → Environment Variables:
 
 | משתנה | מקור |
 |-------|------|
@@ -174,7 +174,7 @@ git push           # דחיפה ל־GitHub (מפעיל build ב־Vercel)
 ## 6. כתובות
 
 - **Firebase:** https://galis-6ebbc.web.app
-- **Vercel:** (בדוק ב־vercel.com את כתובת הפרויקט)
+- **Vercel:** https://galis-restaurant.vercel.app (כולל התחברות + בדוק באינטרנט)
 - **Firebase Console:** https://console.firebase.google.com/project/galis-6ebbc
 - **GitHub:** aviganon/galis-restaurant
 - **GitHub Actions:** aviganon/galis-restaurant/actions
