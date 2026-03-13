@@ -1,0 +1,20 @@
+---
+description: העלאת שינויים ל-GitHub בסוף כל שיחה
+alwaysApply: true
+---
+
+# Git Push - העלאה ל-GitHub
+
+בכל שיחה שבה בוצעו שינויים בקוד:
+
+1. **בסיום השיחה** — אם יש שינויים שלא הועלו, לבצע:
+   - `git add` על קבצי הקוד (לא .cursor, .firebase, tsconfig.tsbuildinfo)
+   - `git commit` עם הודעת commit תיאורית בעברית
+   - `git push origin main`
+
+2. **לא לכלול** בסטייג'ינג:
+   - `.cursor/rules/`
+   - `.firebase/`
+   - `tsconfig.tsbuildinfo`
+
+3. המשתמש מעדיף שהשינויים יועלו אוטומטית — אין צורך לשאול.
