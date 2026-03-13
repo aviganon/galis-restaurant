@@ -1976,7 +1976,6 @@ export function AdminPanel() {
                   <div className="w-full overflow-x-hidden overflow-y-auto max-h-[min(60vh,600px)] rounded-lg border">
                   <Table className="table-fixed w-full text-sm" style={{ tableLayout: "fixed" }}>
                     <colgroup>
-                      <col style={{ width: "4%" }} />
                       <col style={{ width: "14%" }} />
                       <col style={{ width: "6%" }} />
                       <col style={{ width: "8%" }} />
@@ -1988,10 +1987,10 @@ export function AdminPanel() {
                       <col style={{ width: "5%" }} />
                       <col style={{ width: "5%" }} />
                       <col style={{ width: "6%" }} />
+                      <col style={{ width: "4%" }} />
                     </colgroup>
                     <TableHeader className="sticky top-0 z-10 bg-background [&_tr]:bg-background [&_tr]:border-b">
                       <TableRow>
-                        <TableHead className="text-right w-14">פעולות</TableHead>
                         {(["name", "price", "cheapest", "sku", "status", "source", "supplier", "minStock", "stock", "waste", "unit"] as const).map((key) => {
                           if (key === "cheapest") {
                             return <TableHead key="cheapest" className="text-right">הכי זול</TableHead>
@@ -2023,11 +2022,31 @@ export function AdminPanel() {
                             </TableHead>
                           )
                         })}
+                        <TableHead className="text-right w-14">פעולות</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredAndSortedIngredients.map((ing) => (
                         <TableRow key={`${ing.source}-${ing.id}`}>
+                          <TableCell className="font-medium text-right truncate" title={ing.name}>{ing.name}</TableCell>
+                          <TableCell className="text-right">₪{ing.price.toFixed(2)}</TableCell>
+                          <TableCell className="text-right text-sm">
+                            <AdminCheapestPopover
+                              ing={ing}
+                              webPrice={webPriceByIngredient[ing.name]}
+                              onWebPriceSaved={(d) => setWebPriceByIngredient((prev) => ({ ...prev, [ing.name]: d }))}
+                            />
+                          </TableCell>
+                          <TableCell className="text-right truncate" title={ing.sku || undefined}>{ing.sku || "—"}</TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant={ing.status === "שויך" ? "default" : "secondary"}>{ing.status}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">{ing.source === "global" ? "גלובלי" : "מסעדה"}</TableCell>
+                          <TableCell className="text-right truncate" title={ing.supplier || undefined}>{ing.supplier || "—"}</TableCell>
+                          <TableCell className="text-right">{ing.minStock}</TableCell>
+                          <TableCell className="text-right">{ing.stock}</TableCell>
+                          <TableCell className="text-right">{ing.waste}%</TableCell>
+                          <TableCell className="text-right">{ing.unit}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex gap-1 justify-end">
                               <Button
@@ -2049,25 +2068,6 @@ export function AdminPanel() {
                               </Button>
                             </div>
                           </TableCell>
-                          <TableCell className="font-medium text-right truncate" title={ing.name}>{ing.name}</TableCell>
-                          <TableCell className="text-right">₪{ing.price.toFixed(2)}</TableCell>
-                          <TableCell className="text-right text-sm">
-                            <AdminCheapestPopover
-                              ing={ing}
-                              webPrice={webPriceByIngredient[ing.name]}
-                              onWebPriceSaved={(d) => setWebPriceByIngredient((prev) => ({ ...prev, [ing.name]: d }))}
-                            />
-                          </TableCell>
-                          <TableCell className="text-right truncate" title={ing.sku || undefined}>{ing.sku || "—"}</TableCell>
-                          <TableCell className="text-right">
-                            <Badge variant={ing.status === "שויך" ? "default" : "secondary"}>{ing.status}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right">{ing.source === "global" ? "גלובלי" : "מסעדה"}</TableCell>
-                          <TableCell className="text-right truncate" title={ing.supplier || undefined}>{ing.supplier || "—"}</TableCell>
-                          <TableCell className="text-right">{ing.minStock}</TableCell>
-                          <TableCell className="text-right">{ing.stock}</TableCell>
-                          <TableCell className="text-right">{ing.waste}%</TableCell>
-                          <TableCell className="text-right">{ing.unit}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
