@@ -1937,16 +1937,16 @@ export function AdminPanel() {
                       <CardTitle>{t("pages.adminPanel.globalSuppliers")}</CardTitle>
                       <p className="text-sm text-muted-foreground">{t("pages.adminPanel.globalSuppliersDesc")}</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
                       <Button variant="outline" size="sm" onClick={() => loadSystemOwnerData()} disabled={loadingSystemOwner}>
                         <RefreshCw className={`w-4 h-4 ml-1 ${loadingSystemOwner ? "animate-spin" : ""}`} />
                         {t("pages.adminPanel.refresh")}
                       </Button>
-                      <Button variant="outline" onClick={() => { adminInvoiceFileRef.current?.click() }}>
+                      <Button variant="default" onClick={() => { adminInvoiceFileRef.current?.click() }}>
                         <UploadIcon className="w-4 h-4 ml-1" />
                         העלאת חשבונית
                       </Button>
-                      <Button onClick={() => setAddSupplierOpen(true)}>
+                      <Button variant="outline" onClick={() => setAddSupplierOpen(true)}>
                         <Plus className="w-4 h-4 ml-1" />
                         {t("pages.adminPanel.addSupplier")}
                       </Button>

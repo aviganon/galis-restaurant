@@ -625,7 +625,11 @@ export function Suppliers() {
           <h1 className="text-2xl md:text-3xl font-bold mb-1">{t("nav.suppliers")}</h1>
           <p className="text-muted-foreground">{t("pages.suppliers.subtitle")}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+            <UploadIcon className="w-4 h-4 ml-1" />
+            העלאת חשבונית
+          </Button>
           <Button onClick={() => setAddSupplierOpen(true)}>
             <Plus className="w-4 h-4 ml-1" />
             ספק חדש
