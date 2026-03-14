@@ -51,6 +51,7 @@ export function FilePreviewModal({
   const [detectedSupplier, setDetectedSupplier] = useState<string | null>(null)
   const [saveToGlobal, setSaveToGlobal] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isDeliveryNote, setIsDeliveryNote] = useState(false)
   const [webPriceByName, setWebPriceByName] = useState<Record<string, { price: number; store: string; unit: string }>>({})
   const [webPriceLoading, setWebPriceLoading] = useState(false)
 
@@ -65,6 +66,7 @@ export function FilePreviewModal({
     setInvoiceDate(null)
     setDetectedSupplier(null)
     setSaveToGlobal(forceSaveToGlobal)
+    setIsDeliveryNote(false)
     setWebPriceByName({})
     const ext = (file.name.split(".").pop()?.toLowerCase() ?? "").trim()
     const isPdf = ext === "pdf"
@@ -81,12 +83,17 @@ export function FilePreviewModal({
     setLoading(true)
     extractWithAI(file, type, initialSupplier || undefined)
       .then((res) => {
-        if (res.no_prices) {
-          setItems([])
-          setError("תעודת משלוח — אין מחירים")
+        const hasItems = (res.items || []).length > 0
+        if (res.no_prices && hasItems) {
+          setIsDeliveryNote(true)
+          setItems(res.items)
+        } else if (res.no_prices) {
+          setIsDeliveryNote(true)
+          setError("תעודת משלוח — לא זוהו פריטים")
           return
+        } else {
+          setItems(res.items || [])
         }
-        setItems(res.items || [])
         if (res.supplier_name && !initialSupplier) {
           setSupplierName(res.supplier_name)
           setDetectedSupplier(res.supplier_name)
@@ -200,6 +207,12 @@ export function FilePreviewModal({
           {error && !loading && (
             <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200">
               {error}
+            </div>
+          )}
+          {isDeliveryNote && !loading && items.length > 0 && (
+            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-800 dark:text-blue-200 text-sm flex items-center gap-2">
+              <span>📦</span>
+              <span>תעודת משלוח — ללא מחירים. ניתן לאשר עדכון מלאי בלבד.</span>
             </div>
           )}
           {!loading && !error && items.length > 0 && (
