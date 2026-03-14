@@ -250,8 +250,17 @@ export async function extractWithAI(
       messages: [{ role: "user", content: [{ type: "text", text: `טקסט מהמסמך:\n\n${text}\n\n${userContent}` }] }],
     })
     const out = data.content?.map((b) => b.text ?? "").join("") ?? ""
-    const clean = out.replace(/```json|```/g, "").trim()
-    return JSON.parse(clean) as ExtractResult
+    let clean = out.replace(/```json|```/g, "").trim()
+    clean = clean.replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')
+    try {
+      return JSON.parse(clean) as ExtractResult
+    } catch {
+      const jsonMatch = clean.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        try { return JSON.parse(jsonMatch[0]) as ExtractResult } catch {}
+      }
+      throw new Error(`שגיאה בפענוח תשובת AI — נסה שוב או השתמש בקובץ Excel`)
+    }
   }
 
   if (isImage || isPdf) {
@@ -265,7 +274,7 @@ export async function extractWithAI(
           : SALES_SYSTEM
     const userContent =
       type === "p"
-        ? "נתח את החשבונית: חלץ שם ספק (מראש המסמך), תאריך, ולכל פריט — שם, מק\"ט, מחיר ליחידה, יחידה, כמות (qty). JSON בלבד."
+        ? "נתח את החשבונית: חלץ שם ספק, תאריך, ולכל פריט — שם, מק\"ט, מחיר נטו ליחידה, יחידה, וכמות (qty) מעמודת 'כמות'. חשוב: qty חייב להיות מספר גדול מ-0 (אם כמות=1 החזר qty:1). JSON בלבד."
         : type === "d"
           ? "חלץ מנות ומחירים מהתפריט. לכל מנה ישייך רכיבים לפי הבנתך (בשר, ירקות, קמח וכו') — גם אם לא מופיעים בתפריט. JSON בלבד."
           : "חלץ מנות, כמויות ומחירים. JSON בלבד."
@@ -280,9 +289,20 @@ export async function extractWithAI(
       messages: [{ role: "user", content: [mediaBlock, { type: "text" as const, text: userContent }] }],
     })
     const text = data.content?.map((b) => b.text ?? "").join("") ?? ""
-    const clean = text.replace(/```json|```/g, "").trim()
-    const parsed = JSON.parse(clean) as ExtractResult
-    return parsed
+    let clean = text.replace(/```json|```/g, "").trim()
+    // תיקון: הסר תווים בעייתיים שגורמים לשגיאות JSON
+    clean = clean.replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')
+    try {
+      const parsed = JSON.parse(clean) as ExtractResult
+      return parsed
+    } catch (e) {
+      // נסיון שני — חלץ JSON מהתוכן
+      const jsonMatch = clean.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        try { return JSON.parse(jsonMatch[0]) as ExtractResult } catch {}
+      }
+      throw new Error(`שגיאה בפענוח תשובת AI — נסה שוב או השתמש בקובץ Excel`)
+    }
   }
 
   if (isSheet) {
