@@ -228,17 +228,18 @@ export default function Suppliers() {
       const batch = writeBatch(db)
       let count = 0
       items.forEach((item) => {
-        if (!item.name?.trim() || item.price <= 0) return
+        if (!item.name?.trim()) return
+        // תעודת משלוח: price=0 מותר אם יש qty
+        const isDeliveryNoteItem = item.price === 0 && typeof item.qty === "number" && item.qty > 0
+        if (item.price <= 0 && !isDeliveryNoteItem) return
         const qty = typeof item.qty === "number" && item.qty > 0 ? item.qty : 0
         const payload: Record<string, unknown> = {
-          price: item.price,
+          ...(item.price > 0 ? { price: item.price } : {}),  // לא דורסים מחיר קיים בתעודת משלוח
           unit: item.unit || "קג",
           supplier: supName,
           lastUpdated: now,
           createdBy: toGlobal ? "global" : "restaurant",
-          waste: 0,
-          minStock: 0,
-          sku: item.sku ?? "",
+          ...(!isDeliveryNoteItem ? { waste: 0, minStock: 0, sku: item.sku ?? "" } : {}),
         }
         if (!toGlobal) {
           payload.stock = qty > 0 ? (currentStocks[item.name.trim()] ?? 0) + qty : (currentStocks[item.name.trim()] ?? 0)
@@ -285,7 +286,7 @@ export default function Suppliers() {
         loadSuppliers()
         refreshIngredients?.()
       } else {
-        toast.warning("אין רכיבים תקינים לשמירה (שם ריק או מחיר 0)")
+        toast.warning("אין רכיבים תקינים לשמירה (שם ריק, מחיר 0 וגם כמות 0)")
       }
     },
     [currentRestaurantId, isOwner, loadSuppliers, refreshIngredients]
