@@ -117,7 +117,7 @@ export async function detectDocumentType(file: File): Promise<DetectedDocType> {
     const text = await rtfToPlainText(file)
     const preview = text.slice(0, 2000)
     const data = await callClaude({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 100,
       system: DETECT_SYSTEM,
       messages: [{ role: "user", content: [{ type: "text", text: `טקסט מהמסמך:\n${preview}\n\nמה סוג המסמך? החזר JSON בלבד.` }] }],
@@ -140,7 +140,7 @@ export async function detectDocumentType(file: File): Promise<DetectedDocType> {
         ? { type: "document" as const, source: { type: "base64" as const, media_type: "application/pdf" as const, data: base64 } }
         : { type: "image" as const, source: { type: "base64" as const, media_type: mediaType as "image/jpeg" | "image/png" | "image/webp" | "image/gif", data: base64 } }
     const data = await callClaude({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 100,
       system: DETECT_SYSTEM,
       messages: [{ role: "user", content: [mediaBlock, { type: "text" as const, text: "מה סוג המסמך? החזר JSON בלבד." }] }],
@@ -159,7 +159,7 @@ export async function detectDocumentType(file: File): Promise<DetectedDocType> {
     const rows = await parseSpreadsheet(file, ext)
     const preview = JSON.stringify(rows.slice(0, 15))
     const data = await callClaude({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 100,
       system: DETECT_SYSTEM,
       messages: [{ role: "user", content: [{ type: "text", text: `הנתונים:\n${preview}\n\nמה סוג המסמך? החזר JSON בלבד.` }] }],
@@ -242,7 +242,7 @@ export async function extractWithAI(
           ? "חלץ מנות ומחירים מהתפריט. לכל מנה ישייך רכיבים לפי הבנתך (בשר, ירקות, קמח וכו') — גם אם לא מופיעים בתפריט. JSON בלבד."
           : "חלץ מנות, כמויות ומחירים. JSON בלבד."
     const data = await callClaude({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 8000,
       system,
       messages: [{ role: "user", content: [{ type: "text", text: `טקסט מהמסמך:\n\n${text}\n\n${userContent}` }] }],
@@ -272,7 +272,7 @@ export async function extractWithAI(
         ? { type: "document" as const, source: { type: "base64" as const, media_type: "application/pdf" as const, data: base64 } }
         : { type: "image" as const, source: { type: "base64" as const, media_type: mediaType as "image/jpeg" | "image/png" | "image/webp" | "image/gif", data: base64 } }
     const data = await callClaude({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 8000,
       system,
       messages: [{ role: "user", content: [mediaBlock, { type: "text" as const, text: userContent }] }],
@@ -299,7 +299,7 @@ export async function extractWithAI(
           ? `הנתונים:\n${preview}\n\nחלץ רכיבים (שם), מחיר, יחידה, כמות (qty). JSON בלבד.`
           : `הנתונים:\n${preview}\n\nחלץ ל-JSON.`
     const data = await callClaude({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 2000,
       system,
       messages: [{ role: "user", content: [{ type: "text", text: sheetUserText }] }],
@@ -338,7 +338,7 @@ export async function suggestDishFromIngredients(
     .map((i) => `${i.name} — ${i.price} ש"ח/${i.unit}${i.stock != null ? ` (מלאי: ${i.stock})` : ""}`)
     .join("\n")
   const data = await callClaude({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-haiku-4-5-20251001",
     max_tokens: 1500,
     system: SUGGEST_DISH_SYSTEM,
     messages: [{ role: "user", content: [{ type: "text", text: `רשימת הרכיבים במסעדה:\n${list}\n\nהצע מנה אחת עם מתכון מלא. JSON בלבד.` }] }],
@@ -375,7 +375,7 @@ const WEB_PRICE_SYSTEM = `אתה מומחה למחירי מוצרי מזון ב�
 
 export async function fetchWebPriceForIngredient(ingredientName: string): Promise<WebPriceResult | null> {
   const data = await callClaude({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-haiku-4-5-20251001",
     max_tokens: 500,
     system: WEB_PRICE_SYSTEM,
     messages: [{ role: "user", content: [{ type: "text", text: `מה המחיר הטיפוסי ל-${ingredientName} בסופרמרקטים בישראל? איפה הכי זול? החזר JSON בלבד: {"price":0,"store":"שם","unit":"יחידה"}` }] }],
