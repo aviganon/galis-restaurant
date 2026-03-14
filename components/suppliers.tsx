@@ -124,6 +124,68 @@ export default function Suppliers() {
     }
   }, [showInvoiceUploadArea, InvoiceUploadComponent])
 
+  const loadSuppliers = useCallback(async () => {
+    if (!currentRestaurantId) {
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    try {
+      const [restSnap, asDoc, globalSnap] = await Promise.all([
+        getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients")),
+        getDoc(doc(db, "restaurants", currentRestaurantId, "appState", "assignedSuppliers")),
+        getDocs(collection(db, "ingredients")),
+      ])
+      const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
+      const bySupplier = new Map<string, { products: number; totalValue: number; source: "assigned" | "restaurant" }>()
+      const seenIds = new Set<string>()
+      restSnap.forEach((d) => {
+        seenIds.add(d.id)
+        const data = d.data()
+        const sup = (data.supplier as string) || "ללא ספק"
+        const price = typeof data.price === "number" ? data.price : 0
+        const stock = typeof data.stock === "number" ? data.stock : 0
+        const existing = bySupplier.get(sup) || { products: 0, totalValue: 0, source: "restaurant" as const }
+        const src: "assigned" | "restaurant" = assignedList.includes(sup) ? "assigned" : "restaurant"
+        bySupplier.set(sup, {
+          products: existing.products + 1,
+          totalValue: existing.totalValue + price * stock,
+          source: existing.source === "assigned" ? "assigned" : src,
+        })
+      })
+      globalSnap.forEach((d) => {
+        if (seenIds.has(d.id)) return
+        // מכבדים assignedSuppliers — מסעדה חדשה בלי שיוך רואה רק רכיבים שלה
+        if (assignedList.length === 0) return
+        const data = d.data()
+        const sup = (data.supplier as string) || ""
+        if (!sup) return // רכיבים גלובליים ללא ספק — לא מוצגים (רק רכיבי מסעדה עם supplier ריק)
+        if (!assignedList.includes(sup)) return
+        const supKey = sup
+        const price = typeof data.price === "number" ? data.price : 0
+        const stock = typeof data.stock === "number" ? data.stock : 0
+        const existing = bySupplier.get(supKey) || { products: 0, totalValue: 0, source: "assigned" as const }
+        bySupplier.set(supKey, {
+          products: existing.products + 1,
+          totalValue: existing.totalValue + price * stock,
+          source: assignedList.includes(sup) ? "assigned" : existing.source,
+        })
+      })
+      setSuppliers(
+        Array.from(bySupplier.entries()).map(([name, v]) => ({
+          name,
+          products: v.products,
+          totalValue: v.totalValue,
+          source: v.source,
+        }))
+      )
+    } catch (e) {
+      console.error("load suppliers:", e)
+    } finally {
+      setLoading(false)
+    }
+  }, [currentRestaurantId, isOwner])
+
   const handleConfirmSupplier = useCallback(
     async (items: InvoiceItem[], supName: string, saveToGlobal?: boolean) => {
       const toGlobal = !!saveToGlobal && isOwner
@@ -348,67 +410,7 @@ export default function Suppliers() {
     }
   }
 
-  const loadSuppliers = useCallback(async () => {
-    if (!currentRestaurantId) {
-      setLoading(false)
-      return
-    }
-    setLoading(true)
-    try {
-      const [restSnap, asDoc, globalSnap] = await Promise.all([
-        getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients")),
-        getDoc(doc(db, "restaurants", currentRestaurantId, "appState", "assignedSuppliers")),
-        getDocs(collection(db, "ingredients")),
-      ])
-      const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
-      const bySupplier = new Map<string, { products: number; totalValue: number; source: "assigned" | "restaurant" }>()
-      const seenIds = new Set<string>()
-      restSnap.forEach((d) => {
-        seenIds.add(d.id)
-        const data = d.data()
-        const sup = (data.supplier as string) || "ללא ספק"
-        const price = typeof data.price === "number" ? data.price : 0
-        const stock = typeof data.stock === "number" ? data.stock : 0
-        const existing = bySupplier.get(sup) || { products: 0, totalValue: 0, source: "restaurant" as const }
-        const src: "assigned" | "restaurant" = assignedList.includes(sup) ? "assigned" : "restaurant"
-        bySupplier.set(sup, {
-          products: existing.products + 1,
-          totalValue: existing.totalValue + price * stock,
-          source: existing.source === "assigned" ? "assigned" : src,
-        })
-      })
-      globalSnap.forEach((d) => {
-        if (seenIds.has(d.id)) return
-        // מכבדים assignedSuppliers — מסעדה חדשה בלי שיוך רואה רק רכיבים שלה
-        if (assignedList.length === 0) return
-        const data = d.data()
-        const sup = (data.supplier as string) || ""
-        if (!sup) return // רכיבים גלובליים ללא ספק — לא מוצגים (רק רכיבי מסעדה עם supplier ריק)
-        if (!assignedList.includes(sup)) return
-        const supKey = sup
-        const price = typeof data.price === "number" ? data.price : 0
-        const stock = typeof data.stock === "number" ? data.stock : 0
-        const existing = bySupplier.get(supKey) || { products: 0, totalValue: 0, source: "assigned" as const }
-        bySupplier.set(supKey, {
-          products: existing.products + 1,
-          totalValue: existing.totalValue + price * stock,
-          source: assignedList.includes(sup) ? "assigned" : existing.source,
-        })
-      })
-      setSuppliers(
-        Array.from(bySupplier.entries()).map(([name, v]) => ({
-          name,
-          products: v.products,
-          totalValue: v.totalValue,
-          source: v.source,
-        }))
-      )
-    } catch (e) {
-      console.error("load suppliers:", e)
-    } finally {
-      setLoading(false)
-    }
-  }, [currentRestaurantId, isOwner])
+
 
   useEffect(() => {
     loadSuppliers()
