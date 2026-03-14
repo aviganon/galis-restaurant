@@ -102,7 +102,7 @@ export function SuppliersInvoiceUpload({ restaurantName, onConfirm, onClose, onS
               </div>
               <div className="text-right">
                 <h3 className="font-semibold">חשבוניות ספקים</h3>
-                <p className="text-sm text-muted-foreground">גרור PDF/Excel/תמונה — AI יחלץ רכיבים ומחירים</p>
+                <p className="text-sm text-muted-foreground">גרור PDF/Excel/תמונה — AI יחלץ רכיבים ומחירים (PDF עד 8MB)</p>
               </div>
             </div>
             <div className="flex flex-wrap justify-center gap-2 text-xs text-muted-foreground mb-3">

@@ -54,6 +54,9 @@ export function FilePreviewModal({
   const [webPriceByName, setWebPriceByName] = useState<Record<string, { price: number; store: string; unit: string }>>({})
   const [webPriceLoading, setWebPriceLoading] = useState(false)
 
+  const MAX_PDF_MB = 8
+  const MAX_IMAGE_MB = 5
+
   useEffect(() => {
     if (!open || !file) return
     setItems([])
@@ -63,6 +66,18 @@ export function FilePreviewModal({
     setDetectedSupplier(null)
     setSaveToGlobal(forceSaveToGlobal)
     setWebPriceByName({})
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? ""
+    const isPdf = ext === "pdf"
+    const isImage = ["png", "jpg", "jpeg", "gif", "webp"].includes(ext)
+    const maxBytes = isPdf ? MAX_PDF_MB * 1024 * 1024 : isImage ? MAX_IMAGE_MB * 1024 * 1024 : 15 * 1024 * 1024
+    if (file.size > maxBytes) {
+      const maxMb = Math.round(maxBytes / 1024 / 1024)
+      const msg = `הקובץ גדול מדי (${(file.size / 1024 / 1024).toFixed(1)}MB). מקסימום: ${maxMb}MB. נסה קובץ קטן יותר או המר ל-Excel.`
+      setError(msg)
+      setLoading(false)
+      toast.error(msg)
+      return
+    }
     setLoading(true)
     extractWithAI(file, type, initialSupplier || undefined)
       .then((res) => {
@@ -177,7 +192,8 @@ export function FilePreviewModal({
           {loading && (
             <div className="flex flex-col items-center gap-4 py-12">
               <Loader2 className="w-10 h-10 animate-spin text-primary" />
-              <p className="text-muted-foreground">Claude מנתח את הקובץ...</p>
+              <p className="text-muted-foreground text-center">Claude מנתח את הקובץ...</p>
+              <p className="text-xs text-muted-foreground text-center max-w-xs">חשבוניות עם הרבה פריטים עשויות לקחת דקה וחצי — אל תסגור את החלון</p>
               <Progress value={66} className="w-48" />
             </div>
           )}

@@ -1,0 +1,20 @@
+---
+description: הגבלות קריטיות — אל תשנה (תיקונים 14.3.2026)
+alwaysApply: true
+---
+
+# הגבלות קריטיות — אל תשנה
+
+## 1. `.github/workflows/deploy.yml`
+- **אל תשנה** את ערכי משתני הסביבה — הם מגיעים מ-GitHub Secrets בלבד
+- הפורמט: `${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}` וכו'
+- שינוי ל-`undefined` או ערך ישיר שובר את ההתחברות
+
+## 2. `components/suppliers.tsx`
+- **`loadSuppliers`** חייבת להיות **לפני** `handleConfirmSupplier` בקוד
+- הסדר הנכון: `loadSuppliers` → `handleConfirmSupplier`
+- שינוי בסדר גורם ל-`Cannot access before initialization` — crash בהתחזה
+
+## 3. `lib/firebase.ts`
+- placeholder מכוון — מאפשר build בלי env vars
+- אל תסיר את ה-placeholder
