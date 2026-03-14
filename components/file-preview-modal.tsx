@@ -66,7 +66,7 @@ export function FilePreviewModal({
     setDetectedSupplier(null)
     setSaveToGlobal(forceSaveToGlobal)
     setWebPriceByName({})
-    const ext = file.name.split(".").pop()?.toLowerCase() ?? ""
+    const ext = (file.name.split(".").pop()?.toLowerCase() ?? "").trim()
     const isPdf = ext === "pdf"
     const isImage = ["png", "jpg", "jpeg", "gif", "webp"].includes(ext)
     const maxBytes = isPdf ? MAX_PDF_MB * 1024 * 1024 : isImage ? MAX_IMAGE_MB * 1024 * 1024 : 15 * 1024 * 1024

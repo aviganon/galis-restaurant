@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Upload as UploadIcon, FileText, X } from "lucide-react"
 import { FilePreviewModal } from "@/components/file-preview-modal"
+import { isSupportedFormat } from "@/lib/ai-extract"
 import type { ExtractedSupplierItem } from "@/lib/ai-extract"
+import { toast } from "sonner"
 
 const INVOICE_ACCEPT = ".xlsx,.xls,.csv,.pdf,.rtf,image/*"
 
@@ -49,7 +51,12 @@ export function SuppliersInvoiceUpload({ restaurantName, onConfirm, onClose, onS
     setIsInvoiceDragging(false)
     const files = e.dataTransfer?.files ? Array.from(e.dataTransfer.files) : []
     if (files.length > 0) {
-      setFpmFile(files[0])
+      const f = files[0]
+      if (!isSupportedFormat(f)) {
+        toast.error("פורמט לא נתמך. השתמש ב-PDF, Excel, CSV, RTF או תמונה.")
+        return
+      }
+      setFpmFile(f)
       setFpmOpen(true)
     }
   }, [])
@@ -57,7 +64,13 @@ export function SuppliersInvoiceUpload({ restaurantName, onConfirm, onClose, onS
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (files?.length) {
-      setFpmFile(files[0])
+      const f = files[0]
+      if (!isSupportedFormat(f)) {
+        toast.error("פורמט לא נתמך. השתמש ב-PDF, Excel, CSV, RTF או תמונה.")
+        e.target.value = ""
+        return
+      }
+      setFpmFile(f)
       setFpmOpen(true)
     }
     e.target.value = ""

@@ -48,11 +48,15 @@ export interface ExtractResult {
 }
 
 const SUPPLIER_KNOWLEDGE = `
-מבנה חשבונית: שם פריט (תיאור בלבד), מק"ט (קוד נפרד), כמות שהתקבלה (qty), יחידה, מחיר ליחידה, סה"כ. חלץ מחיר נטו ליחידה וכמות (qty) — הכמות מעדכנת מלאי.
-מחירים: זהה ₪ ש״ח שקלים NIS — המר למספר. דלג: מע"מ, סיכומים, פקדונות, הובלה, מחיר=0.
-יחידות נפוצות: קג/ק"ג (משקל), גרם (משקל קטן), ליטר/מ"ל (נוזלים), יחידה (פריט בודד), חבילה, קרטון, קופסה, שקית. נרמל: קג→קג, ג→גרם, ליטר→ליטר.
-רכיבים נפוצים במחירוני ספקים: בשר (חזה עוף, שוק, אונטריב, אנטרקוט, כבש), ירקות (עגבניות, מלפפון, חסה, בצל, גזר, פלפל, חציל, ברוקולי), קמחים (קמח חיטה, קמח מלא, סולת), מוצרי חלב (גבינה, שמנת, יוגורט, חלב), דגים (סלמון, דניס, מוסר, טונה), תבלינים (מלח, פלפל, פפריקה, כורכום), שמנים (שמן קנולה, שמן זית), גרגרים (אורז, גרגרי חומוס, עדשים), מוצרים יבשים (פסטה, אטריות, קוסקוס).
+מבנה חשבונית/אישור הזמנה: שם פריט (תיאור בלבד), מק"ט (קוד נפרד), כמות שהתקבלה (qty), יחידה, מחיר ליחידה, הנחה, סה"כ. חלץ מחיר נטו ליחידה (אחרי הנחה) וכמות (qty) — הכמות מעדכנת מלאי.
+אישור הזמנה = כמו חשבונית — חלץ אותו המבנה (פריטים, מחירים, מק"ט, כמות).
+מחירים: זהה ₪ ש״ח שקלים NIS — המר למספר. דלג: מע"מ, סיכומים, פקדונות, הובלה, מחיר=0. אם יש עמודת הנחה — המחיר ליחידה הוא המחיר הסופי אחרי הנחה.
+יחידות נפוצות: קג/ק"ג (משקל), גרם (משקל קטן), ליטר/מ"ל (נוזלים), יחידה (פריט בודד), חבילה, קרטון, קופסה, שקית, בקבוק. נרמל: קג→קג, ג→גרם, ליטר→ליטר.
+רכיבים נפוצים: בשר (חזה עוף, שוק, אונטריב, אנטרקוט, כבש), ירקות (עגבניות, מלפפון, חסה, בצל, גזר, פלפל, חציל, ברוקולי), קמחים (קמח חיטה, קמח מלא, סולת), מוצרי חלב (גבינה, שמנת, יוגורט, חלב), דגים (סלמון, דניס, מוסר, טונה), תבלינים (מלח, פלפל, פפריקה, כורכום), שמנים (שמן קנולה, שמן זית), גרגרים (אורז, גרגרי חומוס, עדשים), מוצרים יבשים (פסטה, אטריות, קוסקוס).
+משקאות: משקאות חריפים (ג'ין, וודקה, ויסקי, בורבון, רום, טקילה, ברנדי), יין, בירה, קולה, מים, מיצים, משקאות קלים. יחידות: בקבוק, ליטר, מ"ל.
+קפה: פולי קפה, קפה טחון, קפה מסונן, קפה נמס, וסקובי, פולי קפה וסקובי.
 שמות חלופיים: חזה עוף=חזה תרנגולת, אונטריב=בשר טחון שמן, אנטרקוט=צלע, טחינה=טחינה גולמית, גרגרי חומוס=חומוס יבש.
+טבלאות: עמודות נפוצות — שורה, מק"ט, תיאור מוצר, כמות, תאריך אספקה, מחיר ליחידה, הנחה, סה"כ מחיר.
 `
 
 const SUPPLIER_SYSTEM = `אתה מומחה לניתוח חשבוניות ומחירוני ספקי מזון ומשקאות בישראל.
@@ -76,6 +80,17 @@ ${MENU_KNOWLEDGE}
 const SALES_SYSTEM = `אתה מנתח דוחות מכירות. חלץ: name, qty, price.
 דלג: כותרות, מע"מ, הנחות. החזר JSON: {"items":[{"name":"...","qty":0,"price":0.00}]}`
 
+/** פורמטים נתמכים — PDF, Excel, CSV, RTF, תמונות */
+export const SUPPORTED_EXTENSIONS = ["pdf", "xlsx", "xls", "csv", "rtf", "png", "jpg", "jpeg", "gif", "webp"] as const
+
+export function getFileExtension(file: File): string {
+  return (file.name.split(".").pop()?.toLowerCase() ?? "").trim()
+}
+
+export function isSupportedFormat(file: File): boolean {
+  return SUPPORTED_EXTENSIONS.includes(getFileExtension(file) as (typeof SUPPORTED_EXTENSIONS)[number])
+}
+
 async function rtfToPlainText(file: File): Promise<string> {
   const raw = await file.text()
   let out = raw
@@ -90,7 +105,7 @@ async function rtfToPlainText(file: File): Promise<string> {
 }
 
 export async function detectDocumentType(file: File): Promise<DetectedDocType> {
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? ""
+  const ext = getFileExtension(file)
   const isImage = ["png", "jpg", "jpeg", "gif", "webp"].includes(ext)
   const isPdf = ext === "pdf"
   const isSheet = ["xlsx", "xls", "csv"].includes(ext)
@@ -199,7 +214,12 @@ export async function extractWithAI(
   type: ExtractType,
   supplierName?: string
 ): Promise<ExtractResult> {
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? ""
+  const ext = getFileExtension(file)
+  if (!ext || !SUPPORTED_EXTENSIONS.includes(ext as (typeof SUPPORTED_EXTENSIONS)[number])) {
+    throw new Error(
+      `פורמט לא נתמך (${ext || "ללא סיומת"}). השתמש ב-PDF, Excel (.xlsx/.xls), CSV, RTF או תמונה (PNG/JPG).`
+    )
+  }
   const isImage = ["png", "jpg", "jpeg", "gif", "webp"].includes(ext)
   const isPdf = ext === "pdf"
   const isSheet = ["xlsx", "xls", "csv"].includes(ext)
@@ -288,7 +308,7 @@ export async function extractWithAI(
     return parsed
   }
 
-  return { items: [] }
+  throw new Error(`פורמט לא נתמך (${ext}). השתמש ב-PDF, Excel, CSV, RTF או תמונה.`)
 }
 
 export interface IngredientForSuggestion {
