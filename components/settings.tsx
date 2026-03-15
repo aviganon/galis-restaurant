@@ -51,6 +51,10 @@ export function Settings() {
   const [profileAddress, setProfileAddress] = useState("")
   const [savingProfile, setSavingProfile] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [editingUser, setEditingUser] = useState<{uid:string;email:string;role:string;restaurantId:string|null}|null>(null)
+  const [editUserRole, setEditUserRole] = useState<"manager"|"user">("user")
+  const [editUserRestId, setEditUserRestId] = useState("")
+  const [savingEditUser, setSavingEditUser] = useState(false)
   const [apiKeyInput, setApiKeyInput] = useState("")
   const [savingApiKey, setSavingApiKey] = useState(false)
   const [apiKeySaved, setApiKeySaved] = useState(false)
@@ -279,6 +283,15 @@ export function Settings() {
     } finally {
       setDeleting(false)
     }
+  }
+
+  const openEditUser = (u:{uid:string;email:string;role:string;restaurantId:string|null}) => {
+    setEditingUser(u); setEditUserRole(u.role as "manager"|"user"); setEditUserRestId(u.restaurantId||"")
+  }
+  const saveEditUser = async () => {
+    if (!editingUser) return; setSavingEditUser(true)
+    try { await setDoc(doc(db,"users",editingUser.uid),{role:editUserRole,restaurantId:editUserRestId||null},{merge:true}); setUsersData(p=>p.map(u=>u.uid===editingUser.uid?{...u,role:editUserRole,restaurantId:editUserRestId||null,restaurantName:(restaurants||[]).find(r=>r.id===editUserRestId)?.name}:u)); toast.success("משתמש עודכן"); setEditingUser(null) }
+    catch { toast.error("שגיאה") } finally { setSavingEditUser(false) }
   }
 
   const saveApiKey = async () => {
@@ -622,10 +635,23 @@ export function Settings() {
                   <td className="p-2"><div className="text-xs font-medium" dir="ltr">{u.email}</div></td>
                   <td className="p-2 text-center"><select className="text-xs rounded border px-1.5 py-0.5 bg-background" value={u.role} onChange={async e=>{const nr=e.target.value;try{await setDoc(doc(db,"users",u.uid),{role:nr},{merge:true});setUsersData(p=>p.map(x=>x.uid===u.uid?{...x,role:nr}:x));toast.success("עודכן")}catch{toast.error("שגיאה")}}}><option value="manager">מנהל</option><option value="user">משתמש</option></select></td>
                   <td className="p-2 text-xs text-muted-foreground">{u.restaurantName||(u.restaurantId?"—":"ללא")}</td>
-                  <td className="p-2"><div className="flex gap-1"><button className="text-xs px-2 py-1 rounded border hover:bg-muted" onClick={()=>{setAssignTgt({uid:u.uid,email:u.email});setAssignTgtRestId(u.restaurantId||"")}}>שייך</button><button className="text-xs px-2 py-1 rounded border border-blue-200 text-blue-600 hover:bg-blue-50" onClick={async()=>{if(!u.email)return;try{await fetch("/api/invite",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:u.email,role:u.role})});toast.success("קוד נשלח")}catch{toast.error("שגיאה")}}}>שלח קוד</button></div></td>
+                  <td className="p-2"><div className="flex gap-1 flex-wrap">
+                    <button className="text-xs px-2 py-1 rounded border border-violet-200 text-violet-700 hover:bg-violet-50" onClick={()=>openEditUser(u)}>ערוך</button>
+                    <button className="text-xs px-2 py-1 rounded border hover:bg-muted" onClick={()=>{setAssignTgt({uid:u.uid,email:u.email});setAssignTgtRestId(u.restaurantId||"")}}>שייך</button><button className="text-xs px-2 py-1 rounded border border-blue-200 text-blue-600 hover:bg-blue-50" onClick={async()=>{if(!u.email)return;try{await fetch("/api/invite",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:u.email,role:u.role})});toast.success("קוד נשלח")}catch{toast.error("שגיאה")}}}>שלח קוד</button></div></td>
                 </tr>
               )})}</tbody></table></div>
             )}
+            {editingUser&&(<div className="m-4 p-4 rounded-lg border border-violet-200 bg-violet-50/50 dark:bg-violet-950/20 space-y-3">
+              <div className="flex items-center justify-between"><p className="text-sm font-medium">עריכת: <span dir="ltr" className="font-normal text-muted-foreground">{editingUser.email}</span></p><button onClick={()=>setEditingUser(null)}>✕</button></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-xs text-muted-foreground block mb-1">תפקיד</label><select className="w-full h-9 rounded-md border px-3 text-sm bg-background" value={editUserRole} onChange={e=>setEditUserRole(e.target.value as "manager"|"user")}><option value="manager">מנהל</option><option value="user">משתמש</option></select></div>
+                <div><label className="text-xs text-muted-foreground block mb-1">מסעדה</label><select className="w-full h-9 rounded-md border px-3 text-sm bg-background" value={editUserRestId} onChange={e=>setEditUserRestId(e.target.value)}><option value="">— ללא —</option>{(restaurants||[]).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={saveEditUser} disabled={savingEditUser} className="text-xs px-3 py-1.5 rounded-md bg-primary text-primary-foreground flex items-center gap-1">{savingEditUser?<Loader2 className="w-3 h-3 animate-spin"/>:<Save className="w-3 h-3"/>}שמור</button>
+                <button onClick={()=>setEditingUser(null)} className="text-xs px-3 py-1.5 rounded-md border hover:bg-muted">ביטול</button>
+              </div>
+            </div>)}
             {assignTgt&&(<div className="m-4 p-3 rounded-lg border border-primary/30 bg-primary/5 space-y-2"><p className="text-sm font-medium">שיוך: <span dir="ltr" className="font-normal text-muted-foreground">{assignTgt.email}</span></p><div className="flex gap-2"><select className="flex-1 h-9 rounded-md border px-3 text-sm bg-background" value={assignTgtRestId} onChange={e=>setAssignTgtRestId(e.target.value)}><option value="">— ללא —</option>{(restaurants||[]).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select><button onClick={doAssign} disabled={savingAssign2} className="px-3 py-1.5 text-xs rounded-md bg-primary text-primary-foreground">{savingAssign2?<Loader2 className="w-3 h-3 animate-spin"/>:"שמור"}</button><button onClick={()=>setAssignTgt(null)} className="px-3 py-1.5 text-xs rounded-md border hover:bg-muted">ביטול</button></div></div>)}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
