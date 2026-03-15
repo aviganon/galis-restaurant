@@ -276,6 +276,12 @@ export function AdminPanel() {
   const [assignManagerEmail, setAssignManagerEmail] = useState("")
   const [assigningManager, setAssigningManager] = useState(false)
   const [assignManagerResult, setAssignManagerResult] = useState(null)
+  const [allSystemUsers, setAllSystemUsers] = useState([])
+  const [loadingAllUsers, setLoadingAllUsers] = useState(false)
+  const [allUsersLoaded, setAllUsersLoaded] = useState(false)
+  const [assignTarget, setAssignTarget] = useState(null)
+  const [assignTargetRestId, setAssignTargetRestId] = useState("")
+  const [savingAssign, setSavingAssign] = useState(false)
   const [restaurantUsers, setRestaurantUsers] = useState<{ uid: string; email?: string; role: string; permissions?: UserPermissions }[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [editingPermissions, setEditingPermissions] = useState<string | null>(null)
@@ -1622,6 +1628,41 @@ export function AdminPanel() {
     } finally {
       setGeneratingCode(false)
     }
+  }
+
+  const loadAllSystemUsers = async () => {
+    setLoadingAllUsers(true)
+    setAllUsersLoaded(false)
+    try {
+      const snap = await getDocs(collection(db, "users"))
+      const users = snap.docs.map(d => {
+        const data = d.data()
+        const restId = data.restaurantId || null
+        const restName = restsWithDetails.find(r => r.id === restId)?.name
+        return { uid: d.id, email: data.email || d.id, role: data.role || "user", restaurantId: restId, restaurantName: restName }
+      })
+      users.sort((a, b) => a.email.localeCompare(b.email))
+      setAllSystemUsers(users)
+      setAllUsersLoaded(true)
+    } catch(e) { toast.error("שגיאה בטעינת משתמשים") }
+    finally { setLoadingAllUsers(false) }
+  }
+
+  const handleAssignFromTable = async () => {
+    if (!assignTarget) return
+    setSavingAssign(true)
+    try {
+      const currentData = allSystemUsers.find(u => u.uid === assignTarget.uid)
+      await setDoc(doc(db, "users", assignTarget.uid), {
+        restaurantId: assignTargetRestId || null,
+        role: currentData?.role === "owner" ? "owner" : "manager",
+      }, { merge: true })
+      toast.success("✅ " + assignTarget.email + " שויך בהצלחה")
+      setAssignTarget(null)
+      setAssignTargetRestId("")
+      loadAllSystemUsers()
+    } catch(e) { toast.error(e?.message || "שגיאה בשיוך") }
+    finally { setSavingAssign(false) }
   }
 
   const handleAssignManager = async () => {
@@ -3118,36 +3159,96 @@ export function AdminPanel() {
             </Card>
           )}
 
-          {isSystemOwner && currentRestaurantId && (
+          {isSystemOwner && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <UserPlus className="w-5 h-5 text-primary" />
-                  שיוך מנהל קיים למסעדה
+                  <Users className="w-5 h-5 text-primary" />
+                  ניהול משתמשים ושיוך למסעדות
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  שייך משתמש שכבר רשום במערכת כמנהל של המסעדה הנבחרת.
-                </p>
-                <div className="flex gap-2">
-                  <Input
-                    type="email"
-                    placeholder="אימייל המנהל הקיים"
-                    value={assignManagerEmail}
-                    onChange={(e) => { setAssignManagerEmail(e.target.value); setAssignManagerResult(null) }}
-                    className="flex-1"
-                    dir="ltr"
-                  />
-                  <Button onClick={handleAssignManager} disabled={assigningManager}>
-                    {assigningManager ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <UserPlus className="w-4 h-4 ml-1" />}
-                    שייך
-                  </Button>
+              <CardContent className="space-y-4">
+                {currentRestaurantId && (
+                  <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
+                    <p className="text-sm font-medium">שיוך מהיר לפי אימייל → מסעדה נבחרת</p>
+                    <div className="flex gap-2">
+                      <Input type="email" placeholder="אימייל המנהל" value={assignManagerEmail}
+                        onChange={(e) => { setAssignManagerEmail(e.target.value); setAssignManagerResult(null) }}
+                        className="flex-1" dir="ltr" />
+                      <Button onClick={handleAssignManager} disabled={assigningManager}>
+                        {assigningManager ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <UserPlus className="w-4 h-4 ml-1" />}
+                        שייך
+                      </Button>
+                    </div>
+                    {assignManagerResult && (
+                      <p className={`text-sm ${assignManagerResult.ok ? "text-green-600" : "text-destructive"}`}>{assignManagerResult.msg}</p>
+                    )}
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">כל המשתמשים במערכת</p>
+                    <Button size="sm" variant="outline" onClick={loadAllSystemUsers} disabled={loadingAllUsers}>
+                      {loadingAllUsers ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <span className="ml-1">🔄</span>}
+                      {allUsersLoaded ? "רענן" : "טען משתמשים"}
+                    </Button>
+                  </div>
+                  {allUsersLoaded && allSystemUsers.length > 0 && (
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted sticky top-0">
+                            <tr>
+                              <th className="text-right p-2 font-semibold">אימייל</th>
+                              <th className="text-center p-2 font-semibold">תפקיד</th>
+                              <th className="text-right p-2 font-semibold">מסעדה נוכחית</th>
+                              <th className="text-center p-2 font-semibold w-20">שיוך</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {allSystemUsers.map(user => (
+                              <tr key={user.uid} className="border-t border-border hover:bg-muted/30">
+                                <td className="p-2 font-medium text-xs" dir="ltr">{user.email}</td>
+                                <td className="p-2 text-center">
+                                  <span className={`text-xs px-2 py-0.5 rounded-full ${user.role === "owner" ? "bg-purple-100 text-purple-700" : user.role === "manager" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>
+                                    {user.role === "owner" ? "בעלים" : user.role === "manager" ? "מנהל" : "משתמש"}
+                                  </span>
+                                </td>
+                                <td className="p-2 text-muted-foreground text-xs">{user.restaurantName || (user.restaurantId ? "—" : "ללא מסעדה")}</td>
+                                <td className="p-2 text-center">
+                                  {user.role !== "owner" && (
+                                    <Button size="sm" variant="outline" className="h-7 text-xs px-2"
+                                      onClick={() => { setAssignTarget({uid: user.uid, email: user.email}); setAssignTargetRestId(user.restaurantId || "") }}>
+                                      שנה
+                                    </Button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                  {allUsersLoaded && allSystemUsers.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">אין משתמשים</p>
+                  )}
                 </div>
-                {assignManagerResult && (
-                  <p className={`text-sm mt-2 ${assignManagerResult.ok ? "text-green-600" : "text-destructive"}`}>
-                    {assignManagerResult.msg}
-                  </p>
+                {assignTarget && (
+                  <div className="p-3 rounded-lg border border-primary/30 bg-primary/5 space-y-3">
+                    <p className="text-sm font-medium">שיוך: <span dir="ltr" className="font-normal">{assignTarget.email}</span></p>
+                    <div className="flex gap-2">
+                      <select className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm"
+                        value={assignTargetRestId} onChange={e => setAssignTargetRestId(e.target.value)}>
+                        <option value="">— ללא מסעדה —</option>
+                        {restsWithDetails.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                      </select>
+                      <Button size="sm" onClick={handleAssignFromTable} disabled={savingAssign}>
+                        {savingAssign ? <Loader2 className="w-4 h-4 animate-spin" /> : "שמור"}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setAssignTarget(null)}>ביטול</Button>
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
