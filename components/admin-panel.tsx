@@ -1345,11 +1345,25 @@ export function AdminPanel() {
     try {
       const coll = editingSupplierIng.source==="global" ? "ingredients" : `restaurants/${currentRestaurantId}/ingredients`
       const { doc: fd, updateDoc } = await import("firebase/firestore")
-      await updateDoc(fd(db, coll, editingSupplierIng.id), { price: parseFloat(editIngPrice)||0, unit: editIngUnit, waste: parseFloat(editIngWaste)||0, stock: parseFloat(editIngStock)||0, minStock: parseFloat(editIngMinStock)||0, sku: editIngSku, lastUpdated: new Date().toISOString() })
-      toast.success("רכיב עודכן")
+      const updatedFields = { price: parseFloat(editIngPrice)||0, unit: editIngUnit, waste: parseFloat(editIngWaste)||0, stock: parseFloat(editIngStock)||0, minStock: parseFloat(editIngMinStock)||0, sku: editIngSku, lastUpdated: new Date().toISOString() }
+      await updateDoc(fd(db, coll, editingSupplierIng.id), updatedFields)
+      if (editingSupplierIng.source === "global") {
+        const { getDocs: gd, collection: cl, writeBatch: wb } = await import("firebase/firestore")
+        const supplierRests = suppliersWithRests.find(s => s.name === editingSupplierIng!.name)?.restaurantIds || []
+        if (supplierRests.length > 0) {
+          const batch2 = wb(db)
+          for (const restId of supplierRests) {
+            const restIngsSnap = await gd(cl(db, "restaurants", restId, "ingredients"))
+            const match = restIngsSnap.docs.find(d => d.id === editingSupplierIng!.id)
+            if (match) batch2.update(match.ref, updatedFields)
+          }
+          await batch2.commit()
+        }
+      }
+      toast.success("רכיב עודכן" + (editingSupplierIng.source === "global" ? " (כולל עדכון מסעדות)" : ""))
       setSupplierToIngredients(prev => {
         const u = { ...prev }
-        for (const sup in u) u[sup] = u[sup].map(ing => ing.id === editingSupplierIng!.id ? { ...ing, price: parseFloat(editIngPrice)||0, unit: editIngUnit, waste: parseFloat(editIngWaste)||0, stock: parseFloat(editIngStock)||0, minStock: parseFloat(editIngMinStock)||0, sku: editIngSku } : ing)
+        for (const sup in u) u[sup] = u[sup].map(ing => ing.id === editingSupplierIng!.id ? { ...ing, ...updatedFields } : ing)
         return u
       })
       setEditingSupplierIng(null)
@@ -2418,10 +2432,10 @@ export function AdminPanel() {
                                     <tr key={i.id} className="border-b last:border-0">
                                       <td className="py-2 px-2 text-right">
                                         <div className="flex gap-1 items-center">
-                                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={()=>openEditSupplierIng(i as {id:string;name:string;price:number;unit:string;waste:number;stock:number;minStock:number;sku:string;source:"global"|"restaurant"})}>
+                                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={e=>{e.stopPropagation();openEditSupplierIng(i as {id:string;name:string;price:number;unit:string;waste:number;stock:number;minStock:number;sku:string;source:"global"|"restaurant"})}}>
                                             <Edit2 className="w-3.5 h-3.5"/>
                                           </Button>
-                                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={()=>handleDeleteIngredientFromSupplier(i,s.name,s.restaurantIds)} disabled={deletingIngredientId===`${i.source}-${i.id}`}>
+                                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={e=>{e.stopPropagation();handleDeleteIngredientFromSupplier(i,s.name,s.restaurantIds)}} disabled={deletingIngredientId===`${i.source}-${i.id}`}>
                                             {deletingIngredientId===`${i.source}-${i.id}`?<Loader2 className="w-4 h-4 animate-spin"/>:<Trash2 className="w-3.5 h-3.5"/>}
                                           </Button>
                                         </div>
