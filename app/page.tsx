@@ -384,6 +384,7 @@ export default function Home() {
         userPermissions={userPermissions}
         onLogout={handleLogout}
         isImpersonating={!!impersonatingRestaurant}
+        onStopImpersonate={handleStopImpersonate}
       />}
       
       
