@@ -28,6 +28,7 @@ interface MobileNavProps {
   isSystemOwner?: boolean
   userPermissions?: UserPermissions
   isImpersonating?: boolean
+  onStopImpersonate?: () => void
 }
 
 const hasFullMenu = (role: string, isSystemOwner?: boolean) => 
@@ -80,7 +81,7 @@ const moreItems = (
   return items
 }
 
-export function MobileNav({ currentPage, setCurrentPage, userRole, isSystemOwner, userPermissions, isImpersonating }: MobileNavProps) {
+export function MobileNav({ currentPage, setCurrentPage, userRole, isSystemOwner, userPermissions, isImpersonating, onStopImpersonate }: MobileNavProps) {
   const t = useTranslations()
   const [showMore, setShowMore] = useState(false)
 
@@ -95,6 +96,14 @@ export function MobileNav({ currentPage, setCurrentPage, userRole, isSystemOwner
 
   return (
     <>
+      {isImpersonating && onStopImpersonate && (
+        <div className="fixed top-0 inset-x-0 z-50 flex items-center justify-between px-4 h-10 bg-amber-500 text-amber-950 text-sm font-semibold md:hidden">
+          <span>🎭 מצב התחזות</span>
+          <button onClick={onStopImpersonate} className="flex items-center gap-1 border border-amber-800/40 rounded-full px-3 py-0.5 text-xs font-bold">
+            חזור לבעלים ✕
+          </button>
+        </div>
+      )}
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 inset-x-0 z-50 md:hidden bg-primary/95 backdrop-blur-xl border-t border-primary-foreground/10 safe-area-pb">
         <div className="flex items-stretch h-16">
