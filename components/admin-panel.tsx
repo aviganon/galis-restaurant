@@ -1743,358 +1743,919 @@ export function AdminPanel() {
   }
 
   return (
-    <div style={{direction:"rtl",minHeight:"100vh",background:"var(--color-background-tertiary)",fontFamily:"var(--font-sans)"}}>
+    <div className="container mx-auto px-4 py-8 max-w-7xl space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="w-6 h-6" />
+            {t("pages.adminPanel.adminPanelTitle")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">
+            {isSystemOwner
+              ? t("pages.adminPanel.systemOwnerDesc")
+              : userRole === "owner" || userRole === "manager"
+                ? t("pages.adminPanel.restaurantManagerDesc")
+                : t("pages.adminPanel.limitedAccess")}
+          </p>
+        </CardContent>
+      </Card>
 
-      {/* SIDEBAR */}
-      <div style={{position:"fixed",top:0,right:0,bottom:0,width:60,background:"var(--color-background-primary)",borderLeft:"0.5px solid var(--color-border-tertiary)",display:"flex",flexDirection:"column",alignItems:"center",padding:"12px 0",gap:4,zIndex:50}}>
-        <div style={{width:32,height:32,borderRadius:8,background:"#1D9E75",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:8,cursor:"pointer",flexShrink:0}}>
-          <span style={{color:"#fff",fontWeight:700,fontSize:13}}>R</span>
+      {isSystemOwner && adminStats && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-2xl font-bold">{adminStats.rests}</p>
+              <p className="text-xs text-muted-foreground">{t("pages.adminPanel.restaurants")}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-2xl font-bold">{adminStats.users}</p>
+              <p className="text-xs text-muted-foreground">{t("pages.adminPanel.users")}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-2xl font-bold">{adminStats.dishes}</p>
+              <p className="text-xs text-muted-foreground">{t("pages.adminPanel.dishesCount")}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-2xl font-bold">{adminStats.ings}</p>
+              <p className="text-xs text-muted-foreground">{t("pages.adminPanel.globalIngredients")}</p>
+            </CardContent>
+          </Card>
         </div>
-        {([
-          {id:"restaurants" as const,emoji:"🏠",tip:"מסעדות"},
-          {id:"suppliers" as const,emoji:"🛒",tip:"ספקים"},
-          {id:"ingredients" as const,emoji:"🥬",tip:"רכיבים"},
-        ]).map(({id,emoji,tip})=>(
-          <div key={id} title={tip}
-            onClick={()=>setSystemOwnerTab(id)}
-            style={{width:44,height:44,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:20,background:systemOwnerTab===id?"var(--color-background-secondary)":"transparent",transition:"background .15s",position:"relative"}}
-            onMouseEnter={e=>{if(systemOwnerTab!==id)(e.currentTarget as HTMLElement).style.background="var(--color-background-secondary)"}}
-            onMouseLeave={e=>{if(systemOwnerTab!==id)(e.currentTarget as HTMLElement).style.background="transparent"}}
-          >
-            {emoji}
-            {systemOwnerTab===id&&<div style={{position:"absolute",left:-12,top:"50%",transform:"translateY(-50%)",width:3,height:24,background:"var(--color-text-primary)",borderRadius:2}}/>}
-          </div>
-        ))}
-        <div style={{width:32,height:1,background:"var(--color-border-tertiary)",margin:"4px 0"}}/>
-        <div title="משתמשים" style={{width:44,height:44,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18}}
-          onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background="var(--color-background-secondary)"}
-          onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background="transparent"}
-        >👥</div>
-        <div title="קוד הזמנה" style={{width:44,height:44,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18}}
-          onClick={handleCreateManagerCode}
-          onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background="var(--color-background-secondary)"}
-          onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background="transparent"}
-        >🎫</div>
-        <div style={{flex:1}}/>
-        <div title="הגדרות" style={{width:44,height:44,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18}}
-          onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background="var(--color-background-secondary)"}
-          onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background="transparent"}
-        >⚙️</div>
-      </div>
+      )}
 
-      {/* MAIN */}
-      <div style={{marginRight:60,padding:"20px 24px",maxWidth:1100}}>
+      {isSystemOwner && (
+        <Tabs value={systemOwnerTab} onValueChange={(v) => setSystemOwnerTab(v as "restaurants" | "suppliers" | "ingredients")}>
+          <TabsList className="w-full justify-start flex-wrap h-auto gap-1">
+            <TabsTrigger value="restaurants" className="gap-1.5">
+              <UtensilsCrossed className="w-4 h-4" />
+              {t("pages.adminPanel.restaurants")}
+            </TabsTrigger>
+            <TabsTrigger value="suppliers" className="gap-1.5">
+              <Truck className="w-4 h-4" />
+              {t("pages.adminPanel.suppliers")}
+            </TabsTrigger>
+            <TabsTrigger value="ingredients" className="gap-1.5">
+              <Package className="w-4 h-4" />
+              {t("pages.adminPanel.globalIngredients")}
+            </TabsTrigger>
+          </TabsList>
 
-        {/* TOP BAR */}
-        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
-          <div>
-            <div style={{fontSize:20,fontWeight:500,color:"var(--color-text-primary)"}}>
-              {systemOwnerTab==="restaurants"&&"מסעדות"}
-              {systemOwnerTab==="suppliers"&&"ספקים גלובליים"}
-              {systemOwnerTab==="ingredients"&&"רכיבים גלובליים"}
-            </div>
-            <div style={{fontSize:13,color:"var(--color-text-secondary)",marginTop:2}}>
-              {restsWithDetails.length} מסעדות · {suppliersWithRests.length} ספקים
-            </div>
-          </div>
-          <div style={{marginRight:"auto",display:"flex",gap:8}}>
-            {isImpersonating&&onStopImpersonate&&(
-              <Button size="sm" variant="outline" onClick={onStopImpersonate}>← חזור לפאנל בעלים</Button>
-            )}
-            {lastGeneratedCode&&(
-              <div style={{display:"flex",alignItems:"center",gap:6,background:"var(--color-background-secondary)",padding:"4px 10px",borderRadius:8,border:"0.5px solid var(--color-border-tertiary)"}}>
-                <span style={{fontFamily:"var(--font-mono)",fontSize:14,fontWeight:600,letterSpacing:"0.1em"}}>{lastGeneratedCode}</span>
-                <Button size="sm" variant="ghost" onClick={()=>navigator.clipboard.writeText(lastGeneratedCode!)} style={{fontSize:11,height:22}}>📋</Button>
+          <TabsContent value="restaurants" className="mt-4 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="w-5 h-5" />
+                  {t("pages.adminPanel.addRestaurant")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(!restaurants || restaurants.length === 0) && (
+                  <p className="text-sm text-amber-600 dark:text-amber-500 mb-3 flex items-center gap-2">
+                    {t("pages.adminPanel.noRestaurantsLoaded")}{" "}
+                    <Button variant="link" className="p-0 h-auto font-semibold" onClick={() => window.location.reload()}>
+                      {t("pages.adminPanel.clickToRefresh")}
+                    </Button>
+                  </p>
+                )}
+                <p className="text-sm text-muted-foreground mb-4">
+                  {t("pages.adminPanel.createNewRestaurant")}
+                </p>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  <div className="flex-1 min-w-[200px]">
+                    <Label htmlFor="new-rest-name">{t("pages.adminPanel.restaurantName")}</Label>
+                    <Input
+                      id="new-rest-name"
+                      value={newRestName}
+                      onChange={(e) => setNewRestName(e.target.value)}
+                      placeholder={t("pages.adminPanel.enterRestaurantName")}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div className="w-24">
+                    <Label htmlFor="new-rest-emoji">{t("pages.adminPanel.emoji")}</Label>
+                    <Input
+                      id="new-rest-emoji"
+                      value={newRestEmoji}
+                      onChange={(e) => setNewRestEmoji(e.target.value)}
+                      placeholder="☕"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <Label htmlFor="new-rest-invite-code">{t("pages.adminPanel.inviteCodeOptional")}</Label>
+                  <div className="flex gap-2 items-center mt-1">
+                    <Input
+                      id="new-rest-invite-code"
+                      value={newRestInviteCode}
+                      onChange={(e) => setNewRestInviteCode(e.target.value)}
+                      placeholder={t("pages.adminPanel.inviteCodePlaceholder")}
+                      className="max-w-xs font-mono"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        setGeneratingCode(true)
+                        setLastGeneratedCode(null)
+                        try {
+                          const { inviteCodesCollection, inviteCodeFields } = firestoreConfig
+                          let code = generateInviteCode()
+                          let exists = true
+                          while (exists) {
+                            const snap = await getDoc(doc(db, inviteCodesCollection, code))
+                            exists = snap.exists()
+                            if (exists) code = generateInviteCode()
+                          }
+                          await setDoc(doc(db, inviteCodesCollection, code), {
+                            [inviteCodeFields.type]: "manager",
+                            [inviteCodeFields.used]: false,
+                            [inviteCodeFields.createdAt]: new Date().toISOString(),
+                          })
+                          setNewRestInviteCode(code)
+                          setLastGeneratedCode(code)
+                          toast.success(t("pages.adminPanel.codeCreated"))
+                        } catch (e) {
+                          toast.error((e as Error).message)
+                        } finally {
+                          setGeneratingCode(false)
+                        }
+                      }}
+                      disabled={generatingCode}
+                    >
+                      {generatingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                      {t("pages.adminPanel.createCode")}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t("pages.adminPanel.optionallyCreateCode")}
+                  </p>
+                </div>
+                <Button onClick={handleCreateRestaurant} disabled={creatingRest}>
+                  {creatingRest ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Building2 className="w-4 h-4 ml-2" />}
+                  {t("pages.adminPanel.createRestaurant")}
+                </Button>
+              </CardContent>
+            </Card>
+            {loadingSystemOwner ? (
+              <div className="flex items-center gap-2 text-muted-foreground py-8">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                {t("pages.adminPanel.loadingRestaurants")}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {restsWithDetails.map((rest) => (
+                  <Card key={rest.id}>
+                    <CardHeader className="pb-2" dir="rtl">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          {rest.emoji && <span>{rest.emoji}</span>}
+                          {rest.name}
+                        </CardTitle>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">
+                            {rest.dishesCount} {t("pages.adminPanel.dishesCount")} · {t("pages.adminPanel.fcAvg")} {rest.fcAvg}%
+                          </span>
+                          {onImpersonate && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                onImpersonate({ id: rest.id, name: rest.name, emoji: rest.emoji })
+                                toast.success(`${t("pages.adminPanel.impersonatingRest")}: ${rest.emoji ? `${rest.emoji} ` : ""}${rest.name}`)
+                              }}
+                            >
+                              <UserCircle className="w-4 h-4 ml-1" />
+                              {t("pages.adminPanel.impersonate")}
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => {
+                              setRestToDelete(rest)
+                              setDeleteRestDialogOpen(true)
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4 ml-1" />
+                            מחק
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div>
+                        <p className="text-sm font-medium mb-1">משויכים — לחץ להסרה:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {(rest.assignedSuppliers?.length ?? 0) === 0 ? (
+                            <span className="text-sm text-muted-foreground">{t("pages.adminPanel.noAssignedSuppliers")}</span>
+                          ) : (
+                            (rest.assignedSuppliers || []).map((s) => (
+                              <Button
+                                key={s}
+                                size="sm"
+                                variant="secondary"
+                                className="text-destructive hover:bg-destructive/10"
+                                onClick={() => handleRemoveSupplier(rest.id, s)}
+                                disabled={removingSupplier === `${rest.id}:${s}`}
+                              >
+                                {removingSupplier === `${rest.id}:${s}` ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <X className="w-3 h-3 ml-1" />}
+                                {s}
+                              </Button>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium mb-2">{t("pages.adminPanel.suppliersAvailableForAssignment")}:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {suppliersWithRests
+                            .filter((s) => !(rest.assignedSuppliers || []).includes(s.name))
+                            .map((s) => (
+                              <Button
+                                key={s.name}
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleAssignSupplier(rest.id, s.name)}
+                                disabled={assigningSupplier === `${rest.id}:${s.name}`}
+                              >
+                                {assigningSupplier === `${rest.id}:${s.name}` ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <Check className="w-3 h-3 ml-1" />}
+                                {s.name}
+                              </Button>
+                            ))}
+                          {suppliersWithRests.filter((s) => !(rest.assignedSuppliers || []).includes(s.name)).length === 0 && (
+                            <span className="text-sm text-muted-foreground">{t("pages.adminPanel.allSuppliersAssigned")}</span>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                {restsWithDetails.length === 0 && !loadingSystemOwner && (
+                  <p className="text-muted-foreground py-4">{t("pages.adminPanel.noRestaurants")}</p>
+                )}
               </div>
             )}
-          </div>
-        </div>
+          </TabsContent>
 
-        {/* STATS */}
-        {isSystemOwner&&adminStats&&(
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20}}>
-            {([
-              {emoji:"🏠",val:restsWithDetails.length,lbl:"מסעדות פעילות",bg:"#EAF3DE"},
-              {emoji:"🛒",val:suppliersWithRests.length,lbl:"ספקים גלובליים",bg:"#FAEEDA"},
-              {emoji:"🥬",val:adminStats.ings,lbl:"רכיבים בקטלוג",bg:"#E6F1FB"},
-              {emoji:"👥",val:adminStats.users,lbl:"משתמשים",bg:"#EEEDFE"},
-            ] as const).map(({emoji,val,lbl,bg},i)=>(
-              <div key={i} style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:12,padding:16,transition:"transform .2s",cursor:"default"}}
-                onMouseEnter={e=>(e.currentTarget as HTMLElement).style.transform="translateY(-2px)"}
-                onMouseLeave={e=>(e.currentTarget as HTMLElement).style.transform="translateY(0)"}
-              >
-                <div style={{width:36,height:36,borderRadius:8,background:bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,marginBottom:10}}>{emoji}</div>
-                <div style={{fontSize:24,fontWeight:500,color:"var(--color-text-primary)"}}>{val}</div>
-                <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:2}}>{lbl}</div>
+          <TabsContent value="suppliers" className="mt-4">
+            {loadingSystemOwner ? (
+              <div className="flex items-center gap-2 text-muted-foreground py-8">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                {t("pages.adminPanel.loadingSuppliers")}
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* ===== RESTAURANTS ===== */}
-        {systemOwnerTab==="restaurants"&&isSystemOwner&&(
-          <div style={{marginBottom:20}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-              <div style={{fontSize:15,fontWeight:500,color:"var(--color-text-primary)",display:"flex",alignItems:"center",gap:8}}>
-                <span style={{width:8,height:8,borderRadius:"50%",background:"#1D9E75",display:"inline-block"}}/>מסעדות
-              </div>
-              <Button size="sm" onClick={()=>setNewRestOpen(true)}>+ מסעדה חדשה</Button>
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:12}}>
-              {restsWithDetails.map((rest,idx)=>{
-                const grads=["linear-gradient(135deg,#0F6E56,#1D9E75)","linear-gradient(135deg,#185FA5,#378ADD)","linear-gradient(135deg,#533AAB,#7F77DD)","linear-gradient(135deg,#854F0B,#BA7517)","linear-gradient(135deg,#993C1D,#D85A30)"]
-                const fc=rest.fcAvg||0
-                const fcC=fc<30?"#1D9E75":fc<35?"#BA7517":"#D85A30"
-                return (
-                  <div key={rest.id} style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:12,overflow:"hidden",transition:"transform .2s"}}
-                    onMouseEnter={e=>(e.currentTarget as HTMLElement).style.transform="translateY(-3px)"}
-                    onMouseLeave={e=>(e.currentTarget as HTMLElement).style.transform="translateY(0)"}
-                  >
-                    <div style={{height:72,background:grads[idx%grads.length],position:"relative",display:"flex",alignItems:"flex-end",padding:"8px 12px"}}>
-                      <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,rgba(0,0,0,.4),transparent 60%)"}}/>
-                      <span style={{fontSize:24,position:"absolute",top:10,right:12,filter:"drop-shadow(0 2px 4px rgba(0,0,0,.2))"}}>{rest.emoji||"🍽️"}</span>
-                      <span style={{position:"relative",zIndex:1,fontSize:13,fontWeight:500,color:"#fff"}}>{rest.name}</span>
+            ) : (
+              <Card>
+                <CardHeader>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <CardTitle>{t("pages.adminPanel.globalSuppliers")}</CardTitle>
+                      <p className="text-sm text-muted-foreground">{t("pages.adminPanel.globalSuppliersDesc")}</p>
                     </div>
-                    <div style={{padding:12}}>
-                      <div style={{display:"flex",gap:5,flexWrap:"wrap" as const,marginBottom:10}}>
-                        <span style={{fontSize:11,padding:"2px 8px",borderRadius:10,background:"#EAF3DE",color:"#3B6D11",border:"0.5px solid #C0DD97"}}>פעיל</span>
-                        <span style={{fontSize:11,padding:"2px 8px",borderRadius:10,background:"#E6F1FB",color:"#185FA5",border:"0.5px solid #B5D4F4"}}>{(rest.assignedSuppliers||[]).length} ספקים</span>
-                        {rest.dishesCount>0&&<span style={{fontSize:11,padding:"2px 8px",borderRadius:10,background:"var(--color-background-secondary)",color:"var(--color-text-secondary)",border:"0.5px solid var(--color-border-tertiary)"}}>{rest.dishesCount} מנות</span>}
-                      </div>
-                      {fc>0&&(<>
-                        <div style={{height:4,borderRadius:2,background:"var(--color-background-secondary)",overflow:"hidden",marginBottom:4}}>
-                          <div style={{height:4,borderRadius:2,width:`${Math.min(fc*2.5,100)}%`,background:fcC,transition:"width .6s ease"}}/>
-                        </div>
-                        <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--color-text-tertiary)",marginBottom:10}}>
-                          <span>food cost</span><span style={{color:fcC,fontWeight:500}}>{fc}%</span>
-                        </div>
-                      </>)}
-                      <div style={{display:"flex",gap:6,marginBottom:8}}>
-                        <Button size="sm" variant="outline" style={{flex:1,fontSize:11}} onClick={()=>onImpersonate?.({id:rest.id,name:rest.name,emoji:rest.emoji||""})}>← כנס</Button>
-                        <Button size="sm" variant="outline" style={{fontSize:11}} onClick={()=>{setRestToDelete(rest);setDeleteRestDialogOpen(true)}}>🗑</Button>
-                      </div>
-                      <div style={{borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:8}}>
-                        <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginBottom:5}}>ספקים:</div>
-                        <div style={{display:"flex",flexWrap:"wrap" as const,gap:3}}>
-                          {(rest.assignedSuppliers||[]).map((s:string)=>(
-                            <span key={s} style={{fontSize:11,padding:"2px 6px",borderRadius:4,background:"var(--color-background-secondary)",color:"var(--color-text-secondary)",border:"0.5px solid var(--color-border-tertiary)",display:"flex",alignItems:"center",gap:3}}>
-                              {s}<span style={{cursor:"pointer",fontSize:10,color:"var(--color-text-tertiary)"}} onClick={()=>handleRemoveSupplier(rest.id,s)}>✕</span>
-                            </span>
-                          ))}
-                          <select style={{fontSize:11,padding:"2px 5px",borderRadius:4,border:"0.5px solid var(--color-border-tertiary)",background:"var(--color-background-primary)",color:"var(--color-text-secondary)",cursor:"pointer"}}
-                            onChange={e=>{if(e.target.value){handleAssignSupplier(rest.id,e.target.value);e.target.value=""}}} defaultValue="">
-                            <option value="">+ שייך ספק</option>
-                            {suppliersWithRests.filter(s=>!(rest.assignedSuppliers||[]).includes(s.name)).map(s=><option key={s.name} value={s.name}>{s.name}</option>)}
-                          </select>
-                        </div>
-                      </div>
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      <Button variant="outline" size="sm" onClick={() => loadSystemOwnerData()} disabled={loadingSystemOwner}>
+                        <RefreshCw className={`w-4 h-4 ml-1 ${loadingSystemOwner ? "animate-spin" : ""}`} />
+                        {t("pages.adminPanel.refresh")}
+                      </Button>
+                      <Button variant="default" onClick={() => setShowInvoiceUploadArea((v) => !v)}>
+                        <UploadIcon className="w-4 h-4 ml-1" />
+                        העלאת חשבונית
+                      </Button>
+                      <Button variant="outline" onClick={() => setAddSupplierOpen(true)}>
+                        <Plus className="w-4 h-4 ml-1" />
+                        {t("pages.adminPanel.addSupplier")}
+                      </Button>
                     </div>
                   </div>
-                )
-              })}
-              <div style={{background:"var(--color-background-secondary)",border:"1.5px dashed var(--color-border-secondary)",borderRadius:12,display:"flex",flexDirection:"column" as const,alignItems:"center",justifyContent:"center",padding:24,cursor:"pointer",minHeight:160,transition:"background .15s"}}
-                onClick={()=>setNewRestOpen(true)}
-                onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background="var(--color-background-tertiary)"}
-                onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background="var(--color-background-secondary)"}
-              >
-                <div style={{fontSize:28,marginBottom:6}}>+</div>
-                <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>מסעדה חדשה</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ===== SUPPLIERS ===== */}
-        {systemOwnerTab==="suppliers"&&isSystemOwner&&(
-          <div style={{marginBottom:20}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-              <div style={{fontSize:15,fontWeight:500,color:"var(--color-text-primary)",display:"flex",alignItems:"center",gap:8}}>
-                <span style={{width:8,height:8,borderRadius:"50%",background:"#BA7517",display:"inline-block"}}/>ספקים גלובליים
-              </div>
-              <Button size="sm" onClick={()=>setAddSupplierOpen(true)}>+ ספק חדש</Button>
-            </div>
-            <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:12,overflow:"hidden"}}>
-              {/* Upload zone */}
-              <div
-                onDragOver={handleAdminInvoiceDragOver} onDragEnter={handleAdminInvoiceDragEnter}
-                onDragLeave={handleAdminInvoiceDragLeave} onDrop={handleAdminInvoiceDrop}
-                onClick={()=>adminInvoiceFileRef.current?.click()}
-                style={{margin:12,border:`1.5px dashed ${isInvoiceDragging?"#1D9E75":"var(--color-border-secondary)"}`,borderRadius:8,padding:14,display:"flex",alignItems:"center",gap:10,cursor:"pointer",transition:"background .15s",background:isInvoiceDragging?"rgba(29,158,117,.07)":"transparent"}}
-                onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background="var(--color-background-secondary)"}
-                onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background=isInvoiceDragging?"rgba(29,158,117,.07)":"transparent"}
-              >
-                <input ref={adminInvoiceFileRef} type="file" accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.webp,.rtf" style={{display:"none"}} onChange={handleAdminInvoiceFileSelect}/>
-                <div style={{width:38,height:38,borderRadius:8,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>📄</div>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>העלה חשבונית ספק</div>
-                  <div style={{fontSize:11,color:"var(--color-text-tertiary)",marginTop:2}}>PDF, Excel, תמונה — AI יחלץ פרטים אוטומטית</div>
-                </div>
-                <Button size="sm" style={{fontSize:11}} onClick={e=>{e.stopPropagation();adminInvoiceFileRef.current?.click()}}>העלה</Button>
-              </div>
-              {/* Search */}
-              <div style={{display:"flex",gap:8,padding:"0 12px 10px",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-                <Input placeholder="חיפוש ספק..." value={suppliersSearchText} onChange={e=>setSuppliersSearchText(e.target.value)} className="h-8" style={{fontSize:12}}/>
-              </div>
-              {/* List */}
-              <div style={{maxHeight:500,overflowY:"auto" as const}}>
-                {filteredAndSortedSuppliers.map(sup=>{
-                  const bgs=["#EAF3DE","#E6F1FB","#FAEEDA","#FCEBEB","#EEEDFE"]
-                  const tcs=["#0F6E56","#185FA5","#854F0B","#993C1D","#533AAB"]
-                  const ci=Math.abs((sup.name||"").charCodeAt(0))%5
-                  const initials=(sup.name||"").split(/\s+/).slice(0,2).map((w:string)=>w[0]||"").join("")
-                  return (
-                    <div key={sup.name} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderBottom:"0.5px solid var(--color-border-tertiary)",transition:"background .1s"}}
-                      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background="var(--color-background-secondary)"}
-                      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background="transparent"}
+                </CardHeader>
+                <CardContent>
+                  {/* העלאת חשבוניות — נפתח בלחיצה על הכפתור */}
+                  {showInvoiceUploadArea && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="mb-6"
+                      onDragOver={handleAdminInvoiceDragOver}
+                      onDragEnter={handleAdminInvoiceDragEnter}
+                      onDragLeave={handleAdminInvoiceDragLeave}
+                      onDrop={handleAdminInvoiceDrop}
                     >
-                      <div style={{width:34,height:34,borderRadius:8,background:bgs[ci],color:tcs[ci],display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:600,flexShrink:0,border:"0.5px solid var(--color-border-tertiary)"}}>
-                        {initials.slice(0,2)||"?"}
-                      </div>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>{sup.name}</div>
-                        <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:1}}>
-                          {sup.restaurantIds?.length||0} מסעדות{sup.phone&&` · ${sup.phone}`}
-                        </div>
-                      </div>
-                      <div style={{width:44,background:"var(--color-background-secondary)",borderRadius:2,height:3}}>
-                        <div style={{height:3,borderRadius:2,background:"#1D9E75",width:`${Math.min(((sup.restaurantIds?.length||0)/Math.max(restsWithDetails.length,1))*100,100)}%`}}/>
-                      </div>
-                      <button onClick={e=>{e.stopPropagation();setEditSupplierName(sup.name)}} style={{height:26,padding:"0 8px",border:"0.5px solid var(--color-border-tertiary)",borderRadius:6,fontSize:11,background:"var(--color-background-primary)",cursor:"pointer"}}>✏️</button>
-                      <button onClick={e=>{e.stopPropagation();setDeletingSupplierName(sup.name);setDeleteSupplierDialogOpen(true)}} style={{height:26,padding:"0 8px",border:"0.5px solid var(--color-border-tertiary)",borderRadius:6,fontSize:11,background:"var(--color-background-primary)",cursor:"pointer"}}>🗑</button>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ===== INGREDIENTS ===== */}
-        {systemOwnerTab==="ingredients"&&isSystemOwner&&(
-          <div style={{marginBottom:20}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-              <div style={{fontSize:15,fontWeight:500,color:"var(--color-text-primary)",display:"flex",alignItems:"center",gap:8}}>
-                <span style={{width:8,height:8,borderRadius:"50%",background:"#639922",display:"inline-block"}}/>רכיבים גלובליים
-              </div>
-              <div style={{display:"flex",gap:8}}>
-                <Button size="sm" variant="outline" style={{fontSize:11}}>⬇ Excel</Button>
-                <Button size="sm" onClick={()=>setAddIngredientOpen(true)}>+ רכיב</Button>
-              </div>
-            </div>
-            <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:12,overflow:"hidden"}}>
-              <div style={{display:"flex",gap:8,padding:"10px 12px",borderBottom:"0.5px solid var(--color-border-tertiary)",background:"var(--color-background-secondary)"}}>
-                <Input placeholder="חיפוש רכיב..." value={ingredientsSearchText} onChange={e=>setIngredientsSearchText(e.target.value)} className="h-8" style={{fontSize:12}}/>
-                <select style={{height:32,fontSize:11,border:"0.5px solid var(--color-border-tertiary)",borderRadius:6,padding:"0 8px",background:"var(--color-background-primary)",color:"var(--color-text-secondary)"}}>
-                  <option value="">כל הספקים</option>
-                  {suppliersWithRests.map(s=><option key={s.name} value={s.name}>{s.name}</option>)}
-                </select>
-              </div>
-              <div style={{overflowX:"auto" as const}}>
-                <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                  <thead style={{background:"var(--color-background-secondary)"}}>
-                    <tr>
-                      <th style={{textAlign:"right",padding:"9px 12px",fontWeight:500,color:"var(--color-text-tertiary)",fontSize:11,borderBottom:"0.5px solid var(--color-border-tertiary)",width:52}}>תמונה</th>
-                      <th style={{textAlign:"right",padding:"9px 8px",fontWeight:500,color:"var(--color-text-tertiary)",fontSize:11,borderBottom:"0.5px solid var(--color-border-tertiary)"}}>שם רכיב</th>
-                      <th style={{textAlign:"right",padding:"9px 8px",fontWeight:500,color:"var(--color-text-tertiary)",fontSize:11,borderBottom:"0.5px solid var(--color-border-tertiary)"}}>ספק</th>
-                      <th style={{textAlign:"right",padding:"9px 8px",fontWeight:500,color:"var(--color-text-tertiary)",fontSize:11,borderBottom:"0.5px solid var(--color-border-tertiary)"}}>מחיר</th>
-                      <th style={{textAlign:"right",padding:"9px 8px",fontWeight:500,color:"var(--color-text-tertiary)",fontSize:11,borderBottom:"0.5px solid var(--color-border-tertiary)"}}>יחידה</th>
-                      <th style={{textAlign:"center",padding:"9px 8px",width:44,borderBottom:"0.5px solid var(--color-border-tertiary)"}}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredAndSortedIngredients.map((ing:IngredientRow)=>{
-                      const imgQ=encodeURIComponent(ing.name.replace(/[()]/g,"").trim())
-                      const fallback=`https://ui-avatars.com/api/?name=${encodeURIComponent(ing.name.slice(0,2))}&size=40&background=EAF3DE&color=0F6E56&bold=true&format=svg`
-                      return (
-                        <tr key={ing.id} style={{borderBottom:"0.5px solid var(--color-border-tertiary)",transition:"background .1s",cursor:"pointer"}}
-                          onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background="var(--color-background-secondary)"}
-                          onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background="transparent"}
-                          onClick={()=>{setEditAdminIngredient(ing);setEditAdminIngredientOpen(true)}}
-                        >
-                          <td style={{padding:"7px 12px"}}>
-                            <div style={{width:40,height:40,borderRadius:8,overflow:"hidden",background:"var(--color-background-secondary)"}}>
-                              <img
-                                src={`https://source.unsplash.com/40x40/?food,${imgQ}`}
-                                alt={ing.name} width={40} height={40}
-                                style={{width:40,height:40,objectFit:"cover" as const,display:"block"}}
-                                onError={e=>{(e.target as HTMLImageElement).src=fallback}}
-                              />
+                      <Card className={isInvoiceDragging ? "ring-2 ring-primary ring-offset-2" : ""}>
+                        <CardContent className="p-6 relative">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute left-2 top-2 h-8 w-8"
+                            onClick={() => setShowInvoiceUploadArea(false)}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                          <div
+                            className={`border-2 border-dashed rounded-xl p-6 text-center transition-all min-h-[140px] flex flex-col items-center justify-center cursor-pointer ${
+                              isInvoiceDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
+                            }`}
+                            onClick={() => adminInvoiceFileRef.current?.click()}
+                          >
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isInvoiceDragging ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                                <FileText className="w-6 h-6" />
+                              </div>
+                              <div className="text-right">
+                                <h3 className="font-semibold">חשבוניות ספקים — קטלוג גלובלי</h3>
+                                <p className="text-sm text-muted-foreground">גרור PDF/Excel/תמונה — AI יחלץ רכיבים ומחירים ויעלה לספקים הגלובליים</p>
+                              </div>
                             </div>
-                          </td>
-                          <td style={{padding:"7px 8px"}}>
-                            <div style={{fontWeight:500,color:"var(--color-text-primary)",fontSize:13}}>{ing.name}</div>
-                            {ing.sku&&<div style={{fontSize:10,color:"var(--color-text-tertiary)"}}>{ing.sku}</div>}
-                          </td>
-                          <td style={{padding:"7px 8px",color:"var(--color-text-secondary)",fontSize:12}}>{ing.supplier}</td>
-                          <td style={{padding:"7px 8px"}}>
-                            <span style={{fontSize:12,fontFamily:"var(--font-mono,monospace)",background:"var(--color-background-secondary)",padding:"2px 6px",borderRadius:4}}>₪{ing.price.toFixed(2)}</span>
-                          </td>
-                          <td style={{padding:"7px 8px",color:"var(--color-text-tertiary)",fontSize:11}}>{ing.unit}</td>
-                          <td style={{padding:"7px 8px",textAlign:"center"}}>
-                            <button onClick={e=>{e.stopPropagation();handleDeleteIngredientFromSupplier(ing,ing.supplier,ing.source==="global"?(suppliersWithRests.find(s=>s.name===ing.supplier)?.restaurantIds||[]):undefined)}}
-                              style={{height:24,padding:"0 8px",border:"0.5px solid var(--color-border-tertiary)",borderRadius:4,fontSize:11,background:"transparent",color:"var(--color-text-tertiary)",cursor:"pointer"}}>🗑</button>
-                          </td>
-                        </tr>
+                            <div className="flex flex-wrap justify-center gap-2 text-xs text-muted-foreground mb-3">
+                              <Badge variant="outline">PDF</Badge>
+                              <Badge variant="outline">Excel</Badge>
+                              <Badge variant="outline">CSV</Badge>
+                              <Badge variant="outline">תמונות</Badge>
+                            </div>
+                            <input
+                              ref={adminInvoiceFileRef}
+                              type="file"
+                              accept={INVOICE_ACCEPT}
+                              className="hidden"
+                              onChange={handleAdminInvoiceFileSelect}
+                            />
+                            <Button type="button" variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); adminInvoiceFileRef.current?.click() }}>
+                              <UploadIcon className="w-4 h-4 ml-2" />
+                              בחר קובץ
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  )}
+
+                  <FilePreviewModal
+                    open={fpmOpen}
+                    onOpenChange={(o) => { setFpmOpen(o); if (!o) setFpmFile(null) }}
+                    file={fpmFile}
+                    type="p"
+                    forceSaveToGlobal={true}
+                    onConfirmSupplier={handleConfirmAdminSupplier}
+                  />
+
+                  <div className="flex flex-wrap gap-2 items-center mb-4 p-3 rounded-lg bg-muted/50 border">
+                    <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+                      <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <Input
+                        value={suppliersSearchText}
+                        onChange={(e) => setSuppliersSearchText(e.target.value)}
+                        placeholder={t("pages.adminPanel.suppliersSearchPlaceholder")}
+                        className="h-9"
+                      />
+                    </div>
+                    <Select value={suppliersFilterAssigned} onValueChange={setSuppliersFilterAssigned}>
+                      <SelectTrigger className="w-[140px] h-9">
+                        <SelectValue placeholder={t("pages.adminPanel.assign")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">{t("pages.adminPanel.all")}</SelectItem>
+                        <SelectItem value="assigned">{t("pages.adminPanel.assignedToRestaurants")}</SelectItem>
+                        <SelectItem value="unassigned">{t("pages.adminPanel.unassigned")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {(suppliersSearchText || suppliersFilterAssigned !== "__all__") && (
+                      <Button variant="ghost" size="sm" onClick={() => { setSuppliersSearchText(""); setSuppliersFilterAssigned("__all__") }}>
+                        {t("pages.adminPanel.clearFilter")}
+                      </Button>
+                    )}
+                    <span className="text-sm text-muted-foreground">
+                      {filteredAndSortedSuppliers.length === (suppliersWithRests?.length ?? 0)
+                        ? `${suppliersWithRests?.length ?? 0} ${t("pages.adminPanel.suppliersCount")}`
+                        : `${t("pages.adminPanel.showingCount")} ${filteredAndSortedSuppliers.length} ${t("pages.adminPanel.of")} ${suppliersWithRests?.length ?? 0}`}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-4">{t("pages.adminPanel.clickForDetails")}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                    {filteredAndSortedSuppliers.map((s) => {
+                      const ingCount = (supplierToIngredients[s.name] || []).length
+                      return (
+                        <Card
+                          key={s.name}
+                          className={cn(
+                            "border-0 shadow-sm cursor-pointer transition-colors",
+                            selectedSupplierDetail === s.name ? "ring-2 ring-primary bg-muted/50" : "hover:bg-muted/50"
+                          )}
+                          onClick={() => setSelectedSupplierDetail(selectedSupplierDetail === s.name ? null : s.name)}
+                        >
+                          <CardContent className="p-4 flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
+                              <Truck className="w-6 h-6 text-muted-foreground" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold truncate">{s.name}</p>
+                              <p className="text-xs text-muted-foreground">{ingCount} {t("pages.adminPanel.ingredientsCount")}</p>
+                            </div>
+                            <span className="text-muted-foreground">›</span>
+                          </CardContent>
+                        </Card>
                       )
                     })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* canAddUsers section */}
-        {canAddUsers&&currentRestaurantId&&(
-          <div style={{marginBottom:20}}>
-            <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:12,overflow:"hidden"}}>
-              <div style={{padding:"12px 16px",borderBottom:"0.5px solid var(--color-border-tertiary)",fontSize:13,fontWeight:500,color:"var(--color-text-primary)",display:"flex",alignItems:"center",gap:7}}>
-                <span>👥</span>{t("pages.adminPanel.restaurantUsers")}
-              </div>
-              <div style={{padding:"12px 16px"}}>
-                {loadingUsers?<div style={{display:"flex",gap:8,color:"var(--color-text-secondary)",fontSize:13}}><Loader2 className="w-4 h-4 animate-spin"/>{t("pages.adminPanel.loadingUsers")}</div>
-                :restaurantUsers.length===0?<p style={{fontSize:13,color:"var(--color-text-secondary)"}}>{t("pages.adminPanel.noUsersYet")}</p>
-                :<div style={{display:"flex",flexDirection:"column" as const,gap:8}}>
-                  {restaurantUsers.filter(u=>u.role!=="owner").map(u=>(
-                    <div key={u.uid} style={{padding:10,borderRadius:8,border:"0.5px solid var(--color-border-tertiary)",background:"var(--color-background-secondary)"}}>
-                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
-                        <span style={{fontWeight:500,fontSize:13}}>{u.email||u.uid}</span>
-                        <Button size="sm" variant="outline" onClick={()=>setEditingPermissions(editingPermissions===u.uid?null:u.uid)} style={{fontSize:11}}>{t("pages.adminPanel.permissions")}</Button>
-                      </div>
-                      {editingPermissions===u.uid&&(
-                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,paddingTop:8,borderTop:"0.5px solid var(--color-border-tertiary)"}}>
-                          {([
-                            {key:"canSeeDashboard" as const,labelKey:"permDashboard"},
-                            {key:"canSeeProductTree" as const,labelKey:"permProductTree"},
-                            {key:"canSeeIngredients" as const,labelKey:"permIngredients"},
-                            {key:"canSeeInventory" as const,labelKey:"permInventory"},
-                            {key:"canSeeSuppliers" as const,labelKey:"permSuppliers"},
-                            {key:"canSeePurchaseOrders" as const,labelKey:"permPurchaseOrders"},
-                            {key:"canSeeUpload" as const,labelKey:"permUpload"},
-                            {key:"canSeeReports" as const,labelKey:"permReports"},
-                            {key:"canSeeCosts" as const,labelKey:"permMenuCosts"},
-                            {key:"canSeeSettings" as const,labelKey:"permSettings"},
-                          ]).map(({key,labelKey})=>(
-                            <div key={key} style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                              <Label style={{fontSize:11}}>{t(`pages.adminPanel.${labelKey}`)}</Label>
-                              <Switch checked={u.permissions?.[key]??(["canSeeDashboard","canSeeProductTree","canSeeIngredients","canSeeInventory","canSeeSuppliers","canSeePurchaseOrders","canSeeUpload"].includes(key))}
-                                onCheckedChange={checked=>handleSavePermissions(u.uid,{...u.permissions,[key]:checked})}/>
-                            </div>
-                          ))}
+                  </div>
+                  {selectedSupplierDetail && (() => {
+                    const s = filteredAndSortedSuppliers.find((x) => x.name === selectedSupplierDetail)
+                    if (!s) return null
+                    const supplierIngs = supplierToIngredients[s.name] || []
+                    return (
+                      <div className="space-y-4 p-5 rounded-xl border bg-muted/30">
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                          <h3 className="text-lg font-semibold">{s.name}</h3>
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => openEditSupplierDetails(s)}>
+                              <Edit2 className="w-4 h-4 ml-1" />
+                              {t("pages.adminPanel.editDetails")}
+                            </Button>
+                            <Button size="sm" onClick={() => openEditSupplier(s.name)}>
+                              <Plus className="w-4 h-4 ml-1" />
+                              {t("pages.adminPanel.addIngredient")}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={(e) => { e.stopPropagation(); setSupplierToDelete(s); setDeleteSupplierDialogOpen(true) }}
+                            >
+                              <Trash2 className="w-4 h-4 ml-1" />
+                              {t("pages.adminPanel.deleteSupplier")}
+                            </Button>
+                          </div>
                         </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.phone")}</p>
+                            <p className="font-medium">{s.phone || "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.email")}</p>
+                            <p className="font-medium">{s.email || "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.contact")}</p>
+                            <p className="font-medium">{s.contact || "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.address")}</p>
+                            <p className="font-medium">{s.address || "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.assignedToRestaurantsLabel")}</p>
+                            <p className="font-medium">
+                              {(s.restaurantIds?.length ?? 0) === 0 ? (
+                                t("pages.adminPanel.notAssigned")
+                              ) : (
+                                (s.restaurantIds || [])
+                                  .map((rid) => restsWithDetails.find((r) => r.id === rid)?.name || rid)
+                                  .filter(Boolean)
+                                  .join(", ")
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium mb-2">{t("pages.adminPanel.ingredientsCount")} ({supplierIngs.length})</p>
+                          {supplierIngs.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">{t("pages.adminPanel.noIngredientsAddFirst")}</p>
+                          ) : (
+                            <div className="overflow-x-auto rounded-lg border">
+                              <table className="w-full text-sm table-fixed">
+                                <colgroup>
+                                  <col className="w-[5%]" />
+                                  <col className="w-[12%]" />
+                                  <col className="w-[10%]" />
+                                  <col className="w-[10%]" />
+                                  <col className="w-[9%]" />
+                                  <col className="w-[10%]" />
+                                  <col className="w-[10%]" />
+                                  <col className="w-[22%]" />
+                                </colgroup>
+                                <thead>
+                                  <tr className="border-b bg-muted/50">
+                                    <th className="text-right py-2 px-2 font-medium w-14"></th>
+                                    <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.skuLabel")}</th>
+                                    <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.minStockLabel")}</th>
+                                    <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.inventory")}</th>
+                                    <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.wasteLabel")}</th>
+                                    <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.unitUnit")}</th>
+                                    <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.priceLabel")}</th>
+                                    <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.ingredientLabel")}</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {supplierIngs.map((i) => (
+                                    <tr key={i.id} className="border-b last:border-0">
+                                      <td className="py-2 px-2 text-right">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                          onClick={() => handleDeleteIngredientFromSupplier(i, s.name, s.restaurantIds)}
+                                          disabled={deletingIngredientId === `${i.source}-${i.id}`}
+                                        >
+                                          {deletingIngredientId === `${i.source}-${i.id}` ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                        </Button>
+                                      </td>
+                                      <td className="py-2 px-2 text-right">{i.sku || "—"}</td>
+                                      <td className="py-2 px-2 text-right">{i.minStock}</td>
+                                      <td className="py-2 px-2 text-right">{i.stock}</td>
+                                      <td className="py-2 px-2 text-right">{i.waste}%</td>
+                                      <td className="py-2 px-2 text-right">{i.unit}</td>
+                                      <td className="py-2 px-2 text-right">₪{i.price.toFixed(2)}</td>
+                                      <td className="py-2 px-2 text-right font-medium">{i.name}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })()}
+                  {filteredAndSortedSuppliers.length === 0 && !loadingSystemOwner && (
+                    <p className="text-muted-foreground py-4">
+                      {(suppliersWithRests?.length ?? 0) === 0 ? t("pages.adminPanel.noSuppliers") : t("pages.adminPanel.noResults")}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="ingredients" className="mt-4">
+            {loadingSystemOwner ? (
+              <div className="flex items-center gap-2 text-muted-foreground py-8">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                {t("pages.adminPanel.loadingIngredients")}
+              </div>
+            ) : (
+              <Card dir={dir}>
+                <CardHeader>
+                  <CardTitle className={textAlign}>{t("pages.adminPanel.globalIngredients")}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Toolbar */}
+                  <div className={`flex flex-wrap items-center gap-2 ${justify}`}>
+                    <div className="relative flex-1 min-w-[140px] max-w-[220px]">
+                      <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        value={ingredientsSearchText}
+                        onChange={(e) => setIngredientsSearchText(e.target.value)}
+                        placeholder={t("pages.adminPanel.searchPlaceholder")}
+                        className={`h-9 pr-9 ${textAlign}`}
+                      />
+                      {ingredientsSearchText && (
+                        <Button variant="ghost" size="icon" className="absolute left-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={() => setIngredientsSearchText("")} title={t("pages.adminPanel.clear")}>
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
                       )}
                     </div>
-                  ))}
-                </div>}
+                    <Button size="sm" onClick={() => { setAddIngredientSupplier(""); setAddIngredientOpen(true) }}>
+                      <Plus className="w-4 h-4 ml-1" />
+                      {t("pages.adminPanel.addIngredient")}
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      {filteredAndSortedIngredients.length === (ingredientsList?.length ?? 0)
+                        ? `${ingredientsList?.length ?? 0} ${t("pages.adminPanel.ingredientsCount")}`
+                        : `${t("pages.adminPanel.showingCount")} ${filteredAndSortedIngredients.length} ${t("pages.adminPanel.of")} ${ingredientsList?.length ?? 0}`}
+                    </span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-9 w-9 p-0" title={t("pages.adminPanel.tableDisplay")}>
+                          <Columns3 className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align={isRtl ? "start" : "end"} className="min-w-[180px]">
+                        <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{t("pages.adminPanel.rowDensity")}</div>
+                        {(["compact", "normal", "expanded"] as RowDensity[]).map((d) => (
+                          <DropdownMenuCheckboxItem key={d} checked={ingredientsRowDensity === d} onCheckedChange={() => setIngredientsRowDensityAndStore(d)}>
+                            {d === "compact" ? t("pages.adminPanel.densityCompact") : d === "expanded" ? t("pages.adminPanel.densityExpanded") : t("pages.adminPanel.densityNormal")}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                        <div className="border-t my-1" />
+                        <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{t("pages.adminPanel.showHideColumns")}</div>
+                        {defaultColumnOrder.map((k) => {
+                          const isVisible = ingredientsColumnVisibility[k] !== false
+                          const colLabels: Record<string, string> = { name: t("pages.adminPanel.ingredientLabel"), price: t("pages.adminPanel.priceLabel"), cheapest: t("pages.adminPanel.cheapest"), sku: t("pages.adminPanel.skuLabel"), status: t("pages.adminPanel.statusLabel"), source: t("pages.adminPanel.sourceLabel"), supplier: t("pages.adminPanel.supplierLabel"), minStock: t("pages.adminPanel.minStockLabel"), stock: t("pages.adminPanel.inventory"), waste: t("pages.adminPanel.wasteLabel"), unit: t("pages.adminPanel.unitUnit") }
+                          const label = colLabels[k] || k
+                          return (
+                            <DropdownMenuCheckboxItem key={k} checked={isVisible} onCheckedChange={() => toggleIngredientsColumnVisibility(k)}>
+                              {label}
+                            </DropdownMenuCheckboxItem>
+                          )
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+
+                  {/* Table */}
+                  <div className="rounded-lg border overflow-auto max-h-[min(55vh,520px)]" dir={dir}>
+                  <Table className="w-full min-w-full table-fixed text-sm">
+                    <colgroup>
+                      {visibleColumnOrder.map((k) => (
+                        <col key={k} className={k === "name" ? "min-w-[140px]" : k === "supplier" ? "min-w-[100px]" : k === "cheapest" ? "min-w-[90px]" : ""} />
+                      ))}
+                      <col className="w-20" />
+                    </colgroup>
+                    <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
+                      <TableRow className="border-b">
+                        {visibleColumnOrder.map((key, colIndex) => {
+                          if (key === "cheapest") {
+                            return (
+                              <TableHead
+                                key="cheapest"
+                                className={`${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""} select-none`}
+                                draggable
+                                title={t("pages.adminPanel.dragToReorderColumns")}
+                                onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(colIndex)); e.dataTransfer.effectAllowed = "move" }}
+                                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move" }}
+                                onDrop={(e) => {
+                                  e.preventDefault()
+                                  const from = parseInt(e.dataTransfer.getData("text/plain"), 10)
+                                  if (!isNaN(from)) handleIngredientsColumnReorder(from, colIndex)
+                                }}
+                              >
+                                <span className={`flex items-center gap-1 ${justify}`}>
+                                  <GripVertical className="w-3 h-3 text-muted-foreground/60 cursor-grab active:cursor-grabbing shrink-0" />
+                                  {t("pages.adminPanel.cheapest")}
+                                </span>
+                              </TableHead>
+                            )
+                          }
+                          const labels: Record<string, string> = { name: t("pages.adminPanel.ingredientLabel"), price: t("pages.adminPanel.priceLabel"), unit: t("pages.adminPanel.unitUnit"), waste: t("pages.adminPanel.wasteLabel"), stock: t("pages.adminPanel.inventory"), minStock: t("pages.adminPanel.minStockLabel"), supplier: t("pages.adminPanel.supplierLabel"), sku: t("pages.adminPanel.skuLabel"), source: t("pages.adminPanel.sourceLabel"), status: t("pages.adminPanel.statusLabel") }
+                          const isSortable = ["name", "price", "unit", "waste", "stock", "minStock", "supplier", "sku", "source", "status"].includes(key)
+                          return (
+                            <TableHead
+                              key={key}
+                              className={`${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""} ${isSortable ? "cursor-pointer hover:bg-muted/50 select-none" : ""}`}
+                              draggable
+                              title={t("pages.adminPanel.dragToReorderColumns")}
+                              onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(colIndex)); e.dataTransfer.effectAllowed = "move" }}
+                              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move" }}
+                              onDrop={(e) => {
+                                e.preventDefault()
+                                const from = parseInt(e.dataTransfer.getData("text/plain"), 10)
+                                if (!isNaN(from)) handleIngredientsColumnReorder(from, colIndex)
+                              }}
+                              onClick={() => {
+                                if (!isSortable) return
+                                if (ingredientsSortBy === key) {
+                                  if (ingredientsSortDir === "asc") setIngredientsSortDir("desc")
+                                  else { setIngredientsSortBy(""); setIngredientsSortDir("asc") }
+                                } else {
+                                  setIngredientsSortBy(key)
+                                  setIngredientsSortDir("asc")
+                                }
+                              }}
+                            >
+                              <span className={`flex items-center gap-1 ${justify}`}>
+                                <GripVertical className="w-3 h-3 text-muted-foreground/60 cursor-grab active:cursor-grabbing shrink-0" />
+                                {labels[key] || key}
+                                {ingredientsSortBy === key && (
+                                  ingredientsSortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                                )}
+                                {ingredientsSortBy !== key && isSortable && <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                              </span>
+                            </TableHead>
+                          )
+                        })}
+                        <TableHead className={`${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""} w-14`}>{t("pages.adminPanel.actions")}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {[...filteredAndSortedIngredients].reverse().map((ing) => {
+                        const cellByKey: Record<string, React.ReactNode> = {
+                          name: <TableCell key="name" className={`font-medium ${textAlign} ${densityCellClass} truncate`} title={ing.name}>{ing.name}</TableCell>,
+                          price: <TableCell key="price" className={`${textAlign} ${densityCellClass}`}>₪{ing.price.toFixed(2)}</TableCell>,
+                          cheapest: <TableCell key="cheapest" className={`${textAlign} ${densityCellClass} text-sm`}>
+                            <AdminCheapestPopover
+                              ing={ing}
+                              webPrice={webPriceByIngredient[ing.name]}
+                              onWebPriceSaved={(d) => setWebPriceByIngredient((prev) => ({ ...prev, [ing.name]: d }))}
+                              t={t}
+                            />
+                          </TableCell>,
+                          sku: <TableCell key="sku" className={`${textAlign} ${densityCellClass} truncate`} title={ing.sku || undefined}>{ing.sku || "—"}</TableCell>,
+                          status: <TableCell key="status" className={`${textAlign} ${densityCellClass}`}>
+                            <Badge variant={ing.status === "שויך" ? "default" : "secondary"}>{ing.status === "שויך" ? t("pages.adminPanel.assigned") : t("pages.adminPanel.pending")}</Badge>
+                          </TableCell>,
+                          source: <TableCell key="source" className={`${textAlign} ${densityCellClass}`}>{ing.source === "global" ? t("pages.adminPanel.global") : t("pages.adminPanel.restaurant")}</TableCell>,
+                          supplier: <TableCell key="supplier" className={`${textAlign} ${densityCellClass} truncate`} title={ing.supplier || undefined}>{ing.supplier || "—"}</TableCell>,
+                          minStock: <TableCell key="minStock" className={`${textAlign} ${densityCellClass}`}>{ing.minStock}</TableCell>,
+                          stock: <TableCell key="stock" className={`${textAlign} ${densityCellClass}`}>{ing.stock}</TableCell>,
+                          waste: <TableCell key="waste" className={`${textAlign} ${densityCellClass}`}>{ing.waste}%</TableCell>,
+                          unit: <TableCell key="unit" className={`${textAlign} ${densityCellClass}`}>{ing.unit}</TableCell>,
+                        }
+                        return (
+                        <TableRow key={`${ing.source}-${ing.id}`}>
+                          {visibleColumnOrder.map((k) => cellByKey[k] ? <React.Fragment key={k}>{cellByKey[k]}</React.Fragment> : null)}
+                          <TableCell className={`${textAlign} ${densityCellClass}`}>
+                            <div className={`flex gap-1 ${justify}`}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => openEditAdminIngredient(ing)}
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => handleDeleteIngredientFromSupplier(ing, ing.supplier, ing.source === "global" ? (suppliersWithRests.find((s) => s.name === ing.supplier)?.restaurantIds || []) : undefined)}
+                                disabled={deletingIngredientId === `${ing.source}-${ing.id}`}
+                              >
+                                {deletingIngredientId === `${ing.source}-${ing.id}` ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                  </div>
+                  {filteredAndSortedIngredients.length === 0 && !loadingSystemOwner && (
+                    <p className="text-muted-foreground text-center py-8 text-sm">
+                      {(ingredientsList?.length ?? 0) === 0 ? t("pages.adminPanel.noIngredients") : t("pages.adminPanel.noResults")}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
+      )}
+
+      <Dialog open={addIngredientOpen} onOpenChange={(o) => { setAddIngredientOpen(o); if (!o) resetAddIngredientModal() }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t("pages.adminPanel.addIngredientToGlobal")}</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              {t("pages.adminPanel.addToGlobalDesc")}
+            </p>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>{t("pages.adminPanel.ingredientNameLabel")}</Label>
+              <Input value={addIngredientName} onChange={(e) => setAddIngredientName(e.target.value)} placeholder={t("pages.adminPanel.ingredientNamePlaceholder")} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>{t("pages.adminPanel.priceLabelNis")} *</Label>
+                <Input type="text" inputMode="decimal" value={addIngredientPrice} onChange={(e) => setAddIngredientPrice(e.target.value)} placeholder="0" />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("pages.adminPanel.unitUnit")}</Label>
+                <Select value={addIngredientUnit} onValueChange={setAddIngredientUnit}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="גרם">{t("pages.adminPanel.unitGram")}</SelectItem>
+                    <SelectItem value={'ק"ג'}>ק&quot;ג</SelectItem>
+                    <SelectItem value="מל">{t("pages.adminPanel.unitMl")}</SelectItem>
+                    <SelectItem value="ליטר">{t("pages.adminPanel.unitLiter")}</SelectItem>
+                    <SelectItem value="יחידה">{t("pages.adminPanel.unitUnit")}</SelectItem>
+                    <SelectItem value="חבילה">{t("pages.adminPanel.unitPackage")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>{t("pages.adminPanel.wasteLabel")}</Label>
+                <Input type="text" inputMode="decimal" value={addIngredientWaste} onChange={(e) => setAddIngredientWaste(e.target.value)} placeholder="0" />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("pages.adminPanel.inventory")}</Label>
+                <Input type="text" inputMode="numeric" value={addIngredientStock} onChange={(e) => setAddIngredientStock(e.target.value)} placeholder="0" />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("pages.adminPanel.minStock")}</Label>
+                <Input type="text" inputMode="numeric" value={addIngredientMinStock} onChange={(e) => setAddIngredientMinStock(e.target.value)} placeholder="0" />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("pages.adminPanel.skuLabel")}</Label>
+                <Input value={addIngredientSku} onChange={(e) => setAddIngredientSku(e.target.value)} placeholder={t("pages.adminPanel.skuPlaceholder")} />
               </div>
             </div>
+            <div className="space-y-2">
+              <Label>{t("pages.adminPanel.supplierOptional")}</Label>
+              {(() => {
+                const suppliers = suppliersWithRests.map((s) => s.name).sort()
+                if (suppliers.length === 0) {
+                  return (
+                    <Input
+                      value={addIngredientSupplier}
+                      onChange={(e) => setAddIngredientSupplier(e.target.value)}
+                      placeholder={t("pages.adminPanel.enterSupplierName")}
+                    />
+                  )
+                }
+                return (
+                  <Select value={addIngredientSupplier || "__none__"} onValueChange={(v) => setAddIngredientSupplier(v === "__none__" ? "" : v)}>
+                    <SelectTrigger><SelectValue placeholder={t("pages.adminPanel.selectSupplier")} /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">{t("pages.adminPanel.noSupplier")}</SelectItem>
+                      {suppliers.map((name) => (
+                        <SelectItem key={name} value={name}>{name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )
+              })()}
+            </div>
           </div>
-        )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddIngredientOpen(false)}>{t("pages.adminPanel.cancel")}</Button>
+            <Button onClick={handleSaveAddIngredient} disabled={addIngredientSaving}>
+              {addIngredientSaving ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : null}
+              שמור רכיב
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      </div>{/* /main */}
+      <Dialog open={editAdminIngredientOpen} onOpenChange={(o) => { setEditAdminIngredientOpen(o); if (!o) setEditAdminIngredient(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("pages.adminPanel.editIngredient")}</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              {editAdminIngredient && `${editAdminIngredient.name} (${editAdminIngredient.source === "global" ? t("pages.adminPanel.global") : t("pages.adminPanel.restaurant")})`}
+            </p>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>מחיר ₪ *</Label>
+                <Input type="text" inputMode="decimal" value={editAdminIngPrice} onChange={(e) => setEditAdminIngPrice(e.target.value)} placeholder="0" />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("pages.adminPanel.unitUnit")}</Label>
+                <Select value={editAdminIngUnit} onValueChange={setEditAdminIngUnit}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="גרם">{t("pages.adminPanel.unitGram")}</SelectItem>
+                    <SelectItem value={'ק"ג'}>ק&quot;ג</SelectItem>
+                    <SelectItem value="מל">{t("pages.adminPanel.unitMl")}</SelectItem>
+                    <SelectItem value="ליטר">{t("pages.adminPanel.unitLiter")}</SelectItem>
+                    <SelectItem value="יחידה">{t("pages.adminPanel.unitUnit")}</SelectItem>
+                    <SelectItem value="חבילה">{t("pages.adminPanel.unitPackage")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>פחת %</Label>
+                <Input type="text" inputMode="decimal" value={editAdminIngWaste} onChange={(e) => setEditAdminIngWaste(e.target.value)} placeholder="0" />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("pages.adminPanel.inventory")}</Label>
+                <Input type="text" inputMode="numeric" value={editAdminIngStock} onChange={(e) => setEditAdminIngStock(e.target.value)} placeholder="0" />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("pages.adminPanel.minStock")}</Label>
+                <Input type="text" inputMode="numeric" value={editAdminIngMinStock} onChange={(e) => setEditAdminIngMinStock(e.target.value)} placeholder="0" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>{t("pages.adminPanel.skuLabel")}</Label>
+              <Input value={editAdminIngSku} onChange={(e) => setEditAdminIngSku(e.target.value)} placeholder={t("pages.adminPanel.skuPlaceholder")} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t("pages.adminPanel.supplierLabel")}</Label>
+              <Input
+                value={editAdminIngSupplier}
+                onChange={(e) => setEditAdminIngSupplier(e.target.value)}
+                placeholder={t("pages.adminPanel.supplierNamePlaceholder")}
+                list="edit-admin-ing-supplier-list"
+              />
+              <datalist id="edit-admin-ing-supplier-list">
+                {suppliersWithRests.map((s) => (
+                  <option key={s.name} value={s.name} />
+                ))}
+              </datalist>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditAdminIngredientOpen(false)}>{t("pages.adminPanel.cancel")}</Button>
+            <Button onClick={handleSaveEditAdminIngredient} disabled={editAdminIngSaving}>
+              {editAdminIngSaving ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : null}
+              שמור
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* ===== DIALOGS ===== */}
-            <AlertDialog open={deleteRestDialogOpen} onOpenChange={setDeleteRestDialogOpen}>
+      <AlertDialog open={deleteRestDialogOpen} onOpenChange={setDeleteRestDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("pages.adminPanel.deleteRestaurantTitle")}</AlertDialogTitle>
