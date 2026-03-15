@@ -275,11 +275,11 @@ export function AdminPanel() {
   const [inviting, setInviting] = useState(false)
   const [assignManagerEmail, setAssignManagerEmail] = useState("")
   const [assigningManager, setAssigningManager] = useState(false)
-  const [assignManagerResult, setAssignManagerResult] = useState(null)
-  const [allSystemUsers, setAllSystemUsers] = useState([])
+  const [assignManagerResult, setAssignManagerResult] = useState<{ok:boolean;msg:string}|null>(null)
+  const [allSystemUsers, setAllSystemUsers] = useState<{uid:string;email:string;role:string;restaurantId:string|null;restaurantName?:string}[]>([])
   const [loadingAllUsers, setLoadingAllUsers] = useState(false)
   const [allUsersLoaded, setAllUsersLoaded] = useState(false)
-  const [assignTarget, setAssignTarget] = useState(null)
+  const [assignTarget, setAssignTarget] = useState<{uid:string;email:string}|null>(null)
   const [assignTargetRestId, setAssignTargetRestId] = useState("")
   const [savingAssign, setSavingAssign] = useState(false)
   const [restaurantUsers, setRestaurantUsers] = useState<{ uid: string; email?: string; role: string; permissions?: UserPermissions }[]>([])
@@ -1012,9 +1012,11 @@ export function AdminPanel() {
       const batch = writeBatch(db)
       let count = 0
       items.forEach((item) => {
-        if (!item.name?.trim() || item.price <= 0) return
-        const payload = {
-          price: item.price,
+        if (!item.name?.trim()) return
+        const isDeliveryNoteItem = item.price === 0 && typeof item.qty === "number" && item.qty > 0
+        if (item.price <= 0 && !isDeliveryNoteItem) return
+        const payload: Record<string, unknown> = {
+          ...(item.price > 0 ? { price: item.price } : {}),
           unit: item.unit || "קג",
           supplier: supTrim,
           lastUpdated: now,
@@ -1661,7 +1663,7 @@ export function AdminPanel() {
       setAssignTarget(null)
       setAssignTargetRestId("")
       loadAllSystemUsers()
-    } catch(e) { toast.error(e?.message || "שגיאה בשיוך") }
+    } catch(e) { toast.error((e as Error)?.message || "שגיאה בשיוך") }
     finally { setSavingAssign(false) }
   }
 
@@ -1694,7 +1696,7 @@ export function AdminPanel() {
         permissions: d.data().permissions,
       })))
     } catch (e) {
-      setAssignManagerResult({ ok: false, msg: e?.message || "שגיאה בשיוך" })
+      setAssignManagerResult({ ok: false, msg: (e as Error)?.message || "שגיאה בשיוך" })
     } finally { setAssigningManager(false) }
   }
 
