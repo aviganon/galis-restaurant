@@ -2225,25 +2225,40 @@ export function AdminPanel() {
                     {filteredAndSortedSuppliers.map((s) => {
                       const ingCount = (supplierToIngredients[s.name] || []).length
                       return (
-                        <Card
+<div
                           key={s.name}
                           className={cn(
-                            "border-0 shadow-sm cursor-pointer transition-colors",
-                            selectedSupplierDetail === s.name ? "ring-2 ring-primary bg-muted/50" : "hover:bg-muted/50"
+                            "relative rounded-xl overflow-hidden cursor-pointer border-2 transition-all duration-200 shadow-sm hover:shadow-lg hover:-translate-y-0.5",
+                            selectedSupplierDetail === s.name ? "border-primary shadow-lg -translate-y-0.5" : "border-transparent"
                           )}
+                          style={{height:130}}
                           onClick={() => setSelectedSupplierDetail(selectedSupplierDetail === s.name ? null : s.name)}
                         >
-                          <CardContent className="p-4 flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
-                              <Truck className="w-6 h-6 text-muted-foreground" />
+                          {/* Background image */}
+                          <img
+                            src={`https://source.unsplash.com/400x200/?food,supplier,wholesale,${encodeURIComponent(s.name)}`}
+                            alt={s.name}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            onError={e => {
+                              const el = e.target as HTMLImageElement
+                              el.style.display = "none"
+                              const parent = el.parentElement!
+                              parent.style.background = ["linear-gradient(135deg,#0F6E56,#1D9E75)","linear-gradient(135deg,#185FA5,#378ADD)","linear-gradient(135deg,#533AAB,#7F77DD)","linear-gradient(135deg,#854F0B,#BA7517)","linear-gradient(135deg,#993C1D,#D85A30)"][(s.name.charCodeAt(0)||0)%5]
+                            }}
+                          />
+                          {/* Dark overlay */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10"/>
+                          {/* Content */}
+                          <div className="absolute inset-0 flex flex-col justify-end p-4">
+                            <p className="font-bold text-white text-base leading-tight truncate drop-shadow">{s.name}</p>
+                            <p className="text-xs text-white/75 mt-0.5">{ingCount} {t("pages.adminPanel.ingredientsCount")}</p>
+                          </div>
+                          {selectedSupplierDetail === s.name && (
+                            <div className="absolute top-2 left-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                              <Check className="w-3.5 h-3.5 text-white"/>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold truncate">{s.name}</p>
-                              <p className="text-xs text-muted-foreground">{ingCount} {t("pages.adminPanel.ingredientsCount")}</p>
-                            </div>
-                            <span className="text-muted-foreground">›</span>
-                          </CardContent>
-                        </Card>
+                          )}
+                        </div>
                       )
                     })}
                   </div>
