@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
-import { Shield, Key, Loader2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown, GripVertical, Columns3, Upload as UploadIcon, FileText } from "lucide-react"
+import { Shield, Key, Loader2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown, GripVertical, Columns3, Upload as UploadIcon, FileText, TrendingUp, DollarSign, Utensils, AlertTriangle, ShoppingCart } from "lucide-react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -270,6 +270,11 @@ export function AdminPanel() {
   const textAlign = isRtl ? "text-right" : "text-left"
   const justify = isRtl ? "justify-end" : "justify-start"
   const [apiKey, setApiKey] = useState("")
+  const [dashTotalRevenue, setDashTotalRevenue] = useState(0)
+  const [dashTotalDishesSold, setDashTotalDishesSold] = useState(0)
+  const [dashAvgFoodCost, setDashAvgFoodCost] = useState(0)
+  const [dashPurchaseOrders, setDashPurchaseOrders] = useState(0)
+  const [dashLoadingKpis, setDashLoadingKpis] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [newRestName, setNewRestName] = useState("")
@@ -451,6 +456,38 @@ export function AdminPanel() {
       </div>
     )
   }
+
+  useEffect(() => {
+    if (!isSystemOwner || isImpersonating) return
+    setDashLoadingKpis(true)
+    const loadKpis = async () => {
+      try {
+        const restsSnap = await getDocs(collection(db, "restaurants"))
+        let totalRev = 0, totalDishes = 0, poCount = 0
+        const fcList: number[] = []
+        for (const r of restsSnap.docs) {
+          const [recSnap, poSnap] = await Promise.all([
+            getDocs(collection(db, "restaurants", r.id, "recipes")),
+            getDocs(collection(db, "restaurants", r.id, "purchaseOrders")),
+          ])
+          poCount += poSnap.docs.length
+          recSnap.docs.filter(d => !d.data().isCompound).forEach(d => {
+            const data = d.data()
+            const sp = (typeof data.sellingPrice === "number" ? data.sellingPrice : 0) / 1.17
+            const sold = typeof data.salesCount === "number" ? data.salesCount : 0
+            totalRev += sp * sold
+            totalDishes += sold
+            if (typeof data.foodCostPct === "number" && data.foodCostPct > 0) fcList.push(data.foodCostPct)
+          })
+        }
+        setDashTotalRevenue(Math.round(totalRev))
+        setDashTotalDishesSold(totalDishes)
+        setDashAvgFoodCost(fcList.length > 0 ? Math.round(fcList.reduce((a,b)=>a+b,0)/fcList.length*10)/10 : 0)
+        setDashPurchaseOrders(poCount)
+      } catch {} finally { setDashLoadingKpis(false) }
+    }
+    loadKpis()
+  }, [isSystemOwner, isImpersonating])
 
   useEffect(() => {
     getClaudeApiKey().then((k) => {
@@ -1744,6 +1781,67 @@ export function AdminPanel() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl space-y-6">
+
+      {/* OWNER DASHBOARD — merged */}
+      {isSystemOwner && !isImpersonating && (
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold mb-0.5">ניהול מערכת</h1>
+              <p className="text-muted-foreground text-sm">{restsWithDetails.length} מסעדות פעילות</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={()=>loadSystemOwnerData()} disabled={loadingSystemOwner}>
+              <RefreshCw className={cn("w-4 h-4 ml-1.5", loadingSystemOwner && "animate-spin")}/>רענן
+            </Button>
+          </div>
+
+          {restsWithDetails.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold mb-2 text-muted-foreground">מסעדות — לחץ לכניסה</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {restsWithDetails.map(rest => (
+                  <Card key={rest.id} className="border-0 shadow-sm cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={()=>onImpersonate?.({id:rest.id,name:rest.name,emoji:rest.emoji||""})}>
+                    <CardContent className="p-4 flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-xl bg-muted flex items-center justify-center text-xl flex-shrink-0">{rest.emoji||"🍽️"}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold truncate text-sm">{rest.name}</p>
+                        <p className="text-xs text-muted-foreground">{rest.dishesCount} מנות · {(rest.assignedSuppliers||[]).length} ספקים</p>
+                      </div>
+                      <div className="text-left flex-shrink-0">
+                        <p className={cn("font-bold text-sm", rest.fcAvg > 30 ? "text-orange-600" : "text-green-600")}>{rest.fcAvg > 0 ? `${rest.fcAvg.toFixed(1)}%` : "—"}</p>
+                        <p className="text-xs text-muted-foreground">food cost</p>
+                      </div>
+                      <span className="text-muted-foreground">›</span>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {([
+              {label:"הכנסות חודשיות", value:`₪${dashTotalRevenue.toLocaleString()}`, icon:TrendingUp, color:"bg-green-50 text-green-700"},
+              {label:"מנות שנמכרו", value:String(dashTotalDishesSold), icon:Utensils, color:"bg-amber-50 text-amber-700"},
+              {label:"food cost ממוצע", value:`${dashAvgFoodCost.toFixed(1)}%`, icon:DollarSign, color:"bg-blue-50 text-blue-700"},
+              {label:"הזמנות רכש", value:String(dashPurchaseOrders), icon:ShoppingCart, color:"bg-slate-50 text-slate-700"},
+            ] as const).map((kpi,i)=>(
+              <Card key={i} className="border-0 shadow-sm">
+                <CardContent className="p-4">
+                  <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center mb-3", kpi.color)}>
+                    <kpi.icon className="w-4 h-4"/>
+                  </div>
+                  <p className="text-2xl font-bold mb-0.5">{dashLoadingKpis ? "…" : kpi.value}</p>
+                  <p className="text-xs text-muted-foreground">{kpi.label}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <hr className="border-border"/>
+        </div>
+      )}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
