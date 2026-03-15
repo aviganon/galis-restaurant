@@ -430,7 +430,7 @@ export function FilePreviewModal({
               ביטול
             </Button>
             <Button onClick={handleConfirm}>
-              אשר וייבא
+              {isDeliveryNote ? "עדכן מלאי" : "אשר וייבא"}
             </Button>
           </div>
         )}
