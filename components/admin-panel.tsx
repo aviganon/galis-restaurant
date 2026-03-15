@@ -3316,7 +3316,7 @@ export function AdminPanel() {
                 ) : (
                   <div className="space-y-4">
                     {restaurantUsers
-                      .filter((u) => u.role === "user")
+                      .filter((u) => u.role !== "owner")
                       .map((u) => (
                         <div
                           key={u.uid}
@@ -3373,7 +3373,7 @@ export function AdminPanel() {
                           )}
                         </div>
                       ))}
-                    {restaurantUsers.filter((u) => u.role === "user").length === 0 && restaurantUsers.length > 0 && (
+                    {restaurantUsers.filter((u) => u.role !== "owner").length === 0 && restaurantUsers.length > 0 && (
                       <p className="text-sm text-muted-foreground">{t("pages.adminPanel.noUsersWithPermissions")}</p>
                     )}
                   </div>
