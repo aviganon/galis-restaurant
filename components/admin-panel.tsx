@@ -1854,29 +1854,57 @@ export function AdminPanel() {
             ) : (
               <div className="space-y-6">
 
-                {/* Restaurant cards — click to enter */}
+                {/* Restaurant cards — expand to see details */}
                 {restsWithDetails.length > 0 && (
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-3">{t("pages.dashboard.clickToView")}</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {restsWithDetails.map(rest => (
-                        <Card key={rest.id} className="border-0 shadow-sm cursor-pointer hover:bg-muted/50 transition-colors"
-                          onClick={()=>onImpersonate?.({id:rest.id,name:rest.name,emoji:rest.emoji||""})}>
-                          <CardContent className="p-4 flex items-center gap-3">
-                            <div className="w-11 h-11 rounded-xl bg-muted flex items-center justify-center text-xl flex-shrink-0">{rest.emoji||"🍽️"}</div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold truncate text-sm">{rest.name}</p>
-                              <p className="text-xs text-muted-foreground">{rest.dishesCount} מנות · {(rest.assignedSuppliers||[]).length} ספקים</p>
+                  <div className="space-y-3">
+                    {restsWithDetails.map(rest => (
+                      <Card key={rest.id} dir="rtl">
+                        <CardHeader className="pb-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              {rest.emoji && <span>{rest.emoji}</span>}
+                              {rest.name}
+                            </CardTitle>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm text-muted-foreground">
+                                {rest.dishesCount} {t("pages.adminPanel.dishesCount")} · {t("pages.adminPanel.fcAvg")} {rest.fcAvg}%
+                              </span>
+                              {onImpersonate && (
+                                <Button size="sm" variant="outline"
+                                  onClick={()=>{
+                                    onImpersonate({id:rest.id,name:rest.name,emoji:rest.emoji||""})
+                                  }}>
+                                  <UserCircle className="w-4 h-4 ml-1"/>
+                                  {t("pages.adminPanel.impersonate")}
+                                </Button>
+                              )}
+                              <Button size="sm" variant="destructive"
+                                onClick={()=>{setRestToDelete(rest);setDeleteRestDialogOpen(true)}}>
+                                <Trash2 className="w-4 h-4 ml-1"/>מחק
+                              </Button>
                             </div>
-                            <div className="text-left flex-shrink-0">
-                              <p className={cn("font-bold text-sm", rest.fcAvg > 30 ? "text-orange-600" : "text-green-600")}>{rest.fcAvg > 0 ? `${rest.fcAvg.toFixed(1)}%` : "—"}</p>
-                              <p className="text-xs text-muted-foreground">food cost</p>
-                            </div>
-                            <span className="text-muted-foreground">›</span>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-sm text-muted-foreground mb-2">{t("pages.adminPanel.assignedSuppliers")}:</div>
+                          <div className="flex flex-wrap gap-2 items-center">
+                            {(rest.assignedSuppliers||[]).map((s:string)=>(
+                              <Badge key={s} variant="secondary" className="flex items-center gap-1">
+                                {s}
+                                <button className="hover:text-destructive ml-1 text-xs" onClick={()=>handleRemoveSupplier(rest.id,s)}>✕</button>
+                              </Badge>
+                            ))}
+                            <select className="text-sm border rounded px-2 py-1 bg-background"
+                              onChange={e=>{if(e.target.value){handleAssignSupplier(rest.id,e.target.value);e.target.value=""}}} defaultValue="">
+                              <option value="">+ {t("pages.adminPanel.assignSupplier")}</option>
+                              {suppliersWithRests.filter(s=>!(rest.assignedSuppliers||[]).includes(s.name)).map(s=>(
+                                <option key={s.name} value={s.name}>{s.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
                 )}
 
