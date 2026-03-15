@@ -3409,72 +3409,7 @@ export function AdminPanel() {
         </DialogContent>
       </Dialog>
 
-      {hasFullAccess && (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Key className="w-5 h-5" />
-                {t("pages.adminPanel.claudeApiKey")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                {t("pages.adminPanel.apiKeyDesc")}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {t("pages.adminPanel.whereToRegister")}{" "}
-                <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                  Anthropic (Claude)
-                </a>
-                {" "}•{" "}
-                <a href="https://serper.dev/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                  Serper
-                </a>
-                {" "}({t("pages.adminPanel.serperSearchDesc")})
-              </p>
-              {loading ? (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {t("common.loading")}
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label htmlFor="claude-api-key">{t("pages.adminPanel.keyLabel")}</Label>
-                  <Input
-                    id="claude-api-key"
-                    name="claudeApiKey"
-                    type="password"
-                    placeholder={apiKey ? t("pages.adminPanel.keyPlaceholderSet") : t("pages.adminPanel.keyPlaceholderNew")}
-                    className="font-mono"
-                    autoComplete="off"
-                  />
-                  <div className="flex flex-wrap gap-2 items-center">
-                    <Button onClick={handleSaveKey} disabled={saving}>
-                      {saving ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : null}
-                      {t("pages.adminPanel.save")}
-                    </Button>
-                    {apiKey && (
-                      <>
-                        <Button variant="outline" onClick={handleTestApi} disabled={testingApi}>
-                          {testingApi ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : null}
-                          {t("pages.adminPanel.checkConnection")}
-                        </Button>
-                        <Button variant="outline" onClick={handleClearKey} disabled={saving}>
-                          {t("pages.adminPanel.removeKey")}
-                        </Button>
-                      </>
-                    )}
-                    {apiTestResult && (
-                      <span className="text-sm text-muted-foreground">{apiTestResult}</span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
+
     </div>
   )
 }
