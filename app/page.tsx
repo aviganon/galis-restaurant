@@ -263,10 +263,10 @@ export default function Home() {
   }, [userRole, currentPage, isRestrictedPage, hasFullMenu, userPermissions])
 
   useEffect(() => {
-    if (isSystemOwner && restaurants.length === 0 && currentRestaurantId === null) {
+    if (isSystemOwner && !impersonatingRestaurant) {
       setCurrentPage("admin-panel")
     }
-  }, [isSystemOwner, restaurants.length, currentRestaurantId])
+  }, [isSystemOwner, impersonatingRestaurant])
 
   const restaurantOnlyPages = ["calc", "ingredients", "inventory", "suppliers", "purchase-orders", "upload", "reports", "menu", "settings"]
   useEffect(() => {
@@ -285,7 +285,7 @@ export default function Home() {
   const handleImpersonate = (rest: { id: string; name: string; emoji?: string }) => {
     const display = rest.emoji ? `${rest.emoji} ${rest.name}` : rest.name
     setImpersonatingRestaurant({ id: rest.id, name: display })
-    setCurrentPage("dashboard")
+    setCurrentPage(isSystemOwner ? "admin-panel" : "dashboard")
   }
   const handleStopImpersonate = () => setImpersonatingRestaurant(null)
   const handleRestaurantDeleted = useCallback((deletedId: string) => {
@@ -370,7 +370,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      <DesktopNav 
+      {(!isSystemOwner || !!impersonatingRestaurant) && <DesktopNav 
         currentPage={currentPage} 
         setCurrentPage={setCurrentPage}
         currentRestaurant={effectiveRestaurantName}
@@ -426,14 +426,14 @@ export default function Home() {
       </AppProvider>
 
       {/* Mobile Navigation */}
-      <MobileNav 
+      {(!isSystemOwner || !!impersonatingRestaurant) && <MobileNav 
         currentPage={currentPage} 
         setCurrentPage={setCurrentPage}
         userRole={userRole}
         isSystemOwner={isSystemOwner}
         userPermissions={userPermissions}
         isImpersonating={!!impersonatingRestaurant}
-      />
+      />}
     </div>
   )
 }
