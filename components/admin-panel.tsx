@@ -1785,26 +1785,6 @@ export function AdminPanel() {
     } finally { setCreatingUser(false) }
   }
 
-  const handleCreateUser = async () => {
-    setCreateUserError(null)
-    if (!createUserEmail.trim() || !createUserPassword.trim()) { setCreateUserError("נא למלא אימייל וסיסמה"); return }
-    if (createUserPassword.length < 6) { setCreateUserError("הסיסמה חייבת להיות לפחות 6 תווים"); return }
-    setCreatingUser(true)
-    try {
-      const { createUserWithEmailAndPassword } = await import("firebase/auth")
-      const { auth: fbAuth } = await import("@/lib/firebase")
-      const cred = await createUserWithEmailAndPassword(fbAuth, createUserEmail.trim(), createUserPassword)
-      const { doc: fd, setDoc: sd } = await import("firebase/firestore")
-      await sd(fd(db, "users", cred.user.uid), { email: createUserEmail.trim(), role: createUserRole, restaurantId: createUserRestId || null })
-      setAllSystemUsers(prev => [...prev, { uid: cred.user.uid, email: createUserEmail.trim(), role: createUserRole, restaurantId: createUserRestId || null, restaurantName: restsWithDetails.find(r=>r.id===createUserRestId)?.name }])
-      toast.success("משתמש נוצר: " + createUserEmail.trim())
-      setCreateUserEmail(""); setCreateUserPassword(""); setCreateUserRestId(""); setShowCreateUser(false)
-    } catch(e) {
-      const code = (e as {code?:string}).code
-      setCreateUserError(code === "auth/email-already-in-use" ? "אימייל כבר בשימוש" : (e as Error).message || "שגיאה")
-    } finally { setCreatingUser(false) }
-  }
-
   const handleInviteUser = async () => {
     const email = inviteEmail.trim()
     if (!email || !currentRestaurantId) {
@@ -1827,7 +1807,7 @@ export function AdminPanel() {
       const res = await fetch("/api/invite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, restaurantName, role: inviteRole }),
+        body: JSON.stringify({ email, restaurantName }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
