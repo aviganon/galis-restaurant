@@ -239,7 +239,8 @@ export default function Suppliers() {
           supplier: supName,
           lastUpdated: now,
           createdBy: toGlobal ? "global" : "restaurant",
-          ...(!isDeliveryNoteItem ? { waste: 0, minStock: 0, sku: item.sku ?? "" } : {}),
+          // לא מאפסים waste/minStock — הם מוגדרים ידנית
+          sku: item.sku ?? "",
         }
         if (!toGlobal) {
           payload.stock = qty > 0 ? (currentStocks[item.name.trim()] ?? 0) + qty : (currentStocks[item.name.trim()] ?? 0)
@@ -272,6 +273,8 @@ export default function Suppliers() {
               price: item.price,
               unit: item.unit || "קג",
               supplier: supName.trim(),
+              sku: item.sku ?? "",
+              ...(typeof item.qty === "number" && item.qty > 0 ? { qty: item.qty } : {}),
             }))
           if (toSync.length > 0) {
             syncSupplierIngredientsToAssignedRestaurants(supName.trim(), toSync).catch((e) =>
@@ -286,7 +289,7 @@ export default function Suppliers() {
         loadSuppliers()
         refreshIngredients?.()
       } else {
-        toast.warning("אין רכיבים תקינים לשמירה (שם ריק, מחיר 0 וגם כמות 0)")
+        toast.warning("לא נמצאו רכיבים לשמירה — ודא ששם הרכיב מלא ושיש מחיר או כמות")
       }
     },
     [currentRestaurantId, isOwner, loadSuppliers, refreshIngredients]
