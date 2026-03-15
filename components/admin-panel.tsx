@@ -68,7 +68,6 @@ type RestWithDetails = {
   dishesCount: number
   fcAvg: number
   assignedSuppliers: string[]
-  poCount: number
 }
 
 type SupplierWithRests = {
@@ -711,11 +710,6 @@ export function AdminPanel() {
         })
         const fcAvg = fcCount > 0 ? fcSum / fcCount : 0
 
-        let rPoCount = 0
-        try {
-          const poSnap = await getDocs(collection(db, "restaurants", r.id, "purchaseOrders"))
-          rPoCount = poSnap.docs.length
-        } catch {}
         restsWithDetailsList.push({
           id: r.id,
           name: data.name || r.id,
@@ -723,7 +717,6 @@ export function AdminPanel() {
           dishesCount: dishes.length,
           fcAvg: Math.round(fcAvg * 10) / 10,
           assignedSuppliers: assignedList,
-          poCount: rPoCount,
         })
       }
 
@@ -2024,29 +2017,30 @@ export function AdminPanel() {
                           {rest.name}
                         </CardTitle>
                         <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1 flex-wrap">
-                            <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-100 dark:bg-amber-950/30 dark:text-amber-400">
-                              <Utensils className="w-3 h-3"/>
-                              {rest.dishesCount}
-                            </span>
-                            <span className={cn(
-                              "inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-md border",
-                              rest.fcAvg <= 0 ? "bg-muted text-muted-foreground border-border" :
-                              rest.fcAvg <= 28 ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
-                              rest.fcAvg <= 33 ? "bg-blue-50 text-blue-700 border-blue-100" :
-                              "bg-rose-50 text-rose-700 border-rose-100"
-                            )}>
-                              <TrendingUp className="w-3 h-3"/>
-                              {rest.fcAvg > 0 ? `${rest.fcAvg}%` : "—"}
-                            </span>
-                            <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-700 border border-violet-100 dark:bg-violet-950/30 dark:text-violet-400">
-                              <Truck className="w-3 h-3"/>
-                              {(rest.assignedSuppliers||[]).length}
-                            </span>
-                            <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-600 border border-slate-100 dark:bg-slate-900/30">
-                              <ShoppingCart className="w-3 h-3"/>
-                              {rest.poCount ?? 0}
-                            </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {rest.dishesCount > 0 && (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-400">
+                                <Utensils className="w-3 h-3"/>
+                                {rest.dishesCount} מנות
+                              </span>
+                            )}
+                            {rest.fcAvg > 0 && (
+                              <span className={cn(
+                                "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border",
+                                rest.fcAvg <= 28 ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                                rest.fcAvg <= 33 ? "bg-blue-50 text-blue-700 border-blue-200" :
+                                "bg-rose-50 text-rose-700 border-rose-200"
+                              )}>
+                                <TrendingUp className="w-3 h-3"/>
+                                FC {rest.fcAvg}%
+                              </span>
+                            )}
+                            {(rest.assignedSuppliers||[]).length > 0 && (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-950/30 dark:text-violet-400">
+                                <Truck className="w-3 h-3"/>
+                                {(rest.assignedSuppliers||[]).length} ספקים
+                              </span>
+                            )}
                           </div>
                           {onImpersonate && (
                             <Button
@@ -2133,6 +2127,33 @@ export function AdminPanel() {
           
                 
 
+                {/* ── 4 KPI mini-cards ── */}
+                {isSystemOwner && adminStats && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+                    {([
+                      {label:"הכנסות חודשיות", value:`₪${dashTotalRevenue.toLocaleString()}`, icon:TrendingUp, grad:"from-emerald-500 to-teal-600"},
+                      {label:"מנות שנמכרו",     value:String(dashTotalDishesSold),            icon:Utensils,   grad:"from-amber-500 to-orange-500"},
+                      {label:"food cost ממוצע", value:`${dashAvgFoodCost.toFixed(1)}%`,     icon:DollarSign, grad:"from-blue-500 to-indigo-600"},
+                      {label:"הזמנות רכש",      value:String(dashPurchaseOrders),              icon:ShoppingCart,grad:"from-violet-500 to-purple-600"},
+                    ] as const).map((kpi,i)=>(
+                      <Card key={i} className="border-0 shadow-sm overflow-hidden"
+                        style={{transition:"transform .2s,box-shadow .2s"}}
+                        onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.transform="translateY(-3px)";(e.currentTarget as HTMLElement).style.boxShadow="0 8px 20px rgba(0,0,0,.12)"}}
+                        onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.transform="";(e.currentTarget as HTMLElement).style.boxShadow=""}}
+                      >
+                        <CardContent className="p-0">
+                          <div className={cn("bg-gradient-to-br p-3 pb-2",kpi.grad)}>
+                            <kpi.icon className="w-4 h-4 text-white/90 mb-1.5"/>
+                            <p className="text-xl font-bold text-white leading-tight">{dashLoadingKpis?"…":kpi.value}</p>
+                          </div>
+                          <div className="px-3 py-1.5">
+                            <p className="text-xs text-muted-foreground font-medium">{kpi.label}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
           </TabsContent>
 
           <TabsContent value="suppliers" className="mt-4">
