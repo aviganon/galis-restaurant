@@ -13,6 +13,8 @@ import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { extractWithAI, type ExtractType, type ExtractedItem, type ExtractedSupplierItem, type ExtractedDishItem } from "@/lib/ai-extract"
 import { toast } from "sonner"
+import { db } from "@/lib/firebase"
+import { collection, getDocs } from "firebase/firestore"
 import { Loader2, X, Plus, Globe } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 
@@ -26,6 +28,7 @@ interface FilePreviewModalProps {
   canSaveToGlobal?: boolean
   /** כשמופעל — שמירה תמיד לקטלוג הגלובלי (לפאנל מנהל) */
   forceSaveToGlobal?: boolean
+  currentRestaurantId?: string | null
   onConfirmSupplier?: (items: ExtractedSupplierItem[], supplierName: string, saveToGlobal?: boolean) => void
   onConfirmDishes?: (items: ExtractedDishItem[]) => void
   onConfirmSales?: (items: Array<{ name: string; qty: number; price: number }>) => void
@@ -43,6 +46,7 @@ export function FilePreviewModal({
   onConfirmSupplier,
   onConfirmDishes,
   onConfirmSales,
+  currentRestaurantId,
 }: FilePreviewModalProps) {
   const [loading, setLoading] = useState(false)
   const [items, setItems] = useState<ExtractedItem[]>([])
@@ -54,9 +58,22 @@ export function FilePreviewModal({
   const [isDeliveryNote, setIsDeliveryNote] = useState(false)
   const [webPriceByName, setWebPriceByName] = useState<Record<string, { price: number; store: string; unit: string }>>({})
   const [webPriceLoading, setWebPriceLoading] = useState(false)
+  const [existingPrices, setExistingPrices] = useState<Record<string, number>>({})
 
   const MAX_PDF_MB = 8
   const MAX_IMAGE_MB = 5
+
+  useEffect(() => {
+    if (!open) return
+    if (currentRestaurantId) {
+      getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients"))
+        .then(snap => {
+          const prices: Record<string, number> = {}
+          snap.forEach(d => { const data = d.data(); if (typeof data.price === "number" && data.price > 0) prices[d.id] = data.price })
+          setExistingPrices(prices)
+        }).catch(() => {})
+    } else { setExistingPrices({}) }
+  }, [open, currentRestaurantId])
 
   useEffect(() => {
     if (!open || !file) return
@@ -276,6 +293,7 @@ export function FilePreviewModal({
                           <>
                             <th className="text-center p-2 font-semibold">כמות</th>
                             <th className="text-center p-2 font-semibold">מחיר חשבונית</th>
+                            <th className="text-center p-2 font-semibold">מחיר קיים</th>
                             <th className="text-center p-2 font-semibold">מחיר באינטרנט</th>
                             <th className="text-center p-2 font-semibold">יחידה</th>
                             <th className="text-center p-2 font-semibold w-16">מק"ט</th>
@@ -327,6 +345,23 @@ export function FilePreviewModal({
                                   className="h-8 text-sm w-20"
                                   aria-label="מחיר"
                                 />
+                              </td>
+                              <td className="p-2 text-center min-w-[80px]">
+                                {(() => {
+                                  const name = ((item as ExtractedSupplierItem).name || "").trim()
+                                  const invPrice = (item as ExtractedSupplierItem).price ?? 0
+                                  const ep = name ? existingPrices[name] : null
+                                  if (!ep || invPrice <= 0) return <span className="text-muted-foreground text-xs">—</span>
+                                  const diff = ((invPrice - ep) / ep) * 100
+                                  return (
+                                    <div className="text-xs">
+                                      <span className="font-medium">₪{ep.toFixed(1)}</span>
+                                      <div className={diff < -3 ? "text-emerald-600 font-medium" : diff > 3 ? "text-rose-600 font-medium" : "text-muted-foreground"}>
+                                        {diff < -3 ? `↓${Math.abs(diff).toFixed(0)}%` : diff > 3 ? `↑${diff.toFixed(0)}% יקר` : "≈ זהה"}
+                                      </div>
+                                    </div>
+                                  )
+                                })()}
                               </td>
                               <td className="p-2 text-center min-w-[100px]">
                                 {(() => {
