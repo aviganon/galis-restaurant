@@ -987,7 +987,7 @@ export function AdminPanel() {
       setEditAdminIngredientOpen(false)
       setEditAdminIngredient(null)
       setRefreshAdminIngredientsKey((k) => k + 1)
-      loadSystemOwnerData()
+      setAdminIngredients(prev => prev.map(ing => ing.id === editAdminIngredient!.id ? { ...ing, price: parseFloat(editAdminIngPrice)||ing.price, unit: editAdminIngUnit||ing.unit, waste: parseFloat(editAdminIngWaste)||ing.waste, stock: parseFloat(editAdminIngStock)||ing.stock, minStock: parseFloat(editAdminIngMinStock)||ing.minStock, sku: editAdminIngSku||ing.sku, supplier: editAdminIngSupplier||ing.supplier } : ing))
     } catch (e) {
       toast.error((e as Error)?.message || t("pages.adminPanel.error"))
     } finally {
@@ -1329,11 +1329,7 @@ export function AdminPanel() {
       }, { merge: true })
       toast.success(`פרטי ספק "${editSupplierDetailsName}" עודכנו`)
       setEditSupplierDetailsOpen(false)
-      setSuppliersWithRests(prev => prev.map(s =>
-        s.name === editSupplierDetailsName
-          ? { ...s, phone: editSupplierDetailsPhone.trim()||null, email: editSupplierDetailsEmail.trim()||null, contact: editSupplierDetailsContact.trim()||null, address: editSupplierDetailsAddress.trim()||null }
-          : s
-      ))
+      loadSystemOwnerData()
     } catch (e) {
       toast.error((e as Error).message)
     } finally {
@@ -1350,7 +1346,13 @@ export function AdminPanel() {
       const coll = editingSupplierIng.source==="global" ? "ingredients" : `restaurants/${currentRestaurantId}/ingredients`
       const { doc: fd, updateDoc } = await import("firebase/firestore")
       await updateDoc(fd(db, coll, editingSupplierIng.id), { price: parseFloat(editIngPrice)||0, unit: editIngUnit, waste: parseFloat(editIngWaste)||0, stock: parseFloat(editIngStock)||0, minStock: parseFloat(editIngMinStock)||0, sku: editIngSku, lastUpdated: new Date().toISOString() })
-      toast.success("רכיב עודכן"); setEditingSupplierIng(null); await loadSystemOwnerData()
+      toast.success("רכיב עודכן")
+      setSupplierToIngredients(prev => {
+        const u = { ...prev }
+        for (const sup in u) u[sup] = u[sup].map(ing => ing.id === editingSupplierIng!.id ? { ...ing, price: parseFloat(editIngPrice)||0, unit: editIngUnit, waste: parseFloat(editIngWaste)||0, stock: parseFloat(editIngStock)||0, minStock: parseFloat(editIngMinStock)||0, sku: editIngSku } : ing)
+        return u
+      })
+      setEditingSupplierIng(null)
     } catch(e) { toast.error((e as Error).message||"שגיאה") } finally { setSavingIngEdit(false) }
   }
 
@@ -2679,7 +2681,9 @@ export function AdminPanel() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{t("pages.adminPanel.addIngredientToGlobal")}</DialogTitle>
-            <DialogDescription>{t("pages.adminPanel.addToGlobalDesc")}</DialogDescription>
+            <p className="text-sm text-muted-foreground">
+              {t("pages.adminPanel.addToGlobalDesc")}
+            </p>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -2763,7 +2767,9 @@ export function AdminPanel() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{t("pages.adminPanel.editIngredient")}</DialogTitle>
-            <DialogDescription>{editAdminIngredient && `${editAdminIngredient.name} (${editAdminIngredient.source === "global" ? t("pages.adminPanel.global") : t("pages.adminPanel.restaurant")})`}</DialogDescription>
+            <p className="text-sm text-muted-foreground">
+              {editAdminIngredient && `${editAdminIngredient.name} (${editAdminIngredient.source === "global" ? t("pages.adminPanel.global") : t("pages.adminPanel.restaurant")})`}
+            </p>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
@@ -3184,7 +3190,9 @@ export function AdminPanel() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{t("pages.adminPanel.editSupplierDetails")}</DialogTitle>
-            <DialogDescription>{editSupplierDetailsName && `${t("pages.adminPanel.supplierLabelShort")}: ${editSupplierDetailsName}`}</DialogDescription>
+            <p className="text-sm text-muted-foreground">
+              {editSupplierDetailsName && `${t("pages.adminPanel.supplierLabelShort")}: ${editSupplierDetailsName}`}
+            </p>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
