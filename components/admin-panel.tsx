@@ -1978,9 +1978,31 @@ export function AdminPanel() {
                           {rest.name}
                         </CardTitle>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground">
-                            {rest.dishesCount} {t("pages.adminPanel.dishesCount")} · {t("pages.adminPanel.fcAvg")} {rest.fcAvg}%
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {rest.dishesCount > 0 && (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-400">
+                                <Utensils className="w-3 h-3"/>
+                                {rest.dishesCount} מנות
+                              </span>
+                            )}
+                            {rest.fcAvg > 0 && (
+                              <span className={cn(
+                                "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border",
+                                rest.fcAvg <= 28 ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                                rest.fcAvg <= 33 ? "bg-blue-50 text-blue-700 border-blue-200" :
+                                "bg-rose-50 text-rose-700 border-rose-200"
+                              )}>
+                                <TrendingUp className="w-3 h-3"/>
+                                FC {rest.fcAvg}%
+                              </span>
+                            )}
+                            {(rest.assignedSuppliers||[]).length > 0 && (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-950/30 dark:text-violet-400">
+                                <Truck className="w-3 h-3"/>
+                                {(rest.assignedSuppliers||[]).length} ספקים
+                              </span>
+                            )}
+                          </div>
                           {onImpersonate && (
                             <Button
                               size="sm"
@@ -2063,49 +2085,8 @@ export function AdminPanel() {
             )}
           
 
-                {/* KPI cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
-                  {([
-                    {label:"הכנסות חודשיות", value:`₪${dashTotalRevenue.toLocaleString()}`, icon:TrendingUp, color:"bg-green-50 text-green-700"},
-                    {label:"מנות שנמכרו", value:String(dashTotalDishesSold), icon:Utensils, color:"bg-amber-50 text-amber-700"},
-                    {label:"food cost ממוצע", value:`${dashAvgFoodCost.toFixed(1)}%`, icon:DollarSign, color:"bg-blue-50 text-blue-700"},
-                    {label:"הזמנות רכש", value:String(dashPurchaseOrders), icon:ShoppingCart, color:"bg-slate-50 text-slate-700"},
-                  ] as const).map((kpi,i)=>(
-                    <Card key={i} className="border-0 shadow-sm">
-                      <CardContent className="p-4">
-                        <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center mb-3", kpi.color)}>
-                          <kpi.icon className="w-4 h-4"/>
-                        </div>
-                        <p className="text-2xl font-bold mb-0.5">{dashLoadingKpis ? "…" : kpi.value}</p>
-                        <p className="text-xs text-muted-foreground">{kpi.label}</p>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
           
-                {/* KPI cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-                  {([
-                    {label:"הכנסות חודשיות",value:`₪${dashTotalRevenue.toLocaleString()}`,icon:TrendingUp,grad:"from-emerald-500 to-teal-600"},
-                    {label:"מנות שנמכרו",value:String(dashTotalDishesSold),icon:Utensils,grad:"from-amber-500 to-orange-500"},
-                    {label:"food cost ממוצע",value:`${dashAvgFoodCost.toFixed(1)}%`,icon:DollarSign,grad:"from-blue-500 to-indigo-600"},
-                    {label:"הזמנות רכש",value:String(dashPurchaseOrders),icon:ShoppingCart,grad:"from-violet-500 to-purple-600"},
-                  ] as const).map((kpi,i)=>(
-                    <Card key={i} className="border-0 shadow-sm overflow-hidden"
-                      style={{transition:"transform .2s,box-shadow .2s"}}
-                      onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.transform="translateY(-4px)";(e.currentTarget as HTMLElement).style.boxShadow="0 12px 28px rgba(0,0,0,.13)"}}
-                      onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.transform="";(e.currentTarget as HTMLElement).style.boxShadow=""}}
-                    >
-                      <CardContent className="p-0">
-                        <div className={cn("bg-gradient-to-br p-4 pb-3",kpi.grad)}>
-                          <kpi.icon className="w-5 h-5 text-white/90 mb-2"/>
-                          <p className="text-2xl font-bold text-white">{dashLoadingKpis?"…":kpi.value}</p>
-                        </div>
-                        <div className="px-4 py-2"><p className="text-xs text-muted-foreground font-medium">{kpi.label}</p></div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                
           </TabsContent>
 
           <TabsContent value="suppliers" className="mt-4">
