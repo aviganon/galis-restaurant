@@ -448,6 +448,17 @@ export function AdminPanel() {
 
   // Edit supplier - add ingredients to existing
   const [editSupplierOpen, setEditSupplierOpen] = useState(false)
+  const [editingSupplierIng, setEditingSupplierIng] = useState<{id:string;name:string;price:number;unit:string;waste:number;stock:number;minStock:number;sku:string;source:"global"|"restaurant"}|null>(null)
+  const [editIngPrice, setEditIngPrice] = useState("")
+  const [editIngUnit, setEditIngUnit] = useState("")
+  const [editIngWaste, setEditIngWaste] = useState("")
+  const [editIngStock, setEditIngStock] = useState("")
+  const [editIngMinStock, setEditIngMinStock] = useState("")
+  const [editIngSku, setEditIngSku] = useState("")
+  const [savingIngEdit, setSavingIngEdit] = useState(false)
+  const [supplierFpmOpen, setSupplierFpmOpen] = useState(false)
+  const [supplierFpmFile, setSupplierFpmFile] = useState<File|null>(null)
+  const [supplierFpmName, setSupplierFpmName] = useState("")
   const [editSupplierName, setEditSupplierName] = useState("")
   const [editSupplierSaving, setEditSupplierSaving] = useState(false)
   const [editNsmItems, setEditNsmItems] = useState<{ name: string; price: number; unit: string; waste: number; stock: number; minStock: number; sku: string }[]>([])
@@ -1324,6 +1335,19 @@ export function AdminPanel() {
     } finally {
       setEditSupplierDetailsSaving(false)
     }
+  }
+
+  const openEditSupplierIng = (ing: {id:string;name:string;price:number;unit:string;waste:number;stock:number;minStock:number;sku:string;source:"global"|"restaurant"}) => {
+    setEditingSupplierIng(ing); setEditIngPrice(String(ing.price)); setEditIngUnit(ing.unit); setEditIngWaste(String(ing.waste)); setEditIngStock(String(ing.stock)); setEditIngMinStock(String(ing.minStock)); setEditIngSku(ing.sku)
+  }
+  const saveIngEdit = async () => {
+    if (!editingSupplierIng) return; setSavingIngEdit(true)
+    try {
+      const coll = editingSupplierIng.source==="global" ? "ingredients" : `restaurants/${currentRestaurantId}/ingredients`
+      const { doc: fd, updateDoc } = await import("firebase/firestore")
+      await updateDoc(fd(db, coll, editingSupplierIng.id), { price: parseFloat(editIngPrice)||0, unit: editIngUnit, waste: parseFloat(editIngWaste)||0, stock: parseFloat(editIngStock)||0, minStock: parseFloat(editIngMinStock)||0, sku: editIngSku, lastUpdated: new Date().toISOString() })
+      toast.success("רכיב עודכן"); setEditingSupplierIng(null); await loadSystemOwnerData()
+    } catch(e) { toast.error((e as Error).message||"שגיאה") } finally { setSavingIngEdit(false) }
   }
 
   const openEditSupplier = (supplierName: string) => {
@@ -2308,6 +2332,10 @@ export function AdminPanel() {
                               <Plus className="w-4 h-4 ml-1" />
                               {t("pages.adminPanel.addIngredient")}
                             </Button>
+                            <Button size="sm" variant="outline" className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                              onClick={()=>{setSupplierFpmName(s.name);document.getElementById("supplier-inv-input")?.click()}}>
+                              <UploadIcon className="w-4 h-4 ml-1"/>העלאת חשבונית
+                            </Button>
                             <Button
                               size="sm"
                               variant="outline"
@@ -2383,15 +2411,14 @@ export function AdminPanel() {
                                   {supplierIngs.map((i) => (
                                     <tr key={i.id} className="border-b last:border-0">
                                       <td className="py-2 px-2 text-right">
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                          onClick={() => handleDeleteIngredientFromSupplier(i, s.name, s.restaurantIds)}
-                                          disabled={deletingIngredientId === `${i.source}-${i.id}`}
-                                        >
-                                          {deletingIngredientId === `${i.source}-${i.id}` ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                                        </Button>
+                                        <div className="flex gap-1 items-center">
+                                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={()=>openEditSupplierIng(i as {id:string;name:string;price:number;unit:string;waste:number;stock:number;minStock:number;sku:string;source:"global"|"restaurant"})}>
+                                            <Edit2 className="w-3.5 h-3.5"/>
+                                          </Button>
+                                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={()=>handleDeleteIngredientFromSupplier(i,s.name,s.restaurantIds)} disabled={deletingIngredientId===`${i.source}-${i.id}`}>
+                                            {deletingIngredientId===`${i.source}-${i.id}`?<Loader2 className="w-4 h-4 animate-spin"/>:<Trash2 className="w-3.5 h-3.5"/>}
+                                          </Button>
+                                        </div>
                                       </td>
                                       <td className="py-2 px-2 text-right">{i.sku || "—"}</td>
                                       <td className="py-2 px-2 text-right">{i.minStock}</td>
@@ -2407,6 +2434,18 @@ export function AdminPanel() {
                             </div>
                           )}
                         </div>
+                        {editingSupplierIng&&(<div className="mt-3 p-4 rounded-lg border border-violet-200 bg-violet-50/50 dark:bg-violet-950/20 space-y-3">
+                          <div className="flex items-center justify-between"><p className="text-sm font-medium">עריכת: <span className="font-semibold">{editingSupplierIng.name}</span></p><button onClick={()=>setEditingSupplierIng(null)} className="text-muted-foreground hover:text-foreground text-xs">✕</button></div>
+                          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                            {([["מחיר",editIngPrice,setEditIngPrice,"number"],["יחידה",editIngUnit,setEditIngUnit,"text"],["פחת%",editIngWaste,setEditIngWaste,"number"],["מלאי",editIngStock,setEditIngStock,"number"],["מינ׳",editIngMinStock,setEditIngMinStock,"number"],["מקט",editIngSku,setEditIngSku,"text"]] as [string,string,(v:string)=>void,string][]).map(([label,val,set,type])=>(
+                              <div key={label}><label className="text-xs text-muted-foreground block mb-1">{label}</label><Input type={type} value={val} onChange={e=>set(e.target.value)} className="h-8 text-sm"/></div>
+                            ))}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={saveIngEdit} disabled={savingIngEdit}>{savingIngEdit?<Loader2 className="w-3 h-3 animate-spin ml-1"/>:<Edit2 className="w-3 h-3 ml-1"/>}שמור</Button>
+                            <Button size="sm" variant="ghost" onClick={()=>setEditingSupplierIng(null)}>ביטול</Button>
+                          </div>
+                        </div>)}
                       </div>
                     )
                   })()}
@@ -2418,6 +2457,9 @@ export function AdminPanel() {
                 </CardContent>
               </Card>
             )}
+          <input type="file" id="supplier-inv-input" className="hidden" accept=".xlsx,.xls,.csv,.pdf,.rtf,image/*" onChange={e=>{const f=e.currentTarget.files?.[0];if(f){setSupplierFpmFile(f);setSupplierFpmOpen(true)}e.currentTarget.value=""}}/>
+          <FilePreviewModal open={supplierFpmOpen} onOpenChange={o=>{setSupplierFpmOpen(o);if(!o)setSupplierFpmFile(null)}} file={supplierFpmFile} type="p" supplierName={supplierFpmName} restaurantName={restsWithDetails.find(r=>r.id===currentRestaurantId)?.name} canSaveToGlobal={false} currentRestaurantId={currentRestaurantId} onConfirmSupplier={handleConfirmAdminSupplier}/>
+
           </TabsContent>
 
           <TabsContent value="ingredients" className="mt-4">
