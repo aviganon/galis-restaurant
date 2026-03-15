@@ -93,6 +93,11 @@ type IngredientRow = {
   source: "global" | "restaurant"
   status: "שויך" | "ממתין"
   globalCheapest?: GlobalCheapest
+  imageUrl?: string
+}
+
+function getIngredientImageUrl(name: string): string {
+  return `https://source.unsplash.com/56x56/?food,${encodeURIComponent(name.replace(/[()]/g,"").trim())},ingredient`
 }
 
 function pricePerKg(p: number, u: string): number {
@@ -260,7 +265,7 @@ function WebPriceCell({
 export function AdminPanel() {
   const t = useTranslations()
   const { dir } = useLanguage()
-  const { userRole, isSystemOwner, currentRestaurantId, restaurants, onImpersonate, onRestaurantDeleted, refreshRestaurants, refreshIngredients } = useApp()
+  const { userRole, isSystemOwner, currentRestaurantId, restaurants, onImpersonate, onStopImpersonate, isImpersonating, onRestaurantDeleted, refreshRestaurants, refreshIngredients } = useApp()
   const isRtl = dir === "rtl"
   const textAlign = isRtl ? "text-right" : "text-left"
   const justify = isRtl ? "justify-end" : "justify-start"
@@ -271,6 +276,7 @@ export function AdminPanel() {
   const [newRestEmoji, setNewRestEmoji] = useState("")
   const [newRestInviteCode, setNewRestInviteCode] = useState("")
   const [creatingRest, setCreatingRest] = useState(false)
+  const [newRestOpen, setNewRestOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviting, setInviting] = useState(false)
   const [assignManagerEmail, setAssignManagerEmail] = useState("")
