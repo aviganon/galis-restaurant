@@ -231,7 +231,7 @@ export default function Home() {
     return () => unsub()
   }, [])
 
-  const restrictedPages = ["admin-panel", "dashboard", "calc", "ingredients", "inventory", "suppliers", "purchase-orders", "upload", "reports", "menu", "settings"]
+  const restrictedPages = ["admin-panel", "dashboard", "calc", "ingredients", "inventory", "suppliers", "purchase-orders", "upload", "reports", "menu"]
   const isRestrictedPage = restrictedPages.includes(currentPage)
   const hasFullMenu = !!isSystemOwner || userRole === "owner" || userRole === "admin" || userRole === "manager"
   const canAccessPage = (page: string) => {
@@ -256,7 +256,7 @@ export default function Home() {
 
   useEffect(() => {
     if (isRestrictedPage && !canAccessPage(currentPage)) {
-      const fallback = ["dashboard", "calc", "ingredients", "inventory", "suppliers", "purchase-orders", "upload", "reports", "menu", "settings"]
+      const fallback = ["dashboard", "calc", "ingredients", "inventory", "suppliers", "purchase-orders", "upload", "reports", "menu", ]
         .find((p) => canAccessPage(p))
       setCurrentPage(fallback || "dashboard")
     }
@@ -268,7 +268,7 @@ export default function Home() {
     }
   }, [isSystemOwner, impersonatingRestaurant])
 
-  const restaurantOnlyPages = ["calc", "ingredients", "inventory", "suppliers", "purchase-orders", "upload", "reports", "menu", "settings"]
+  const restaurantOnlyPages = ["calc", "ingredients", "inventory", "suppliers", "purchase-orders", "upload", "reports", "menu"]
   useEffect(() => {
     if (isSystemOwner && !impersonatingRestaurant && restaurantOnlyPages.includes(currentPage)) {
       setCurrentPage("admin-panel")
