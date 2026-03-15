@@ -2444,10 +2444,13 @@ export function AdminPanel() {
 
                   {/* Table */}
                   <div className="rounded-lg border overflow-auto max-h-[min(55vh,520px)]" dir={dir}>
-                  <Table className="w-full min-w-full table-fixed text-sm">
+                  <Table className="w-full table-fixed text-sm">
                     <colgroup>
                       {visibleColumnOrder.map((k) => (
-                        <col key={k} className={k === "name" ? "min-w-[140px]" : k === "supplier" ? "min-w-[100px]" : k === "cheapest" ? "min-w-[90px]" : ""} />
+                        <col key={k} style={{
+                          width: k==="name"?"160px":k==="price"?"84px":k==="cheapest"?"124px":k==="sku"?"110px":k==="status"?"80px":k==="source"?"76px":k==="supplier"?"110px":k==="minStock"?"70px":k==="stock"?"70px":k==="waste"?"70px":k==="unit"?"72px":"88px",
+                          minWidth: k==="name"?"130px":k==="cheapest"?"110px":k==="sku"?"90px":k==="supplier"?"90px":"58px"
+                        }} />
                       ))}
                       <col className="w-20" />
                     </colgroup>
@@ -2529,12 +2532,12 @@ export function AdminPanel() {
                               t={t}
                             />
                           </TableCell>,
-                          sku: <TableCell key="sku" className={`${textAlign} ${densityCellClass} truncate`} title={ing.sku || undefined}>{ing.sku || "—"}</TableCell>,
+                          sku: <TableCell key="sku" className={`${textAlign} ${densityCellClass} truncate max-w-[110px]`} title={ing.sku || undefined}>{ing.sku || "—"}</TableCell>,
                           status: <TableCell key="status" className={`${textAlign} ${densityCellClass}`}>
                             <Badge variant={ing.status === "שויך" ? "default" : "secondary"}>{ing.status === "שויך" ? t("pages.adminPanel.assigned") : t("pages.adminPanel.pending")}</Badge>
                           </TableCell>,
                           source: <TableCell key="source" className={`${textAlign} ${densityCellClass}`}>{ing.source === "global" ? t("pages.adminPanel.global") : t("pages.adminPanel.restaurant")}</TableCell>,
-                          supplier: <TableCell key="supplier" className={`${textAlign} ${densityCellClass} truncate`} title={ing.supplier || undefined}>{ing.supplier || "—"}</TableCell>,
+                          supplier: <TableCell key="supplier" className={`${textAlign} ${densityCellClass} truncate max-w-[110px]`} title={ing.supplier || undefined}>{ing.supplier || "—"}</TableCell>,
                           minStock: <TableCell key="minStock" className={`${textAlign} ${densityCellClass}`}>{ing.minStock}</TableCell>,
                           stock: <TableCell key="stock" className={`${textAlign} ${densityCellClass}`}>{ing.stock}</TableCell>,
                           waste: <TableCell key="waste" className={`${textAlign} ${densityCellClass}`}>{ing.waste}%</TableCell>,
