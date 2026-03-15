@@ -82,6 +82,8 @@ const moreNavItems = (
   const full = hasFullMenu(userRole, isSystemOwner)
   const items: { id: string; label: string; icon: typeof Package }[] = []
   if (isSystemOwner && !isImpersonating) return items
+  // בעלים בהתחזות — כפתור חזרה לפאנל בעלים
+  if (isSystemOwner && isImpersonating) items.push({ id: "admin-panel", label: t("nav.adminPanel"), icon: Shield })
   if (full || userCanSee(perms, "canSeeInventory")) items.push({ id: "inventory", label: t("nav.inventory"), icon: Package })
   if (full || userCanSee(perms, "canSeePurchaseOrders")) items.push({ id: "purchase-orders", label: t("nav.purchaseOrders"), icon: ClipboardList })
   if (full || userCanSee(perms, "canSeeUpload")) items.push({ id: "upload", label: t("nav.upload"), icon: Upload })
