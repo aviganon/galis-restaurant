@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
-import { Shield, Key, Loader2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown, GripVertical, Columns3, Upload as UploadIcon, FileText, TrendingUp, DollarSign, Utensils, AlertTriangle, ShoppingCart } from "lucide-react"
+import { Shield, Key, Loader2, LogOut, Settings2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown, GripVertical, Columns3, Upload as UploadIcon, FileText, TrendingUp, DollarSign, Utensils, AlertTriangle, ShoppingCart } from "lucide-react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -49,6 +49,9 @@ import { getClaudeApiKey, setClaudeApiKey, testClaudeConnection } from "@/lib/cl
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
 import { useLanguage } from "@/contexts/language-context"
+import { LanguageSwitcher } from "@/components/language-switcher"
+import { signOut } from "firebase/auth"
+import { auth } from "@/lib/firebase"
 import { doc, setDoc, getDoc, getDocFromServer, collection, collectionGroup, query, where, getDocs, getDocsFromServer, deleteDoc, writeBatch } from "firebase/firestore"
 import { FilePreviewModal } from "@/components/file-preview-modal"
 import type { ExtractedSupplierItem } from "@/lib/ai-extract"
@@ -269,7 +272,7 @@ function WebPriceCell({
 export function AdminPanel() {
   const t = useTranslations()
   const { dir } = useLanguage()
-  const { userRole, isSystemOwner, currentRestaurantId, restaurants, onImpersonate, onStopImpersonate, isImpersonating, onRestaurantDeleted, refreshRestaurants, refreshIngredients } = useApp()
+  const { userRole, isSystemOwner, currentRestaurantId, restaurants, onImpersonate, onStopImpersonate, isImpersonating, onRestaurantDeleted, refreshRestaurants, refreshIngredients, setCurrentPage } = useApp()
   const isRtl = dir === "rtl"
   const textAlign = isRtl ? "text-right" : "text-left"
   const justify = isRtl ? "justify-end" : "justify-start"
@@ -1785,6 +1788,40 @@ export function AdminPanel() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl space-y-6">
+
+      {/* Owner top action bar — shown only when owner is NOT impersonating */}
+      {isSystemOwner && !isImpersonating && (
+        <div className="flex items-center justify-between py-2 px-4 rounded-xl bg-muted/50 border border-border">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
+              <Shield className="w-3.5 h-3.5 text-primary-foreground"/>
+            </div>
+            <span className="text-sm font-medium text-muted-foreground">פאנל בעלים</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <LanguageSwitcher/>
+            <Button
+              variant="ghost" size="sm"
+              onClick={()=>setCurrentPage?.("settings")}
+              className="gap-1.5 text-muted-foreground hover:text-foreground"
+              title="הגדרות"
+            >
+              <Settings2 className="w-4 h-4"/>
+              <span className="hidden sm:inline text-xs">הגדרות</span>
+            </Button>
+            <Button
+              variant="ghost" size="sm"
+              onClick={()=>signOut(auth)}
+              className="gap-1.5 text-muted-foreground hover:text-destructive"
+              title="יציאה"
+            >
+              <LogOut className="w-4 h-4"/>
+              <span className="hidden sm:inline text-xs">יציאה</span>
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
