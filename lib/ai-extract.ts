@@ -257,10 +257,23 @@ export async function extractWithAI(
     clean = clean.replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')
     try {
       return JSON.parse(clean) as ExtractResult
-    } catch {
-      const jsonMatch = clean.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        try { return JSON.parse(jsonMatch[0]) as ExtractResult } catch {}
+    } catch (e) {
+      // נסיון שני — חלץ JSON אגרסיבי
+      const attempts = [
+        clean,
+        clean.replace(/[\u2018\u2019\u201C\u201D]/g, '"'),
+        (clean.match(/\{[\s\S]*\}/) || [])[0] || '',
+      ].filter(Boolean)
+      for (const attempt of attempts) {
+        try {
+          const c2 = attempt.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')
+          return JSON.parse(c2)
+        } catch {}
+      }
+      if (clean.includes('supplier_name') || clean.includes('no_prices') || clean.includes('תעודת משלוח')) {
+        const supMatch = clean.match(/supplier_name[^:]*:[^"]*"([^"]+)"/)
+        const dateMatch = clean.match(/invoice_date[^:]*:[^"]*"([^"]+)"/)
+        return { supplier_name: supMatch?.[1]?.trim() || '', invoice_date: dateMatch?.[1]?.trim() || null, no_prices: true, items: [] }
       }
       throw new Error(`שגיאה בפענוח תשובת AI — נסה שוב או השתמש בקובץ Excel`)
     }
@@ -299,10 +312,22 @@ export async function extractWithAI(
       const parsed = JSON.parse(clean) as ExtractResult
       return parsed
     } catch (e) {
-      // נסיון שני — חלץ JSON מהתוכן
-      const jsonMatch = clean.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        try { return JSON.parse(jsonMatch[0]) as ExtractResult } catch {}
+      // נסיון שני — חלץ JSON אגרסיבי
+      const attempts = [
+        clean,
+        clean.replace(/[\u2018\u2019\u201C\u201D]/g, '"'),
+        (clean.match(/\{[\s\S]*\}/) || [])[0] || '',
+      ].filter(Boolean)
+      for (const attempt of attempts) {
+        try {
+          const c2 = attempt.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')
+          return JSON.parse(c2)
+        } catch {}
+      }
+      if (clean.includes('supplier_name') || clean.includes('no_prices') || clean.includes('תעודת משלוח')) {
+        const supMatch = clean.match(/supplier_name[^:]*:[^"]*"([^"]+)"/)
+        const dateMatch = clean.match(/invoice_date[^:]*:[^"]*"([^"]+)"/)
+        return { supplier_name: supMatch?.[1]?.trim() || '', invoice_date: dateMatch?.[1]?.trim() || null, no_prices: true, items: [] }
       }
       throw new Error(`שגיאה בפענוח תשובת AI — נסה שוב או השתמש בקובץ Excel`)
     }
