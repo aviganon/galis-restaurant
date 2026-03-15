@@ -158,6 +158,7 @@ export function SuppliersInvoiceUpload({ restaurantName, onConfirm, onClose, onS
         type="p"
         restaurantName={restaurantName}
         canSaveToGlobal={false}
+        currentRestaurantId={currentRestaurantId}
         onConfirmSupplier={handleConfirm}
       />
     </motion.div>
