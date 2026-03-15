@@ -61,6 +61,7 @@ qty = עמודת "כמות" — המספר שמופיע ליד שם הפריט. 
 טבלאות: עמודות נפוצות — שורה, מק"ט, תיאור מוצר (=name), כמות (=qty), תאריך אספקה, מחיר ליחידה, הנחה, סה"כ מחיר.
 דוגמה: שורה=1, מק"ט=6090, תאור מוצר=בנדקטין, כמות=6 → name:"בנדקטין", sku:"6090", qty:6, price:0, unit:"יחידה"
 חשוב: name = תוכן עמודת "תאור מוצר" / "תיאור" / "פריט" — לא המק"ט ולא מספר השורה!
+פורמט pipe: עמודות barcode-name-qty-price-discount-netprice. חלץ: price=netprice (מחיר אחרי הנחה), qty=כמות, sku=barcode. דוגמה: |7290005966354|ירדן בלאן|24|54.00|20.0|43.20|... → name:ירדן בלאן, sku:7290005966354, qty:24, price:43.20
 `
 
 const SUPPLIER_SYSTEM = `אתה מומחה לניתוח חשבוניות ומחירוני ספקי מזון ומשקאות בישראל.
@@ -139,7 +140,7 @@ export async function detectDocumentType(file: File): Promise<DetectedDocType> {
 
   if (isImage || isPdf) {
     const base64 = await fileToBase64(file)
-    const mediaType = isPdf ? "application/pdf" : `image/${ext}`
+    const mediaType = isPdf ? "application/pdf" : `image/${ext === "jpg" ? "jpeg" : ext}`
     const mediaBlock =
       isPdf
         ? { type: "document" as const, source: { type: "base64" as const, media_type: "application/pdf" as const, data: base64 } }
@@ -242,7 +243,7 @@ export async function extractWithAI(
           : SALES_SYSTEM
     const userContent =
       type === "p"
-        ? "נתח את החשבונית: חלץ שם ספק, תאריך, ולכל פריט — שם (תיאור המוצר), מק\"ט, מחיר נטו ליחידה (0 אם אין), יחידה, וכמות (qty). אם אין עמודת מחיר כלל — החזר no_prices:true. qty חייב להיות מספר גדול מ-0. JSON בלבד."
+        ? "נתח את החשבונית: חלץ שם ספק, תאריך, ולכל פריט — שם, מק\"ט, מחיר נטו ליחידה (אחרי הנחה), יחידה, כמות (qty). פורמט pipe: price=netprice, qty=col3, sku=barcode. אם אין מחיר — no_prices:true. JSON בלבד."
         : type === "d"
           ? "חלץ מנות ומחירים מהתפריט. לכל מנה ישייך רכיבים לפי הבנתך (בשר, ירקות, קמח וכו') — גם אם לא מופיעים בתפריט. JSON בלבד."
           : "חלץ מנות, כמויות ומחירים. JSON בלבד."
@@ -281,7 +282,7 @@ export async function extractWithAI(
 
   if (isImage || isPdf) {
     const base64 = await fileToBase64(file)
-    const mediaType = isPdf ? "application/pdf" : `image/${ext}`
+    const mediaType = isPdf ? "application/pdf" : `image/${ext === "jpg" ? "jpeg" : ext}`
     const system =
       type === "p"
         ? SUPPLIER_SYSTEM + (supplierName ? ` שם הספק: "${supplierName}".` : "")
@@ -290,7 +291,7 @@ export async function extractWithAI(
           : SALES_SYSTEM
     const userContent =
       type === "p"
-        ? "נתח את החשבונית: חלץ שם ספק, תאריך, ולכל פריט — שם (תיאור המוצר), מק\"ט, מחיר נטו ליחידה (0 אם אין), יחידה, וכמות (qty). אם אין עמודת מחיר כלל — החזר no_prices:true. qty חייב להיות מספר גדול מ-0. JSON בלבד."
+        ? "נתח את החשבונית: חלץ שם ספק, תאריך, ולכל פריט — שם, מק\"ט, מחיר נטו ליחידה (אחרי הנחה), יחידה, כמות (qty). פורמט pipe: price=netprice, qty=col3, sku=barcode. אם אין מחיר — no_prices:true. JSON בלבד."
         : type === "d"
           ? "חלץ מנות ומחירים מהתפריט. לכל מנה ישייך רכיבים לפי הבנתך (בשר, ירקות, קמח וכו') — גם אם לא מופיעים בתפריט. JSON בלבד."
           : "חלץ מנות, כמויות ומחירים. JSON בלבד."
