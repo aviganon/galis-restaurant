@@ -277,6 +277,7 @@ export function AdminPanel() {
   const [newRestInviteCode, setNewRestInviteCode] = useState("")
   const [creatingRest, setCreatingRest] = useState(false)
   const [newRestOpen, setNewRestOpen] = useState(false)
+  const [newRestOpen, setNewRestOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviting, setInviting] = useState(false)
   const [assignManagerEmail, setAssignManagerEmail] = useState("")
