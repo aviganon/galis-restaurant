@@ -1021,8 +1021,6 @@ export function AdminPanel() {
           supplier: supTrim,
           lastUpdated: now,
           createdBy: "global" as const,
-          waste: 0,
-          minStock: 0,
           sku: item.sku ?? "",
         }
         batch.set(doc(db, "ingredients", item.name.trim()), payload, { merge: true })
