@@ -396,6 +396,10 @@ export function AdminPanel() {
   const INVOICE_ACCEPT = ".xlsx,.xls,.csv,.pdf,.rtf,image/*"
   const [selectedSupplierDetail, setSelectedSupplierDetail] = useState<string | null>(null)
   const [selectedRestDetail, setSelectedRestDetail] = useState<string | null>(null)
+  const [activeRestChip, setActiveRestChip] = useState<"dishes"|"fc"|"suppliers"|"orders"|null>(null)
+  const [restChipLoading, setRestChipLoading] = useState(false)
+  const [restChipDishes, setRestChipDishes] = useState<{name:string;price:number;fc:number}[]>([])
+  const [restChipOrders, setRestChipOrders] = useState<{id:string;supplier:string;date:string;total:number;status:string}[]>([])
   const [loadingSystemOwner, setLoadingSystemOwner] = useState(false)
   const [addIngredientOpen, setAddIngredientOpen] = useState(false)
   const [addIngredientName, setAddIngredientName] = useState("")
@@ -2137,49 +2141,101 @@ export function AdminPanel() {
                           </Button>
                         </div>
                       </div>
+                      {/* Clickable KPI chips */}
                       <div className="flex gap-3 flex-wrap">
                         {([
-                          {icon:Utensils,val:selectedRest.dishesCount,label:"מנות",grad:"from-amber-400 to-orange-500"},
-                          {icon:TrendingUp,val:selectedRest.fcAvg>0?`${selectedRest.fcAvg}%`:"—",label:"Food Cost",grad:selectedRest.fcAvg<=0?"from-slate-400 to-slate-500":selectedRest.fcAvg<=28?"from-emerald-400 to-teal-500":selectedRest.fcAvg<=33?"from-blue-400 to-indigo-500":"from-rose-400 to-red-500"},
-                          {icon:Truck,val:(selectedRest.assignedSuppliers||[]).length,label:"ספקים",grad:"from-violet-400 to-purple-500"},
-                          {icon:ShoppingCart,val:selectedRest.poCount??0,label:"הזמנות",grad:"from-slate-400 to-slate-500"},
-                        ] as const).map((chip,ci)=>(
-                          <div key={ci} className="rounded-lg overflow-hidden shadow-sm" style={{minWidth:68}}>
+                          {key:"dishes" as const,icon:Utensils,val:selectedRest.dishesCount,label:"מנות",grad:"from-amber-400 to-orange-500"},
+                          {key:"fc" as const,icon:TrendingUp,val:selectedRest.fcAvg>0?`${selectedRest.fcAvg}%`:"—",label:"Food Cost",grad:selectedRest.fcAvg<=0?"from-slate-400 to-slate-500":selectedRest.fcAvg<=28?"from-emerald-400 to-teal-500":selectedRest.fcAvg<=33?"from-blue-400 to-indigo-500":"from-rose-400 to-red-500"},
+                          {key:"suppliers" as const,icon:Truck,val:(selectedRest.assignedSuppliers||[]).length,label:"ספקים",grad:"from-violet-400 to-purple-500"},
+                          {key:"orders" as const,icon:ShoppingCart,val:selectedRest.poCount??0,label:"הזמנות",grad:"from-slate-400 to-slate-500"},
+                        ] as const).map((chip)=>(
+                          <div key={chip.key}
+                            className={`rounded-lg overflow-hidden shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 ${activeRestChip===chip.key?"ring-2 ring-offset-1 ring-primary scale-105":""}`}
+                            style={{minWidth:72}}
+                            onClick={()=>loadRestChipData(selectedRest.id,chip.key)}>
                             <div className={`bg-gradient-to-br ${chip.grad} px-3 py-1.5 flex items-center gap-1.5`}>
                               <chip.icon className="w-3.5 h-3.5 text-white/80"/><span className="text-base font-bold text-white">{chip.val}</span>
                             </div>
-                            <div className="bg-muted/60 px-2 py-0.5"><p className="text-[10px] text-muted-foreground font-medium">{chip.label}</p></div>
+                            <div className={`px-2 py-0.5 ${activeRestChip===chip.key?"bg-primary/10":"bg-muted/60"}`}>
+                              <p className={`text-[10px] font-medium ${activeRestChip===chip.key?"text-primary":"text-muted-foreground"}`}>{chip.label}</p>
+                            </div>
                           </div>
                         ))}
                       </div>
-                      <div>
-                        <p className="text-sm font-medium mb-2">ספקים משויכים — לחץ להסרה:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {(selectedRest.assignedSuppliers?.length??0)===0
-                            ?<span className="text-sm text-muted-foreground">{t("pages.adminPanel.noAssignedSuppliers")}</span>
-                            :(selectedRest.assignedSuppliers||[]).map(s=>(
-                              <Button key={s} size="sm" variant="secondary" className="text-destructive hover:bg-destructive/10"
-                                onClick={()=>handleRemoveSupplier(selectedRest.id,s)} disabled={removingSupplier===selectedRest.id+":"+s}>
-                                {removingSupplier===selectedRest.id+":"+s?<Loader2 className="w-3 h-3 animate-spin ml-1"/>:<X className="w-3 h-3 ml-1"/>}{s}
-                              </Button>
-                            ))
-                          }
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium mb-2">{t("pages.adminPanel.suppliersAvailableForAssignment")}:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {suppliersWithRests.filter(s=>!(selectedRest.assignedSuppliers||[]).includes(s.name)).map(s=>(
-                            <Button key={s.name} size="sm" variant="outline"
-                              onClick={()=>handleAssignSupplier(selectedRest.id,s.name)} disabled={assigningSupplier===selectedRest.id+":"+s.name}>
-                              {assigningSupplier===selectedRest.id+":"+s.name?<Loader2 className="w-3 h-3 animate-spin ml-1"/>:<Check className="w-3 h-3 ml-1"/>}{s.name}
-                            </Button>
-                          ))}
-                          {suppliersWithRests.filter(s=>!(selectedRest.assignedSuppliers||[]).includes(s.name)).length===0&&(
-                            <span className="text-sm text-muted-foreground">{t("pages.adminPanel.allSuppliersAssigned")}</span>
-                          )}
-                        </div>
-                      </div>
+
+                      {activeRestChip && (
+                        <motion.div initial={{opacity:0,y:-6}} animate={{opacity:1,y:0}} className="rounded-xl border bg-background p-4">
+                          {restChipLoading ? (
+                            <div className="flex items-center gap-2 text-muted-foreground py-3"><Loader2 className="w-4 h-4 animate-spin"/>טוען...</div>
+                          ) : activeRestChip==="dishes" ? (
+                            <div>
+                              <p className="text-sm font-semibold mb-3 flex items-center gap-1.5"><Utensils className="w-4 h-4 text-amber-500"/>מנות ({restChipDishes.length})</p>
+                              {restChipDishes.length===0?<p className="text-sm text-muted-foreground">אין מנות</p>:(
+                                <div className="overflow-x-auto"><table className="w-full text-sm">
+                                  <thead><tr className="border-b text-xs text-muted-foreground"><th className="text-right pb-1.5">מנה</th><th className="text-center pb-1.5 w-20">מחיר</th><th className="text-center pb-1.5 w-20">FC%</th></tr></thead>
+                                  <tbody>{restChipDishes.map((d,i)=>(
+                                    <tr key={i} className="border-b last:border-0 hover:bg-muted/30">
+                                      <td className="py-1.5 font-medium">{d.name}</td>
+                                      <td className="py-1.5 text-center text-muted-foreground">₪{d.price.toLocaleString()}</td>
+                                      <td className="py-1.5 text-center"><span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${d.fc<=0?"text-muted-foreground":d.fc<=28?"text-emerald-700 bg-emerald-50":d.fc<=33?"text-blue-700 bg-blue-50":"text-rose-700 bg-rose-50"}`}>{d.fc>0?`${d.fc}%`:"—"}</span></td>
+                                    </tr>
+                                  ))}</tbody>
+                                </table></div>
+                              )}
+                            </div>
+                          ) : activeRestChip==="fc" ? (
+                            <div>
+                              <p className="text-sm font-semibold mb-3 flex items-center gap-1.5"><TrendingUp className="w-4 h-4 text-blue-500"/>Food Cost — {selectedRest.fcAvg>0?`ממוצע ${selectedRest.fcAvg}%`:"אין נתונים"}</p>
+                              {restChipDishes.filter(d=>d.fc>0).length===0?<p className="text-sm text-muted-foreground">אין נתוני FC</p>:(
+                                <div className="space-y-2">{restChipDishes.filter(d=>d.fc>0).sort((a,b)=>b.fc-a.fc).map((d,i)=>(
+                                  <div key={i} className="flex items-center gap-2">
+                                    <span className="text-sm flex-1 truncate">{d.name}</span>
+                                    <div className="flex-1 max-w-[120px] h-2 bg-muted rounded-full overflow-hidden">
+                                      <div className={`h-full rounded-full ${d.fc<=28?"bg-emerald-400":d.fc<=33?"bg-blue-400":"bg-rose-400"}`} style={{width:`${Math.min(d.fc/50*100,100)}%`}}/>
+                                    </div>
+                                    <span className={`text-xs font-bold w-12 text-right ${d.fc<=28?"text-emerald-600":d.fc<=33?"text-blue-600":"text-rose-600"}`}>{d.fc}%</span>
+                                  </div>
+                                ))}</div>
+                              )}
+                            </div>
+                          ) : activeRestChip==="suppliers" ? (
+                            <div className="space-y-3">
+                              <p className="text-sm font-semibold flex items-center gap-1.5"><Truck className="w-4 h-4 text-violet-500"/>ספקים משויכים</p>
+                              <div className="flex flex-wrap gap-2">
+                                {(selectedRest.assignedSuppliers?.length??0)===0?<span className="text-sm text-muted-foreground">{t("pages.adminPanel.noAssignedSuppliers")}</span>
+                                  :(selectedRest.assignedSuppliers||[]).map(s=>(<Button key={s} size="sm" variant="secondary" className="text-destructive hover:bg-destructive/10"
+                                    onClick={()=>handleRemoveSupplier(selectedRest.id,s)} disabled={removingSupplier===selectedRest.id+":"+s}>
+                                    {removingSupplier===selectedRest.id+":"+s?<Loader2 className="w-3 h-3 animate-spin ml-1"/>:<X className="w-3 h-3 ml-1"/>}{s}</Button>))}
+                              </div>
+                              <p className="text-xs text-muted-foreground">הוסף ספק:</p>
+                              <div className="flex flex-wrap gap-2">
+                                {suppliersWithRests.filter(s=>!(selectedRest.assignedSuppliers||[]).includes(s.name)).map(s=>(
+                                  <Button key={s.name} size="sm" variant="outline" onClick={()=>handleAssignSupplier(selectedRest.id,s.name)} disabled={assigningSupplier===selectedRest.id+":"+s.name}>
+                                    {assigningSupplier===selectedRest.id+":"+s.name?<Loader2 className="w-3 h-3 animate-spin ml-1"/>:<Check className="w-3 h-3 ml-1"/>}{s.name}</Button>
+                                ))}
+                                {suppliersWithRests.filter(s=>!(selectedRest.assignedSuppliers||[]).includes(s.name)).length===0&&<span className="text-sm text-muted-foreground">{t("pages.adminPanel.allSuppliersAssigned")}</span>}
+                              </div>
+                            </div>
+                          ) : activeRestChip==="orders" ? (
+                            <div>
+                              <p className="text-sm font-semibold mb-3 flex items-center gap-1.5"><ShoppingCart className="w-4 h-4 text-slate-500"/>הזמנות רכש ({restChipOrders.length})</p>
+                              {restChipOrders.length===0?<p className="text-sm text-muted-foreground">אין הזמנות</p>:(
+                                <div className="overflow-x-auto"><table className="w-full text-sm">
+                                  <thead><tr className="border-b text-xs text-muted-foreground"><th className="text-right pb-1.5">ספק</th><th className="text-center pb-1.5">תאריך</th><th className="text-center pb-1.5">סכום</th><th className="text-center pb-1.5">סטטוס</th></tr></thead>
+                                  <tbody>{restChipOrders.map((o)=>(
+                                    <tr key={o.id} className="border-b last:border-0 hover:bg-muted/30">
+                                      <td className="py-1.5 font-medium">{o.supplier}</td>
+                                      <td className="py-1.5 text-center text-muted-foreground text-xs">{o.date?new Date(o.date).toLocaleDateString("he-IL"):"—"}</td>
+                                      <td className="py-1.5 text-center">{o.total>0?`₪${o.total.toLocaleString()}`:"—"}</td>
+                                      <td className="py-1.5 text-center"><span className="text-xs px-1.5 py-0.5 rounded-full bg-muted">{o.status||"—"}</span></td>
+                                    </tr>
+                                  ))}</tbody>
+                                </table></div>
+                              )}
+                            </div>
+                          ) : null}
+                        </motion.div>
+                      )}
                     </motion.div>
                   )
                 })()}
