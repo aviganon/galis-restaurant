@@ -52,6 +52,11 @@ export function Settings() {
   const [savingProfile, setSavingProfile] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<{uid:string;email:string;role:string;restaurantId:string|null}|null>(null)
+  const [editUserName, setEditUserName] = useState("")
+  const [editUserPhone, setEditUserPhone] = useState("")
+  const [editUserAddress, setEditUserAddress] = useState("")
+  const [editUserNotes, setEditUserNotes] = useState("")
+  const [loadingEditProfile, setLoadingEditProfile] = useState(false)
   const [editUserRole, setEditUserRole] = useState<"manager"|"user">("user")
   const [editUserRestId, setEditUserRestId] = useState("")
   const [savingEditUser, setSavingEditUser] = useState(false)
@@ -285,12 +290,20 @@ export function Settings() {
     }
   }
 
-  const openEditUser = (u:{uid:string;email:string;role:string;restaurantId:string|null}) => {
+  const openEditUser = async (u:{uid:string;email:string;role:string;restaurantId:string|null}) => {
     setEditingUser(u); setEditUserRole(u.role as "manager"|"user"); setEditUserRestId(u.restaurantId||"")
+    setEditUserName(""); setEditUserPhone(""); setEditUserAddress(""); setEditUserNotes("")
+    setLoadingEditProfile(true)
+    try { const snap=await getDoc(doc(db,"users",u.uid)); if(snap.exists()){const d=snap.data();setEditUserName(d.name||"");setEditUserPhone(d.phone||"");setEditUserAddress(d.address||"");setEditUserNotes(d.notes||"")} }
+    catch{} finally{setLoadingEditProfile(false)}
   }
   const saveEditUser = async () => {
     if (!editingUser) return; setSavingEditUser(true)
-    try { await setDoc(doc(db,"users",editingUser.uid),{role:editUserRole,restaurantId:editUserRestId||null},{merge:true}); setUsersData(p=>p.map(u=>u.uid===editingUser.uid?{...u,role:editUserRole,restaurantId:editUserRestId||null,restaurantName:(restaurants||[]).find(r=>r.id===editUserRestId)?.name}:u)); toast.success("משתמש עודכן"); setEditingUser(null) }
+    try {
+      await setDoc(doc(db,"users",editingUser.uid),{role:editUserRole,restaurantId:editUserRestId||null,name:editUserName.trim()||null,phone:editUserPhone.trim()||null,address:editUserAddress.trim()||null,notes:editUserNotes.trim()||null,updatedAt:new Date().toISOString()},{merge:true})
+      setUsersData(p=>p.map(u=>u.uid===editingUser.uid?{...u,role:editUserRole,restaurantId:editUserRestId||null,restaurantName:(restaurants||[]).find(r=>r.id===editUserRestId)?.name}:u))
+      toast.success("משתמש עודכן"); setEditingUser(null)
+    }
     catch { toast.error("שגיאה") } finally { setSavingEditUser(false) }
   }
 
@@ -641,17 +654,7 @@ export function Settings() {
                 </tr>
               )})}</tbody></table></div>
             )}
-            {editingUser&&(<div className="m-4 p-4 rounded-lg border border-violet-200 bg-violet-50/50 dark:bg-violet-950/20 space-y-3">
-              <div className="flex items-center justify-between"><p className="text-sm font-medium">עריכת: <span dir="ltr" className="font-normal text-muted-foreground">{editingUser.email}</span></p><button onClick={()=>setEditingUser(null)}>✕</button></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="text-xs text-muted-foreground block mb-1">תפקיד</label><select className="w-full h-9 rounded-md border px-3 text-sm bg-background" value={editUserRole} onChange={e=>setEditUserRole(e.target.value as "manager"|"user")}><option value="manager">מנהל</option><option value="user">משתמש</option></select></div>
-                <div><label className="text-xs text-muted-foreground block mb-1">מסעדה</label><select className="w-full h-9 rounded-md border px-3 text-sm bg-background" value={editUserRestId} onChange={e=>setEditUserRestId(e.target.value)}><option value="">— ללא —</option>{(restaurants||[]).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></div>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={saveEditUser} disabled={savingEditUser} className="text-xs px-3 py-1.5 rounded-md bg-primary text-primary-foreground flex items-center gap-1">{savingEditUser?<Loader2 className="w-3 h-3 animate-spin"/>:<Save className="w-3 h-3"/>}שמור</button>
-                <button onClick={()=>setEditingUser(null)} className="text-xs px-3 py-1.5 rounded-md border hover:bg-muted">ביטול</button>
-              </div>
-            </div>)}
+
             {assignTgt&&(<div className="m-4 p-3 rounded-lg border border-primary/30 bg-primary/5 space-y-2"><p className="text-sm font-medium">שיוך: <span dir="ltr" className="font-normal text-muted-foreground">{assignTgt.email}</span></p><div className="flex gap-2"><select className="flex-1 h-9 rounded-md border px-3 text-sm bg-background" value={assignTgtRestId} onChange={e=>setAssignTgtRestId(e.target.value)}><option value="">— ללא —</option>{(restaurants||[]).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select><button onClick={doAssign} disabled={savingAssign2} className="px-3 py-1.5 text-xs rounded-md bg-primary text-primary-foreground">{savingAssign2?<Loader2 className="w-3 h-3 animate-spin"/>:"שמור"}</button><button onClick={()=>setAssignTgt(null)} className="px-3 py-1.5 text-xs rounded-md border hover:bg-muted">ביטול</button></div></div>)}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -661,6 +664,61 @@ export function Settings() {
         </TabsContent>
         )}
       </Tabs>
+
+      <Dialog open={!!editingUser} onOpenChange={o=>{if(!o)setEditingUser(null)}}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><User className="w-4 h-4"/>עריכת משתמש</DialogTitle>
+            <DialogDescription dir="ltr">{editingUser?.email}</DialogDescription>
+          </DialogHeader>
+          {editingUser&&(
+            <div className="space-y-4 py-2">
+              {loadingEditProfile?(
+                <div className="flex items-center gap-2 text-muted-foreground py-4"><Loader2 className="w-4 h-4 animate-spin"/>טוען פרטים...</div>
+              ):(<>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium flex items-center gap-1.5"><User className="w-3.5 h-3.5"/>שם מלא</label>
+                  <Input value={editUserName} onChange={e=>setEditUserName(e.target.value)} placeholder="שם פרטי ומשפחה" className="h-10"/>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium flex items-center gap-1.5"><Phone className="w-3.5 h-3.5"/>טלפון</label>
+                  <Input value={editUserPhone} onChange={e=>setEditUserPhone(e.target.value)} placeholder="050-0000000" dir="ltr" type="tel" className="h-10"/>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5"/>כתובת</label>
+                  <Input value={editUserAddress} onChange={e=>setEditUserAddress(e.target.value)} placeholder="רחוב, עיר" className="h-10"/>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">תפקיד</label>
+                    <select className="w-full h-10 rounded-md border px-3 text-sm bg-background" value={editUserRole} onChange={e=>setEditUserRole(e.target.value as "manager"|"user")}>
+                      <option value="manager">מנהל</option><option value="user">משתמש</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">מסעדה</label>
+                    <select className="w-full h-10 rounded-md border px-3 text-sm bg-background" value={editUserRestId} onChange={e=>setEditUserRestId(e.target.value)}>
+                      <option value="">— ללא —</option>
+                      {(restaurants||[]).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">הערות</label>
+                  <textarea value={editUserNotes} onChange={e=>setEditUserNotes(e.target.value)} placeholder="הערות נוספות..." className="w-full min-h-[72px] rounded-md border px-3 py-2 text-sm bg-background resize-none"/>
+                </div>
+              </>)}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={()=>setEditingUser(null)}>ביטול</Button>
+            <Button onClick={saveEditUser} disabled={savingEditUser||loadingEditProfile}>
+              {savingEditUser?<Loader2 className="w-4 h-4 animate-spin ml-1"/>:<Save className="w-4 h-4 ml-1"/>}שמור
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   )
 }
