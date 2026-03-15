@@ -35,7 +35,7 @@ import { useTranslations } from "@/lib/use-translations"
 
 export function Settings() {
   const t = useTranslations()
-  const { userRole, currentRestaurantId, refreshIngredients } = useApp()
+  const { userRole, currentRestaurantId, refreshIngredients, isImpersonating } = useApp()
   const [email, setEmail] = useState("")
   const [displayName, setDisplayName] = useState("")
   const [userId, setUserId] = useState<string | null>(null)
@@ -110,7 +110,9 @@ export function Settings() {
     }
   }
 
-  const roleLabel = userRole === "owner" ? t("pages.settings.owner") : userRole === "manager" ? t("pages.settings.manager") : userRole === "user" ? t("pages.settings.user") : t("pages.settings.manager")
+  // בהתחזות — הצג "מנהל" ולא "בעלים"
+  const effectiveRole = (userRole === "owner" && isImpersonating) ? "manager" : userRole
+  const roleLabel = effectiveRole === "owner" ? t("pages.settings.owner") : effectiveRole === "manager" ? t("pages.settings.manager") : effectiveRole === "user" ? t("pages.settings.user") : t("pages.settings.manager")
 
   const handleChangePassword = async () => {
     if (!email) {
