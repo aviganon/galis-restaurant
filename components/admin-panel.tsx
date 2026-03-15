@@ -485,6 +485,11 @@ export function AdminPanel() {
   const [editSupplierDetailsOpen, setEditSupplierDetailsOpen] = useState(false)
   const [editSupplierDetailsName, setEditSupplierDetailsName] = useState("")
   const [editSupplierDetailsPhone, setEditSupplierDetailsPhone] = useState("")
+  const [editSupplierDetailsImageUrl, setEditSupplierDetailsImageUrl] = useState<string|null>(null)
+  const [editSupplierDetailsImageFile, setEditSupplierDetailsImageFile] = useState<File|null>(null)
+  const [uploadingSupplierImage, setUploadingSupplierImage] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const supplierImageInputRef = useRef<HTMLInputElement>(null)
   const [editSupplierDetailsEmail, setEditSupplierDetailsEmail] = useState("")
   const [editSupplierDetailsContact, setEditSupplierDetailsContact] = useState("")
   const [editSupplierDetailsAddress, setEditSupplierDetailsAddress] = useState("")
@@ -1321,6 +1326,9 @@ export function AdminPanel() {
     setEditSupplierDetailsEmail(s.email || "")
     setEditSupplierDetailsContact(s.contact || "")
     setEditSupplierDetailsAddress(s.address || "")
+    setEditSupplierDetailsImageUrl((s as any).imageUrl || null)
+    setEditSupplierDetailsImageFile(null)
+    setUploadProgress(0)
     setEditSupplierDetailsOpen(true)
   }
 
@@ -1329,12 +1337,27 @@ export function AdminPanel() {
     setEditSupplierDetailsSaving(true)
     try {
       const supplierId = editSupplierDetailsName.replace(/\//g, "_").trim() || "supplier"
+      let finalImageUrl = editSupplierDetailsImageUrl
+      if (editSupplierDetailsImageFile) {
+        setUploadingSupplierImage(true)
+        const sRef = storageRef(storage, 'suppliers/' + supplierId + '/cover.jpg')
+        await new Promise<void>((resolve, reject) => {
+          const task = uploadBytesResumable(sRef, editSupplierDetailsImageFile!)
+          task.on("state_changed",
+            snap => setUploadProgress(Math.round(snap.bytesTransferred/snap.totalBytes*100)),
+            reject,
+            async () => { finalImageUrl = await getDownloadURL(sRef); resolve() }
+          )
+        })
+        setUploadingSupplierImage(false)
+      }
       await setDoc(doc(db, "suppliers", supplierId), {
         name: editSupplierDetailsName,
         phone: editSupplierDetailsPhone.trim() || null,
         email: editSupplierDetailsEmail.trim() || null,
         contact: editSupplierDetailsContact.trim() || null,
         address: editSupplierDetailsAddress.trim() || null,
+        imageUrl: finalImageUrl || null,
         lastUpdated: new Date().toISOString(),
       }, { merge: true })
       toast.success(`פרטי ספק "${editSupplierDetailsName}" עודכנו`)
@@ -2319,7 +2342,7 @@ export function AdminPanel() {
                         >
                           {/* Background image */}
                           <img
-                            src={`https://source.unsplash.com/400x200/?food,supplier,wholesale,${encodeURIComponent(s.name)}`}
+                            src={(s as any).imageUrl || `https://source.unsplash.com/400x200/?food,supplier,wholesale,${encodeURIComponent(s.name)}`}
                             alt={s.name}
                             className="absolute inset-0 w-full h-full object-cover"
                             onError={e => {
@@ -3259,6 +3282,38 @@ export function AdminPanel() {
             </p>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>תמונת ספק</Label>
+              <div className="flex items-center gap-3">
+                <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-muted shrink-0 cursor-pointer border hover:opacity-80 transition-opacity"
+                  onClick={()=>supplierImageInputRef.current?.click()}>
+                  {(editSupplierDetailsImageFile||editSupplierDetailsImageUrl) ? (
+                    <img src={editSupplierDetailsImageFile?URL.createObjectURL(editSupplierDetailsImageFile):editSupplierDetailsImageUrl!}
+                      className="w-full h-full object-cover" alt=""/>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground"><UploadIcon className="w-6 h-6"/></div>
+                  )}
+                  {uploadingSupplierImage&&(
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <span className="text-white text-xs font-bold">{uploadProgress}%</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 space-y-1.5">
+                  <Button type="button" variant="outline" size="sm" className="w-full" onClick={()=>supplierImageInputRef.current?.click()}>
+                    <UploadIcon className="w-3.5 h-3.5 ml-1.5"/>
+                    {(editSupplierDetailsImageUrl||editSupplierDetailsImageFile)?"החלף תמונה":"העלה תמונה"}
+                  </Button>
+                  {(editSupplierDetailsImageUrl||editSupplierDetailsImageFile)&&(
+                    <Button type="button" variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive"
+                      onClick={()=>{setEditSupplierDetailsImageUrl(null);setEditSupplierDetailsImageFile(null)}}>הסר תמונה</Button>
+                  )}
+                  <p className="text-xs text-muted-foreground">PNG, JPG עד 5MB</p>
+                </div>
+              </div>
+              <input ref={supplierImageInputRef} type="file" accept="image/*" className="hidden"
+                onChange={e=>{const f=e.currentTarget.files?.[0];if(f&&f.size<=5242880){setEditSupplierDetailsImageFile(f)}else if(f){toast.error("קובץ גדול מדי — מקסימום 5MB")}e.currentTarget.value=""}}/>
+            </div>
             <div className="space-y-2">
               <Label>{t("pages.adminPanel.phone")}</Label>
               <Input
