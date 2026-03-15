@@ -273,6 +273,9 @@ export function AdminPanel() {
   const [creatingRest, setCreatingRest] = useState(false)
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviting, setInviting] = useState(false)
+  const [assignManagerEmail, setAssignManagerEmail] = useState("")
+  const [assigningManager, setAssigningManager] = useState(false)
+  const [assignManagerResult, setAssignManagerResult] = useState(null)
   const [restaurantUsers, setRestaurantUsers] = useState<{ uid: string; email?: string; role: string; permissions?: UserPermissions }[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [editingPermissions, setEditingPermissions] = useState<string | null>(null)
@@ -1619,6 +1622,39 @@ export function AdminPanel() {
     } finally {
       setGeneratingCode(false)
     }
+  }
+
+  const handleAssignManager = async () => {
+    if (!currentRestaurantId) return
+    const email = assignManagerEmail.trim().toLowerCase()
+    if (!email) { setAssignManagerResult({ ok: false, msg: "הזן אימייל" }); return }
+    setAssigningManager(true)
+    setAssignManagerResult(null)
+    try {
+      const usersSnap = await getDocs(collection(db, "users"))
+      const userDoc = usersSnap.docs.find(d => d.data().email?.toLowerCase() === email)
+      if (!userDoc) {
+        setAssignManagerResult({ ok: false, msg: `משתמש עם האימייל ${email} לא נמצא במערכת` })
+        return
+      }
+      const uid = userDoc.id
+      const currentData = userDoc.data()
+      await setDoc(doc(db, "users", uid), {
+        restaurantId: currentRestaurantId,
+        role: currentData.role === "owner" ? "owner" : "manager",
+      }, { merge: true })
+      setAssignManagerResult({ ok: true, msg: `✅ ${email} שויך למסעדה כמנהל` })
+      setAssignManagerEmail("")
+      const snap = await getDocs(query(collection(db, "users"), where("restaurantId", "==", currentRestaurantId)))
+      setRestaurantUsers(snap.docs.map(d => ({
+        uid: d.id,
+        email: d.data().email || undefined,
+        role: d.data().role || "user",
+        permissions: d.data().permissions,
+      })))
+    } catch (e) {
+      setAssignManagerResult({ ok: false, msg: e?.message || "שגיאה בשיוך" })
+    } finally { setAssigningManager(false) }
   }
 
   const handleInviteUser = async () => {
@@ -3078,6 +3114,41 @@ export function AdminPanel() {
                     </div>
                   )}
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {isSystemOwner && currentRestaurantId && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserPlus className="w-5 h-5 text-primary" />
+                  שיוך מנהל קיים למסעדה
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  שייך משתמש שכבר רשום במערכת כמנהל של המסעדה הנבחרת.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    type="email"
+                    placeholder="אימייל המנהל הקיים"
+                    value={assignManagerEmail}
+                    onChange={(e) => { setAssignManagerEmail(e.target.value); setAssignManagerResult(null) }}
+                    className="flex-1"
+                    dir="ltr"
+                  />
+                  <Button onClick={handleAssignManager} disabled={assigningManager}>
+                    {assigningManager ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <UserPlus className="w-4 h-4 ml-1" />}
+                    שייך
+                  </Button>
+                </div>
+                {assignManagerResult && (
+                  <p className={`text-sm mt-2 ${assignManagerResult.ok ? "text-green-600" : "text-destructive"}`}>
+                    {assignManagerResult.msg}
+                  </p>
+                )}
               </CardContent>
             </Card>
           )}
