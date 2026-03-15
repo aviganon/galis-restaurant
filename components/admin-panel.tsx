@@ -288,6 +288,7 @@ export function AdminPanel() {
   const [creatingRest, setCreatingRest] = useState(false)
   const [newRestOpen, setNewRestOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteRole, setInviteRole] = useState<"user"|"manager">("user")
   const [inviting, setInviting] = useState(false)
   const [assignManagerEmail, setAssignManagerEmail] = useState("")
   const [assigningManager, setAssigningManager] = useState(false)
@@ -1768,7 +1769,7 @@ export function AdminPanel() {
       const res = await fetch("/api/invite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, restaurantName }),
+        body: JSON.stringify({ email, restaurantName, role: inviteRole }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -2651,13 +2652,22 @@ export function AdminPanel() {
                   )}
 
                   {canAddUsers && (
-                    <div>
-                      <p className="text-sm font-medium mb-1">{t("pages.adminPanel.addUserToRestaurant")}</p>
-                      <p className="text-xs text-muted-foreground mb-2">{t("pages.adminPanel.inviteUsersDesc")}</p>
-                      <div className="flex gap-2">
-                        <Input type="email" placeholder={t("pages.adminPanel.userEmailPlaceholder")} value={inviteEmail} onChange={(e)=>setInviteEmail(e.target.value)} className="flex-1"/>
-                        <Button onClick={handleInviteUser} disabled={inviting}>{inviting?<Loader2 className="w-4 h-4 animate-spin"/>:<UserPlus className="w-4 h-4 ml-1"/>}{t("pages.adminPanel.invite")}</Button>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">הזמן משתמש חדש</p>
+                      <div className="flex gap-2 flex-wrap">
+                        <Input type="email" placeholder={t("pages.adminPanel.userEmailPlaceholder")} value={inviteEmail} onChange={(e)=>setInviteEmail(e.target.value)} className="flex-1 min-w-[180px]"/>
+                        {isSystemOwner && (
+                          <select value={inviteRole} onChange={e=>setInviteRole(e.target.value as "user"|"manager")}
+                            className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+                            <option value="user">משתמש</option>
+                            <option value="manager">מנהל</option>
+                          </select>
+                        )}
+                        <Button onClick={handleInviteUser} disabled={inviting}>
+                          {inviting?<Loader2 className="w-4 h-4 animate-spin"/>:<UserPlus className="w-4 h-4 ml-1"/>}הזמן
+                        </Button>
                       </div>
+                      <p className="text-xs text-muted-foreground">{t("pages.adminPanel.inviteUsersDesc")}</p>
                     </div>
                   )}
 
@@ -2667,7 +2677,7 @@ export function AdminPanel() {
                         <p className="text-sm font-medium">כל המשתמשים במערכת</p>
                         <Button size="sm" variant="outline" onClick={loadAllSystemUsers} disabled={loadingAllUsers}>{loadingAllUsers?<Loader2 className="w-4 h-4 animate-spin ml-1"/>:<span className="ml-1">🔄</span>}{allUsersLoaded?"רענן":"טען משתמשים"}</Button>
                       </div>
-                      {allUsersLoaded&&allSystemUsers.length>0&&(<div className="border rounded-lg overflow-hidden"><div className="overflow-x-auto max-h-[360px] overflow-y-auto"><table className="w-full text-sm"><thead className="bg-muted sticky top-0"><tr><th className="text-right p-2 font-semibold">אימייל</th><th className="text-center p-2 font-semibold">תפקיד</th><th className="text-right p-2 font-semibold">מסעדה</th><th className="text-center p-2 font-semibold w-16">שיוך</th></tr></thead><tbody>{allSystemUsers.map(user=>(<tr key={user.uid} className="border-t border-border hover:bg-muted/30"><td className="p-2 text-xs"><div className="font-medium" dir="ltr">{user.email}</div>{(user.name||user.phone)&&<div className="text-muted-foreground mt-0.5">{user.name&&<span>{user.name}</span>}{user.name&&user.phone&&<span className="mx-1">·</span>}{user.phone&&<span dir="ltr">{user.phone}</span>}</div>}</td><td className="p-2 text-center"><span className={`text-xs px-2 py-0.5 rounded-full ${user.role==="owner"?"bg-purple-100 text-purple-700":user.role==="manager"?"bg-blue-100 text-blue-700":"bg-gray-100 text-gray-600"}`}>{user.role==="owner"?"בעלים":user.role==="manager"?"מנהל":"משתמש"}</span></td><td className="p-2 text-muted-foreground text-xs">{user.restaurantName||(user.restaurantId?"—":"ללא מסעדה")}</td><td className="p-2 text-center">{user.role!=="owner"&&<Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={()=>{setAssignTarget({uid:user.uid,email:user.email});setAssignTargetRestId(user.restaurantId||"")}}>שנה</Button>}</td></tr>))}</tbody></table></div></div>)}
+                      {allUsersLoaded&&allSystemUsers.length>0&&(<div className="border rounded-lg overflow-hidden"><div className="overflow-x-auto max-h-[360px] overflow-y-auto"><table className="w-full text-sm"><thead className="bg-muted sticky top-0"><tr><th className="text-right p-2 font-semibold">אימייל</th><th className="text-center p-2 font-semibold">תפקיד</th><th className="text-right p-2 font-semibold">מסעדה</th><th className="text-center p-2 font-semibold w-16">שיוך</th></tr></thead><tbody>{allSystemUsers.map(user=>(<tr key={user.uid} className="border-t border-border hover:bg-muted/30"><td className="p-2 text-xs"><div className="font-medium" dir="ltr">{user.email}</div>{(user.name||user.phone)&&<div className="text-muted-foreground mt-0.5">{user.name&&<span>{user.name}</span>}{user.name&&user.phone&&<span className="mx-1">·</span>}{user.phone&&<span dir="ltr">{user.phone}</span>}</div>}</td><td className="p-2 text-center">{user.role==="owner"?(<span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">בעלים</span>):(<select className="text-xs rounded border border-input bg-background px-1.5 py-0.5" value={user.role} onChange={async(e)=>{const nr=e.target.value;try{const{doc:fd,updateDoc:ud}=await import("firebase/firestore");await ud(fd(db,"users",user.uid),{role:nr});setAllSystemUsers(p=>p.map(u=>u.uid===user.uid?{...u,role:nr}:u));toast.success("תפקיד עודכן")}catch{toast.error("שגיאה")}}}>><option value="manager">מנהל</option><option value="user">משתמש</option></select>)}</td><td className="p-2 text-muted-foreground text-xs">{user.restaurantName||(user.restaurantId?"—":"ללא מסעדה")}</td><td className="p-2 text-center">{user.role!=="owner"&&<Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={()=>{setAssignTarget({uid:user.uid,email:user.email});setAssignTargetRestId(user.restaurantId||"")}}>שנה</Button>}</td></tr>))}</tbody></table></div></div>)}
                       {allUsersLoaded&&allSystemUsers.length===0&&<p className="text-sm text-muted-foreground text-center py-4">אין משתמשים</p>}
                       {assignTarget&&(<div className="mt-3 p-3 rounded-lg border border-primary/30 bg-primary/5 space-y-3"><p className="text-sm font-medium">שיוך: <span dir="ltr" className="font-normal">{assignTarget.email}</span></p><div className="flex gap-2"><select className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm" value={assignTargetRestId} onChange={e=>setAssignTargetRestId(e.target.value)}><option value="">— ללא מסעדה —</option>{restsWithDetails.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select><Button size="sm" onClick={handleAssignFromTable} disabled={savingAssign}>{savingAssign?<Loader2 className="w-4 h-4 animate-spin"/>:"שמור"}</Button><Button size="sm" variant="ghost" onClick={()=>setAssignTarget(null)}>ביטול</Button></div></div>)}
                     </div>
