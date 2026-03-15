@@ -459,6 +459,9 @@ export function AdminPanel() {
   const [supplierFpmOpen, setSupplierFpmOpen] = useState(false)
   const [supplierFpmFile, setSupplierFpmFile] = useState<File|null>(null)
   const [supplierFpmName, setSupplierFpmName] = useState("")
+  const [showSupplierInvUpload, setShowSupplierInvUpload] = useState(false)
+  const [isSupplierInvDragging, setIsSupplierInvDragging] = useState(false)
+  const supplierInvFileRef = useRef<HTMLInputElement>(null)
   const [editSupplierName, setEditSupplierName] = useState("")
   const [editSupplierSaving, setEditSupplierSaving] = useState(false)
   const [editNsmItems, setEditNsmItems] = useState<{ name: string; price: number; unit: string; waste: number; stock: number; minStock: number; sku: string }[]>([])
@@ -2353,7 +2356,7 @@ export function AdminPanel() {
                               {t("pages.adminPanel.addIngredient")}
                             </Button>
                             <Button size="sm" variant="outline" className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                              onClick={()=>{setSupplierFpmName(s.name);document.getElementById("supplier-inv-input")?.click()}}>
+                              onClick={()=>{setSupplierFpmName(s.name);setShowSupplierInvUpload(v=>!v)}}>
                               <UploadIcon className="w-4 h-4 ml-1"/>העלאת חשבונית
                             </Button>
                             <Button
@@ -2398,6 +2401,33 @@ export function AdminPanel() {
                             </p>
                           </div>
                         </div>
+                        {showSupplierInvUpload && (
+                          <motion.div initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} className="mb-4"
+                            onDragOver={e=>{e.preventDefault();setIsSupplierInvDragging(true)}}
+                            onDragEnter={e=>{e.preventDefault();setIsSupplierInvDragging(true)}}
+                            onDragLeave={()=>setIsSupplierInvDragging(false)}
+                            onDrop={e=>{e.preventDefault();setIsSupplierInvDragging(false);const f=e.dataTransfer.files[0];if(f){setSupplierFpmFile(f);setSupplierFpmOpen(true);setShowSupplierInvUpload(false)}}}>
+                            <div className={`border-2 border-dashed rounded-xl p-5 text-center transition-all cursor-pointer ${isSupplierInvDragging?"border-blue-400 bg-blue-50/50":"border-muted-foreground/25 hover:border-blue-400/60"}`}
+                              onClick={()=>supplierInvFileRef.current?.click()}>
+                              <div className="flex items-center gap-3 justify-center mb-2">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isSupplierInvDragging?"bg-blue-500 text-white":"bg-muted"}`}>
+                                  <FileText className="w-5 h-5"/>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-semibold text-sm">חשבונית עבור: {s.name}</p>
+                                  <p className="text-xs text-muted-foreground">גרור PDF/Excel/תמונה — AI יחלץ רכיבים ומחירים</p>
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap justify-center gap-1.5 text-xs mb-2">
+                                {["PDF","Excel","CSV","תמונות"].map(fmt=><Badge key={fmt} variant="outline" className="text-xs">{fmt}</Badge>)}
+                              </div>
+                              <Button type="button" variant="secondary" size="sm" onClick={e=>{e.stopPropagation();supplierInvFileRef.current?.click()}}>
+                                <UploadIcon className="w-3.5 h-3.5 ml-1.5"/>בחר קובץ
+                              </Button>
+                            </div>
+                          </motion.div>
+                        )}
+
                         <div>
                           <p className="text-sm font-medium mb-2">{t("pages.adminPanel.ingredientsCount")} ({supplierIngs.length})</p>
                           {supplierIngs.length === 0 ? (
@@ -2454,18 +2484,7 @@ export function AdminPanel() {
                             </div>
                           )}
                         </div>
-                        {editingSupplierIng&&(<div className="mt-3 p-4 rounded-lg border border-violet-200 bg-violet-50/50 dark:bg-violet-950/20 space-y-3">
-                          <div className="flex items-center justify-between"><p className="text-sm font-medium">עריכת: <span className="font-semibold">{editingSupplierIng.name}</span></p><button onClick={()=>setEditingSupplierIng(null)} className="text-muted-foreground hover:text-foreground text-xs">✕</button></div>
-                          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                            {([["מחיר",editIngPrice,setEditIngPrice,"number"],["יחידה",editIngUnit,setEditIngUnit,"text"],["פחת%",editIngWaste,setEditIngWaste,"number"],["מלאי",editIngStock,setEditIngStock,"number"],["מינ׳",editIngMinStock,setEditIngMinStock,"number"],["מקט",editIngSku,setEditIngSku,"text"]] as [string,string,(v:string)=>void,string][]).map(([label,val,set,type])=>(
-                              <div key={label}><label className="text-xs text-muted-foreground block mb-1">{label}</label><Input type={type} value={val} onChange={e=>set(e.target.value)} className="h-8 text-sm"/></div>
-                            ))}
-                          </div>
-                          <div className="flex gap-2">
-                            <Button size="sm" onClick={saveIngEdit} disabled={savingIngEdit}>{savingIngEdit?<Loader2 className="w-3 h-3 animate-spin ml-1"/>:<Edit2 className="w-3 h-3 ml-1"/>}שמור</Button>
-                            <Button size="sm" variant="ghost" onClick={()=>setEditingSupplierIng(null)}>ביטול</Button>
-                          </div>
-                        </div>)}
+
                       </div>
                     )
                   })()}
@@ -2477,8 +2496,32 @@ export function AdminPanel() {
                 </CardContent>
               </Card>
             )}
-          <input type="file" id="supplier-inv-input" className="hidden" accept=".xlsx,.xls,.csv,.pdf,.rtf,image/*" onChange={e=>{const f=e.currentTarget.files?.[0];if(f){setSupplierFpmFile(f);setSupplierFpmOpen(true)}e.currentTarget.value=""}}/>
+          <input ref={supplierInvFileRef} type="file" accept={INVOICE_ACCEPT} className="hidden" onChange={e=>{const f=e.currentTarget.files?.[0];if(f){setSupplierFpmFile(f);setSupplierFpmOpen(true);setShowSupplierInvUpload(false)}e.currentTarget.value=""}}/>
           <FilePreviewModal open={supplierFpmOpen} onOpenChange={o=>{setSupplierFpmOpen(o);if(!o)setSupplierFpmFile(null)}} file={supplierFpmFile} type="p" supplierName={supplierFpmName} restaurantName={restsWithDetails.find(r=>r.id===currentRestaurantId)?.name} canSaveToGlobal={false} currentRestaurantId={currentRestaurantId} onConfirmSupplier={handleConfirmAdminSupplier}/>
+          {/* Edit ingredient Dialog */}
+          <Dialog open={!!editingSupplierIng} onOpenChange={o=>{if(!o)setEditingSupplierIng(null)}}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2"><Edit2 className="w-4 h-4"/>עריכת רכיב</DialogTitle>
+                <DialogDescription>{editingSupplierIng?.name}</DialogDescription>
+              </DialogHeader>
+              {editingSupplierIng&&(<div className="space-y-4 py-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5"><Label>מחיר (₪)</Label><Input type="number" value={editIngPrice} onChange={e=>setEditIngPrice(e.target.value)} className="h-10"/></div>
+                  <div className="space-y-1.5"><Label>יחידה</Label><Input value={editIngUnit} onChange={e=>setEditIngUnit(e.target.value)} className="h-10"/></div>
+                  <div className="space-y-1.5"><Label>פחת %</Label><Input type="number" value={editIngWaste} onChange={e=>setEditIngWaste(e.target.value)} className="h-10"/></div>
+                  <div className="space-y-1.5"><Label>מלאי</Label><Input type="number" value={editIngStock} onChange={e=>setEditIngStock(e.target.value)} className="h-10"/></div>
+                  <div className="space-y-1.5"><Label>מינימום מלאי</Label><Input type="number" value={editIngMinStock} onChange={e=>setEditIngMinStock(e.target.value)} className="h-10"/></div>
+                  <div className="space-y-1.5"><Label>מקט</Label><Input value={editIngSku} onChange={e=>setEditIngSku(e.target.value)} className="h-10"/></div>
+                </div>
+                {editingSupplierIng.source==="global"&&<p className="text-xs text-blue-600 bg-blue-50 rounded-lg p-2">שמירה תעדכן גם את כל המסעדות המשויכות לספק זה</p>}
+              </div>)}
+              <DialogFooter>
+                <Button variant="outline" onClick={()=>setEditingSupplierIng(null)}>{t("pages.adminPanel.cancel")}</Button>
+                <Button onClick={saveIngEdit} disabled={savingIngEdit}>{savingIngEdit?<Loader2 className="w-4 h-4 animate-spin ml-1"/>:<Edit2 className="w-4 h-4 ml-1"/>}{t("pages.adminPanel.save")}</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           </TabsContent>
 
