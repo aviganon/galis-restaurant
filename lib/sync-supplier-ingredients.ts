@@ -13,6 +13,7 @@ export type IngredientPayload = {
   waste?: number
   sku?: string
   category?: string
+  qty?: number
 }
 
 /**
@@ -42,19 +43,22 @@ export async function syncSupplierIngredientsToAssignedRestaurants(
   for (const restId of assignedRestIds) {
     const batch = writeBatch(db)
     for (const item of ingredients) {
-      batch.set(
-        doc(db, "restaurants", restId, "ingredients", item.name),
-        {
+      const syncPayload: Record<string, unknown> = {
           price: item.price,
           unit: item.unit,
           waste: item.waste ?? 0,
           supplier: item.supplier,
           sku: item.sku ?? "",
-          category: item.category ?? "אחר",
           lastUpdated: now,
-        },
-        { merge: true }
-      )
+        }
+        if (typeof item.qty === "number" && item.qty > 0) {
+          syncPayload.stock = item.qty
+        }
+        batch.set(
+          doc(db, "restaurants", restId, "ingredients", item.name),
+          syncPayload,
+          { merge: true }
+        )
       totalUpdated++
     }
     await batch.commit()
