@@ -1800,31 +1800,28 @@ export function AdminPanel() {
       </Card>
 
       {isSystemOwner && adminStats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-2xl font-bold">{adminStats.rests}</p>
-              <p className="text-xs text-muted-foreground">{t("pages.adminPanel.restaurants")}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-2xl font-bold">{adminStats.users}</p>
-              <p className="text-xs text-muted-foreground">{t("pages.adminPanel.users")}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-2xl font-bold">{adminStats.dishes}</p>
-              <p className="text-xs text-muted-foreground">{t("pages.adminPanel.dishesCount")}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-2xl font-bold">{adminStats.ings}</p>
-              <p className="text-xs text-muted-foreground">{t("pages.adminPanel.globalIngredients")}</p>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" style={{animation:"_fOwner .4s ease both"}}>
+          <style>{`@keyframes _fOwner{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}`}</style>
+          {([
+            {val:adminStats.rests,lbl:t("pages.adminPanel.restaurants"),grad:"from-emerald-500 to-teal-600",icon:"🏠"},
+            {val:adminStats.users,lbl:t("pages.adminPanel.users"),grad:"from-blue-500 to-indigo-600",icon:"👥"},
+            {val:adminStats.dishes,lbl:t("pages.adminPanel.dishes"),grad:"from-amber-500 to-orange-500",icon:"🍽️"},
+            {val:adminStats.ings,lbl:t("pages.adminPanel.ingredients"),grad:"from-violet-500 to-purple-600",icon:"🥬"},
+          ] as const).map((s,i)=>(
+            <Card key={i} className="border-0 shadow-sm overflow-hidden"
+              style={{transition:"transform .2s,box-shadow .2s"}}
+              onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.transform="translateY(-3px)";(e.currentTarget as HTMLElement).style.boxShadow="0 8px 20px rgba(0,0,0,.12)"}}
+              onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.transform="";(e.currentTarget as HTMLElement).style.boxShadow=""}}
+            >
+              <CardContent className="p-0">
+                <div className={cn("bg-gradient-to-br p-4 pb-2",s.grad)}>
+                  <span className="text-xl">{s.icon}</span>
+                  <p className="text-2xl font-bold text-white mt-1">{s.val}</p>
+                </div>
+                <div className="px-4 py-2"><p className="text-xs text-muted-foreground font-medium">{s.lbl}</p></div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
 
@@ -1950,8 +1947,8 @@ export function AdminPanel() {
               </div>
             ) : (
               <div className="space-y-4">
-                {restsWithDetails.map((rest) => (
-                  <Card key={rest.id}>
+                {restsWithDetails.map((rest, _ri) => (
+                  <Card key={rest.id} className={["border-l-4 border-l-emerald-500","border-l-4 border-l-blue-500","border-l-4 border-l-violet-500","border-l-4 border-l-rose-500","border-l-4 border-l-amber-500"][_ri%5] + " transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"}>
                     <CardHeader className="pb-2" dir="rtl">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <CardTitle className="text-lg flex items-center gap-2">
@@ -2059,6 +2056,30 @@ export function AdminPanel() {
                         </div>
                         <p className="text-2xl font-bold mb-0.5">{dashLoadingKpis ? "…" : kpi.value}</p>
                         <p className="text-xs text-muted-foreground">{kpi.label}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+          
+                {/* KPI cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+                  {([
+                    {label:"הכנסות חודשיות",value:`₪${dashTotalRevenue.toLocaleString()}`,icon:TrendingUp,grad:"from-emerald-500 to-teal-600"},
+                    {label:"מנות שנמכרו",value:String(dashTotalDishesSold),icon:Utensils,grad:"from-amber-500 to-orange-500"},
+                    {label:"food cost ממוצע",value:`${dashAvgFoodCost.toFixed(1)}%`,icon:DollarSign,grad:"from-blue-500 to-indigo-600"},
+                    {label:"הזמנות רכש",value:String(dashPurchaseOrders),icon:ShoppingCart,grad:"from-violet-500 to-purple-600"},
+                  ] as const).map((kpi,i)=>(
+                    <Card key={i} className="border-0 shadow-sm overflow-hidden"
+                      style={{transition:"transform .2s,box-shadow .2s"}}
+                      onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.transform="translateY(-4px)";(e.currentTarget as HTMLElement).style.boxShadow="0 12px 28px rgba(0,0,0,.13)"}}
+                      onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.transform="";(e.currentTarget as HTMLElement).style.boxShadow=""}}
+                    >
+                      <CardContent className="p-0">
+                        <div className={cn("bg-gradient-to-br p-4 pb-3",kpi.grad)}>
+                          <kpi.icon className="w-5 h-5 text-white/90 mb-2"/>
+                          <p className="text-2xl font-bold text-white">{dashLoadingKpis?"…":kpi.value}</p>
+                        </div>
+                        <div className="px-4 py-2"><p className="text-xs text-muted-foreground font-medium">{kpi.label}</p></div>
                       </CardContent>
                     </Card>
                   ))}
