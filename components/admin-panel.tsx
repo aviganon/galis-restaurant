@@ -1787,45 +1787,31 @@ export function AdminPanel() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl space-y-6">
 
-      {/* Owner top action bar — shown only when owner is NOT impersonating */}
-      {isSystemOwner && !isImpersonating && (
-        <div className="flex items-center justify-between py-2 px-4 rounded-xl bg-muted/50 border border-border">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-              <Shield className="w-3.5 h-3.5 text-primary-foreground"/>
-            </div>
-            <span className="text-sm font-medium text-muted-foreground">פאנל בעלים</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <LanguageSwitcher/>
-            <Button
-              variant="ghost" size="sm"
-              onClick={()=>setCurrentPage?.("settings")}
-              className="gap-1.5 text-muted-foreground hover:text-foreground"
-              title="הגדרות"
-            >
-              <Settings2 className="w-4 h-4"/>
-              <span className="hidden sm:inline text-xs">הגדרות</span>
-            </Button>
-            <Button
-              variant="ghost" size="sm"
-              onClick={()=>signOut(auth)}
-              className="gap-1.5 text-muted-foreground hover:text-destructive"
-              title="יציאה"
-            >
-              <LogOut className="w-4 h-4"/>
-              <span className="hidden sm:inline text-xs">יציאה</span>
-            </Button>
-          </div>
-        </div>
-      )}
-
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="w-6 h-6" />
-            {t("pages.adminPanel.adminPanelTitle")}
-          </CardTitle>
+          <div className="flex items-center justify-between gap-2 w-full">
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="w-6 h-6" />
+              {t("pages.adminPanel.adminPanelTitle")}
+            </CardTitle>
+            {isSystemOwner && !isImpersonating && (
+              <div className="flex items-center gap-1">
+                <div className="border border-border rounded-md overflow-hidden">
+                  <LanguageSwitcher />
+                </div>
+                <Button variant="ghost" size="sm" onClick={()=>setCurrentPage?.("settings")}
+                  className="gap-1.5 text-muted-foreground hover:text-foreground h-8">
+                  <Settings2 className="w-4 h-4"/>
+                  <span className="text-xs hidden sm:inline">הגדרות</span>
+                </Button>
+                <Button variant="ghost" size="sm" onClick={()=>signOut(auth)}
+                  className="gap-1.5 text-muted-foreground hover:text-destructive h-8">
+                  <LogOut className="w-4 h-4"/>
+                  <span className="text-xs hidden sm:inline">יציאה</span>
+                </Button>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground">
