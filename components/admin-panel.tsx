@@ -328,7 +328,7 @@ export function AdminPanel() {
   const [apiTestResult, setApiTestResult] = useState<string | null>(null)
 
   // System owner tabs
-  const [systemOwnerTab, setSystemOwnerTab] = useState<"restaurants" | "suppliers" | "ingredients" | "users">("restaurants")
+  const [systemOwnerTab, setSystemOwnerTab] = useState<"restaurants" | "suppliers" | "ingredients">("restaurants")
   const [restsWithDetails, setRestsWithDetails] = useState<RestWithDetails[]>([])
   const [suppliersWithRests, setSuppliersWithRests] = useState<SupplierWithRests[]>([])
   const [supplierToIngredients, setSupplierToIngredients] = useState<Record<string, IngredientRow[]>>({})
@@ -1883,7 +1883,7 @@ export function AdminPanel() {
       )}
 
       {isSystemOwner && (
-        <Tabs value={systemOwnerTab} onValueChange={(v) => setSystemOwnerTab(v as "restaurants" | "suppliers" | "ingredients" | "users")}>
+        <Tabs value={systemOwnerTab} onValueChange={(v) => setSystemOwnerTab(v as "restaurants" | "suppliers" | "ingredients")}>
           <TabsList className="w-full justify-start flex-wrap h-auto gap-1">
             <TabsTrigger value="restaurants" className="gap-1.5">
               <UtensilsCrossed className="w-4 h-4" />
@@ -1897,10 +1897,7 @@ export function AdminPanel() {
               <Package className="w-4 h-4" />
               {t("pages.adminPanel.globalIngredients")}
             </TabsTrigger>
-            <TabsTrigger value="users" className="gap-1.5">
-              <Users className="w-4 h-4" />
-              משתמשים
-            </TabsTrigger>
+
           </TabsList>
 
           <TabsContent value="restaurants" className="mt-4 space-y-4">
@@ -2628,187 +2625,6 @@ export function AdminPanel() {
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
-          <TabsContent value="users" className="mt-4 space-y-4">
-
-            {isSystemOwner && (
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  {label:`סה"כ משתמשים`, val: allSystemUsers.length},
-                  {label:"מנהלים", val: allSystemUsers.filter(u=>u.role==="manager").length},
-                  {label:"משתמשים", val: allSystemUsers.filter(u=>u.role==="user").length},
-                ].map((s,i)=>(
-                  <div key={i} className="bg-muted/50 rounded-lg p-3">
-                    <p className="text-xs text-muted-foreground mb-1">{s.label}</p>
-                    <p className="text-2xl font-semibold">{allUsersLoaded ? s.val : "—"}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {isSystemOwner && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5 text-primary"/>כל המשתמשים</CardTitle>
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" variant="outline" onClick={loadAllSystemUsers} disabled={loadingAllUsers}>
-                        {loadingAllUsers?<Loader2 className="w-3 h-3 animate-spin ml-1"/>:<span className="ml-1 text-xs">🔄</span>}
-                        {allUsersLoaded?"רענן":"טען"}
-                      </Button>
-                      <Button size="sm" className="gap-1.5" onClick={()=>setShowCreateUser(v=>!v)}>
-                        <UserPlus className="w-4 h-4"/>צור משתמש
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-
-                {showCreateUser && (
-                  <div className="mx-4 mb-4 p-4 rounded-lg bg-muted/40 border space-y-3">
-                    <p className="text-sm font-medium">יצירת משתמש חדש</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs text-muted-foreground block mb-1">אימייל</label>
-                        <Input type="email" placeholder="user@example.com" dir="ltr" value={createUserEmail} onChange={e=>setCreateUserEmail(e.target.value)}/>
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground block mb-1">סיסמה זמנית</label>
-                        <Input type="password" placeholder="לפחות 6 תווים" value={createUserPassword} onChange={e=>setCreateUserPassword(e.target.value)}/>
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground block mb-1">תפקיד</label>
-                        <select className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm" value={createUserRole} onChange={e=>setCreateUserRole(e.target.value as "manager"|"user")}>
-                          <option value="manager">מנהל</option>
-                          <option value="user">משתמש</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground block mb-1">מסעדה</label>
-                        <select className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm" value={createUserRestId} onChange={e=>setCreateUserRestId(e.target.value)}>
-                          <option value="">— ללא מסעדה —</option>
-                          {restsWithDetails.map(r=><option key={r.id} value={r.id}>{r.emoji?`${r.emoji} `:""}{r.name}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 pt-1">
-                      <Button size="sm" onClick={handleCreateUser} disabled={creatingUser}>
-                        {creatingUser?<Loader2 className="w-3 h-3 animate-spin ml-1"/>:<UserPlus className="w-3 h-3 ml-1"/>}צור משתמש
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={()=>setShowCreateUser(false)}>ביטול</Button>
-                    </div>
-                    {createUserError && <p className="text-xs text-destructive">{createUserError}</p>}
-                  </div>
-                )}
-
-                <CardContent className="p-0">
-                  {!allUsersLoaded ? (
-                    <div className="text-center py-10 text-sm text-muted-foreground">לחץ "טען" לראות את כל המשתמשים</div>
-                  ) : allSystemUsers.length === 0 ? (
-                    <div className="text-center py-10 text-sm text-muted-foreground">אין משתמשים</div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted/50 border-b border-border">
-                          <tr>
-                            <th className="w-10 p-2"></th>
-                            <th className="text-right p-2 font-medium text-muted-foreground text-xs">אימייל</th>
-                            <th className="text-center p-2 font-medium text-muted-foreground text-xs">תפקיד</th>
-                            <th className="text-right p-2 font-medium text-muted-foreground text-xs">מסעדה</th>
-                            <th className="p-2 font-medium text-muted-foreground text-xs">פעולות</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {allSystemUsers.map(user => {
-                            const initials = (user.email||"?").slice(0,2).toUpperCase()
-                            const cols = [{bg:"#E6F1FB",c:"#0C447C"},{bg:"#EAF3DE",c:"#27500A"},{bg:"#FAEEDA",c:"#633806"},{bg:"#EEEDFE",c:"#3C3489"},{bg:"#E1F5EE",c:"#085041"}]
-                            const col = cols[(user.email||"").charCodeAt(0)%5]
-                            return (
-                              <tr key={user.uid} className="border-b border-border last:border-0 hover:bg-muted/30">
-                                <td className="p-2 pl-3">
-                                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium" style={{background:col.bg,color:col.c}}>{initials}</div>
-                                </td>
-                                <td className="p-2">
-                                  <div className="font-medium text-xs" dir="ltr">{user.email}</div>
-                                  {user.name && <div className="text-xs text-muted-foreground">{user.name}</div>}
-                                </td>
-                                <td className="p-2 text-center">
-                                  {user.role==="owner"?(
-                                    <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">בעלים</span>
-                                  ):(
-                                    <select className="text-xs rounded border border-input bg-background px-1.5 py-0.5" value={user.role}
-                                      onChange={async e=>{const nr=e.target.value;try{const{doc:fd,updateDoc:ud}=await import("firebase/firestore");await ud(fd(db,"users",user.uid),{role:nr});setAllSystemUsers(p=>p.map(u=>u.uid===user.uid?{...u,role:nr}:u));toast.success("תפקיד עודכן")}catch{toast.error("שגיאה")}}}>
-                                      <option value="manager">מנהל</option>
-                                      <option value="user">משתמש</option>
-                                    </select>
-                                  )}
-                                </td>
-                                <td className="p-2 text-xs text-muted-foreground">{user.restaurantName||(user.restaurantId?"—":"ללא מסעדה")}</td>
-                                <td className="p-2">
-                                  <div className="flex items-center gap-1">
-                                    <Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={()=>{setAssignTarget({uid:user.uid,email:user.email});setAssignTargetRestId(user.restaurantId||"")}}>שייך</Button>
-                                    <Button size="sm" variant="outline" className="h-7 text-xs px-2 text-blue-600 border-blue-200 hover:bg-blue-50"
-                                      onClick={async()=>{if(!user.email)return;const rn=restsWithDetails.find(r=>r.id===user.restaurantId)?.name;try{await fetch("/api/invite",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:user.email,restaurantName:rn,role:user.role})});toast.success("קוד נשלח ל-"+user.email)}catch{toast.error("שגיאה")}}}>שלח קוד</Button>
-                                  </div>
-                                </td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                  {assignTarget && (
-                    <div className="m-4 p-3 rounded-lg border border-primary/30 bg-primary/5 space-y-2">
-                      <p className="text-sm font-medium">שיוך: <span dir="ltr" className="font-normal text-muted-foreground">{assignTarget.email}</span></p>
-                      <div className="flex gap-2">
-                        <select className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm" value={assignTargetRestId} onChange={e=>setAssignTargetRestId(e.target.value)}>
-                          <option value="">— ללא מסעדה —</option>
-                          {restsWithDetails.map(r=><option key={r.id} value={r.id}>{r.emoji?`${r.emoji} `:""}{r.name}</option>)}
-                        </select>
-                        <Button size="sm" onClick={handleAssignFromTable} disabled={savingAssign}>{savingAssign?<Loader2 className="w-3 h-3 animate-spin"/>:"שמור"}</Button>
-                        <Button size="sm" variant="ghost" onClick={()=>setAssignTarget(null)}>ביטול</Button>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {hasFullAccess && (
-                <Card>
-                  <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-sm"><Ticket className="w-4 h-4"/>קוד הזמנה למנהל</CardTitle></CardHeader>
-                  <CardContent>
-                    <p className="text-xs text-muted-foreground mb-3">{currentRestaurantId && isSystemOwner ? t("pages.adminPanel.managerCodeAssignDesc") : t("pages.adminPanel.managerCodeCreateDesc")}</p>
-                    <div className="flex gap-2 items-center flex-wrap">
-                      <Button size="sm" onClick={handleCreateManagerCode} disabled={generatingCode}>{generatingCode?<Loader2 className="w-3 h-3 animate-spin ml-1"/>:<Copy className="w-3 h-3 ml-1"/>}{t("pages.adminPanel.createCode")}</Button>
-                      {lastGeneratedCode && (<div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted font-mono text-sm flex-1 justify-between"><span>{lastGeneratedCode}</span><Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={()=>{navigator.clipboard.writeText(lastGeneratedCode!);toast.success(t("pages.adminPanel.codeCopied"))}}><Copy className="w-3 h-3"/></Button></div>)}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              {canAddUsers && (
-                <Card>
-                  <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-sm"><UserPlus className="w-4 h-4"/>הזמן לפי אימייל</CardTitle></CardHeader>
-                  <CardContent>
-                    <p className="text-xs text-muted-foreground mb-3">{t("pages.adminPanel.inviteUsersDesc")}</p>
-                    <div className="flex gap-2 flex-wrap">
-                      <Input type="email" placeholder={t("pages.adminPanel.userEmailPlaceholder")} value={inviteEmail} onChange={e=>setInviteEmail(e.target.value)} className="flex-1 min-w-[150px]"/>
-                      {isSystemOwner && (<select value={inviteRole} onChange={e=>setInviteRole(e.target.value as "user"|"manager")} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="user">משתמש</option><option value="manager">מנהל</option></select>)}
-                      <Button size="sm" onClick={handleInviteUser} disabled={inviting}>{inviting?<Loader2 className="w-3 h-3 animate-spin"/>:<UserPlus className="w-3 h-3 ml-1"/>}שלח</Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-
-            {canAddUsers && currentRestaurantId && !isSystemOwner && (
-              <Card>
-                <CardHeader><CardTitle className="flex items-center gap-2"><Users className="w-5 h-5"/>{t("pages.adminPanel.restaurantUsers")}</CardTitle></CardHeader>
-                <CardContent>{loadingUsers?(<div className="flex gap-2 text-muted-foreground text-sm"><Loader2 className="w-4 h-4 animate-spin"/>{t("pages.adminPanel.loadingUsers")}</div>):restaurantUsers.length===0?(<p className="text-sm text-muted-foreground">{t("pages.adminPanel.noUsersYet")}</p>):(<div className="space-y-3">{restaurantUsers.filter(u=>u.role!=="owner").map(u=>(<div key={u.uid} className="flex flex-col gap-3 p-3 rounded-lg border bg-muted/30"><div className="flex items-center justify-between"><span className="font-medium text-sm">{u.email||u.uid}</span>{editingPermissions===u.uid?(<Button size="sm" variant="ghost" onClick={()=>setEditingPermissions(null)}><X className="w-4 h-4"/></Button>):(<Button size="sm" variant="outline" onClick={()=>setEditingPermissions(u.uid)}>{t("pages.adminPanel.permissions")}</Button>)}</div>{editingPermissions===u.uid&&(<div className="grid grid-cols-2 gap-2 pt-2 border-t">{[{key:"canSeeDashboard" as const,lk:"permDashboard"},{key:"canSeeProductTree" as const,lk:"permProductTree"},{key:"canSeeIngredients" as const,lk:"permIngredients"},{key:"canSeeInventory" as const,lk:"permInventory"},{key:"canSeeSuppliers" as const,lk:"permSuppliers"},{key:"canSeePurchaseOrders" as const,lk:"permPurchaseOrders"},{key:"canSeeUpload" as const,lk:"permUpload"},{key:"canSeeReports" as const,lk:"permReports"},{key:"canSeeCosts" as const,lk:"permMenuCosts"},{key:"canSeeSettings" as const,lk:"permSettings"}].map(({key,lk})=>(<div key={key} className="flex items-center justify-between"><Label className="text-xs">{t(`pages.adminPanel.${lk}`)}</Label><Switch checked={u.permissions?.[key]??(key==="canSeeDashboard"||key==="canSeeProductTree"||key==="canSeeIngredients"||key==="canSeeInventory"||key==="canSeeSuppliers"||key==="canSeePurchaseOrders"||key==="canSeeUpload")} onCheckedChange={checked=>handleSavePermissions(u.uid,{...u.permissions,[key]:checked})}/></div>))}</div>)}</div>))}</div>)}</CardContent>
-              </Card>
-            )}
-
           </TabsContent>
         </Tabs>
       )}
