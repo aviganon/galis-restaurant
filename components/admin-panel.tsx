@@ -1329,7 +1329,11 @@ export function AdminPanel() {
       }, { merge: true })
       toast.success(`פרטי ספק "${editSupplierDetailsName}" עודכנו`)
       setEditSupplierDetailsOpen(false)
-      loadSystemOwnerData()
+      setSuppliersWithRests(prev => prev.map(s =>
+        s.name === editSupplierDetailsName
+          ? { ...s, phone: editSupplierDetailsPhone.trim()||null, email: editSupplierDetailsEmail.trim()||null, contact: editSupplierDetailsContact.trim()||null, address: editSupplierDetailsAddress.trim()||null }
+          : s
+      ))
     } catch (e) {
       toast.error((e as Error).message)
     } finally {
@@ -2675,9 +2679,7 @@ export function AdminPanel() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{t("pages.adminPanel.addIngredientToGlobal")}</DialogTitle>
-            <p className="text-sm text-muted-foreground">
-              {t("pages.adminPanel.addToGlobalDesc")}
-            </p>
+            <DialogDescription>{t("pages.adminPanel.addToGlobalDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -2761,9 +2763,7 @@ export function AdminPanel() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{t("pages.adminPanel.editIngredient")}</DialogTitle>
-            <p className="text-sm text-muted-foreground">
-              {editAdminIngredient && `${editAdminIngredient.name} (${editAdminIngredient.source === "global" ? t("pages.adminPanel.global") : t("pages.adminPanel.restaurant")})`}
-            </p>
+            <DialogDescription>{editAdminIngredient && `${editAdminIngredient.name} (${editAdminIngredient.source === "global" ? t("pages.adminPanel.global") : t("pages.adminPanel.restaurant")})`}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
@@ -3184,9 +3184,7 @@ export function AdminPanel() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{t("pages.adminPanel.editSupplierDetails")}</DialogTitle>
-            <p className="text-sm text-muted-foreground">
-              {editSupplierDetailsName && `${t("pages.adminPanel.supplierLabelShort")}: ${editSupplierDetailsName}`}
-            </p>
+            <DialogDescription>{editSupplierDetailsName && `${t("pages.adminPanel.supplierLabelShort")}: ${editSupplierDetailsName}`}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
