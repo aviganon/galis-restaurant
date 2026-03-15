@@ -1806,7 +1806,7 @@ export function AdminPanel() {
             </CardTitle>
             {isSystemOwner && !isImpersonating && (
               <div className="flex items-center gap-1">
-                <div className="border border-border rounded-md overflow-hidden"><LanguageSwitcher /></div>
+                <LanguageSwitcher variant="light" />
                 <Button variant="ghost" size="sm" onClick={()=>setCurrentPage?.("settings")} className="gap-1.5 text-muted-foreground hover:text-foreground h-8">
                   <Settings2 className="w-4 h-4"/><span className="text-xs hidden sm:inline">הגדרות</span>
                 </Button>
