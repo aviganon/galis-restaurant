@@ -33,6 +33,7 @@ import {
   MapPin,
   Save,
   Loader2,
+  Key,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
@@ -41,7 +42,7 @@ import { Users, UserPlus, Ticket, Copy } from "lucide-react"
 
 export function Settings() {
   const t = useTranslations()
-  const { userRole, currentRestaurantId, refreshIngredients, isImpersonating, isSystemOwner, restaurants } = useApp()
+  const { userRole, currentRestaurantId, refreshIngredients, isImpersonating, isSystemOwner, restaurants, setCurrentPage } = useApp()
   const [email, setEmail] = useState("")
   const [displayName, setDisplayName] = useState("")
   const [userId, setUserId] = useState<string | null>(null)
@@ -50,6 +51,9 @@ export function Settings() {
   const [profileAddress, setProfileAddress] = useState("")
   const [savingProfile, setSavingProfile] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [apiKeyInput, setApiKeyInput] = useState("")
+  const [savingApiKey, setSavingApiKey] = useState(false)
+  const [apiKeySaved, setApiKeySaved] = useState(false)
   const [usersData, setUsersData] = useState<{uid:string;email:string;role:string;restaurantId:string|null;restaurantName?:string}[]>([])
   const [usersLoaded, setUsersLoaded] = useState(false)
   const [loadingUsers2, setLoadingUsers2] = useState(false)
@@ -277,6 +281,15 @@ export function Settings() {
     }
   }
 
+  const saveApiKey = async () => {
+    if (!apiKeyInput.trim()) return
+    setSavingApiKey(true)
+    try {
+      await setDoc(doc(db,"appConfig","claudeApi"),{key:apiKeyInput.trim(),updatedAt:new Date().toISOString()},{merge:true})
+      setApiKeySaved(true); setTimeout(()=>setApiKeySaved(false),3000)
+    } catch { toast.error("שגיאה") } finally { setSavingApiKey(false) }
+  }
+
   const loadU = async()=>{setLoadingUsers2(true);try{const s=await getDocs(collection(db,"users"));const rs=restaurants||[];setUsersData(s.docs.map(d=>{const dt=d.data();const r=rs.find(x=>x.id===dt.restaurantId);return{uid:d.id,email:dt.email||"",role:dt.role||"user",restaurantId:dt.restaurantId||null,restaurantName:r?.name}}).filter(u=>u.role!=="owner"));setUsersLoaded(true)}catch{toast.error("שגיאה")}finally{setLoadingUsers2(false)}}
   const doCreate=async()=>{setCErr(null);if(!cEmail.trim()||!cPass.trim()){setCErr("נא למלא אימייל וסיסמה");return}if(cPass.length<6){setCErr("סיסמה קצרה");return}setCreating2(true);try{const{createUserWithEmailAndPassword}=await import("firebase/auth");const cr=await createUserWithEmailAndPassword(auth,cEmail.trim(),cPass);await setDoc(doc(db,"users",cr.user.uid),{email:cEmail.trim(),role:cRole,restaurantId:cRest||null});setUsersData(p=>[...p,{uid:cr.user.uid,email:cEmail.trim(),role:cRole,restaurantId:cRest||null,restaurantName:(restaurants||[]).find(r=>r.id===cRest)?.name}]);toast.success("נוצר");setCEmail("");setCPass("");setCRest("");setShowCreate2(false)}catch(e){const c=(e as{code?:string}).code;setCErr(c==="auth/email-already-in-use"?"אימייל בשימוש":(e as Error).message||"שגיאה")}finally{setCreating2(false)}}
   const doAssign=async()=>{if(!assignTgt)return;setSavingAssign2(true);try{await setDoc(doc(db,"users",assignTgt.uid),{restaurantId:assignTgtRestId||null},{merge:true});setUsersData(p=>p.map(u=>u.uid===assignTgt.uid?{...u,restaurantId:assignTgtRestId||null,restaurantName:(restaurants||[]).find(r=>r.id===assignTgtRestId)?.name}:u));toast.success("שויך");setAssignTgt(null)}catch{toast.error("שגיאה")}finally{setSavingAssign2(false)}}
@@ -286,6 +299,11 @@ export function Settings() {
   return (
     <div className="container mx-auto px-4 py-6 max-w-4xl">
       <div className="mb-6">
+        <button onClick={()=>setCurrentPage?.(isSystemOwner&&!isImpersonating?"admin-panel":"dashboard")}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors">
+          <ChevronLeft className="w-4 h-4"/>
+          {isSystemOwner&&!isImpersonating?"חזור לפאנל בעלים":"חזור לדף הראשי"}
+        </button>
         <h1 className="text-2xl md:text-3xl font-bold mb-1">{t("pages.settings.title")}</h1>
         <p className="text-muted-foreground">{t("pages.settings.subtitle")}</p>
       </div>
@@ -477,6 +495,20 @@ export function Settings() {
             </Button>
           </CardContent>
         </Card>
+
+        {isSystemOwner && (
+        <Card className="border-0 shadow-sm">
+          <CardHeader><CardTitle className="text-lg font-semibold flex items-center gap-2"><Key className="w-5 h-5 text-muted-foreground"/>מפתח Claude API</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">המפתח משמש לניתוח חשבוניות ובדיקת מחירים באינטרנט.</p>
+            <div className="flex gap-2">
+              <Input type="password" placeholder="sk-ant-..." value={apiKeyInput} onChange={e=>setApiKeyInput(e.target.value)} className="flex-1 font-mono text-sm" dir="ltr"/>
+              <Button size="sm" onClick={saveApiKey} disabled={savingApiKey}>{savingApiKey?<Loader2 className="w-4 h-4 animate-spin"/>:<Save className="w-4 h-4"/>}</Button>
+            </div>
+            {apiKeySaved&&<p className="text-xs text-emerald-600">✓ מפתח נשמר</p>}
+          </CardContent>
+        </Card>
+        )}
 
         {/* Data Management - only for owner/manager, when restaurant selected */}
         {currentRestaurantId && (userRole === "owner" || userRole === "admin" || userRole === "manager") && (
