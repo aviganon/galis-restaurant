@@ -1781,67 +1781,6 @@ export function AdminPanel() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl space-y-6">
-
-      {/* OWNER DASHBOARD — merged */}
-      {isSystemOwner && !isImpersonating && (
-        <div className="space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold mb-0.5">ניהול מערכת</h1>
-              <p className="text-muted-foreground text-sm">{restsWithDetails.length} מסעדות פעילות</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={()=>loadSystemOwnerData()} disabled={loadingSystemOwner}>
-              <RefreshCw className={cn("w-4 h-4 ml-1.5", loadingSystemOwner && "animate-spin")}/>רענן
-            </Button>
-          </div>
-
-          {restsWithDetails.length > 0 && (
-            <div>
-              <h2 className="text-sm font-semibold mb-2 text-muted-foreground">מסעדות — לחץ לכניסה</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {restsWithDetails.map(rest => (
-                  <Card key={rest.id} className="border-0 shadow-sm cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={()=>onImpersonate?.({id:rest.id,name:rest.name,emoji:rest.emoji||""})}>
-                    <CardContent className="p-4 flex items-center gap-3">
-                      <div className="w-11 h-11 rounded-xl bg-muted flex items-center justify-center text-xl flex-shrink-0">{rest.emoji||"🍽️"}</div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold truncate text-sm">{rest.name}</p>
-                        <p className="text-xs text-muted-foreground">{rest.dishesCount} מנות · {(rest.assignedSuppliers||[]).length} ספקים</p>
-                      </div>
-                      <div className="text-left flex-shrink-0">
-                        <p className={cn("font-bold text-sm", rest.fcAvg > 30 ? "text-orange-600" : "text-green-600")}>{rest.fcAvg > 0 ? `${rest.fcAvg.toFixed(1)}%` : "—"}</p>
-                        <p className="text-xs text-muted-foreground">food cost</p>
-                      </div>
-                      <span className="text-muted-foreground">›</span>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {([
-              {label:"הכנסות חודשיות", value:`₪${dashTotalRevenue.toLocaleString()}`, icon:TrendingUp, color:"bg-green-50 text-green-700"},
-              {label:"מנות שנמכרו", value:String(dashTotalDishesSold), icon:Utensils, color:"bg-amber-50 text-amber-700"},
-              {label:"food cost ממוצע", value:`${dashAvgFoodCost.toFixed(1)}%`, icon:DollarSign, color:"bg-blue-50 text-blue-700"},
-              {label:"הזמנות רכש", value:String(dashPurchaseOrders), icon:ShoppingCart, color:"bg-slate-50 text-slate-700"},
-            ] as const).map((kpi,i)=>(
-              <Card key={i} className="border-0 shadow-sm">
-                <CardContent className="p-4">
-                  <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center mb-3", kpi.color)}>
-                    <kpi.icon className="w-4 h-4"/>
-                  </div>
-                  <p className="text-2xl font-bold mb-0.5">{dashLoadingKpis ? "…" : kpi.value}</p>
-                  <p className="text-xs text-muted-foreground">{kpi.label}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <hr className="border-border"/>
-        </div>
-      )}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -1906,201 +1845,68 @@ export function AdminPanel() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="restaurants" className="mt-4 space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="w-5 h-5" />
-                  {t("pages.adminPanel.addRestaurant")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {(!restaurants || restaurants.length === 0) && (
-                  <p className="text-sm text-amber-600 dark:text-amber-500 mb-3 flex items-center gap-2">
-                    {t("pages.adminPanel.noRestaurantsLoaded")}{" "}
-                    <Button variant="link" className="p-0 h-auto font-semibold" onClick={() => window.location.reload()}>
-                      {t("pages.adminPanel.clickToRefresh")}
-                    </Button>
-                  </p>
-                )}
-                <p className="text-sm text-muted-foreground mb-4">
-                  {t("pages.adminPanel.createNewRestaurant")}
-                </p>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  <div className="flex-1 min-w-[200px]">
-                    <Label htmlFor="new-rest-name">{t("pages.adminPanel.restaurantName")}</Label>
-                    <Input
-                      id="new-rest-name"
-                      value={newRestName}
-                      onChange={(e) => setNewRestName(e.target.value)}
-                      placeholder={t("pages.adminPanel.enterRestaurantName")}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div className="w-24">
-                    <Label htmlFor="new-rest-emoji">{t("pages.adminPanel.emoji")}</Label>
-                    <Input
-                      id="new-rest-emoji"
-                      value={newRestEmoji}
-                      onChange={(e) => setNewRestEmoji(e.target.value)}
-                      placeholder="☕"
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-                <div className="mb-3">
-                  <Label htmlFor="new-rest-invite-code">{t("pages.adminPanel.inviteCodeOptional")}</Label>
-                  <div className="flex gap-2 items-center mt-1">
-                    <Input
-                      id="new-rest-invite-code"
-                      value={newRestInviteCode}
-                      onChange={(e) => setNewRestInviteCode(e.target.value)}
-                      placeholder={t("pages.adminPanel.inviteCodePlaceholder")}
-                      className="max-w-xs font-mono"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={async () => {
-                        setGeneratingCode(true)
-                        setLastGeneratedCode(null)
-                        try {
-                          const { inviteCodesCollection, inviteCodeFields } = firestoreConfig
-                          let code = generateInviteCode()
-                          let exists = true
-                          while (exists) {
-                            const snap = await getDoc(doc(db, inviteCodesCollection, code))
-                            exists = snap.exists()
-                            if (exists) code = generateInviteCode()
-                          }
-                          await setDoc(doc(db, inviteCodesCollection, code), {
-                            [inviteCodeFields.type]: "manager",
-                            [inviteCodeFields.used]: false,
-                            [inviteCodeFields.createdAt]: new Date().toISOString(),
-                          })
-                          setNewRestInviteCode(code)
-                          setLastGeneratedCode(code)
-                          toast.success(t("pages.adminPanel.codeCreated"))
-                        } catch (e) {
-                          toast.error((e as Error).message)
-                        } finally {
-                          setGeneratingCode(false)
-                        }
-                      }}
-                      disabled={generatingCode}
-                    >
-                      {generatingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                      {t("pages.adminPanel.createCode")}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {t("pages.adminPanel.optionallyCreateCode")}
-                  </p>
-                </div>
-                <Button onClick={handleCreateRestaurant} disabled={creatingRest}>
-                  {creatingRest ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Building2 className="w-4 h-4 ml-2" />}
-                  {t("pages.adminPanel.createRestaurant")}
-                </Button>
-              </CardContent>
-            </Card>
+          <TabsContent value="restaurants" className="mt-4">
             {loadingSystemOwner ? (
               <div className="flex items-center gap-2 text-muted-foreground py-8">
                 <Loader2 className="w-5 h-5 animate-spin" />
                 {t("pages.adminPanel.loadingRestaurants")}
               </div>
             ) : (
-              <div className="space-y-4">
-                {restsWithDetails.map((rest) => (
-                  <Card key={rest.id}>
-                    <CardHeader className="pb-2" dir="rtl">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <CardTitle className="text-lg flex items-center gap-2">
-                          {rest.emoji && <span>{rest.emoji}</span>}
-                          {rest.name}
-                        </CardTitle>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground">
-                            {rest.dishesCount} {t("pages.adminPanel.dishesCount")} · {t("pages.adminPanel.fcAvg")} {rest.fcAvg}%
-                          </span>
-                          {onImpersonate && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                onImpersonate({ id: rest.id, name: rest.name, emoji: rest.emoji })
-                                toast.success(`${t("pages.adminPanel.impersonatingRest")}: ${rest.emoji ? `${rest.emoji} ` : ""}${rest.name}`)
-                              }}
-                            >
-                              <UserCircle className="w-4 h-4 ml-1" />
-                              {t("pages.adminPanel.impersonate")}
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => {
-                              setRestToDelete(rest)
-                              setDeleteRestDialogOpen(true)
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4 ml-1" />
-                            מחק
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div>
-                        <p className="text-sm font-medium mb-1">משויכים — לחץ להסרה:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {(rest.assignedSuppliers?.length ?? 0) === 0 ? (
-                            <span className="text-sm text-muted-foreground">{t("pages.adminPanel.noAssignedSuppliers")}</span>
-                          ) : (
-                            (rest.assignedSuppliers || []).map((s) => (
-                              <Button
-                                key={s}
-                                size="sm"
-                                variant="secondary"
-                                className="text-destructive hover:bg-destructive/10"
-                                onClick={() => handleRemoveSupplier(rest.id, s)}
-                                disabled={removingSupplier === `${rest.id}:${s}`}
-                              >
-                                {removingSupplier === `${rest.id}:${s}` ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <X className="w-3 h-3 ml-1" />}
-                                {s}
-                              </Button>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium mb-2">{t("pages.adminPanel.suppliersAvailableForAssignment")}:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {suppliersWithRests
-                            .filter((s) => !(rest.assignedSuppliers || []).includes(s.name))
-                            .map((s) => (
-                              <Button
-                                key={s.name}
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleAssignSupplier(rest.id, s.name)}
-                                disabled={assigningSupplier === `${rest.id}:${s.name}`}
-                              >
-                                {assigningSupplier === `${rest.id}:${s.name}` ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <Check className="w-3 h-3 ml-1" />}
-                                {s.name}
-                              </Button>
-                            ))}
-                          {suppliersWithRests.filter((s) => !(rest.assignedSuppliers || []).includes(s.name)).length === 0 && (
-                            <span className="text-sm text-muted-foreground">{t("pages.adminPanel.allSuppliersAssigned")}</span>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-                {restsWithDetails.length === 0 && !loadingSystemOwner && (
-                  <p className="text-muted-foreground py-4">{t("pages.adminPanel.noRestaurants")}</p>
+              <div className="space-y-6">
+
+                {/* Restaurant cards — click to enter */}
+                {restsWithDetails.length > 0 && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-3">{t("pages.dashboard.clickToView")}</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {restsWithDetails.map(rest => (
+                        <Card key={rest.id} className="border-0 shadow-sm cursor-pointer hover:bg-muted/50 transition-colors"
+                          onClick={()=>onImpersonate?.({id:rest.id,name:rest.name,emoji:rest.emoji||""})}>
+                          <CardContent className="p-4 flex items-center gap-3">
+                            <div className="w-11 h-11 rounded-xl bg-muted flex items-center justify-center text-xl flex-shrink-0">{rest.emoji||"🍽️"}</div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold truncate text-sm">{rest.name}</p>
+                              <p className="text-xs text-muted-foreground">{rest.dishesCount} מנות · {(rest.assignedSuppliers||[]).length} ספקים</p>
+                            </div>
+                            <div className="text-left flex-shrink-0">
+                              <p className={cn("font-bold text-sm", rest.fcAvg > 30 ? "text-orange-600" : "text-green-600")}>{rest.fcAvg > 0 ? `${rest.fcAvg.toFixed(1)}%` : "—"}</p>
+                              <p className="text-xs text-muted-foreground">food cost</p>
+                            </div>
+                            <span className="text-muted-foreground">›</span>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
                 )}
+
+                {/* KPI cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {([
+                    {label:"הכנסות חודשיות", value:`₪${dashTotalRevenue.toLocaleString()}`, icon:TrendingUp, color:"bg-green-50 text-green-700"},
+                    {label:"מנות שנמכרו", value:String(dashTotalDishesSold), icon:Utensils, color:"bg-amber-50 text-amber-700"},
+                    {label:"food cost ממוצע", value:`${dashAvgFoodCost.toFixed(1)}%`, icon:DollarSign, color:"bg-blue-50 text-blue-700"},
+                    {label:"הזמנות רכש", value:String(dashPurchaseOrders), icon:ShoppingCart, color:"bg-slate-50 text-slate-700"},
+                  ] as const).map((kpi,i)=>(
+                    <Card key={i} className="border-0 shadow-sm">
+                      <CardContent className="p-4">
+                        <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center mb-3", kpi.color)}>
+                          <kpi.icon className="w-4 h-4"/>
+                        </div>
+                        <p className="text-2xl font-bold mb-0.5">{dashLoadingKpis ? "…" : kpi.value}</p>
+                        <p className="text-xs text-muted-foreground">{kpi.label}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Add new restaurant */}
+                <div className="flex justify-end">
+                  <Button onClick={()=>setNewRestOpen(true)} size="sm">
+                    <Plus className="w-4 h-4 ml-1" />{t("pages.adminPanel.addRestaurant")}
+                  </Button>
+                </div>
+
               </div>
             )}
           </TabsContent>
