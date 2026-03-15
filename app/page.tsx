@@ -384,7 +384,7 @@ export default function Home() {
         userPermissions={userPermissions}
         onLogout={handleLogout}
         isImpersonating={!!impersonatingRestaurant}
-      />
+      />}
       
       {impersonatingRestaurant && (
         <div className="fixed top-0 md:top-16 left-0 right-0 z-40 flex items-center justify-center gap-3 py-2 bg-amber-500/90 text-amber-950 text-sm font-medium">
