@@ -248,7 +248,7 @@ export async function extractWithAI(
           : SALES_SYSTEM
     const userContent =
       type === "p"
-        ? "נתח את החשבונית: חלץ שם ספק, תאריך, ולכל פריט — name=עמודת תאור/שם המוצר (לא המקט!), sku=מק\"ט, price=מחיר נטו (אחרי הנחה), unit=יחידה, qty=כמות. אם אין מחירים כלל — no_prices:true. JSON בלבד."
+        ? "נתח את המסמך (חשבונית/מחירון/תעודת משלוח). אם כותרת 'מחירון' — כל שורה=פריט, qty=1, price=המחיר, sku=קוד. אם חשבונית — price=נטו, qty=כמות. אם ללא מחירים — no_prices:true. name=שם המוצר בלבד. JSON בלבד."
         : type === "d"
           ? "חלץ מנות ומחירים מהתפריט. לכל מנה ישייך רכיבים לפי הבנתך (בשר, ירקות, קמח וכו') — גם אם לא מופיעים בתפריט. JSON בלבד."
           : "חלץ מנות, כמויות ומחירים. JSON בלבד."
@@ -276,7 +276,7 @@ export async function extractWithAI(
           return JSON.parse(c2)
         } catch {}
       }
-      if (clean.includes('supplier_name') || clean.includes('no_prices') || clean.includes('תעודת משלוח')) {
+      if (clean.includes('"no_prices":true') && !clean.includes('"items":[{')) {
         const supMatch = clean.match(/supplier_name[^:]*:[^"]*"([^"]+)"/)
         const dateMatch = clean.match(/invoice_date[^:]*:[^"]*"([^"]+)"/)
         return { supplier_name: supMatch?.[1]?.trim() || '', invoice_date: dateMatch?.[1]?.trim() || null, no_prices: true, items: [] }
@@ -296,7 +296,7 @@ export async function extractWithAI(
           : SALES_SYSTEM
     const userContent =
       type === "p"
-        ? "נתח את החשבונית: חלץ שם ספק, תאריך, ולכל פריט — name=עמודת תאור/שם המוצר (לא המקט!), sku=מק\"ט, price=מחיר נטו (אחרי הנחה), unit=יחידה, qty=כמות. אם אין מחירים כלל — no_prices:true. JSON בלבד."
+        ? "נתח את המסמך (חשבונית/מחירון/תעודת משלוח). אם כותרת 'מחירון' — כל שורה=פריט, qty=1, price=המחיר, sku=קוד. אם חשבונית — price=נטו, qty=כמות. אם ללא מחירים — no_prices:true. name=שם המוצר בלבד. JSON בלבד."
         : type === "d"
           ? "חלץ מנות ומחירים מהתפריט. לכל מנה ישייך רכיבים לפי הבנתך (בשר, ירקות, קמח וכו') — גם אם לא מופיעים בתפריט. JSON בלבד."
           : "חלץ מנות, כמויות ומחירים. JSON בלבד."
@@ -330,7 +330,7 @@ export async function extractWithAI(
           return JSON.parse(c2)
         } catch {}
       }
-      if (clean.includes('supplier_name') || clean.includes('no_prices') || clean.includes('תעודת משלוח')) {
+      if (clean.includes('"no_prices":true') && !clean.includes('"items":[{')) {
         const supMatch = clean.match(/supplier_name[^:]*:[^"]*"([^"]+)"/)
         const dateMatch = clean.match(/invoice_date[^:]*:[^"]*"([^"]+)"/)
         return { supplier_name: supMatch?.[1]?.trim() || '', invoice_date: dateMatch?.[1]?.trim() || null, no_prices: true, items: [] }
