@@ -1039,7 +1039,7 @@ export function AdminPanel() {
         await batch.commit()
         const supplierId = supTrim.replace(/\//g, "_").replace(/\./g, "_").trim() || "supplier"
         await setDoc(doc(db, "suppliers", supplierId), { name: supTrim, lastUpdated: now, createdBy: "owner" }, { merge: true })
-        const toSync = items.filter((i) => i.name?.trim() && i.price > 0).map((i) => ({ name: i.name!.trim(), price: i.price, unit: i.unit || "קג", supplier: supTrim }))
+        const toSync = items.filter((i) => i.name?.trim() && i.price > 0).map((i) => ({ name: i.name!.trim(), price: i.price, unit: i.unit || "קג", supplier: supTrim, waste: 0, sku: i.sku ?? "", ...(typeof i.qty === "number" && i.qty > 0 ? { qty: i.qty } : {}) }))
         if (toSync.length > 0) {
           const synced = await syncSupplierIngredientsToAssignedRestaurants(supTrim, toSync)
           const restCount = synced > 0 ? Math.ceil(synced / toSync.length) : 0
