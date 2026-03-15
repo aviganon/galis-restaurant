@@ -2890,9 +2890,6 @@ export function AdminPanel() {
     </div>
   )
 }
-          </TabsContent>
-        </Tabs>
-      )}
 
       <Dialog open={addIngredientOpen} onOpenChange={(o) => { setAddIngredientOpen(o); if (!o) resetAddIngredientModal() }}>
         <DialogContent className="max-w-lg">
