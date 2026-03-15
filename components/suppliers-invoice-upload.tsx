@@ -10,6 +10,7 @@ import { FilePreviewModal } from "@/components/file-preview-modal"
 import { isSupportedFormat } from "@/lib/ai-extract"
 import type { ExtractedSupplierItem } from "@/lib/ai-extract"
 import { toast } from "sonner"
+import { useApp } from "@/contexts/app-context"
 
 const INVOICE_ACCEPT = ".xlsx,.xls,.csv,.pdf,.rtf,image/*"
 
@@ -21,6 +22,7 @@ interface SuppliersInvoiceUploadProps {
 }
 
 export function SuppliersInvoiceUpload({ restaurantName, onConfirm, onClose, onSuccess }: SuppliersInvoiceUploadProps) {
+  const { currentRestaurantId } = useApp()
   const [fpmOpen, setFpmOpen] = useState(false)
   const [fpmFile, setFpmFile] = useState<File | null>(null)
   const [isInvoiceDragging, setIsInvoiceDragging] = useState(false)
