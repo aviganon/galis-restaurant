@@ -140,10 +140,14 @@ function AdminCheapestPopover({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium transition-colors hover:bg-muted text-muted-foreground"
+          className={
+            displayPrice
+              ? "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all bg-blue-500 hover:bg-blue-600 text-white shadow-sm hover:shadow-md active:scale-95"
+              : "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium transition-colors hover:bg-muted text-muted-foreground"
+          }
         >
           {displayPrice || "—"}
-          <ChevronDown className="w-3 h-3" />
+          <ChevronDown className="w-3 h-3 opacity-70" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 p-4">
