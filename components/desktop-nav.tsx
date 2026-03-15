@@ -42,6 +42,7 @@ interface DesktopNavProps {
   userPermissions?: UserPermissions
   onLogout: () => void
   isImpersonating?: boolean
+  onStopImpersonate?: () => void
 }
 
 const hasFullMenu = (role: string, isSystemOwner?: boolean) => 
@@ -102,7 +103,8 @@ export function DesktopNav({
   isSystemOwner,
   userPermissions,
   onLogout,
-  isImpersonating
+  isImpersonating,
+  onStopImpersonate
 }: DesktopNavProps) {
   const t = useTranslations()
   return (
@@ -121,8 +123,14 @@ export function DesktopNav({
           {(isImpersonating || !isSystemOwner) && restaurants.length > 0 && (
             isImpersonating ? (
               <div className="flex items-center gap-2 h-9 px-3 bg-primary-foreground/10 rounded-full">
-                <div className="w-2 h-2 rounded-full bg-amber-400" />
-                <span className="max-w-[140px] truncate font-medium">{currentRestaurant}</span>
+                <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <span className="max-w-[120px] truncate font-medium">{currentRestaurant}</span>
+                {onStopImpersonate && (
+                  <button onClick={onStopImpersonate} title="חזור לפאנל בעלים"
+                    className="opacity-60 hover:opacity-100 transition-opacity text-xs leading-none">
+                    ✕
+                  </button>
+                )}
               </div>
             ) : (
               <div className="flex items-center gap-2 h-9 px-3 bg-primary-foreground/10 rounded-full">
