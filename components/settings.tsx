@@ -347,7 +347,7 @@ export function Settings() {
           </CardContent>
         </Card>
 
-        {currentRestaurantId && (
+        {currentRestaurantId && (!isSystemOwner || isImpersonating) && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -362,7 +362,6 @@ export function Settings() {
         )}
 
         {/* Notifications */}
-        {!isSystemOwner && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -442,7 +441,6 @@ export function Settings() {
             )}
           </CardContent>
         </Card>
-        )}
 
         {/* Security */}
         <Card className="border-0 shadow-sm">
@@ -477,8 +475,7 @@ export function Settings() {
         </Card>
 
         {/* Data Management - only for owner/manager, when restaurant selected */}
-        {!isSystemOwner && currentRestaurantId && (userRole === "owner" || userRole === "admin" || userRole === "manager") && (
-        {!isSystemOwner && (
+        {currentRestaurantId && (userRole === "owner" || userRole === "admin" || userRole === "manager") && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -545,7 +542,6 @@ export function Settings() {
             </AlertDialog>
           </CardContent>
         </Card>
-        )}
         )}
 
         {/* App Info */}
