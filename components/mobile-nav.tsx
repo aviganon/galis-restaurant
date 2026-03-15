@@ -68,6 +68,8 @@ const moreItems = (
   const full = hasFullMenu(userRole, isSystemOwner)
   const items: { id: string; label: string; icon: typeof Package }[] = []
   if (isSystemOwner && !isImpersonating) return items
+  // בעלים בהתחזות — כפתור חזרה לפאנל בעלים
+  if (isSystemOwner && isImpersonating) items.push({ id: "admin-panel", label: t("nav.adminPanel"), icon: Shield })
   if (full && !isImpersonating) items.push({ id: "admin-panel", label: t("nav.adminPanel"), icon: Shield })
   if (full || userCanSeeOptIn(perms, "canSeeCosts")) items.push({ id: "menu", label: t("nav.menuCosts"), icon: UtensilsCrossed })
   if (full || userCanSee(perms, "canSeeSuppliers")) items.push({ id: "suppliers", label: t("nav.suppliers"), icon: Truck })
