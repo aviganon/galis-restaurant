@@ -97,6 +97,12 @@ type IngredientRow = {
   imageUrl?: string
 }
 
+function getRestaurantImageUrl(name: string): string {
+  const themes = ["restaurant,food,kitchen","cafe,interior,dining","chef,cooking,meal","bistro,food,elegant","bakery,food,fresh"]
+  const i = (name.charCodeAt(0)||0) % themes.length
+  return 'https://source.unsplash.com/400x200/?' + themes[i] + ',' + encodeURIComponent(name)
+}
+
 function getIngredientImageUrl(name: string): string {
   return `https://source.unsplash.com/56x56/?food,${encodeURIComponent(name.replace(/[()]/g,"").trim())},ingredient`
 }
@@ -389,6 +395,7 @@ export function AdminPanel() {
   const adminInvoiceFileRef = useRef<HTMLInputElement>(null)
   const INVOICE_ACCEPT = ".xlsx,.xls,.csv,.pdf,.rtf,image/*"
   const [selectedSupplierDetail, setSelectedSupplierDetail] = useState<string | null>(null)
+  const [selectedRestDetail, setSelectedRestDetail] = useState<string | null>(null)
   const [loadingSystemOwner, setLoadingSystemOwner] = useState(false)
   const [addIngredientOpen, setAddIngredientOpen] = useState(false)
   const [addIngredientName, setAddIngredientName] = useState("")
@@ -2052,108 +2059,108 @@ export function AdminPanel() {
               </div>
             ) : (
               <div className="space-y-4">
-                {restsWithDetails.map((rest, _ri) => (
-                  <Card key={rest.id} className={["border-l-4 border-l-emerald-500","border-l-4 border-l-blue-500","border-l-4 border-l-violet-500","border-l-4 border-l-rose-500","border-l-4 border-l-amber-500"][_ri%5] + " transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"}>
-                    <CardHeader className="pb-2" dir="rtl">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <CardTitle className="text-lg flex items-center gap-2">
-                          {rest.emoji && <span>{rest.emoji}</span>}
-                          {rest.name}
-                        </CardTitle>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-2 flex-wrap">
+                {/* Restaurant image cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+                  {restsWithDetails.map((rest, _ri) => {
+                    const colors = ["linear-gradient(135deg,#0F6E56,#1D9E75)","linear-gradient(135deg,#185FA5,#378ADD)","linear-gradient(135deg,#533AAB,#7F77DD)","linear-gradient(135deg,#854F0B,#BA7517)","linear-gradient(135deg,#993C1D,#D85A30)"]
+                    return (
+                      <div key={rest.id}
+                        className={cn("relative rounded-xl overflow-hidden cursor-pointer border-2 transition-all duration-200 shadow-sm hover:shadow-lg hover:-translate-y-0.5",
+                          selectedRestDetail===rest.id?"border-primary shadow-lg -translate-y-0.5":"border-transparent")}
+                        style={{height:140}}
+                        onClick={()=>setSelectedRestDetail(selectedRestDetail===rest.id?null:rest.id)}>
+                        <img src={getRestaurantImageUrl(rest.name)} alt={rest.name}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          onError={e=>{(e.target as HTMLImageElement).style.display="none";(e.target as HTMLImageElement).parentElement!.style.background=colors[_ri%5]}}/>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-black/10"/>
+                        <div className="absolute inset-0 flex flex-col justify-end p-3">
+                          <p className="font-bold text-white text-sm leading-tight drop-shadow truncate">
+                            {rest.emoji&&<span className="ml-1">{rest.emoji}</span>}{rest.name}
+                          </p>
+                          <div className="flex gap-1 mt-1.5 flex-wrap">
                             {([
-                              {icon:Utensils,val:rest.dishesCount,label:"מנות",grad:"from-amber-400 to-orange-500"},
-                              {icon:TrendingUp,val:rest.fcAvg>0?`${rest.fcAvg}%`:"—",label:"Food Cost",grad:rest.fcAvg<=0?"from-slate-400 to-slate-500":rest.fcAvg<=28?"from-emerald-400 to-teal-500":rest.fcAvg<=33?"from-blue-400 to-indigo-500":"from-rose-400 to-red-500"},
-                              {icon:Truck,val:(rest.assignedSuppliers||[]).length,label:"ספקים",grad:"from-violet-400 to-purple-500"},
-                              {icon:ShoppingCart,val:rest.poCount??0,label:"הזמנות",grad:"from-slate-400 to-slate-500"},
+                              {icon:Utensils,val:rest.dishesCount,grad:"from-amber-400 to-orange-500"},
+                              {icon:TrendingUp,val:rest.fcAvg>0?`${rest.fcAvg}%`:"—",grad:rest.fcAvg<=0?"from-slate-400 to-slate-500":rest.fcAvg<=28?"from-emerald-400 to-teal-500":rest.fcAvg<=33?"from-blue-400 to-indigo-500":"from-rose-400 to-red-500"},
+                              {icon:Truck,val:(rest.assignedSuppliers||[]).length,grad:"from-violet-400 to-purple-500"},
+                              {icon:ShoppingCart,val:rest.poCount??0,grad:"from-slate-400 to-slate-500"},
                             ] as const).map((chip,ci)=>(
-                              <div key={ci} className="rounded-lg overflow-hidden shadow-sm" style={{minWidth:68}}>
-                                <div className={`bg-gradient-to-br ${chip.grad} px-3 py-1.5 flex items-center gap-1.5`}>
-                                  <chip.icon className="w-3.5 h-3.5 text-white/80 shrink-0"/>
-                                  <span className="text-base font-bold text-white leading-none">{chip.val}</span>
-                                </div>
-                                <div className="bg-muted/60 px-2 py-0.5">
-                                  <p className="text-[10px] text-muted-foreground font-medium">{chip.label}</p>
-                                </div>
+                              <div key={ci} className={`inline-flex items-center gap-0.5 bg-gradient-to-br ${chip.grad} px-1.5 py-0.5 rounded text-white text-[11px] font-bold`}>
+                                <chip.icon className="w-2.5 h-2.5 opacity-80"/>{chip.val}
                               </div>
                             ))}
                           </div>
-                          {onImpersonate && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                onImpersonate({ id: rest.id, name: rest.name, emoji: rest.emoji })
-                                toast.success(`${t("pages.adminPanel.impersonatingRest")}: ${rest.emoji ? `${rest.emoji} ` : ""}${rest.name}`)
-                              }}
-                            >
-                              <UserCircle className="w-4 h-4 ml-1" />
-                              {t("pages.adminPanel.impersonate")}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Restaurant detail panel */}
+                {selectedRestDetail && (()=>{
+                  const selectedRest=restsWithDetails.find(r=>r.id===selectedRestDetail)
+                  if(!selectedRest)return null
+                  return (
+                    <motion.div initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} className="space-y-4 p-5 rounded-xl border bg-muted/30 mb-4">
+                      <div className="flex flex-wrap items-center justify-between gap-4">
+                        <h3 className="text-lg font-semibold">{selectedRest.emoji&&<span className="ml-2">{selectedRest.emoji}</span>}{selectedRest.name}</h3>
+                        <div className="flex gap-2 flex-wrap">
+                          {onImpersonate&&(
+                            <Button size="sm" variant="outline" onClick={()=>{onImpersonate({id:selectedRest.id,name:selectedRest.name,emoji:selectedRest.emoji});toast.success(t("pages.adminPanel.impersonatingRest")+": "+selectedRest.name)}}>
+                              <UserCircle className="w-4 h-4 ml-1"/>{t("pages.adminPanel.impersonate")}
                             </Button>
                           )}
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => {
-                              setRestToDelete(rest)
-                              setDeleteRestDialogOpen(true)
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4 ml-1" />
-                            מחק
+                          <Button size="sm" variant="destructive" onClick={()=>{setRestToDelete(selectedRest);setDeleteRestDialogOpen(true)}}>
+                            <Trash2 className="w-4 h-4 ml-1"/>מחק
                           </Button>
                         </div>
                       </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
+                      <div className="flex gap-3 flex-wrap">
+                        {([
+                          {icon:Utensils,val:selectedRest.dishesCount,label:"מנות",grad:"from-amber-400 to-orange-500"},
+                          {icon:TrendingUp,val:selectedRest.fcAvg>0?`${selectedRest.fcAvg}%`:"—",label:"Food Cost",grad:selectedRest.fcAvg<=0?"from-slate-400 to-slate-500":selectedRest.fcAvg<=28?"from-emerald-400 to-teal-500":selectedRest.fcAvg<=33?"from-blue-400 to-indigo-500":"from-rose-400 to-red-500"},
+                          {icon:Truck,val:(selectedRest.assignedSuppliers||[]).length,label:"ספקים",grad:"from-violet-400 to-purple-500"},
+                          {icon:ShoppingCart,val:selectedRest.poCount??0,label:"הזמנות",grad:"from-slate-400 to-slate-500"},
+                        ] as const).map((chip,ci)=>(
+                          <div key={ci} className="rounded-lg overflow-hidden shadow-sm" style={{minWidth:68}}>
+                            <div className={`bg-gradient-to-br ${chip.grad} px-3 py-1.5 flex items-center gap-1.5`}>
+                              <chip.icon className="w-3.5 h-3.5 text-white/80"/><span className="text-base font-bold text-white">{chip.val}</span>
+                            </div>
+                            <div className="bg-muted/60 px-2 py-0.5"><p className="text-[10px] text-muted-foreground font-medium">{chip.label}</p></div>
+                          </div>
+                        ))}
+                      </div>
                       <div>
-                        <p className="text-sm font-medium mb-1">משויכים — לחץ להסרה:</p>
+                        <p className="text-sm font-medium mb-2">ספקים משויכים — לחץ להסרה:</p>
                         <div className="flex flex-wrap gap-2">
-                          {(rest.assignedSuppliers?.length ?? 0) === 0 ? (
-                            <span className="text-sm text-muted-foreground">{t("pages.adminPanel.noAssignedSuppliers")}</span>
-                          ) : (
-                            (rest.assignedSuppliers || []).map((s) => (
-                              <Button
-                                key={s}
-                                size="sm"
-                                variant="secondary"
-                                className="text-destructive hover:bg-destructive/10"
-                                onClick={() => handleRemoveSupplier(rest.id, s)}
-                                disabled={removingSupplier === `${rest.id}:${s}`}
-                              >
-                                {removingSupplier === `${rest.id}:${s}` ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <X className="w-3 h-3 ml-1" />}
-                                {s}
+                          {(selectedRest.assignedSuppliers?.length??0)===0
+                            ?<span className="text-sm text-muted-foreground">{t("pages.adminPanel.noAssignedSuppliers")}</span>
+                            :(selectedRest.assignedSuppliers||[]).map(s=>(
+                              <Button key={s} size="sm" variant="secondary" className="text-destructive hover:bg-destructive/10"
+                                onClick={()=>handleRemoveSupplier(selectedRest.id,s)} disabled={removingSupplier===selectedRest.id+":"+s}>
+                                {removingSupplier===selectedRest.id+":"+s?<Loader2 className="w-3 h-3 animate-spin ml-1"/>:<X className="w-3 h-3 ml-1"/>}{s}
                               </Button>
                             ))
-                          )}
+                          }
                         </div>
                       </div>
                       <div>
                         <p className="text-sm font-medium mb-2">{t("pages.adminPanel.suppliersAvailableForAssignment")}:</p>
                         <div className="flex flex-wrap gap-2">
-                          {suppliersWithRests
-                            .filter((s) => !(rest.assignedSuppliers || []).includes(s.name))
-                            .map((s) => (
-                              <Button
-                                key={s.name}
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleAssignSupplier(rest.id, s.name)}
-                                disabled={assigningSupplier === `${rest.id}:${s.name}`}
-                              >
-                                {assigningSupplier === `${rest.id}:${s.name}` ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <Check className="w-3 h-3 ml-1" />}
-                                {s.name}
-                              </Button>
-                            ))}
-                          {suppliersWithRests.filter((s) => !(rest.assignedSuppliers || []).includes(s.name)).length === 0 && (
+                          {suppliersWithRests.filter(s=>!(selectedRest.assignedSuppliers||[]).includes(s.name)).map(s=>(
+                            <Button key={s.name} size="sm" variant="outline"
+                              onClick={()=>handleAssignSupplier(selectedRest.id,s.name)} disabled={assigningSupplier===selectedRest.id+":"+s.name}>
+                              {assigningSupplier===selectedRest.id+":"+s.name?<Loader2 className="w-3 h-3 animate-spin ml-1"/>:<Check className="w-3 h-3 ml-1"/>}{s.name}
+                            </Button>
+                          ))}
+                          {suppliersWithRests.filter(s=>!(selectedRest.assignedSuppliers||[]).includes(s.name)).length===0&&(
                             <span className="text-sm text-muted-foreground">{t("pages.adminPanel.allSuppliersAssigned")}</span>
                           )}
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                    </motion.div>
+                  )
+                })()}
+
                 {restsWithDetails.length === 0 && !loadingSystemOwner && (
                   <p className="text-muted-foreground py-4">{t("pages.adminPanel.noRestaurants")}</p>
                 )}
