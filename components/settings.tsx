@@ -289,13 +289,15 @@ export function Settings() {
         <h1 className="text-2xl md:text-3xl font-bold mb-1">{t("pages.settings.title")}</h1>
         <p className="text-muted-foreground">{t("pages.settings.subtitle")}</p>
       </div>
-      <Tabs defaultValue="settings">
+      <Tabs defaultValue={isSystemOwner && !isImpersonating ? "users" : "settings"}>
+        {(!isSystemOwner || isImpersonating) && (
         <TabsList className="mb-6">
           <TabsTrigger value="settings">הגדרות</TabsTrigger>
-          {isSystemOwner && <TabsTrigger value="users" className="gap-1.5"><Users className="w-4 h-4"/>משתמשים</TabsTrigger>}
         </TabsList>
+        )}
         <TabsContent value="settings">
         <div className="space-y-6">
+        {(!isSystemOwner || isImpersonating) && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -347,6 +349,7 @@ export function Settings() {
           </CardContent>
         </Card>
 
+        )}
         {currentRestaurantId && (!isSystemOwner || isImpersonating) && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
@@ -559,6 +562,16 @@ export function Settings() {
         </TabsContent>
         {isSystemOwner && (
         <TabsContent value="users" className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-muted/40 rounded-xl border">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-lg">👨‍🍳</div>
+              <div>
+                <p className="font-semibold text-sm">{displayName || email}</p>
+                <p className="text-xs text-muted-foreground">{roleLabel} · {email}</p>
+              </div>
+            </div>
+            <Button size="sm" variant="outline" onClick={handleChangePassword} className="text-xs">שנה סיסמה</Button>
+          </div>
           <div className="grid grid-cols-3 gap-3">{[{label:`סה"כ`,val:usersData.length},{label:"מנהלים",val:usersData.filter(u=>u.role==="manager").length},{label:"משתמשים",val:usersData.filter(u=>u.role==="user").length}].map((s,i)=>(<div key={i} className="bg-muted/50 rounded-lg p-3"><p className="text-xs text-muted-foreground mb-1">{s.label}</p><p className="text-2xl font-semibold">{usersLoaded?s.val:"—"}</p></div>))}</div>
           <div className="bg-card border rounded-xl overflow-hidden">
             <div className="flex items-center justify-between p-4 border-b">
