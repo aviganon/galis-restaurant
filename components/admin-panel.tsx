@@ -276,7 +276,7 @@ export function AdminPanel() {
   const [assignManagerEmail, setAssignManagerEmail] = useState("")
   const [assigningManager, setAssigningManager] = useState(false)
   const [assignManagerResult, setAssignManagerResult] = useState<{ok:boolean;msg:string}|null>(null)
-  const [allSystemUsers, setAllSystemUsers] = useState<{uid:string;email:string;role:string;restaurantId:string|null;restaurantName?:string}[]>([])
+  const [allSystemUsers, setAllSystemUsers] = useState<{uid:string;email:string;role:string;restaurantId:string|null;restaurantName?:string;name?:string;phone?:string}[]>([])
   const [loadingAllUsers, setLoadingAllUsers] = useState(false)
   const [allUsersLoaded, setAllUsersLoaded] = useState(false)
   const [assignTarget, setAssignTarget] = useState<{uid:string;email:string}|null>(null)
@@ -1641,7 +1641,7 @@ export function AdminPanel() {
         const data = d.data()
         const restId = data.restaurantId || null
         const restName = restsWithDetails.find(r => r.id === restId)?.name
-        return { uid: d.id, email: data.email || d.id, role: data.role || "user", restaurantId: restId, restaurantName: restName }
+        return { uid: d.id, email: data.email || d.id, role: data.role || "user", restaurantId: restId, restaurantName: restName, name: (data.name as string) || "", phone: (data.phone as string) || "" }
       })
       users.sort((a, b) => a.email.localeCompare(b.email))
       setAllSystemUsers(users)
@@ -3210,7 +3210,16 @@ export function AdminPanel() {
                           <tbody>
                             {allSystemUsers.map(user => (
                               <tr key={user.uid} className="border-t border-border hover:bg-muted/30">
-                                <td className="p-2 font-medium text-xs" dir="ltr">{user.email}</td>
+                                <td className="p-2 text-xs">
+                                  <div className="font-medium" dir="ltr">{user.email}</div>
+                                  {(user.name || user.phone) && (
+                                    <div className="text-muted-foreground mt-0.5">
+                                      {user.name && <span>{user.name}</span>}
+                                      {user.name && user.phone && <span className="mx-1">·</span>}
+                                      {user.phone && <span dir="ltr">{user.phone}</span>}
+                                    </div>
+                                  )}
+                                </td>
                                 <td className="p-2 text-center">
                                   <span className={`text-xs px-2 py-0.5 rounded-full ${user.role === "owner" ? "bg-purple-100 text-purple-700" : user.role === "manager" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>
                                     {user.role === "owner" ? "בעלים" : user.role === "manager" ? "מנהל" : "משתמש"}
