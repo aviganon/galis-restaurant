@@ -1845,71 +1845,207 @@ export function AdminPanel() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="restaurants" className="mt-4">
+          <TabsContent value="restaurants" className="mt-4 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="w-5 h-5" />
+                  {t("pages.adminPanel.addRestaurant")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(!restaurants || restaurants.length === 0) && (
+                  <p className="text-sm text-amber-600 dark:text-amber-500 mb-3 flex items-center gap-2">
+                    {t("pages.adminPanel.noRestaurantsLoaded")}{" "}
+                    <Button variant="link" className="p-0 h-auto font-semibold" onClick={() => window.location.reload()}>
+                      {t("pages.adminPanel.clickToRefresh")}
+                    </Button>
+                  </p>
+                )}
+                <p className="text-sm text-muted-foreground mb-4">
+                  {t("pages.adminPanel.createNewRestaurant")}
+                </p>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  <div className="flex-1 min-w-[200px]">
+                    <Label htmlFor="new-rest-name">{t("pages.adminPanel.restaurantName")}</Label>
+                    <Input
+                      id="new-rest-name"
+                      value={newRestName}
+                      onChange={(e) => setNewRestName(e.target.value)}
+                      placeholder={t("pages.adminPanel.enterRestaurantName")}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div className="w-24">
+                    <Label htmlFor="new-rest-emoji">{t("pages.adminPanel.emoji")}</Label>
+                    <Input
+                      id="new-rest-emoji"
+                      value={newRestEmoji}
+                      onChange={(e) => setNewRestEmoji(e.target.value)}
+                      placeholder="☕"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <Label htmlFor="new-rest-invite-code">{t("pages.adminPanel.inviteCodeOptional")}</Label>
+                  <div className="flex gap-2 items-center mt-1">
+                    <Input
+                      id="new-rest-invite-code"
+                      value={newRestInviteCode}
+                      onChange={(e) => setNewRestInviteCode(e.target.value)}
+                      placeholder={t("pages.adminPanel.inviteCodePlaceholder")}
+                      className="max-w-xs font-mono"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        setGeneratingCode(true)
+                        setLastGeneratedCode(null)
+                        try {
+                          const { inviteCodesCollection, inviteCodeFields } = firestoreConfig
+                          let code = generateInviteCode()
+                          let exists = true
+                          while (exists) {
+                            const snap = await getDoc(doc(db, inviteCodesCollection, code))
+                            exists = snap.exists()
+                            if (exists) code = generateInviteCode()
+                          }
+                          await setDoc(doc(db, inviteCodesCollection, code), {
+                            [inviteCodeFields.type]: "manager",
+                            [inviteCodeFields.used]: false,
+                            [inviteCodeFields.createdAt]: new Date().toISOString(),
+                          })
+                          setNewRestInviteCode(code)
+                          setLastGeneratedCode(code)
+                          toast.success(t("pages.adminPanel.codeCreated"))
+                        } catch (e) {
+                          toast.error((e as Error).message)
+                        } finally {
+                          setGeneratingCode(false)
+                        }
+                      }}
+                      disabled={generatingCode}
+                    >
+                      {generatingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                      {t("pages.adminPanel.createCode")}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t("pages.adminPanel.optionallyCreateCode")}
+                  </p>
+                </div>
+                <Button onClick={handleCreateRestaurant} disabled={creatingRest}>
+                  {creatingRest ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Building2 className="w-4 h-4 ml-2" />}
+                  {t("pages.adminPanel.createRestaurant")}
+                </Button>
+              </CardContent>
+            </Card>
             {loadingSystemOwner ? (
               <div className="flex items-center gap-2 text-muted-foreground py-8">
                 <Loader2 className="w-5 h-5 animate-spin" />
                 {t("pages.adminPanel.loadingRestaurants")}
               </div>
             ) : (
-              <div className="space-y-6">
-
-                {/* Restaurant cards — expand to see details */}
-                {restsWithDetails.length > 0 && (
-                  <div className="space-y-3">
-                    {restsWithDetails.map(rest => (
-                      <Card key={rest.id} dir="rtl">
-                        <CardHeader className="pb-2">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <CardTitle className="text-base flex items-center gap-2">
-                              {rest.emoji && <span>{rest.emoji}</span>}
-                              {rest.name}
-                            </CardTitle>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm text-muted-foreground">
-                                {rest.dishesCount} {t("pages.adminPanel.dishesCount")} · {t("pages.adminPanel.fcAvg")} {rest.fcAvg}%
-                              </span>
-                              {onImpersonate && (
-                                <Button size="sm" variant="outline"
-                                  onClick={()=>{
-                                    onImpersonate({id:rest.id,name:rest.name,emoji:rest.emoji||""})
-                                  }}>
-                                  <UserCircle className="w-4 h-4 ml-1"/>
-                                  {t("pages.adminPanel.impersonate")}
-                                </Button>
-                              )}
-                              <Button size="sm" variant="destructive"
-                                onClick={()=>{setRestToDelete(rest);setDeleteRestDialogOpen(true)}}>
-                                <Trash2 className="w-4 h-4 ml-1"/>מחק
-                              </Button>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-sm text-muted-foreground mb-2">{t("pages.adminPanel.assignedSuppliers")}:</div>
-                          <div className="flex flex-wrap gap-2 items-center">
-                            {(rest.assignedSuppliers||[]).map((s:string)=>(
-                              <Badge key={s} variant="secondary" className="flex items-center gap-1">
+              <div className="space-y-4">
+                {restsWithDetails.map((rest) => (
+                  <Card key={rest.id}>
+                    <CardHeader className="pb-2" dir="rtl">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          {rest.emoji && <span>{rest.emoji}</span>}
+                          {rest.name}
+                        </CardTitle>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">
+                            {rest.dishesCount} {t("pages.adminPanel.dishesCount")} · {t("pages.adminPanel.fcAvg")} {rest.fcAvg}%
+                          </span>
+                          {onImpersonate && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                onImpersonate({ id: rest.id, name: rest.name, emoji: rest.emoji })
+                                toast.success(`${t("pages.adminPanel.impersonatingRest")}: ${rest.emoji ? `${rest.emoji} ` : ""}${rest.name}`)
+                              }}
+                            >
+                              <UserCircle className="w-4 h-4 ml-1" />
+                              {t("pages.adminPanel.impersonate")}
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => {
+                              setRestToDelete(rest)
+                              setDeleteRestDialogOpen(true)
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4 ml-1" />
+                            מחק
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div>
+                        <p className="text-sm font-medium mb-1">משויכים — לחץ להסרה:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {(rest.assignedSuppliers?.length ?? 0) === 0 ? (
+                            <span className="text-sm text-muted-foreground">{t("pages.adminPanel.noAssignedSuppliers")}</span>
+                          ) : (
+                            (rest.assignedSuppliers || []).map((s) => (
+                              <Button
+                                key={s}
+                                size="sm"
+                                variant="secondary"
+                                className="text-destructive hover:bg-destructive/10"
+                                onClick={() => handleRemoveSupplier(rest.id, s)}
+                                disabled={removingSupplier === `${rest.id}:${s}`}
+                              >
+                                {removingSupplier === `${rest.id}:${s}` ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <X className="w-3 h-3 ml-1" />}
                                 {s}
-                                <button className="hover:text-destructive ml-1 text-xs" onClick={()=>handleRemoveSupplier(rest.id,s)}>✕</button>
-                              </Badge>
+                              </Button>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium mb-2">{t("pages.adminPanel.suppliersAvailableForAssignment")}:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {suppliersWithRests
+                            .filter((s) => !(rest.assignedSuppliers || []).includes(s.name))
+                            .map((s) => (
+                              <Button
+                                key={s.name}
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleAssignSupplier(rest.id, s.name)}
+                                disabled={assigningSupplier === `${rest.id}:${s.name}`}
+                              >
+                                {assigningSupplier === `${rest.id}:${s.name}` ? <Loader2 className="w-3 h-3 animate-spin ml-1" /> : <Check className="w-3 h-3 ml-1" />}
+                                {s.name}
+                              </Button>
                             ))}
-                            <select className="text-sm border rounded px-2 py-1 bg-background"
-                              onChange={e=>{if(e.target.value){handleAssignSupplier(rest.id,e.target.value);e.target.value=""}}} defaultValue="">
-                              <option value="">+ {t("pages.adminPanel.assignSupplier")}</option>
-                              {suppliersWithRests.filter(s=>!(rest.assignedSuppliers||[]).includes(s.name)).map(s=>(
-                                <option key={s.name} value={s.name}>{s.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
+                          {suppliersWithRests.filter((s) => !(rest.assignedSuppliers || []).includes(s.name)).length === 0 && (
+                            <span className="text-sm text-muted-foreground">{t("pages.adminPanel.allSuppliersAssigned")}</span>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                {restsWithDetails.length === 0 && !loadingSystemOwner && (
+                  <p className="text-muted-foreground py-4">{t("pages.adminPanel.noRestaurants")}</p>
                 )}
+              </div>
+            )}
+          
 
                 {/* KPI cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
                   {([
                     {label:"הכנסות חודשיות", value:`₪${dashTotalRevenue.toLocaleString()}`, icon:TrendingUp, color:"bg-green-50 text-green-700"},
                     {label:"מנות שנמכרו", value:String(dashTotalDishesSold), icon:Utensils, color:"bg-amber-50 text-amber-700"},
@@ -1927,16 +2063,6 @@ export function AdminPanel() {
                     </Card>
                   ))}
                 </div>
-
-                {/* Add new restaurant */}
-                <div className="flex justify-end">
-                  <Button onClick={()=>setNewRestOpen(true)} size="sm">
-                    <Plus className="w-4 h-4 ml-1" />{t("pages.adminPanel.addRestaurant")}
-                  </Button>
-                </div>
-
-              </div>
-            )}
           </TabsContent>
 
           <TabsContent value="suppliers" className="mt-4">
