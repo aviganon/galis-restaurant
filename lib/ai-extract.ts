@@ -361,9 +361,17 @@ export async function extractWithAI(
       messages: [{ role: "user", content: [{ type: "text", text: sheetUserText }] }],
     })
     const text = data.content?.map((b) => b.text ?? "").join("") ?? ""
-    const clean = text.replace(/```json|```/g, "").trim()
-    const parsed = JSON.parse(clean) as ExtractResult
-    return parsed
+    let clean = text.replace(/```json|```/g, "").trim()
+    clean = clean.replace(/[\u0000-\u001F\u007F]/g, " ").replace(/,\s*}/g, "}").replace(/,\s*]/g, "]")
+    try {
+      return JSON.parse(clean) as ExtractResult
+    } catch {
+      const jsonMatch = clean.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        try { return JSON.parse(jsonMatch[0]) as ExtractResult } catch {}
+      }
+      throw new Error(`שגיאה בפענוח תשובת AI — נסה שוב או השתמש בקובץ Excel`)
+    }
   }
 
   throw new Error(`פורמט לא נתמך (${ext}). השתמש ב-PDF, Excel, CSV, RTF או תמונה.`)
