@@ -142,7 +142,7 @@ function AdminCheapestPopover({
           ? { price: wp.price, unit: wp.unit, from: "web" as const, store: wp.store }
           : null
 
-  const displayPrice = cheapest ? `₪${cheapest.price.toFixed(1)}/${cheapest.unit}` : null
+  const displayPrice = cheapest ? `₪${cheapest.price.toFixed(1)}` : null
 
   return (
     <Popover>
@@ -167,7 +167,7 @@ function AdminCheapestPopover({
           {gc ? (
             <div className="rounded-lg border p-3 text-sm">
               <div className="text-xs font-medium text-muted-foreground mb-1">{t("pages.adminPanel.fromSuppliers")}</div>
-              <div className="font-semibold">₪{gc.price.toFixed(1)}/{gc.unit}</div>
+              <div className="font-semibold">₪{gc.price.toFixed(1)} <span className="text-xs font-normal text-muted-foreground">/ {gc.unit}</span></div>
               {gc.supplier && <div className="text-primary text-xs mt-0.5">{t("pages.ingredients.at")} {gc.supplier}</div>}
             </div>
           ) : (
@@ -250,7 +250,7 @@ function WebPriceCell({
       <div className="space-y-3">
         <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3 text-sm text-blue-700 dark:text-blue-400">
           <div className="text-xs font-medium text-muted-foreground mb-1">{t("pages.adminPanel.fromInternet")}</div>
-          <div className="text-xl font-bold">₪{data.price.toFixed(1)}<span className="text-sm font-normal">/{data.unit}</span></div>
+          <div className="text-xl font-bold">₪{data.price.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">/ {data.unit}</span></div>
           <div className="text-xs mt-0.5">{t("pages.ingredients.at")} {data.store}</div>
         </div>
         <div className="flex gap-2">
