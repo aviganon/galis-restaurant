@@ -29,6 +29,10 @@ import {
   Upload,
   Trash2,
   ChevronLeft,
+  Phone,
+  MapPin,
+  Save,
+  Loader2,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
@@ -39,6 +43,10 @@ export function Settings() {
   const [email, setEmail] = useState("")
   const [displayName, setDisplayName] = useState("")
   const [userId, setUserId] = useState<string | null>(null)
+  const [profileName, setProfileName] = useState("")
+  const [profilePhone, setProfilePhone] = useState("")
+  const [profileAddress, setProfileAddress] = useState("")
+  const [savingProfile, setSavingProfile] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -53,10 +61,21 @@ export function Settings() {
   const [savingNotification, setSavingNotification] = useState<string | null>(null)
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
       setEmail(user?.email || "")
       setDisplayName(user?.displayName || "")
       setUserId(user?.uid || null)
+      if (user?.uid) {
+        try {
+          const snap = await getDoc(doc(db, "users", user.uid))
+          const d = snap.data()
+          if (d) {
+            setProfileName((d.name as string) || user.displayName || "")
+            setProfilePhone((d.phone as string) || "")
+            setProfileAddress((d.address as string) || "")
+          }
+        } catch {}
+      }
     })
     return () => unsub()
   }, [])
@@ -93,6 +112,23 @@ export function Settings() {
       .catch(() => {})
       .finally(() => setLoadingNotifications(false))
   }, [currentRestaurantId, userId])
+
+  const saveProfile = async () => {
+    if (!userId) return
+    setSavingProfile(true)
+    try {
+      await setDoc(doc(db, "users", userId), {
+        name: profileName.trim(),
+        phone: profilePhone.trim(),
+        address: profileAddress.trim(),
+      }, { merge: true })
+      toast.success("פרטי הפרופיל עודכנו בהצלחה")
+    } catch (e) {
+      toast.error((e as Error).message || "שגיאה בשמירה")
+    } finally {
+      setSavingProfile(false)
+    }
+  }
 
   const saveNotificationSetting = async (key: string, value: boolean) => {
     const path = getNotificationSettingsPath()
@@ -261,6 +297,27 @@ export function Settings() {
                 <label htmlFor="settings-role" className="text-sm font-medium">{t("pages.settings.role")}</label>
                 <Input id="settings-role" value={roleLabel} readOnly className="h-11 rounded-xl bg-muted" />
               </div>
+            </div>
+            <div className="border-t pt-4 space-y-3">
+              <p className="text-sm font-medium text-muted-foreground">פרטים נוספים</p>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium flex items-center gap-1.5"><User className="w-3.5 h-3.5" />שם מלא</label>
+                  <Input value={profileName} onChange={e => setProfileName(e.target.value)} placeholder="שם פרטי ומשפחה" className="h-10 rounded-xl" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" />טלפון</label>
+                  <Input value={profilePhone} onChange={e => setProfilePhone(e.target.value)} placeholder="050-0000000" className="h-10 rounded-xl" dir="ltr" type="tel" />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-sm font-medium flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" />כתובת</label>
+                  <Input value={profileAddress} onChange={e => setProfileAddress(e.target.value)} placeholder="רחוב, עיר" className="h-10 rounded-xl" />
+                </div>
+              </div>
+              <Button onClick={saveProfile} disabled={savingProfile} size="sm" className="w-full sm:w-auto">
+                {savingProfile ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Save className="w-4 h-4 ml-2" />}
+                שמור פרטים
+              </Button>
             </div>
           </CardContent>
         </Card>
