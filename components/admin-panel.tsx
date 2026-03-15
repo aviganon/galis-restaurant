@@ -281,7 +281,7 @@ function WebPriceCell({
 export function AdminPanel() {
   const t = useTranslations()
   const { dir } = useLanguage()
-  const { userRole, isSystemOwner, currentRestaurantId, restaurants, onImpersonate, onStopImpersonate, isImpersonating, onRestaurantDeleted, refreshRestaurants, refreshIngredients } = useApp()
+  const { userRole, isSystemOwner, currentRestaurantId, restaurants, onImpersonate, onStopImpersonate, isImpersonating, onRestaurantDeleted, refreshRestaurants, refreshIngredients, setCurrentPage } = useApp()
   const isRtl = dir === "rtl"
   const textAlign = isRtl ? "text-right" : "text-left"
   const justify = isRtl ? "justify-end" : "justify-start"
@@ -2017,23 +2017,30 @@ export function AdminPanel() {
                           {rest.name}
                         </CardTitle>
                         <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {([
-                              {icon:Utensils,val:rest.dishesCount,label:"מנות",grad:"from-amber-400 to-orange-500"},
-                              {icon:TrendingUp,val:rest.fcAvg>0?`${rest.fcAvg}%`:"—",label:"Food Cost",grad:rest.fcAvg<=0?"from-slate-400 to-slate-500":rest.fcAvg<=28?"from-emerald-400 to-teal-500":rest.fcAvg<=33?"from-blue-400 to-indigo-500":"from-rose-400 to-red-500"},
-                              {icon:Truck,val:(rest.assignedSuppliers||[]).length,label:"ספקים",grad:"from-violet-400 to-purple-500"},
-                              {icon:ShoppingCart,val:rest.poCount??0,label:"הזמנות",grad:"from-slate-400 to-slate-500"},
-                            ] as const).map((chip,ci)=>(
-                              <div key={ci} className="rounded-lg overflow-hidden shadow-sm" style={{minWidth:68}}>
-                                <div className={`bg-gradient-to-br ${chip.grad} px-3 py-1.5 flex items-center gap-1.5`}>
-                                  <chip.icon className="w-3.5 h-3.5 text-white/80 shrink-0"/>
-                                  <span className="text-base font-bold text-white leading-none">{chip.val}</span>
-                                </div>
-                                <div className="bg-muted/60 px-2 py-0.5">
-                                  <p className="text-[10px] text-muted-foreground font-medium">{chip.label}</p>
-                                </div>
-                              </div>
-                            ))}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {rest.dishesCount > 0 && (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-400">
+                                <Utensils className="w-3 h-3"/>
+                                {rest.dishesCount} מנות
+                              </span>
+                            )}
+                            {rest.fcAvg > 0 && (
+                              <span className={cn(
+                                "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border",
+                                rest.fcAvg <= 28 ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                                rest.fcAvg <= 33 ? "bg-blue-50 text-blue-700 border-blue-200" :
+                                "bg-rose-50 text-rose-700 border-rose-200"
+                              )}>
+                                <TrendingUp className="w-3 h-3"/>
+                                FC {rest.fcAvg}%
+                              </span>
+                            )}
+                            {(rest.assignedSuppliers||[]).length > 0 && (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-950/30 dark:text-violet-400">
+                                <Truck className="w-3 h-3"/>
+                                {(rest.assignedSuppliers||[]).length} ספקים
+                              </span>
+                            )}
                           </div>
                           {onImpersonate && (
                             <Button
