@@ -2087,6 +2087,34 @@ export function AdminPanel() {
 
           
                 
+
+                {/* ── 4 KPI mini-cards ── */}
+                {isSystemOwner && adminStats && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+                    {([
+                      {label:"הכנסות חודשיות", value:`₪${dashTotalRevenue.toLocaleString()}`, icon:TrendingUp, grad:"from-emerald-500 to-teal-600"},
+                      {label:"מנות שנמכרו",     value:String(dashTotalDishesSold),            icon:Utensils,   grad:"from-amber-500 to-orange-500"},
+                      {label:"food cost ממוצע", value:`${dashAvgFoodCost.toFixed(1)}%`,     icon:DollarSign, grad:"from-blue-500 to-indigo-600"},
+                      {label:"הזמנות רכש",      value:String(dashPurchaseOrders),              icon:ShoppingCart,grad:"from-violet-500 to-purple-600"},
+                    ] as const).map((kpi,i)=>(
+                      <Card key={i} className="border-0 shadow-sm overflow-hidden"
+                        style={{transition:"transform .2s,box-shadow .2s"}}
+                        onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.transform="translateY(-3px)";(e.currentTarget as HTMLElement).style.boxShadow="0 8px 20px rgba(0,0,0,.12)"}}
+                        onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.transform="";(e.currentTarget as HTMLElement).style.boxShadow=""}}
+                      >
+                        <CardContent className="p-0">
+                          <div className={cn("bg-gradient-to-br p-3 pb-2",kpi.grad)}>
+                            <kpi.icon className="w-4 h-4 text-white/90 mb-1.5"/>
+                            <p className="text-xl font-bold text-white leading-tight">{dashLoadingKpis?"…":kpi.value}</p>
+                          </div>
+                          <div className="px-3 py-1.5">
+                            <p className="text-xs text-muted-foreground font-medium">{kpi.label}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
           </TabsContent>
 
           <TabsContent value="suppliers" className="mt-4">
