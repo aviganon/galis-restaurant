@@ -41,7 +41,7 @@ import { Users, UserPlus, Ticket, Copy } from "lucide-react"
 
 export function Settings() {
   const t = useTranslations()
-  const { userRole, currentRestaurantId, refreshIngredients, isImpersonating, isSystemOwner, restaurants, setCurrentPage } = useApp()
+  const { userRole, currentRestaurantId, refreshIngredients, isImpersonating, isSystemOwner, restaurants } = useApp()
   const [email, setEmail] = useState("")
   const [displayName, setDisplayName] = useState("")
   const [userId, setUserId] = useState<string | null>(null)
@@ -286,13 +286,6 @@ export function Settings() {
   return (
     <div className="container mx-auto px-4 py-6 max-w-4xl">
       <div className="mb-6">
-        <button
-          onClick={()=>setCurrentPage?.(isSystemOwner&&!isImpersonating?"admin-panel":"dashboard")}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors"
-        >
-          <ChevronLeft className="w-4 h-4"/>
-          {isSystemOwner&&!isImpersonating?"חזור לפאנל בעלים":"חזור לדף הראשי"}
-        </button>
         <h1 className="text-2xl md:text-3xl font-bold mb-1">{t("pages.settings.title")}</h1>
         <p className="text-muted-foreground">{t("pages.settings.subtitle")}</p>
       </div>
@@ -368,7 +361,7 @@ export function Settings() {
         </Card>
         )}
 
-        {/* Notifications */}
+        {(!isSystemOwner || isImpersonating) && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -448,6 +441,7 @@ export function Settings() {
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* Security */}
         <Card className="border-0 shadow-sm">
