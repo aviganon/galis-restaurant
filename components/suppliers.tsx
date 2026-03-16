@@ -89,6 +89,7 @@ export default function Suppliers() {
   const [supplierDetailInfo, setSupplierDetailInfo] = useState<{ phone?: string; email?: string; contact?: string; address?: string } | null>(null)
   const [supplierDetailItems, setSupplierDetailItems] = useState<{ name: string; price: number; unit: string; waste: number; stock: number; minStock: number; sku: string }[]>([])
   const [supplierDetailLoading, setSupplierDetailLoading] = useState(false)
+  const [stockChipFilter, setStockChipFilter] = useState<"all"|"ok"|"low"|"zero">("all")
   const [nsmName, setNsmName] = useState("")
   const [nsmItems, setNsmItems] = useState<{ name: string; price: number; unit: string; waste: number; stock: number; minStock: number; sku: string }[]>([])
   const [nsmItemName, setNsmItemName] = useState("")
@@ -637,7 +638,7 @@ export default function Suppliers() {
                   "border-0 shadow-sm cursor-pointer transition-colors",
                   selectedSupplierDetail === supplier.name ? "ring-2 ring-primary bg-muted/50" : "hover:bg-muted/50"
                 )}
-                onClick={() => supplier.name !== "ללא ספק" && setSelectedSupplierDetail(selectedSupplierDetail === supplier.name ? null : supplier.name)}
+                onClick={() => supplier.name !== "ללא ספק" && setSelectedSupplierDetail(selectedSupplierDetail === supplier.name ? null : supplier.name); setStockChipFilter("all")}
               >
               <CardContent className="p-4 flex items-center gap-4">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
@@ -717,7 +718,44 @@ export default function Suppliers() {
                     </div>
                   )}
                   <div>
-                    <p className="text-sm font-medium mb-2">רכיבים ({(supplierDetailItems || []).length})</p>
+                    {/* KPI chips */}
+                    {(supplierDetailItems||[]).length > 0 && (()=>{
+                      const items = supplierDetailItems||[];
+                      const okCount = items.filter(i=>i.stock>0&&(i.minStock===0||i.stock>=i.minStock)).length;
+                      const lowCount = items.filter(i=>i.stock>0&&i.minStock>0&&i.stock<i.minStock).length;
+                      const zeroCount = items.filter(i=>i.stock===0).length;
+                      const chips=[
+                        {key:"ok" as const, label:"פריטים במלאי", val:okCount, grad:"from-emerald-400 to-teal-500"},
+                        {key:"low" as const, label:"מלאי נמוך", val:lowCount, grad:"from-amber-400 to-orange-500"},
+                        {key:"zero" as const, label:"אזל מהמלאי", val:zeroCount, grad:"from-red-400 to-rose-500"},
+                      ];
+                      return (
+                        <div className="flex flex-wrap gap-3 mb-4">
+                          {chips.map(chip=>(
+                            <div key={chip.key}
+                              className={`rounded-lg overflow-hidden shadow-sm cursor-pointer hover:-translate-y-0.5 transition-all ${stockChipFilter===chip.key?"ring-2 ring-offset-1 ring-primary scale-105":""}`}
+                              style={{minWidth:90}}
+                              onClick={()=>setStockChipFilter(stockChipFilter===chip.key?"all":chip.key)}>
+                              <div className={`bg-gradient-to-br ${chip.grad} px-3 py-1.5 flex items-center gap-1.5`}>
+                                <span className="text-base font-bold text-white">{chip.val}</span>
+                              </div>
+                              <div className={`px-2 py-0.5 ${stockChipFilter===chip.key?"bg-primary/10":"bg-muted/60"}`}>
+                                <p className={`text-[10px] font-medium ${stockChipFilter===chip.key?"text-primary":"text-muted-foreground"}`}>{chip.label}</p>
+                              </div>
+                            </div>
+                          ))}
+                          {stockChipFilter!=="all"&&(
+                            <button onClick={()=>setStockChipFilter("all")} className="text-xs text-muted-foreground hover:text-foreground self-center mr-1">✕ הצג הכל</button>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    <p className="text-sm font-medium mb-2">רכיבים ({(supplierDetailItems || []).filter(i=>
+                      stockChipFilter==="all"||
+                      (stockChipFilter==="ok"&&i.stock>0&&(i.minStock===0||i.stock>=i.minStock))||
+                      (stockChipFilter==="low"&&i.stock>0&&i.minStock>0&&i.stock<i.minStock)||
+                      (stockChipFilter==="zero"&&i.stock===0)
+                    ).length})</p>
                     {(supplierDetailItems || []).length === 0 ? (
                       <p className="text-sm text-muted-foreground">אין רכיבים להצגה</p>
                     ) : (
@@ -737,7 +775,12 @@ export default function Suppliers() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {(supplierDetailItems || []).map((i) => (
+                            {(supplierDetailItems || []).filter(i=>
+                              stockChipFilter==="all"||
+                              (stockChipFilter==="ok"&&i.stock>0&&(i.minStock===0||i.stock>=i.minStock))||
+                              (stockChipFilter==="low"&&i.stock>0&&i.minStock>0&&i.stock<i.minStock)||
+                              (stockChipFilter==="zero"&&i.stock===0)
+                            ).map((i) => (
                               <TableRow key={i.name}>
                                 <TableCell className="font-medium text-right">{i.name}</TableCell>
                                 <TableCell className="text-right">₪{i.price.toFixed(2)}</TableCell>
