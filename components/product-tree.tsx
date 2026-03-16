@@ -642,13 +642,15 @@ export default function ProductTree() {
       }
       const newName = (editDishName||'').trim() || editDishTarget
       const updatedDish = {...dish, name:newName, category:editDishCategory, ...(imgUrl?{imageUrl:imgUrl}:{})}
+      // Strip undefined — Firestore rejects undefined values
+      const clean = Object.fromEntries(Object.entries(updatedDish).filter(([,v])=>v!==undefined))
       if (newName !== editDishTarget) {
-        await setDoc(doc(db,'restaurants',currentRestaurantId,'recipes',newName), updatedDish, {merge:true})
+        await setDoc(doc(db,'restaurants',currentRestaurantId,'recipes',newName), clean, {merge:true})
         await deleteDoc(doc(db,'restaurants',currentRestaurantId,'recipes',editDishTarget))
         setDishes(prev=>{ const n={...prev}; delete n[editDishTarget]; n[newName]=updatedDish; return n })
         if(selectedDish===editDishTarget) setSelectedDish(newName)
       } else {
-        await setDoc(doc(db,'restaurants',currentRestaurantId,'recipes',editDishTarget), updatedDish, {merge:true})
+        await setDoc(doc(db,'restaurants',currentRestaurantId,'recipes',editDishTarget), clean, {merge:true})
         setDishes(prev=>({...prev,[editDishTarget]:updatedDish}))
       }
       toast.success('המנה עודכנה'); setEditDishDialogOpen(false)
