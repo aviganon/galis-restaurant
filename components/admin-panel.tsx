@@ -1935,6 +1935,20 @@ export function AdminPanel() {
 
 
 
+  const handleBulkDelete = async () => {
+    if (selectedIngIds.size === 0) return
+    if (!window.confirm(`למחוק ${selectedIngIds.size} רכיבים לצמיתות?`)) return
+    setSavingBulkAssign(true)
+    try {
+      const batch = writeBatch(db)
+      selectedIngIds.forEach(id => batch.delete(doc(db,"ingredients",id)))
+      await batch.commit()
+      setAdminIngredients(prev => prev.filter(ing => !selectedIngIds.has(ing.id)))
+      toast.success(`נמחקו ${selectedIngIds.size} רכיבים`)
+      setSelectedIngIds(new Set())
+    } catch(e){toast.error((e as Error).message||"שגיאה")} finally{setSavingBulkAssign(false)}
+  }
+
   const loadRestChipData = async (restId: string, chip: "dishes"|"fc"|"suppliers"|"orders") => {
     if (activeRestChip === chip) { setActiveRestChip(null); return }
     setActiveRestChip(chip)
@@ -2734,26 +2748,15 @@ export function AdminPanel() {
                         <Button size="sm" onClick={handleBulkAssign} disabled={!bulkAssignSupplier||savingBulkAssign}>
                           {savingBulkAssign?<Loader2 className="w-3 h-3 animate-spin ml-1"/>:<Check className="w-3 h-3 ml-1"/>}שייך
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={()=>setSelectedIngIds(new Set())} className="text-muted-foreground">
-                          <X className="w-3 h-3 ml-1"/>בטל
-                        </Button>
-                      </div>
-                    )}
-                    {selectedIngIds.size > 0 && (
-                      <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-lg border border-primary/30 flex-wrap">
-                        <span className="text-sm font-medium text-primary">{selectedIngIds.size} נבחרו</span>
-                        <select className="h-8 rounded-md border border-input bg-background px-2 text-sm min-w-[130px]" value={bulkAssignSupplier} onChange={e=>setBulkAssignSupplier(e.target.value)}>
-                          <option value="">— בחר ספק —</option>
-                          {suppliersWithRests.map(s=><option key={s.name} value={s.name}>{s.name}</option>)}
-                        </select>
-                        <Button size="sm" onClick={handleBulkAssign} disabled={!bulkAssignSupplier||savingBulkAssign}>
-                          {savingBulkAssign?<Loader2 className="w-3 h-3 animate-spin ml-1"/>:<Check className="w-3 h-3 ml-1"/>}שייך
+                        <Button size="sm" variant="destructive" onClick={handleBulkDelete} disabled={savingBulkAssign}>
+                          <Trash2 className="w-3 h-3 ml-1"/>מחק
                         </Button>
                         <Button size="sm" variant="ghost" onClick={()=>setSelectedIngIds(new Set())} className="text-muted-foreground">
                           <X className="w-3 h-3 ml-1"/>בטל
                         </Button>
                       </div>
                     )}
+
                     <span className="text-sm text-muted-foreground">
                       {filteredAndSortedIngredients.length === (ingredientsList?.length ?? 0)
                         ? `${ingredientsList?.length ?? 0} ${t("pages.adminPanel.ingredientsCount")}`
