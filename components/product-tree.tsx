@@ -107,6 +107,7 @@ export default function ProductTree() {
   const [importFile, setImportFile] = useState<File | null>(null)
   const [fpmOpen, setFpmOpen] = useState(false)
   const importFileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
   const [isCostPanelExpanded, setIsCostPanelExpanded] = useState(true)
   const [editingDish, setEditingDish] = useState<string | null>(null)
   
@@ -821,6 +822,22 @@ export default function ProductTree() {
                       className="hidden"
                       onChange={handleImportFileSelect}
                     />
+                    <input
+                      ref={cameraInputRef}
+                      type="file"
+                      id="camera-dish-file"
+                      name="cameraDishFile"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={e=>{
+                        const f=e.currentTarget.files?.[0];
+                        if(!f)return;
+                        setImportFile(f);
+                        setFpmOpen(true);
+                        e.currentTarget.value="";
+                      }}
+                    />
                     <div
                       onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
                       onDragLeave={(e) => { e.preventDefault(); e.stopPropagation() }}
@@ -861,7 +878,7 @@ export default function ProductTree() {
                 size="sm"
                 variant="outline"
                 className="gap-1.5 bg-gradient-to-l from-purple-500/10 to-violet-500/10 border-purple-500/30 text-purple-600 hover:bg-purple-500/20"
-                onClick={() => toast.info("זיהוי AI יהיה זמין בגרסה הבאה")}
+                onClick={() => cameraInputRef.current?.click()}
               >
                 <Camera className="w-4 h-4" />
                 <span className="hidden sm:inline">{t("pages.productTree.identify")}</span>
