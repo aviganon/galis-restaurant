@@ -638,7 +638,7 @@ export default function Suppliers() {
                   "border-0 shadow-sm cursor-pointer transition-colors",
                   selectedSupplierDetail === supplier.name ? "ring-2 ring-primary bg-muted/50" : "hover:bg-muted/50"
                 )}
-                onClick={() => supplier.name !== "ללא ספק" && setSelectedSupplierDetail(selectedSupplierDetail === supplier.name ? null : supplier.name); setStockChipFilter("all")}
+                onClick={() => { if(supplier.name !== "ללא ספק") { setSelectedSupplierDetail(selectedSupplierDetail === supplier.name ? null : supplier.name); setStockChipFilter("all") } }}
               >
               <CardContent className="p-4 flex items-center gap-4">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
