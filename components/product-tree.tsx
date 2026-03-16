@@ -1226,7 +1226,6 @@ export default function ProductTree() {
           </CardContent>
         </Card>
         )}
-      </div>
         {/* Recipe Editor */}
         <Card className="border-0 shadow-lg min-h-0 flex flex-col">
           <CardContent className="p-3 flex flex-col min-h-0 flex-1">
@@ -1558,7 +1557,7 @@ export default function ProductTree() {
               </div>
             )}
           </CardContent>
-
+        </Card>
       </div>
       </div>
 
