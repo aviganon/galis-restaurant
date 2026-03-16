@@ -400,10 +400,6 @@ export function AdminPanel() {
   const [restChipLoading, setRestChipLoading] = useState(false)
   const [restChipDishes, setRestChipDishes] = useState<{name:string;price:number;fc:number}[]>([])
   const [restChipOrders, setRestChipOrders] = useState<{id:string;supplier:string;date:string;total:number;status:string}[]>([])
-  const [activeRestChip, setActiveRestChip] = useState<"dishes"|"fc"|"suppliers"|"orders"|null>(null)
-  const [restChipLoading, setRestChipLoading] = useState(false)
-  const [restChipDishes, setRestChipDishes] = useState<{name:string;price:number;fc:number}[]>([])
-  const [restChipOrders, setRestChipOrders] = useState<{id:string;supplier:string;date:string;total:number;status:string}[]>([])
   const [loadingSystemOwner, setLoadingSystemOwner] = useState(false)
   const [addIngredientOpen, setAddIngredientOpen] = useState(false)
   const [addIngredientName, setAddIngredientName] = useState("")
@@ -1908,25 +1904,6 @@ export function AdminPanel() {
     }
   }
 
-  const loadRestChipData = async (restId: string, chip: "dishes"|"fc"|"suppliers"|"orders") => {
-    if (activeRestChip === chip) { setActiveRestChip(null); return }
-    setActiveRestChip(chip)
-    if (chip === "dishes" || chip === "fc") {
-      setRestChipLoading(true)
-      try {
-        const snap = await getDocs(collection(db, "restaurants", restId, "recipes"))
-        setRestChipDishes(snap.docs.filter(d=>!d.data().isCompound).map(d=>{const dt=d.data();return{name:d.id,price:typeof dt.sellingPrice==="number"?dt.sellingPrice:0,fc:typeof dt.foodCostPct==="number"?Math.round(dt.foodCostPct*10)/10:0}}).sort((a,b)=>b.price-a.price))
-      } catch(e) { toast.error("שגיאה בטעינה") } finally { setRestChipLoading(false) }
-    }
-    if (chip === "orders") {
-      setRestChipLoading(true)
-      try {
-        const snap = await getDocs(collection(db, "restaurants", restId, "purchaseOrders"))
-        setRestChipOrders(snap.docs.map(d=>{const dt=d.data();return{id:d.id,supplier:(dt.supplierName||dt.supplier||"לא ידוע") as string,date:(dt.createdAt||dt.date||"") as string,total:typeof dt.totalAmount==="number"?dt.totalAmount:typeof dt.total==="number"?dt.total:0,status:(dt.status||"") as string}}).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,15))
-      } catch(e) { toast.error("שגיאה בטעינה") } finally { setRestChipLoading(false) }
-    }
-  }
-
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl space-y-6">
       <Card>
@@ -2259,6 +2236,37 @@ export function AdminPanel() {
                           ) : null}
                         </motion.div>
                       )}
+                      {/* Supplier assignment — always visible */}
+                      <div className="border-t pt-3 space-y-3">
+                        <div>
+                          <p className="text-sm font-medium mb-2">ספקים משויכים — לחץ להסרה:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {(selectedRest.assignedSuppliers?.length??0)===0
+                              ?<span className="text-sm text-muted-foreground">{t("pages.adminPanel.noAssignedSuppliers")}</span>
+                              :(selectedRest.assignedSuppliers||[]).map(s=>(
+                                <Button key={s} size="sm" variant="secondary" className="text-destructive hover:bg-destructive/10"
+                                  onClick={()=>handleRemoveSupplier(selectedRest.id,s)} disabled={removingSupplier===selectedRest.id+":"+s}>
+                                  {removingSupplier===selectedRest.id+":"+s?<Loader2 className="w-3 h-3 animate-spin ml-1"/>:<X className="w-3 h-3 ml-1"/>}{s}
+                                </Button>
+                              ))
+                            }
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium mb-2">{t("pages.adminPanel.suppliersAvailableForAssignment")}:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {suppliersWithRests.filter(s=>!(selectedRest.assignedSuppliers||[]).includes(s.name)).map(s=>(
+                              <Button key={s.name} size="sm" variant="outline"
+                                onClick={()=>handleAssignSupplier(selectedRest.id,s.name)} disabled={assigningSupplier===selectedRest.id+":"+s.name}>
+                                {assigningSupplier===selectedRest.id+":"+s.name?<Loader2 className="w-3 h-3 animate-spin ml-1"/>:<Check className="w-3 h-3 ml-1"/>}{s.name}
+                              </Button>
+                            ))}
+                            {suppliersWithRests.filter(s=>!(selectedRest.assignedSuppliers||[]).includes(s.name)).length===0&&(
+                              <span className="text-sm text-muted-foreground">{t("pages.adminPanel.allSuppliersAssigned")}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </motion.div>
                   )
                 })()}
