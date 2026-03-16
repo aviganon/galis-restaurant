@@ -968,10 +968,6 @@ export default function ProductTree() {
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start">
-                        <DropdownMenuItem onClick={() => setEditingDish(name)}>
-                          <Edit2 className="w-4 h-4 ml-2" />
-                          {t("pages.productTree.editDetails")}
-                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => duplicateDish(name)}>
                           <Copy className="w-4 h-4 ml-2" />
                           {t("pages.productTree.duplicateDish")}
