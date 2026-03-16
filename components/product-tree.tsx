@@ -23,7 +23,8 @@ import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { doc, collection, getDocs, getDoc, setDoc, deleteDoc, writeBatch } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { db, storage } from "@/lib/firebase"
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage"
 import { useApp } from "@/contexts/app-context"
 import { FilePreviewModal } from "@/components/file-preview-modal"
 import { suggestDishFromIngredients, type ExtractedDishItem } from "@/lib/ai-extract"
@@ -49,6 +50,7 @@ interface Dish {
   portions?: number
   yieldQty?: number
   yieldUnit?: string
+  imageUrl?: string
 }
 
 interface SupplierPrice {
@@ -84,6 +86,10 @@ const CATEGORY_TO_KEY: Record<string, string> = {
 }
 export default function ProductTree() {
   const [activeTab, setActiveTab] = useState<"ingredients"|"suppliers"|null>(null)
+  const [dishImages, setDishImages] = useState<Record<string,string>>({})
+  const [uploadingDishImg, setUploadingDishImg] = useState<string|null>(null)
+  const dishImgInputRef = useRef<HTMLInputElement>(null)
+  const [pendingImgDish, setPendingImgDish] = useState<string|null>(null)
   const t = useTranslations()
   const { dir } = useLanguage()
   const isRtl = dir === "rtl"
@@ -161,6 +167,7 @@ export default function ProductTree() {
             isCompound: !!data.isCompound,
             yieldQty: typeof data.yieldQty === "number" ? data.yieldQty : 1,
             yieldUnit: (data.yieldUnit as string) || "מנה",
+            imageUrl: (data.imageUrl as string) || undefined,
           }
         })
 
@@ -187,6 +194,9 @@ export default function ProductTree() {
         }
         restIngSnap.forEach((d) => mergePrice(d.id, d.data() as IngData))
 
+        const imgs: Record<string,string> = {}
+        Object.entries(newDishes).forEach(([name,dish])=>{ if(dish.imageUrl) imgs[name]=dish.imageUrl })
+        setDishImages(imgs)
         setDishes(newDishes)
         setSelectedDish(prev => (prev && newDishes[prev] ? prev : Object.keys(newDishes)[0] || null))
         setSupplierPrices(newPrices)
@@ -605,6 +615,27 @@ export default function ProductTree() {
     navigator.clipboard.writeText(toCopy).then(() => toast.success(t("pages.productTree.copiedToClipboard")))
   }
 
+  const handleDishImageUpload = async (file: File, dishName: string) => {
+    if(!currentRestaurantId||!file) return
+    setUploadingDishImg(dishName)
+    try {
+      const safe = dishName.replace(/[^a-zA-Z0-9֐-׿]/g,'_')
+      const sRef = storageRef(storage, `restaurants/${currentRestaurantId}/dishes/${safe}/cover.jpg`)
+      await new Promise<void>((res,rej)=>{
+        const task = uploadBytesResumable(sRef, file)
+        task.on('state_changed',()=>{},rej,async()=>{
+          const url = await getDownloadURL(sRef)
+          setDishImages(prev=>({...prev,[dishName]:url}))
+          const ref = doc(db,'restaurants',currentRestaurantId,'recipes',dishName)
+          await setDoc(ref,{imageUrl:url},{merge:true})
+          res()
+        })
+      })
+      toast.success('תמונה עודכנה')
+    } catch(e){ toast.error((e as Error).message||'שגיאה') }
+    finally{ setUploadingDishImg(null) }
+  }
+
   return (
     <div className="flex flex-col bg-background">
       {loading && (
@@ -626,6 +657,14 @@ export default function ProductTree() {
         onConfirmDishes={handleConfirmDishes}
       />
 
+      {/* Dish image upload input */}
+      <input ref={dishImgInputRef} type="file" accept="image/*" className="hidden"
+        onChange={e=>{
+          const f=e.currentTarget.files?.[0]
+          if(f&&pendingImgDish){ handleDishImageUpload(f,pendingImgDish); setPendingImgDish(null) }
+          e.currentTarget.value=""
+        }}
+      />
       {/* Camera input for dish recognition — must be at root level */}
       <input
         ref={cameraInputRef}
@@ -954,6 +993,16 @@ export default function ProductTree() {
                         : "bg-card border border-border hover:border-primary/50 hover:shadow-md"
                     )}
                   >
+                    {/* Image overlay */}
+                    {dishImages[name] && (
+                      <div className="absolute inset-0 rounded-xl" style={{background:'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 60%, rgba(0,0,0,0.1) 100%)'}}/>
+                    )}
+                    {/* Upload spinner */}
+                    {uploadingDishImg===name && (
+                      <div className="absolute inset-0 rounded-xl bg-black/50 flex items-center justify-center z-10">
+                        <Loader2 className="w-5 h-5 animate-spin text-white"/>
+                      </div>
+                    )}
                     {/* Edit button */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -975,6 +1024,10 @@ export default function ProductTree() {
                         <DropdownMenuItem onClick={() => duplicateDish(name)}>
                           <Copy className="w-4 h-4 ml-2" />
                           {t("pages.productTree.duplicateDish")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={e=>{ e.stopPropagation(); setPendingImgDish(name); setTimeout(()=>dishImgInputRef.current?.click(),50) }}>
+                          <ImageIcon className="w-4 h-4 ml-2" />
+                          שנה תמונה
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
