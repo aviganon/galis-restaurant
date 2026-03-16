@@ -285,7 +285,17 @@ export function FilePreviewModal({
               )}
               <div className="border rounded-lg overflow-hidden">
                 <div className="overflow-x-auto max-h-[320px] overflow-y-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm" style={{minWidth:520}}>
+                    <colgroup>
+                      <col style={{minWidth:150}}/>
+                      <col style={{width:58}}/>
+                      <col style={{width:90}}/>
+                      <col style={{width:90}}/>
+                      <col style={{width:100}}/>
+                      <col style={{width:60}}/>
+                      <col style={{width:68}}/>
+                      <col style={{width:36}}/>
+                    </colgroup>
                     <thead className="bg-muted sticky top-0">
                       <tr>
                         <th className="text-right p-2 font-semibold">שם</th>
