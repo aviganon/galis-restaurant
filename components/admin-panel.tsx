@@ -1121,13 +1121,14 @@ export function AdminPanel() {
         if (item.price <= 0 && !isDeliveryNoteItem) return
         const alreadyExists = existingMap.has(nameKey)
         const docId = existingMap.get(nameKey) || nameTrimmed
+        // Always update price, unit AND supplier — new/orphaned/different supplier all get updated
         const payload: Record<string, unknown> = {
           ...(item.price > 0 ? { price: item.price } : {}),
           unit: item.unit || "קג",
+          supplier: supTrim,
           lastUpdated: now,
           createdBy: "global" as const,
           sku: item.sku ?? "",
-          ...(alreadyExists ? {} : { supplier: supTrim }),
         }
         batch.set(doc(db, "ingredients", docId), payload, { merge: true })
         const priceId = supTrim.replace(/\//g, "_").replace(/\./g, "_").trim() || "default"
