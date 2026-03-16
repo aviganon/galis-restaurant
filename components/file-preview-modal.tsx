@@ -182,25 +182,25 @@ export function FilePreviewModal({
     }
     setWebPriceLoading(true)
     const next: Record<string, { price: number; store: string; unit: string }> = {}
+    const limited = unique.slice(0, 15)
     try {
-      for (const name of unique) {
+      for (const name of limited) {
         try {
+          const controller = new AbortController()
+          const timeout = setTimeout(() => controller.abort(), 8000)
           const res = await fetch("/api/ingredient-web-price", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name }),
+            signal: controller.signal,
           })
+          clearTimeout(timeout)
           if (res.ok) {
             const d = await res.json()
             if (d?.price) next[name] = { price: d.price, store: d.store || "—", unit: d.unit || "קג" }
           }
-        } catch {
-          // נסה דרך AI מהלקוח
-          const { fetchWebPriceForIngredient } = await import("@/lib/ai-extract")
-          const d = await fetchWebPriceForIngredient(name)
-          if (d) next[name] = { price: d.price, store: d.store || "—", unit: d.unit || "קג" }
-        }
-        await new Promise((r) => setTimeout(r, 400))
+        } catch { /* דלג */ }
+        await new Promise((r) => setTimeout(r, 200))
       }
       setWebPriceByName((prev) => ({ ...prev, ...next }))
       if (Object.keys(next).length > 0) toast.success(`נמצאו מחירים ל־${Object.keys(next).length} רכיבים`)
@@ -230,7 +230,7 @@ export function FilePreviewModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {file?.name ?? "קובץ"}
