@@ -968,6 +968,10 @@ export default function ProductTree() {
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start">
+                        <DropdownMenuItem onClick={e=>{ e.stopPropagation(); setPendingImgDish(name); setTimeout(()=>dishImgInputRef.current?.click(),50) }}>
+                          <ImageIcon className="w-4 h-4 ml-2" />
+                          שנה תמונה
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => duplicateDish(name)}>
                           <Copy className="w-4 h-4 ml-2" />
                           {t("pages.productTree.duplicateDish")}
