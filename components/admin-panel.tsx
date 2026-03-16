@@ -2782,7 +2782,7 @@ export function AdminPanel() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Toolbar */}
-                  <div className={`flex flex-wrap items-center gap-2 ${justify}`}>
+                  <div className={`flex flex-wrap items-center gap-2 px-px ${justify}`}>
                     <div className="relative flex-1 min-w-[140px] max-w-[220px]">
                       <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
