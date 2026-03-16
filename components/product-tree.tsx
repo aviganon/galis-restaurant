@@ -29,6 +29,7 @@ import { FilePreviewModal } from "@/components/file-preview-modal"
 import { suggestDishFromIngredients, type ExtractedDishItem } from "@/lib/ai-extract"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
+import { useLanguage } from "@/contexts/language-context"
 
 // Types
 interface Ingredient {
@@ -84,6 +85,8 @@ const CATEGORY_TO_KEY: Record<string, string> = {
 export default function ProductTree() {
   const [activeTab, setActiveTab] = useState<"ingredients"|"suppliers"|null>(null)
   const t = useTranslations()
+  const { dir } = useLanguage()
+  const isRtl = dir === "rtl"
   const { currentRestaurantId, userRole, userPermissions, isSystemOwner, refreshIngredientsKey, refreshIngredients } = useApp()
   const canSeeCosts = userRole === "owner" || userRole === "admin" || userRole === "manager" || !!userPermissions?.canSeeCosts
   const isOwner = isOwnerRole(userRole, isSystemOwner)
@@ -1023,7 +1026,7 @@ export default function ProductTree() {
       <div className="grid gap-4" style={canSeeCosts ? {gridTemplateColumns:"300px 1fr"} : {}}>
         {/* Cost Panel — לבעלים בלבד */}
         {canSeeCosts && (
-        <Card className={cn(
+        <Card style={{order: isRtl ? 2 : 1}} className={cn(
           "border-0 shadow-lg transition-all",
           "lg:sticky lg:top-4 lg:self-start"
         )}>
@@ -1227,7 +1230,7 @@ export default function ProductTree() {
         </Card>
         )}
         {/* Recipe Editor */}
-        <Card className="border-0 shadow-lg min-h-0 flex flex-col">
+        <Card style={{order: isRtl ? 1 : 2}} className="border-0 shadow-lg min-h-0 flex flex-col">
           <CardContent className="p-3 flex flex-col min-h-0 flex-1">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
