@@ -708,7 +708,7 @@ export default function Suppliers() {
                 }}
                 onClick={() => { if(supplier.name !== "ללא ספק") { setSelectedSupplierDetail(selectedSupplierDetail === supplier.name ? null : supplier.name); setStockChipFilter("all") } }}
               >
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"/>
+                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/30 to-black/80"/>
                 <div className="absolute inset-0 p-3 flex flex-col justify-between">
                   {/* Top: value */}
                   <div className="flex justify-end">
