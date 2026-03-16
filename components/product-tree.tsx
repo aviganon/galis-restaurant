@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Ingredients } from "@/components/ingredients"
 import SuppliersComp from "@/components/suppliers"
 import { Badge } from "@/components/ui/badge"
