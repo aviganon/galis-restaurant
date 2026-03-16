@@ -152,6 +152,7 @@ export default function Suppliers() {
       ])
       const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
       const bySupplier = new Map<string, { products: number; totalValue: number; source: "assigned" | "restaurant" }>()
+      const chipsBySupplier = new Map<string, { stock: number; minStock: number }[]>()
       const seenIds = new Set<string>()
       restSnap.forEach((d) => {
         seenIds.add(d.id)
@@ -166,6 +167,7 @@ export default function Suppliers() {
           totalValue: existing.totalValue + price * stock,
           source: existing.source === "assigned" ? "assigned" : src,
         })
+        const chips0 = chipsBySupplier.get(sup) || []; chips0.push({ stock, minStock: typeof data.minStock === "number" ? data.minStock : 0 }); chipsBySupplier.set(sup, chips0)
       })
       globalSnap.forEach((d) => {
         if (seenIds.has(d.id)) return
@@ -184,6 +186,7 @@ export default function Suppliers() {
           totalValue: existing.totalValue + price * stock,
           source: assignedList.includes(sup) ? "assigned" : existing.source,
         })
+        const chips1 = chipsBySupplier.get(supKey) || []; chips1.push({ stock, minStock: typeof data.minStock === "number" ? data.minStock : 0 }); chipsBySupplier.set(supKey, chips1)
       })
       const supplierDocs = await Promise.all(
         Array.from(bySupplier.keys()).map(name => {
@@ -200,6 +203,7 @@ export default function Suppliers() {
           totalValue: v.totalValue,
           source: v.source,
           imageUrl: imageUrlMap[name],
+          ingredientsForChips: chipsBySupplier.get(name) || [],
         }))
       )
     } catch (e) {
