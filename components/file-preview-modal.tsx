@@ -14,7 +14,7 @@ import { Progress } from "@/components/ui/progress"
 import { extractWithAI, type ExtractType, type ExtractedItem, type ExtractedSupplierItem, type ExtractedDishItem } from "@/lib/ai-extract"
 import { toast } from "sonner"
 import { db } from "@/lib/firebase"
-import { collection, getDocs } from "firebase/firestore"
+import { collection, getDocs, getDoc, doc } from "firebase/firestore"
 import { Loader2, X, Plus, Globe } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 
@@ -58,6 +58,8 @@ export function FilePreviewModal({
   const [error, setError] = useState<string | null>(null)
   const [isDeliveryNote, setIsDeliveryNote] = useState(false)
   const [webPriceByName, setWebPriceByName] = useState<Record<string, { price: number; store: string; unit: string }>>({})
+  const [supplierAlreadyAssigned, setSupplierAlreadyAssigned] = useState(false)
+  const [assignedIngCount, setAssignedIngCount] = useState(0)
   const [webPriceLoading, setWebPriceLoading] = useState(false)
   const [existingPrices, setExistingPrices] = useState<Record<string, number>>({})
 
@@ -66,6 +68,8 @@ export function FilePreviewModal({
 
   useEffect(() => {
     if (!open) return
+    setSupplierAlreadyAssigned(false)
+    setAssignedIngCount(0)
     if (currentRestaurantId) {
       getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients"))
         .then(snap => {
@@ -120,6 +124,21 @@ export function FilePreviewModal({
         if (res.supplier_name && !initialSupplier) {
           setSupplierName(res.supplier_name)
           setDetectedSupplier(res.supplier_name)
+        }
+        const detectedSup = res.supplier_name || initialSupplier
+        if (detectedSup && currentRestaurantId) {
+          Promise.all([
+            getDoc(doc(db, "restaurants", currentRestaurantId, "appState", "assignedSuppliers")),
+            getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients"))
+          ]).then(([asSnap, ingSnap]) => {
+            const list: string[] = Array.isArray(asSnap.data()?.list) ? asSnap.data()!.list : []
+            const isAssigned = list.some(s => s.trim().toLowerCase() === detectedSup.trim().toLowerCase())
+            if (isAssigned) {
+              const cnt = ingSnap.docs.filter(d => ((d.data().supplier as string)||"").trim().toLowerCase() === detectedSup.trim().toLowerCase()).length
+              setSupplierAlreadyAssigned(true)
+              setAssignedIngCount(cnt)
+            }
+          }).catch(()=>{})
         }
         if (res.invoice_date) setInvoiceDate(res.invoice_date)
       })
@@ -238,6 +257,19 @@ export function FilePreviewModal({
               <span>תעודת משלוח — ללא מחירים. ניתן לאשר עדכון מלאי בלבד.</span>
             </div>
           )}
+          {supplierAlreadyAssigned && !loading && items.length > 0 && (
+            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/50 text-amber-800 dark:text-amber-200 text-sm flex items-start gap-2">
+              <span className="text-base shrink-0">⚠️</span>
+              <div>
+                <p className="font-semibold">ספק זה כבר משויך למסעדה</p>
+                <p className="text-xs mt-0.5 opacity-80">
+                  {assignedIngCount > 0
+                    ? `קיימים ${assignedIngCount} רכיבים — האישור יעדכן את המחירים הקיימים.`
+                    : "הספק משויך אך אין עדיין רכיבים — האישור יוסיף את הרכיבים."}
+                </p>
+              </div>
+            </div>
+          )}
           {!loading && !error && items.length > 0 && (
             <>
               {/* ישויוך — למי הפריטים ישויכו */}
@@ -254,7 +286,21 @@ export function FilePreviewModal({
                         id="fpm-supplier"
                         name="fpmSupplier"
                         value={supplierName}
-                        onChange={(e) => setSupplierName(e.target.value)}
+                        onChange={(e) => { setSupplierName(e.target.value); setSupplierAlreadyAssigned(false); setAssignedIngCount(0) }}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim()
+                          if (!val || !currentRestaurantId) return
+                          Promise.all([
+                            getDoc(doc(db, "restaurants", currentRestaurantId, "appState", "assignedSuppliers")),
+                            getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients"))
+                          ]).then(([asSnap, ingSnap]) => {
+                            const list: string[] = Array.isArray(asSnap.data()?.list) ? asSnap.data()!.list : []
+                            const isAssigned = list.some(s => s.trim().toLowerCase() === val.toLowerCase())
+                            const cnt = isAssigned ? ingSnap.docs.filter(d => ((d.data().supplier as string)||"").trim().toLowerCase() === val.toLowerCase()).length : 0
+                            setSupplierAlreadyAssigned(isAssigned)
+                            setAssignedIngCount(cnt)
+                          }).catch(()=>{})
+                        }}
                         placeholder="שם הספק"
                         className="h-10"
                       />
