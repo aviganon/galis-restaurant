@@ -315,6 +315,11 @@ export function Settings() {
     catch { toast.error("שגיאה") } finally { setSavingEditUser(false) }
   }
 
+  useEffect(() => {
+    if (!isSystemOwner) return
+    getDoc(doc(db,"appConfig","claudeApi")).then(snap=>{if(snap.exists())setApiKeyInput(snap.data().key||"")}).catch(()=>{})
+  }, [isSystemOwner])
+
   const saveApiKey = async () => {
     if (!apiKeyInput.trim()) return
     setSavingApiKey(true)
@@ -323,6 +328,11 @@ export function Settings() {
       setApiKeySaved(true); setTimeout(()=>setApiKeySaved(false),3000)
     } catch { toast.error("שגיאה") } finally { setSavingApiKey(false) }
   }
+
+  useEffect(() => {
+    if (isSystemOwner && !isImpersonating) loadU()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSystemOwner, isImpersonating])
 
   const loadU = async()=>{setLoadingUsers2(true);try{const s=await getDocs(collection(db,"users"));const rs=restaurants||[];setUsersData(s.docs.map(d=>{const dt=d.data();const r=rs.find(x=>x.id===dt.restaurantId);return{uid:d.id,email:dt.email||"",role:dt.role||"user",restaurantId:dt.restaurantId||null,restaurantName:r?.name}}).filter(u=>u.role!=="owner"));setUsersLoaded(true)}catch{toast.error("שגיאה")}finally{setLoadingUsers2(false)}}
   const doCreate=async()=>{setCErr(null);if(!cEmail.trim()||!cPass.trim()){setCErr("נא למלא אימייל וסיסמה");return}if(cPass.length<6){setCErr("סיסמה קצרה");return}setCreating2(true);try{const{createUserWithEmailAndPassword}=await import("firebase/auth");const cr=await createUserWithEmailAndPassword(auth,cEmail.trim(),cPass);await setDoc(doc(db,"users",cr.user.uid),{email:cEmail.trim(),role:cRole,restaurantId:cRest||null});setUsersData(p=>[...p,{uid:cr.user.uid,email:cEmail.trim(),role:cRole,restaurantId:cRest||null,restaurantName:(restaurants||[]).find(r=>r.id===cRest)?.name}]);toast.success("נוצר");setCEmail("");setCPass("");setCRest("");setShowCreate2(false)}catch(e){const c=(e as{code?:string}).code;setCErr(c==="auth/email-already-in-use"?"אימייל בשימוש":(e as Error).message||"שגיאה")}finally{setCreating2(false)}}
