@@ -400,6 +400,10 @@ export function AdminPanel() {
   const [restChipLoading, setRestChipLoading] = useState(false)
   const [restChipDishes, setRestChipDishes] = useState<{name:string;price:number;fc:number}[]>([])
   const [restChipOrders, setRestChipOrders] = useState<{id:string;supplier:string;date:string;total:number;status:string}[]>([])
+  const [activeRestChip, setActiveRestChip] = useState<"dishes"|"fc"|"suppliers"|"orders"|null>(null)
+  const [restChipLoading, setRestChipLoading] = useState(false)
+  const [restChipDishes, setRestChipDishes] = useState<{name:string;price:number;fc:number}[]>([])
+  const [restChipOrders, setRestChipOrders] = useState<{id:string;supplier:string;date:string;total:number;status:string}[]>([])
   const [loadingSystemOwner, setLoadingSystemOwner] = useState(false)
   const [addIngredientOpen, setAddIngredientOpen] = useState(false)
   const [addIngredientName, setAddIngredientName] = useState("")
@@ -1901,6 +1905,25 @@ export function AdminPanel() {
       toast.error((e as Error).message)
     } finally {
       setInviting(false)
+    }
+  }
+
+  const loadRestChipData = async (restId: string, chip: "dishes"|"fc"|"suppliers"|"orders") => {
+    if (activeRestChip === chip) { setActiveRestChip(null); return }
+    setActiveRestChip(chip)
+    if (chip === "dishes" || chip === "fc") {
+      setRestChipLoading(true)
+      try {
+        const snap = await getDocs(collection(db, "restaurants", restId, "recipes"))
+        setRestChipDishes(snap.docs.filter(d=>!d.data().isCompound).map(d=>{const dt=d.data();return{name:d.id,price:typeof dt.sellingPrice==="number"?dt.sellingPrice:0,fc:typeof dt.foodCostPct==="number"?Math.round(dt.foodCostPct*10)/10:0}}).sort((a,b)=>b.price-a.price))
+      } catch(e) { toast.error("שגיאה בטעינה") } finally { setRestChipLoading(false) }
+    }
+    if (chip === "orders") {
+      setRestChipLoading(true)
+      try {
+        const snap = await getDocs(collection(db, "restaurants", restId, "purchaseOrders"))
+        setRestChipOrders(snap.docs.map(d=>{const dt=d.data();return{id:d.id,supplier:(dt.supplierName||dt.supplier||"לא ידוע") as string,date:(dt.createdAt||dt.date||"") as string,total:typeof dt.totalAmount==="number"?dt.totalAmount:typeof dt.total==="number"?dt.total:0,status:(dt.status||"") as string}}).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,15))
+      } catch(e) { toast.error("שגיאה בטעינה") } finally { setRestChipLoading(false) }
     }
   }
 
