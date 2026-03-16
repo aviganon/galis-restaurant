@@ -177,7 +177,7 @@ function CheapestPricePopover({
                 variant="default"
                 size="sm"
                 className="w-full"
-                onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(ingredient.name + " " + webPrice.store + " מחיר קנייה")}`, "_blank")}
+                onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(ingredient.name)}&tbm=shop`, "_blank")}
               >
                 <Globe className="w-4 h-4 ml-2" />
                 {t("pages.ingredients.buyOnline")} →
