@@ -257,7 +257,9 @@ export function Upload() {
       const batch = writeBatch(db)
       let count = 0
       items.forEach((item) => {
-        if (!item.name?.trim() || item.price <= 0) return
+        if (!item.name?.trim()) return
+        const isDeliveryNoteItem = item.price === 0 && typeof item.qty === "number" && item.qty > 0
+        if (item.price <= 0 && !isDeliveryNoteItem) return
         const qty = typeof item.qty === "number" && item.qty > 0 ? item.qty : 0
         const payload: Record<string, unknown> = {
           price: item.price,
