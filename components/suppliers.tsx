@@ -71,6 +71,7 @@ interface SupplierInfo {
   totalValue: number
   source: "assigned" | "restaurant"
   ingredientsForChips?: { stock: number; minStock: number }[]
+  imageUrl?: string
 }
 
 const isOwnerRole = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner"
@@ -184,12 +185,21 @@ export default function Suppliers() {
           source: assignedList.includes(sup) ? "assigned" : existing.source,
         })
       })
+      const supplierDocs = await Promise.all(
+        Array.from(bySupplier.keys()).map(name => {
+          const id = name.replace(/\//g,"_").replace(/\./g,"_").trim()||"supplier"
+          return getDoc(doc(db,"suppliers",id)).then(d=>({name,imageUrl:(d.data()?.imageUrl as string)||undefined}))
+        })
+      )
+      const imageUrlMap: Record<string,string> = {}
+      supplierDocs.forEach(({name,imageUrl})=>{ if(imageUrl) imageUrlMap[name]=imageUrl })
       setSuppliers(
         Array.from(bySupplier.entries()).map(([name, v]) => ({
           name,
           products: v.products,
           totalValue: v.totalValue,
           source: v.source,
+          imageUrl: imageUrlMap[name],
         }))
       )
     } catch (e) {
@@ -622,6 +632,7 @@ export default function Suppliers() {
       })
       setEditSupplierOpen(false)
       toast.success("פרטי הספק עודכנו")
+      if(imgUrl) setSuppliers(prev=>prev.map(s=>s.name===selectedSupplierDetail?{...s,imageUrl:imgUrl!}:s))
     } catch(e) { toast.error(e.message || "שגיאה") }
     finally { setSavingEdit(false); setUploadingImg(false) }
   }
@@ -694,8 +705,11 @@ export default function Suppliers() {
               >
               <CardContent className="p-4">
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                    <Truck className="w-4 h-4 text-primary" />
+                  <div className="w-9 h-9 rounded-xl overflow-hidden bg-primary/10 flex items-center justify-center shrink-0">
+                    {supplier.imageUrl
+                      ? <img src={supplier.imageUrl} className="w-full h-full object-cover" alt=""/>
+                      : <Truck className="w-4 h-4 text-primary"/>
+                    }
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold truncate">{supplier.name === "ללא ספק" ? t("pages.suppliers.noSupplier") : supplier.name}</p>
