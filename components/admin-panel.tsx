@@ -264,7 +264,7 @@ function WebPriceCell({
             variant="default"
             size="sm"
             className="flex-1"
-            onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(ingredientName + " " + data.store + " מחיר קנייה")}`, "_blank")}
+            onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(ingredientName)}&tbm=shop`, "_blank")}
           >
             <Globe className="w-4 h-4 ml-2" />
             {t("pages.adminPanel.buyOnline")} →
