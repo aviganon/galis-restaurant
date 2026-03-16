@@ -1020,7 +1020,213 @@ export default function ProductTree() {
       </Card>
 
       {/* Recipe & Cost Layout */}
-      <div className={cn("grid gap-2", canSeeCosts ? "lg:grid-cols-[1fr,340px]" : "")}>
+      <div className={cn("grid gap-4", canSeeCosts ? "lg:grid-cols-[300px,1fr]" : "")}>
+        {/* Cost Panel — לבעלים בלבד */}
+        {canSeeCosts && (
+        <Card className={cn(
+          "border-0 shadow-lg transition-all",
+          "lg:sticky lg:top-4 lg:self-start"
+        )}>
+          <CardContent className="p-0">
+            {/* Panel Header - Clickable on mobile */}
+            <button
+              onClick={() => setIsCostPanelExpanded(!isCostPanelExpanded)}
+              className="w-full p-4 flex items-center justify-between lg:cursor-default"
+            >
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-primary" />
+                <h3 className="font-bold">{t("pages.productTree.costSummary")}</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge 
+                  variant="secondary"
+                  className={cn(
+                    "font-bold",
+                    getStatusColor(currentPct).bg,
+                    getStatusColor(currentPct).text
+                  )}
+                >
+                  {currentPct.toFixed(1)}%
+                </Badge>
+                <ChevronDown className={cn(
+                  "w-5 h-5 text-muted-foreground transition-transform lg:hidden",
+                  isCostPanelExpanded && "rotate-180"
+                )} />
+              </div>
+            </button>
+            
+            {/* Panel Content */}
+            <AnimatePresence>
+              {(isCostPanelExpanded || typeof window !== 'undefined' && window.innerWidth >= 1024) && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden lg:!h-auto lg:!opacity-100"
+                >
+                  <div className="px-4 pb-4 space-y-4">
+                    {/* Selling Price */}
+                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                      <Label htmlFor="selling-price" className="text-sm">{t("pages.productTree.sellingPriceLabel")}:</Label>
+                      <div className="flex items-center gap-1 flex-1">
+                        <span className="text-lg font-semibold">₪</span>
+                        <Input
+                          id="selling-price"
+                          name="sellingPrice"
+                          type="number"
+                          value={currentDish?.sellingPrice || 0}
+                          onChange={e => updateSellingPrice(Number(e.target.value))}
+                          className="h-9 font-bold"
+                          min={0}
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Cost Meter */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">{t("pages.productTree.foodCostPct")}</span>
+                        <span className={cn(
+                          "font-bold text-lg",
+                          getStatusColor(currentPct).text
+                        )}>
+                          {currentPct.toFixed(1)}%
+                        </span>
+                      </div>
+                      
+                      <div className="relative h-3 bg-muted rounded-full overflow-hidden">
+                        <motion.div
+                          className={cn(
+                            "h-full rounded-full transition-colors",
+                            currentPct <= targetFoodCost ? "bg-emerald-500" :
+                            currentPct <= targetFoodCost * 1.27 ? "bg-amber-500" : "bg-red-500"
+                          )}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.min(currentPct / 50 * 100, 100)}%` }}
+                          transition={{ duration: 0.5, ease: "easeOut" }}
+                        />
+                        {/* Target marker */}
+                        <div 
+                          className="absolute top-0 bottom-0 w-0.5 bg-foreground/50"
+                          style={{ left: `${targetFoodCost / 50 * 100}%` }}
+                        />
+                      </div>
+                      
+                      {/* Target adjuster */}
+                      <div className="flex items-center justify-center gap-2 text-sm">
+                        <span className="text-muted-foreground">יעד:</span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="w-6 h-6"
+                          onClick={() => setTargetFoodCost(prev => Math.max(10, prev - 1))}
+                        >
+                          <span className="text-lg leading-none">-</span>
+                        </Button>
+                        <span className="font-bold w-10 text-center">{targetFoodCost}%</span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="w-6 h-6"
+                          onClick={() => setTargetFoodCost(prev => Math.min(50, prev + 1))}
+                        >
+                          <span className="text-lg leading-none">+</span>
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {/* Status */}
+                    <div className={cn(
+                      "p-3 rounded-lg flex items-center gap-3",
+                      getStatusColor(currentPct).bg,
+                      getStatusColor(currentPct).border,
+                      "border"
+                    )}>
+                      {currentPct <= targetFoodCost ? (
+                        <>
+                          <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                          <div>
+                            <p className="font-bold text-emerald-600">{t("pages.productTree.withinTarget")}</p>
+                            <p className="text-xs text-emerald-600/80">
+                              {currentPct.toFixed(1)}% מתוך {targetFoodCost}%
+                            </p>
+                          </div>
+                        </>
+                      ) : currentPct <= targetFoodCost * 1.27 ? (
+                        <>
+                          <AlertTriangle className="w-6 h-6 text-amber-600" />
+                          <div>
+                            <p className="font-bold text-amber-600">{t("pages.productTree.overTarget")}</p>
+                            <p className="text-xs text-amber-600/80">
+                              {t("pages.productTree.overTargetDeviation")} {(currentPct - targetFoodCost).toFixed(1)}% - {t("pages.productTree.checkSuppliers")}
+                            </p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <AlertTriangle className="w-6 h-6 text-red-600" />
+                          <div>
+                            <p className="font-bold text-red-600">{t("pages.productTree.critical")}</p>
+                            <p className="text-xs text-red-600/80">
+                              {t("pages.productTree.costTooHigh")} ({currentPct.toFixed(1)}%)
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    
+                    {/* Breakdown */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        פירוט
+                      </p>
+                      
+                      <ScrollArea className="h-[100px]">
+                        <div className="space-y-1.5 pr-2">
+                          {currentDish?.ingredients.map((ing, idx) => {
+                            const cost = calcIngredientCost(ing.name, ing.qty, ing.waste, ing.unit)
+                            const share = currentCost > 0 ? (cost / currentCost * 100) : 0
+                            return (
+                              <div key={idx} className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">{ing.name}</span>
+                                <span className="font-medium">
+                                  ₪{cost.toFixed(2)}
+                                  <span className="text-xs text-muted-foreground mr-1">
+                                    ({share.toFixed(0)}%)
+                                  </span>
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </ScrollArea>
+                      
+                      {/* Totals */}
+                      <div className="pt-3 border-t border-border space-y-2">
+                        <div className="flex justify-between font-semibold">
+                          <span>{t("pages.productTree.totalDishCost")}</span>
+                          <span>₪{currentCost.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between font-semibold">
+                          <span>{t("pages.productTree.grossProfit")}</span>
+                          <span className={currentProfit > 0 ? "text-emerald-600" : "text-red-600"}>
+                            ₪{currentProfit.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>{t("pages.productTree.profitMargin")}</span>
+                          <span>{currentMargin.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </CardContent>
+        </Card>
+        )}
+      </div>
         {/* Recipe Editor */}
         <Card className="border-0 shadow-lg min-h-0 flex flex-col">
           <CardContent className="p-3 flex flex-col min-h-0 flex-1">
@@ -1352,213 +1558,7 @@ export default function ProductTree() {
               </div>
             )}
           </CardContent>
-        </Card>
-        
-        {/* Cost Panel — לבעלים בלבד */}
-        {canSeeCosts && (
-        <Card className={cn(
-          "border-0 shadow-lg transition-all",
-          "lg:sticky lg:top-4 lg:h-fit"
-        )}>
-          <CardContent className="p-0">
-            {/* Panel Header - Clickable on mobile */}
-            <button
-              onClick={() => setIsCostPanelExpanded(!isCostPanelExpanded)}
-              className="w-full p-4 flex items-center justify-between lg:cursor-default"
-            >
-              <div className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-primary" />
-                <h3 className="font-bold">{t("pages.productTree.costSummary")}</h3>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge 
-                  variant="secondary"
-                  className={cn(
-                    "font-bold",
-                    getStatusColor(currentPct).bg,
-                    getStatusColor(currentPct).text
-                  )}
-                >
-                  {currentPct.toFixed(1)}%
-                </Badge>
-                <ChevronDown className={cn(
-                  "w-5 h-5 text-muted-foreground transition-transform lg:hidden",
-                  isCostPanelExpanded && "rotate-180"
-                )} />
-              </div>
-            </button>
-            
-            {/* Panel Content */}
-            <AnimatePresence>
-              {(isCostPanelExpanded || typeof window !== 'undefined' && window.innerWidth >= 1024) && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden lg:!h-auto lg:!opacity-100"
-                >
-                  <div className="px-4 pb-4 space-y-4">
-                    {/* Selling Price */}
-                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                      <Label htmlFor="selling-price" className="text-sm">{t("pages.productTree.sellingPriceLabel")}:</Label>
-                      <div className="flex items-center gap-1 flex-1">
-                        <span className="text-lg font-semibold">₪</span>
-                        <Input
-                          id="selling-price"
-                          name="sellingPrice"
-                          type="number"
-                          value={currentDish?.sellingPrice || 0}
-                          onChange={e => updateSellingPrice(Number(e.target.value))}
-                          className="h-9 font-bold"
-                          min={0}
-                        />
-                      </div>
-                    </div>
-                    
-                    {/* Cost Meter */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">{t("pages.productTree.foodCostPct")}</span>
-                        <span className={cn(
-                          "font-bold text-lg",
-                          getStatusColor(currentPct).text
-                        )}>
-                          {currentPct.toFixed(1)}%
-                        </span>
-                      </div>
-                      
-                      <div className="relative h-3 bg-muted rounded-full overflow-hidden">
-                        <motion.div
-                          className={cn(
-                            "h-full rounded-full transition-colors",
-                            currentPct <= targetFoodCost ? "bg-emerald-500" :
-                            currentPct <= targetFoodCost * 1.27 ? "bg-amber-500" : "bg-red-500"
-                          )}
-                          initial={{ width: 0 }}
-                          animate={{ width: `${Math.min(currentPct / 50 * 100, 100)}%` }}
-                          transition={{ duration: 0.5, ease: "easeOut" }}
-                        />
-                        {/* Target marker */}
-                        <div 
-                          className="absolute top-0 bottom-0 w-0.5 bg-foreground/50"
-                          style={{ left: `${targetFoodCost / 50 * 100}%` }}
-                        />
-                      </div>
-                      
-                      {/* Target adjuster */}
-                      <div className="flex items-center justify-center gap-2 text-sm">
-                        <span className="text-muted-foreground">יעד:</span>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="w-6 h-6"
-                          onClick={() => setTargetFoodCost(prev => Math.max(10, prev - 1))}
-                        >
-                          <span className="text-lg leading-none">-</span>
-                        </Button>
-                        <span className="font-bold w-10 text-center">{targetFoodCost}%</span>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="w-6 h-6"
-                          onClick={() => setTargetFoodCost(prev => Math.min(50, prev + 1))}
-                        >
-                          <span className="text-lg leading-none">+</span>
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    {/* Status */}
-                    <div className={cn(
-                      "p-3 rounded-lg flex items-center gap-3",
-                      getStatusColor(currentPct).bg,
-                      getStatusColor(currentPct).border,
-                      "border"
-                    )}>
-                      {currentPct <= targetFoodCost ? (
-                        <>
-                          <CheckCircle2 className="w-6 h-6 text-emerald-600" />
-                          <div>
-                            <p className="font-bold text-emerald-600">{t("pages.productTree.withinTarget")}</p>
-                            <p className="text-xs text-emerald-600/80">
-                              {currentPct.toFixed(1)}% מתוך {targetFoodCost}%
-                            </p>
-                          </div>
-                        </>
-                      ) : currentPct <= targetFoodCost * 1.27 ? (
-                        <>
-                          <AlertTriangle className="w-6 h-6 text-amber-600" />
-                          <div>
-                            <p className="font-bold text-amber-600">{t("pages.productTree.overTarget")}</p>
-                            <p className="text-xs text-amber-600/80">
-                              {t("pages.productTree.overTargetDeviation")} {(currentPct - targetFoodCost).toFixed(1)}% - {t("pages.productTree.checkSuppliers")}
-                            </p>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <AlertTriangle className="w-6 h-6 text-red-600" />
-                          <div>
-                            <p className="font-bold text-red-600">{t("pages.productTree.critical")}</p>
-                            <p className="text-xs text-red-600/80">
-                              {t("pages.productTree.costTooHigh")} ({currentPct.toFixed(1)}%)
-                            </p>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                    
-                    {/* Breakdown */}
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        פירוט
-                      </p>
-                      
-                      <ScrollArea className="h-[100px]">
-                        <div className="space-y-1.5 pr-2">
-                          {currentDish?.ingredients.map((ing, idx) => {
-                            const cost = calcIngredientCost(ing.name, ing.qty, ing.waste, ing.unit)
-                            const share = currentCost > 0 ? (cost / currentCost * 100) : 0
-                            return (
-                              <div key={idx} className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground">{ing.name}</span>
-                                <span className="font-medium">
-                                  ₪{cost.toFixed(2)}
-                                  <span className="text-xs text-muted-foreground mr-1">
-                                    ({share.toFixed(0)}%)
-                                  </span>
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </ScrollArea>
-                      
-                      {/* Totals */}
-                      <div className="pt-3 border-t border-border space-y-2">
-                        <div className="flex justify-between font-semibold">
-                          <span>{t("pages.productTree.totalDishCost")}</span>
-                          <span>₪{currentCost.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between font-semibold">
-                          <span>{t("pages.productTree.grossProfit")}</span>
-                          <span className={currentProfit > 0 ? "text-emerald-600" : "text-red-600"}>
-                            ₪{currentProfit.toFixed(2)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-sm text-muted-foreground">
-                          <span>{t("pages.productTree.profitMargin")}</span>
-                          <span>{currentMargin.toFixed(1)}%</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </CardContent>
-        </Card>
-        )}
+
       </div>
       </div>
 
