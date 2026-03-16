@@ -2753,13 +2753,14 @@ export function AdminPanel() {
                               <table className="w-full text-sm table-fixed">
                                 <colgroup>
                                   <col className="w-[5%]" />
-                                  <col className="w-[12%]" />
-                                  <col className="w-[10%]" />
-                                  <col className="w-[10%]" />
+                                  <col className="w-[11%]" />
                                   <col className="w-[9%]" />
-                                  <col className="w-[10%]" />
-                                  <col className="w-[10%]" />
-                                  <col className="w-[22%]" />
+                                  <col className="w-[9%]" />
+                                  <col className="w-[8%]" />
+                                  <col className="w-[8%]" />
+                                  <col className="w-[9%]" />
+                                  <col className="w-[9%]" />
+                                  <col className="w-[20%]" />
                                 </colgroup>
                                 <thead>
                                   <tr className="border-b bg-muted/50">
@@ -2767,6 +2768,7 @@ export function AdminPanel() {
                                     <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.skuLabel")}</th>
                                     <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.minStockLabel")}</th>
                                     <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.inventory")}</th>
+                                    <th className="text-right py-2 px-2 font-medium">סטטוס</th>
                                     <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.wasteLabel")}</th>
                                     <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.unitUnit")}</th>
                                     <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.priceLabel")}</th>
@@ -2789,6 +2791,14 @@ export function AdminPanel() {
                                       <td className="py-2 px-2 text-right">{i.sku || "—"}</td>
                                       <td className="py-2 px-2 text-right">{i.minStock}</td>
                                       <td className="py-2 px-2 text-right">{i.stock}</td>
+                                      <td className="py-2 px-2 text-right">
+                                        {(()=>{
+                                          const s=i.stock??0; const m=i.minStock??0;
+                                          if(s===0) return <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700">אזל</span>;
+                                          if(m>0&&s<m) return <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">נמוך</span>;
+                                          return <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-700">תקין</span>;
+                                        })()}
+                                      </td>
                                       <td className="py-2 px-2 text-right">{i.waste}%</td>
                                       <td className="py-2 px-2 text-right">{i.unit}</td>
                                       <td className="py-2 px-2 text-right">₪{i.price.toFixed(2)}</td>
