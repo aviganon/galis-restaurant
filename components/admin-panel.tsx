@@ -342,9 +342,7 @@ export function AdminPanel() {
   const [selectedIngIds, setSelectedIngIds] = useState<Set<string>>(new Set())
   const [bulkAssignSupplier, setBulkAssignSupplier] = useState("")
   const [savingBulkAssign, setSavingBulkAssign] = useState(false)
-  const [selectedIngIds, setSelectedIngIds] = useState<Set<string>>(new Set())
-  const [bulkAssignSupplier, setBulkAssignSupplier] = useState("")
-  const [savingBulkAssign, setSavingBulkAssign] = useState(false)
+
   const [ingredientsSearchText, setIngredientsSearchText] = useState("")
   const [ingredientsSortBy, setIngredientsSortBy] = useState<keyof IngredientRow | "">("")
   const [ingredientsSortDir, setIngredientsSortDir] = useState<"asc" | "desc">("asc")
@@ -1935,20 +1933,7 @@ export function AdminPanel() {
     } catch(e){toast.error((e as Error).message||"שגיאה")} finally{setSavingBulkAssign(false)}
   }
 
-  const handleBulkAssign = async () => {
-    if (!bulkAssignSupplier || selectedIngIds.size === 0) return
-    setSavingBulkAssign(true)
-    try {
-      const now = new Date().toISOString()
-      const supTrim = bulkAssignSupplier.trim()
-      const batch = writeBatch(db)
-      selectedIngIds.forEach(id => batch.set(doc(db,"ingredients",id),{supplier:supTrim,lastUpdated:now},{merge:true}))
-      await batch.commit()
-      setAdminIngredients(prev=>prev.map(ing=>selectedIngIds.has(ing.id)?{...ing,supplier:supTrim}:ing))
-      toast.success(`שויכו ${selectedIngIds.size} רכיבים לספק "${supTrim}"`)
-      setSelectedIngIds(new Set()); setBulkAssignSupplier("")
-    } catch(e){toast.error((e as Error).message||"שגיאה")} finally{setSavingBulkAssign(false)}
-  }
+
 
   const loadRestChipData = async (restId: string, chip: "dishes"|"fc"|"suppliers"|"orders") => {
     if (activeRestChip === chip) { setActiveRestChip(null); return }
