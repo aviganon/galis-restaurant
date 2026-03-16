@@ -118,6 +118,20 @@ function webPriceCacheDocId(name: string) {
   return name.replace(/\//g, "_").replace(/\./g, "_") || "unknown"
 }
 
+
+function getStoreSearchUrl(store: string, productName: string): string {
+  const q = encodeURIComponent(productName)
+  const s = store.toLowerCase()
+  if (s.includes("רמי לוי") || s.includes("rami")) return 'https://www.rami-levy.co.il/he/search?q=' + q
+  if (s.includes("שופרסל") || s.includes("shufersal")) return 'https://www.shufersal.co.il/online/he/search?q=' + q
+  if (s.includes("יוחננוף") || s.includes("yochananof")) return 'https://www.yochananof.co.il/search?q=' + q
+  if (s.includes("ויקטורי") || s.includes("victory")) return 'https://www.victory.co.il/search?q=' + q
+  if (s.includes("מגה") || s.includes("mega")) return 'https://www.mega.co.il/search?q=' + q
+  if (s.includes("חצי חינם") || s.includes("hatzi")) return 'https://www.hazi-hinam.co.il/search?q=' + q
+  if (s.includes("קרפור") || s.includes("carrefour")) return 'https://www.carrefour.co.il/search?q=' + q
+  return 'https://www.google.com/search?q=' + q + '&tbm=shop'
+}
+
 function AdminCheapestPopover({
   ing,
   webPrice,
@@ -1010,7 +1024,7 @@ export function AdminPanel() {
       setEditAdminIngredientOpen(false)
       setEditAdminIngredient(null)
       setRefreshAdminIngredientsKey((k) => k + 1)
-      setIngredientsList(prev => prev.map(ing => ing.id === editAdminIngredient!.id ? { ...ing, price: parseFloat(editAdminIngPrice)||ing.price, unit: editAdminIngUnit||ing.unit, waste: parseFloat(editAdminIngWaste)||ing.waste, stock: parseFloat(editAdminIngStock)||ing.stock, minStock: parseFloat(editAdminIngMinStock)||ing.minStock, sku: editAdminIngSku||ing.sku, supplier: editAdminIngSupplier||ing.supplier } : ing))
+      setAdminIngredients(prev => prev.map(ing => ing.id === editAdminIngredient!.id ? { ...ing, price: parseFloat(editAdminIngPrice)||ing.price, unit: editAdminIngUnit||ing.unit, waste: parseFloat(editAdminIngWaste)||ing.waste, stock: parseFloat(editAdminIngStock)||ing.stock, minStock: parseFloat(editAdminIngMinStock)||ing.minStock, sku: editAdminIngSku||ing.sku, supplier: editAdminIngSupplier||ing.supplier } : ing))
     } catch (e) {
       toast.error((e as Error)?.message || t("pages.adminPanel.error"))
     } finally {
@@ -1927,7 +1941,7 @@ export function AdminPanel() {
       const batch = writeBatch(db)
       selectedIngIds.forEach(id => batch.set(doc(db,"ingredients",id),{supplier:supTrim,lastUpdated:now},{merge:true}))
       await batch.commit()
-      setIngredientsList(prev=>prev.map(ing=>selectedIngIds.has(ing.id)?{...ing,supplier:supTrim}:ing))
+      setAdminIngredients(prev=>prev.map(ing=>selectedIngIds.has(ing.id)?{...ing,supplier:supTrim}:ing))
       toast.success(`שויכו ${selectedIngIds.size} רכיבים לספק "${supTrim}"`)
       setSelectedIngIds(new Set()); setBulkAssignSupplier("")
     } catch(e){toast.error((e as Error).message||"שגיאה")} finally{setSavingBulkAssign(false)}
@@ -1943,7 +1957,7 @@ export function AdminPanel() {
       const batch = writeBatch(db)
       selectedIngIds.forEach(id => batch.delete(doc(db,"ingredients",id)))
       await batch.commit()
-      setIngredientsList(prev => prev.filter(ing => !selectedIngIds.has(ing.id)))
+      setAdminIngredients(prev => prev.filter(ing => !selectedIngIds.has(ing.id)))
       toast.success(`נמחקו ${selectedIngIds.size} רכיבים`)
       setSelectedIngIds(new Set())
     } catch(e){toast.error((e as Error).message||"שגיאה")} finally{setSavingBulkAssign(false)}
