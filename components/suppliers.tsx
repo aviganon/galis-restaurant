@@ -717,15 +717,15 @@ export default function Suppliers() {
                   {/* Bottom: name + chips */}
                   <div>
                     <p className="font-bold text-white text-sm leading-tight mb-1">{supplier.name === "ללא ספק" ? t("pages.suppliers.noSupplier") : supplier.name}</p>
-                    <div className="flex gap-1 flex-wrap">
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-black/40 text-white/80">{supplier.products} פריטים</span>
+                    <div className="flex gap-1 flex-wrap items-center">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-black/50 text-white">🛒 {supplier.products}</span>
                       {(()=>{
                         const items = supplier.ingredientsForChips||[]
                         if(!items.length) return null
                         const ok = items.filter(i=>i.stock>0&&(i.minStock===0||i.stock>=i.minStock)).length
                         const low = items.filter(i=>i.stock>0&&i.minStock>0&&i.stock<i.minStock).length
                         const zero = items.filter(i=>i.stock===0).length
-                        return <>{ok>0&&<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/80 text-white">✓ {ok}</span>}{low>0&&<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/80 text-white">⚠ {low}</span>}{zero>0&&<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-500/80 text-white">✕ {zero}</span>}</>
+                        return <>{ok>0&&<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/90 text-white">✓ {ok}</span>{low>0&&<span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/90 text-white">⚠ {low}</span>}{zero>0&&<span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-500/90 text-white">✕ {zero}</span></>
                       })()}
                     </div>
                   </div>
