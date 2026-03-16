@@ -731,6 +731,7 @@ export default function Suppliers() {
                               <TableHead className="text-right">פחת %</TableHead>
                               <TableHead className="text-right">מלאי</TableHead>
                               <TableHead className="text-right">מינ׳</TableHead>
+                              <TableHead className="text-right">סטטוס</TableHead>
                               <TableHead className="text-right">מק״ט</TableHead>
                               <TableHead className="text-right w-20">פעולות</TableHead>
                             </TableRow>
@@ -744,6 +745,14 @@ export default function Suppliers() {
                                 <TableCell className="text-right">{i.waste}%</TableCell>
                                 <TableCell className="text-right">{i.stock}</TableCell>
                                 <TableCell className="text-right">{i.minStock}</TableCell>
+                                <TableCell className="text-right">
+                                  {i.stock===0
+                                    ?<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700">אזל</span>
+                                    :i.minStock>0&&i.stock<i.minStock
+                                      ?<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">נמוך</span>
+                                      :<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-700">תקין</span>
+                                  }
+                                </TableCell>
                                 <TableCell className="text-right">{i.sku || "—"}</TableCell>
                                 <TableCell className="text-right">
                                     <div className="flex items-center justify-end gap-1">
