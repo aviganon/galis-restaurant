@@ -414,6 +414,7 @@ export function AdminPanel() {
   const adminInvoiceFileRef = useRef<HTMLInputElement>(null)
   const INVOICE_ACCEPT = ".xlsx,.xls,.csv,.pdf,.rtf,image/*"
   const [selectedSupplierDetail, setSelectedSupplierDetail] = useState<string | null>(null)
+  const [activeSupplierChip, setActiveSupplierChip] = useState<"restaurants"|"ingredients"|"cost"|null>(null)
   const [selectedRestDetail, setSelectedRestDetail] = useState<string | null>(null)
   const [editRestImageFile, setEditRestImageFile] = useState<File|null>(null)
   const [editRestImageUrl, setEditRestImageUrl] = useState<string|null>(null)
@@ -2552,7 +2553,7 @@ export function AdminPanel() {
                             selectedSupplierDetail === s.name ? "border-primary shadow-lg -translate-y-0.5" : "border-transparent"
                           )}
                           style={{height:130}}
-                          onClick={() => setSelectedSupplierDetail(selectedSupplierDetail === s.name ? null : s.name)}
+                          onClick={() => { setSelectedSupplierDetail(selectedSupplierDetail === s.name ? null : s.name); setActiveSupplierChip(null) }}
                         >
                           {/* Background image */}
                           <img
@@ -2622,37 +2623,100 @@ export function AdminPanel() {
                             </Button>
                           </div>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                          <div>
-                            <p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.phone")}</p>
-                            <p className="font-medium">{s.phone || "—"}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.email")}</p>
-                            <p className="font-medium">{s.email || "—"}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.contact")}</p>
-                            <p className="font-medium">{s.contact || "—"}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.address")}</p>
-                            <p className="font-medium">{s.address || "—"}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.assignedToRestaurantsLabel")}</p>
-                            <p className="font-medium">
-                              {(s.restaurantIds?.length ?? 0) === 0 ? (
-                                t("pages.adminPanel.notAssigned")
-                              ) : (
-                                (s.restaurantIds || [])
-                                  .map((rid) => restsWithDetails.find((r) => r.id === rid)?.name || rid)
-                                  .filter(Boolean)
-                                  .join(", ")
+                        {/* Clickable KPI chips */}
+                        {(()=>{
+                          const ings=supplierToIngredients[s.name]||[]
+                          const totalCost=ings.reduce((sum,ing)=>sum+(typeof ing.price==="number"?ing.price:0),0)
+                          const assignedRests=(s.restaurantIds||[]).map(rid=>restsWithDetails.find(r=>r.id===rid)?.name||rid).filter(Boolean)
+                          const lastUpdated=ings.reduce((latest,ing)=>{const d=(ing as any).lastUpdated||"";return d>latest?d:latest},(s as any).lastUpdated||"")
+                          const lastStr=lastUpdated?new Date(lastUpdated).toLocaleDateString("he-IL"):"—"
+                          const chips=[
+                            {key:"restaurants" as const,icon:Building2,val:assignedRests.length,label:"מסעדות",grad:"from-emerald-400 to-teal-500"},
+                            {key:"ingredients" as const,icon:ShoppingCart,val:ings.length,label:"רכיבים",grad:"from-violet-400 to-purple-500"},
+                            {key:"cost" as const,icon:TrendingUp,val:"₪"+(totalCost>=1000?(totalCost/1000).toFixed(1)+"k":totalCost.toFixed(0)),label:"עלות רכיבים",grad:"from-amber-400 to-orange-500"},
+                            {key:null,icon:RefreshCw,val:lastStr,label:"עדכון אחרון",grad:"from-slate-400 to-slate-500"},
+                          ]
+                          return (
+                            <>
+                              <div className="flex flex-wrap gap-3">
+                                {chips.map((chip,ci)=>(
+                                  <div key={ci}
+                                    className={`rounded-lg overflow-hidden shadow-sm ${chip.key?"cursor-pointer hover:-translate-y-0.5 transition-all":""} ${activeSupplierChip===chip.key&&chip.key?"ring-2 ring-offset-1 ring-primary scale-105":""}`}
+                                    style={{minWidth:80}}
+                                    onClick={chip.key?()=>setActiveSupplierChip(activeSupplierChip===chip.key?null:chip.key):undefined}>
+                                    <div className={`bg-gradient-to-br ${chip.grad} px-3 py-1.5 flex items-center gap-1.5`}>
+                                      <chip.icon className="w-3.5 h-3.5 text-white/80 shrink-0"/>
+                                      <span className="text-sm font-bold text-white">{chip.val}</span>
+                                    </div>
+                                    <div className={`px-2 py-0.5 ${activeSupplierChip===chip.key&&chip.key?"bg-primary/10":"bg-muted/60"}`}>
+                                      <p className={`text-[10px] font-medium ${activeSupplierChip===chip.key&&chip.key?"text-primary":"text-muted-foreground"}`}>{chip.label}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Chip content panel */}
+                              {activeSupplierChip && (
+                                <motion.div initial={{opacity:0,y:-6}} animate={{opacity:1,y:0}} className="rounded-xl border bg-background p-4">
+                                  {activeSupplierChip==="restaurants" ? (
+                                    <div>
+                                      <p className="text-sm font-semibold mb-3 flex items-center gap-1.5"><Building2 className="w-4 h-4 text-emerald-500"/>מסעדות משויכות ({assignedRests.length})</p>
+                                      {assignedRests.length===0?<p className="text-sm text-muted-foreground">לא משויך לאף מסעדה</p>:(
+                                        <div className="flex flex-wrap gap-2">
+                                          {assignedRests.map(r=>(
+                                            <span key={r} className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 rounded-lg text-sm font-medium">{r}</span>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : activeSupplierChip==="ingredients" ? (
+                                    <div>
+                                      <p className="text-sm font-semibold mb-3 flex items-center gap-1.5"><ShoppingCart className="w-4 h-4 text-violet-500"/>רכיבים ({ings.length})</p>
+                                      {ings.length===0?<p className="text-sm text-muted-foreground">אין רכיבים</p>:(
+                                        <div className="overflow-x-auto"><table className="w-full text-sm">
+                                          <thead><tr className="border-b text-xs text-muted-foreground"><th className="text-right pb-1.5">רכיב</th><th className="text-center pb-1.5 w-20">מחיר</th><th className="text-center pb-1.5 w-20">יחידה</th><th className="text-center pb-1.5 w-24">מקט</th></tr></thead>
+                                          <tbody>{ings.map((ing,i)=>(
+                                            <tr key={i} className="border-b last:border-0 hover:bg-muted/30">
+                                              <td className="py-1.5 font-medium">{ing.name}</td>
+                                              <td className="py-1.5 text-center">₪{typeof ing.price==="number"?ing.price.toFixed(2):"—"}</td>
+                                              <td className="py-1.5 text-center text-muted-foreground">{(ing as any).unit||"—"}</td>
+                                              <td className="py-1.5 text-center text-muted-foreground text-xs">{(ing as any).sku||"—"}</td>
+                                            </tr>
+                                          ))}</tbody>
+                                        </table></div>
+                                      )}
+                                    </div>
+                                  ) : activeSupplierChip==="cost" ? (
+                                    <div>
+                                      <p className="text-sm font-semibold mb-3 flex items-center gap-1.5"><TrendingUp className="w-4 h-4 text-amber-500"/>עלות רכיבים — סה"כ ₪{totalCost.toFixed(2)}</p>
+                                      {ings.length===0?<p className="text-sm text-muted-foreground">אין נתונים</p>:(
+                                        <div className="space-y-1.5">
+                                          {[...ings].sort((a,b)=>(typeof b.price==="number"?b.price:0)-(typeof a.price==="number"?a.price:0)).map((ing,i)=>(
+                                            <div key={i} className="flex items-center gap-2">
+                                              <span className="text-sm flex-1 truncate">{ing.name}</span>
+                                              <div className="flex-1 max-w-[120px] h-2 bg-muted rounded-full overflow-hidden">
+                                                <div className="h-full bg-amber-400 rounded-full" style={{width:`${totalCost>0?Math.min((typeof ing.price==="number"?ing.price:0)/totalCost*100,100):0}%`}}/>
+                                              </div>
+                                              <span className="text-xs font-bold w-16 text-right text-amber-600">₪{typeof ing.price==="number"?ing.price.toFixed(2):"—"}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : null}
+                                </motion.div>
                               )}
-                            </p>
-                          </div>
-                        </div>
+
+                              {/* Contact details */}
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm pt-1">
+                                <div><p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.phone")}</p><p className="font-medium">{s.phone||"—"}</p></div>
+                                <div><p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.email")}</p><p className="font-medium">{s.email||"—"}</p></div>
+                                <div><p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.contact")}</p><p className="font-medium">{s.contact||"—"}</p></div>
+                                <div><p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.address")}</p><p className="font-medium">{s.address||"—"}</p></div>
+                              </div>
+                            </>
+                          )
+                        })()}
                         {showSupplierInvUpload && (
                           <motion.div initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} className="mb-4"
                             onDragOver={e=>{e.preventDefault();setIsSupplierInvDragging(true)}}
