@@ -1108,26 +1108,35 @@ export function AdminPanel() {
       const now = new Date().toISOString()
       const batch = writeBatch(db)
       let count = 0
+      // Smart upsert — check existing ingredients to avoid duplicates
+      const existingSnap = await getDocs(collection(db, "ingredients"))
+      const existingMap = new Map(existingSnap.docs.map(d=>[d.id.toLowerCase().trim(), d.id]))
+      let updatedCount = 0, newCount = 0
+
       items.forEach((item) => {
         if (!item.name?.trim()) return
+        const nameTrimmed = item.name.trim()
+        const nameKey = nameTrimmed.toLowerCase().trim()
         const isDeliveryNoteItem = item.price === 0 && typeof item.qty === "number" && item.qty > 0
         if (item.price <= 0 && !isDeliveryNoteItem) return
+        const alreadyExists = existingMap.has(nameKey)
+        const docId = existingMap.get(nameKey) || nameTrimmed
         const payload: Record<string, unknown> = {
           ...(item.price > 0 ? { price: item.price } : {}),
           unit: item.unit || "קג",
-          supplier: supTrim,
           lastUpdated: now,
           createdBy: "global" as const,
           sku: item.sku ?? "",
+          ...(alreadyExists ? {} : { supplier: supTrim }),
         }
-        batch.set(doc(db, "ingredients", item.name.trim()), payload, { merge: true })
+        batch.set(doc(db, "ingredients", docId), payload, { merge: true })
         const priceId = supTrim.replace(/\//g, "_").replace(/\./g, "_").trim() || "default"
-        batch.set(doc(db, "ingredients", item.name.trim(), "prices", priceId), {
-          price: item.price,
-          unit: item.unit || "קג",
-          supplier: supTrim,
-          lastUpdated: now,
-        }, { merge: true })
+        if (item.price > 0) {
+          batch.set(doc(db, "ingredients", docId, "prices", priceId), {
+            price: item.price, unit: item.unit || "קג", supplier: supTrim, lastUpdated: now,
+          }, { merge: true })
+        }
+        alreadyExists ? updatedCount++ : newCount++
         count++
       })
       if (count > 0) {
@@ -1138,9 +1147,9 @@ export function AdminPanel() {
         if (toSync.length > 0) {
           const synced = await syncSupplierIngredientsToAssignedRestaurants(supTrim, toSync)
           const restCount = synced > 0 ? Math.ceil(synced / toSync.length) : 0
-          toast.success(`ספק "${supTrim}" — ${count} רכיבים נוספו לקטלוג הגלובלי${restCount > 0 ? ` — עודכן ב־${restCount} מסעדות` : ""}`)
+          toast.success(`ספק "${supTrim}" — ${newCount} חדשים, ${updatedCount} עודכנו${restCount > 0 ? ` — סונכרן ל-${restCount} מסעדות` : ""}`)
         } else {
-          toast.success(`ספק "${supTrim}" — ${count} רכיבים נוספו לקטלוג הגלובלי`)
+          toast.success(`ספק "${supTrim}" — ${newCount} חדשים, ${updatedCount} עודכנו`)
         }
         loadSystemOwnerData()
       } else {
