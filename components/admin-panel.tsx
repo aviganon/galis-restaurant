@@ -2095,7 +2095,7 @@ export function AdminPanel() {
                         className={cn("relative rounded-xl overflow-hidden cursor-pointer border-2 transition-all duration-200 shadow-sm hover:shadow-lg hover:-translate-y-0.5",
                           selectedRestDetail===rest.id?"border-primary shadow-lg -translate-y-0.5":"border-transparent")}
                         style={{height:140}}
-                        onClick={()=>setSelectedRestDetail(selectedRestDetail===rest.id?null:rest.id)}>
+                        onClick={()=>{setSelectedRestDetail(selectedRestDetail===rest.id?null:rest.id);setActiveRestChip(null)}}>
                         <img src={getRestaurantImageUrl(rest.name)} alt={rest.name}
                           className="absolute inset-0 w-full h-full object-cover"
                           onError={e=>{(e.target as HTMLImageElement).style.display="none";(e.target as HTMLImageElement).parentElement!.style.background=colors[_ri%5]}}/>
