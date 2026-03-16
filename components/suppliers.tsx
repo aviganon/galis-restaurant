@@ -710,20 +710,24 @@ export default function Suppliers() {
               >
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"/>
                 <div className="absolute inset-0 p-3 flex flex-col justify-between">
-                  <div className="flex gap-1.5 flex-wrap">
-                    {(()=>{
-                      const items = supplier.ingredientsForChips||[]
-                      if(!items.length) return null
-                      const ok = items.filter(i=>i.stock>0&&(i.minStock===0||i.stock>=i.minStock)).length
-                      const low = items.filter(i=>i.stock>0&&i.minStock>0&&i.stock<i.minStock).length
-                      const zero = items.filter(i=>i.stock===0).length
-                      return <>{ok>0&&<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/80 text-white">✓ {ok}</span>}{low>0&&<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/80 text-white">⚠ {low}</span>}{zero>0&&<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-500/80 text-white">✕ {zero}</span>}</>
-                    })()}
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-black/40 text-white mr-auto">₪{supplier.totalValue.toLocaleString()}</span>
+                  {/* Top: value */}
+                  <div className="flex justify-end">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-black/40 text-white">₪{supplier.totalValue.toLocaleString()}</span>
                   </div>
+                  {/* Bottom: name + chips */}
                   <div>
-                    <p className="font-bold text-white text-sm leading-tight">{supplier.name === "ללא ספק" ? t("pages.suppliers.noSupplier") : supplier.name}</p>
-                    <p className="text-white/70 text-xs">{supplier.products} {t("pages.suppliers.products")}</p>
+                    <p className="font-bold text-white text-sm leading-tight mb-1">{supplier.name === "ללא ספק" ? t("pages.suppliers.noSupplier") : supplier.name}</p>
+                    <div className="flex gap-1 flex-wrap">
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-black/40 text-white/80">{supplier.products} פריטים</span>
+                      {(()=>{
+                        const items = supplier.ingredientsForChips||[]
+                        if(!items.length) return null
+                        const ok = items.filter(i=>i.stock>0&&(i.minStock===0||i.stock>=i.minStock)).length
+                        const low = items.filter(i=>i.stock>0&&i.minStock>0&&i.stock<i.minStock).length
+                        const zero = items.filter(i=>i.stock===0).length
+                        return <>{ok>0&&<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/80 text-white">✓ {ok}</span>}{low>0&&<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/80 text-white">⚠ {low}</span>}{zero>0&&<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-500/80 text-white">✕ {zero}</span>}</>
+                      })()}
+                    </div>
                   </div>
                 </div>
               </div>
