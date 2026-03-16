@@ -177,7 +177,7 @@ function CheapestPricePopover({
                 variant="default"
                 size="sm"
                 className="w-full"
-                onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(ingredient.name)}&tbm=shop`, "_blank")}
+                onClick={() => window.open(getStoreSearchUrl(webPrice.store, ingredient.name), "_blank")}
               >
                 <Globe className="w-4 h-4 ml-2" />
                 {t("pages.ingredients.buyOnline")} →
@@ -199,6 +199,20 @@ function CheapestPricePopover({
       </PopoverContent>
     </Popover>
   )
+}
+
+
+function getStoreSearchUrl(store: string, productName: string): string {
+  const q = encodeURIComponent(productName)
+  const s = store.toLowerCase()
+  if (s.includes("רמי לוי") || s.includes("rami")) return 'https://www.rami-levy.co.il/he/search?q=' + q
+  if (s.includes("שופרסל") || s.includes("shufersal")) return 'https://www.shufersal.co.il/online/he/search?q=' + q
+  if (s.includes("יוחננוף") || s.includes("yochananof")) return 'https://www.yochananof.co.il/search?q=' + q
+  if (s.includes("ויקטורי") || s.includes("victory")) return 'https://www.victory.co.il/search?q=' + q
+  if (s.includes("מגה") || s.includes("mega")) return 'https://www.mega.co.il/search?q=' + q
+  if (s.includes("חצי חינם") || s.includes("hatzi")) return 'https://www.hazi-hinam.co.il/search?q=' + q
+  if (s.includes("קרפור") || s.includes("carrefour")) return 'https://www.carrefour.co.il/search?q=' + q
+  return 'https://www.google.com/search?q=' + q + '&tbm=shop'
 }
 
 export function Ingredients() {
