@@ -606,12 +606,12 @@ export default function Suppliers() {
         setUploadingImg(true)
         const safe = selectedSupplierDetail.replace(/[^a-zA-Z0-9]/g,"_")
         const sRef = storageRef(storage, "suppliers/"+safe+"/cover.jpg")
-        await new Promise((res, rej) => {
-          const task = uploadBytesResumable(sRef, editImageFile)
+        await new Promise<void>((res, rej) => {
+          const task = uploadBytesResumable(sRef, editImageFile!)
           task.on("state_changed", ()=>{}, rej, async () => {
             imgUrl = await getDownloadURL(sRef)
             setEditImageUrl(imgUrl)
-            res()
+            res(undefined)
           })
         })
         setUploadingImg(false)
@@ -695,43 +695,38 @@ export default function Suppliers() {
           <p className="text-sm text-muted-foreground mb-4">{t("pages.suppliers.clickForDetails")}</p>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
             {safeFilteredSuppliers.map((supplier) => (
-              <Card
+              <div
                 key={supplier.name}
                 className={cn(
-                  "border-0 shadow-sm cursor-pointer transition-colors",
-                  selectedSupplierDetail === supplier.name ? "ring-2 ring-primary bg-muted/50" : "hover:bg-muted/50"
+                  "relative rounded-xl cursor-pointer transition-all overflow-hidden shadow-sm h-28",
+                  selectedSupplierDetail === supplier.name ? "ring-2 ring-primary scale-[0.98]" : "hover:shadow-md hover:scale-[0.99]"
                 )}
+                style={{
+                  background: supplier.imageUrl
+                    ? 'url('+supplier.imageUrl+') center/cover'
+                    : 'linear-gradient(135deg,hsl(var(--primary)/0.15),hsl(var(--primary)/0.05))'
+                }}
                 onClick={() => { if(supplier.name !== "ללא ספק") { setSelectedSupplierDetail(selectedSupplierDetail === supplier.name ? null : supplier.name); setStockChipFilter("all") } }}
               >
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-9 h-9 rounded-xl overflow-hidden bg-primary/10 flex items-center justify-center shrink-0">
-                    {supplier.imageUrl
-                      ? <img src={supplier.imageUrl} className="w-full h-full object-cover" alt=""/>
-                      : <Truck className="w-4 h-4 text-primary"/>
-                    }
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"/>
+                <div className="absolute inset-0 p-3 flex flex-col justify-between">
+                  <div className="flex gap-1.5 flex-wrap">
+                    {(()=>{
+                      const items = supplier.ingredientsForChips||[]
+                      if(!items.length) return null
+                      const ok = items.filter(i=>i.stock>0&&(i.minStock===0||i.stock>=i.minStock)).length
+                      const low = items.filter(i=>i.stock>0&&i.minStock>0&&i.stock<i.minStock).length
+                      const zero = items.filter(i=>i.stock===0).length
+                      return <>{ok>0&&<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/80 text-white">✓ {ok}</span>}{low>0&&<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/80 text-white">⚠ {low}</span>}{zero>0&&<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-500/80 text-white">✕ {zero}</span>}</>
+                    })()}
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-black/40 text-white mr-auto">₪{supplier.totalValue.toLocaleString()}</span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">{supplier.name === "ללא ספק" ? t("pages.suppliers.noSupplier") : supplier.name}</p>
-                    <p className="text-xs text-muted-foreground">{supplier.products} {t("pages.suppliers.products")}</p>
+                  <div>
+                    <p className="font-bold text-white text-sm leading-tight">{supplier.name === "ללא ספק" ? t("pages.suppliers.noSupplier") : supplier.name}</p>
+                    <p className="text-white/70 text-xs">{supplier.products} {t("pages.suppliers.products")}</p>
                   </div>
-                  <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 shrink-0 text-xs">₪{supplier.totalValue.toLocaleString()}</Badge>
                 </div>
-                {supplier.name !== "ללא ספק" && (supplier.ingredientsForChips||[]).length > 0 && (()=>{
-                  const items = supplier.ingredientsForChips||[]
-                  const ok = items.filter(i=>i.stock>0&&(i.minStock===0||i.stock>=i.minStock)).length
-                  const low = items.filter(i=>i.stock>0&&i.minStock>0&&i.stock<i.minStock).length
-                  const zero = items.filter(i=>i.stock===0).length
-                  return (
-                    <div className="flex gap-1.5 flex-wrap">
-                      {ok>0&&<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-700">✓ {ok} במלאי</span>}
-                      {low>0&&<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">⚠ {low} נמוך</span>}
-                      {zero>0&&<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700">✕ {zero} אזל</span>}
-                    </div>
-                  )
-                })()}
-              </CardContent>
-            </Card>
+              </div>
           ))}
           </div>
           {selectedSupplierDetail && selectedSupplierDetail !== "ללא ספק" && (
