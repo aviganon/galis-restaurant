@@ -587,6 +587,45 @@ export default function Suppliers() {
     )
   }
 
+  const handleSaveEdit = async () => {
+    if (!currentRestaurantId || !selectedSupplierDetail) return
+    setSavingEdit(true)
+    try {
+      let imgUrl = editImageUrl
+      if (editImageFile) {
+        setUploadingImg(true)
+        const safe = selectedSupplierDetail.replace(/[^a-zA-Z0-9]/g,"_")
+        const sRef = storageRef(storage, "suppliers/"+safe+"/cover.jpg")
+        await new Promise((res, rej) => {
+          const task = uploadBytesResumable(sRef, editImageFile)
+          task.on("state_changed", ()=>{}, rej, async () => {
+            imgUrl = await getDownloadURL(sRef)
+            setEditImageUrl(imgUrl)
+            res()
+          })
+        })
+        setUploadingImg(false)
+      }
+      await setDoc(doc(db, "suppliers", selectedSupplierDetail), {
+        phone: editPhone.trim() || null,
+        email: editEmail.trim() || null,
+        contact: editContact.trim() || null,
+        address: editAddress.trim() || null,
+        ...(imgUrl ? { imageUrl: imgUrl } : {}),
+        updatedAt: new Date().toISOString()
+      }, { merge: true })
+      setSupplierDetailInfo({
+        phone: editPhone || undefined,
+        email: editEmail || undefined,
+        contact: editContact || undefined,
+        address: editAddress || undefined,
+      })
+      setEditSupplierOpen(false)
+      toast.success("פרטי הספק עודכנו")
+    } catch(e) { toast.error(e.message || "שגיאה") }
+    finally { setSavingEdit(false); setUploadingImg(false) }
+  }
+
   const restaurantName = restaurants?.find((r) => r.id === currentRestaurantId)?.name ?? undefined
   const safeFilteredSuppliers = Array.isArray(suppliers) ? suppliers.filter((s) => (s?.name ?? "").includes(searchQuery)) : []
 
