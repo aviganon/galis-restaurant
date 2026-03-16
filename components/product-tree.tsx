@@ -1562,22 +1562,40 @@ export default function ProductTree() {
       </div>
       </div>
 
-      {/* ── Section tabs: רכיבים / ספקים ── */}
-      <div className="px-4 pb-10 mt-4 border-t pt-4">
-        <div className="flex gap-3 mb-4">
+      {/* ── Section tabs: רכיבים / ספקים — same style as owner panel ── */}
+      <div className="mt-2">
+        {/* Divider */}
+        <div className="h-px bg-border mx-0 mb-0"/>
+        {/* Tab buttons — matching owner panel style */}
+        <div className="flex w-full border-b bg-background sticky top-0 z-10">
           <button
             onClick={()=>setActiveTab(activeTab==="ingredients"?null:"ingredients")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border ${activeTab==="ingredients"?"bg-primary text-primary-foreground border-primary":"bg-muted/50 hover:bg-muted border-transparent"}`}>
-            🥬 רכיבים
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3.5 text-sm font-medium transition-all relative
+              ${activeTab==="ingredients"
+                ?"text-primary after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary"
+                :"text-muted-foreground hover:text-foreground hover:bg-muted/40"}`}>
+            <span className="text-base">🥬</span> רכיבים
           </button>
           <button
             onClick={()=>setActiveTab(activeTab==="suppliers"?null:"suppliers")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border ${activeTab==="suppliers"?"bg-primary text-primary-foreground border-primary":"bg-muted/50 hover:bg-muted border-transparent"}`}>
-            🚚 ספקים
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3.5 text-sm font-medium transition-all relative
+              ${activeTab==="suppliers"
+                ?"text-primary after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary"
+                :"text-muted-foreground hover:text-foreground hover:bg-muted/40"}`}>
+            <span className="text-base">🚚</span> ספקים
           </button>
         </div>
-        {activeTab==="ingredients" && <Ingredients />}
-        {activeTab==="suppliers" && <SuppliersComp />}
+        {/* Content */}
+        {activeTab==="ingredients" && (
+          <div className="pb-10">
+            <Ingredients />
+          </div>
+        )}
+        {activeTab==="suppliers" && (
+          <div className="pb-10">
+            <SuppliersComp />
+          </div>
+        )}
       </div>
     </div>
   )
