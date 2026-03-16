@@ -2807,7 +2807,7 @@ export function AdminPanel() {
                   <div className="rounded-lg border overflow-x-auto max-h-[min(55vh,520px)]" dir={dir}>
                   <Table className="w-full table-fixed text-sm">
                     <colgroup>
-                      <col style={{width:"36px",minWidth:"36px",maxWidth:"36px"}}/>
+                      <col style={{width:"40px",minWidth:"40px",maxWidth:"40px"}}/>
                       {visibleColumnOrder.map((k) => (
                         <col key={k} style={{
                           width: k==="name"?"160px":k==="price"?"84px":k==="cheapest"?"124px":k==="sku"?"110px":k==="status"?"80px":k==="source"?"76px":k==="supplier"?"110px":k==="minStock"?"70px":k==="stock"?"70px":k==="waste"?"70px":k==="unit"?"72px":"88px",
@@ -2818,7 +2818,7 @@ export function AdminPanel() {
                     </colgroup>
                     <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
                       <TableRow className="border-b">
-                        <TableHead className="p-0" style={{width:36,minWidth:36,maxWidth:36}}><div className="flex justify-center items-center" style={{height:"100%",minHeight:36}}><input type="checkbox" className="cursor-pointer" checked={filteredAndSortedIngredients.length>0&&filteredAndSortedIngredients.every(i=>selectedIngIds.has(i.id))} onChange={e=>{if(e.target.checked)setSelectedIngIds(new Set(filteredAndSortedIngredients.map(i=>i.id)));else setSelectedIngIds(new Set())}}/></div></TableHead>
+                        <TableHead style={{width:"40px",minWidth:"40px",maxWidth:"40px",padding:0}}><div style={{display:"flex",justifyContent:"center",alignItems:"center",height:"100%",minHeight:"36px"}}><input type="checkbox" style={{cursor:"pointer"}} checked={filteredAndSortedIngredients.length>0&&filteredAndSortedIngredients.every(i=>selectedIngIds.has(i.id))} onChange={e=>{if(e.target.checked)setSelectedIngIds(new Set(filteredAndSortedIngredients.map(i=>i.id)));else setSelectedIngIds(new Set())}}/></div></TableHead>
                         {visibleColumnOrder.map((key, colIndex) => {
                           if (key === "cheapest") {
                             return (
@@ -2908,7 +2908,7 @@ export function AdminPanel() {
                         }
                         return (
                         <TableRow key={`${ing.source}-${ing.id}`} className={selectedIngIds.has(ing.id)?"bg-primary/5":""}>
-                          <TableCell className="p-0" style={{width:36,minWidth:36,maxWidth:36}} onClick={e=>e.stopPropagation()}><div className="flex justify-center items-center" style={{height:"100%",minHeight:36}}><input type="checkbox" className="cursor-pointer" checked={selectedIngIds.has(ing.id)} onChange={e=>{setSelectedIngIds(prev=>{const n=new Set(prev);e.target.checked?n.add(ing.id):n.delete(ing.id);return n})}}/></div></TableCell>
+                          <TableCell style={{width:"40px",minWidth:"40px",maxWidth:"40px",padding:0}} onClick={e=>e.stopPropagation()}><div style={{display:"flex",justifyContent:"center",alignItems:"center",height:"100%",minHeight:"36px"}}><input type="checkbox" style={{cursor:"pointer"}} checked={selectedIngIds.has(ing.id)} onChange={e=>{setSelectedIngIds(prev=>{const n=new Set(prev);e.target.checked?n.add(ing.id):n.delete(ing.id);return n})}}/></div></TableCell>
                           {visibleColumnOrder.map((k) => cellByKey[k] ? <React.Fragment key={k}>{cellByKey[k]}</React.Fragment> : null)}
                           <TableCell className={`${textAlign} ${densityCellClass}`}>
                             <div className={`flex gap-1 ${justify}`}>
