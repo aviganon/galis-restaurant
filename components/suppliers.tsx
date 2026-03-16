@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
 import { collection, getDocs, doc, getDoc, setDoc, writeBatch, deleteDoc, addDoc } from "firebase/firestore"
 import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplier-ingredients"
 import {
@@ -12,7 +12,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
-import { db } from "@/lib/firebase"
+import { db, storage } from "@/lib/firebase"
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage"
 import { useApp } from "@/contexts/app-context"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -69,6 +70,7 @@ interface SupplierInfo {
   products: number
   totalValue: number
   source: "assigned" | "restaurant"
+  ingredientsForChips?: { stock: number; minStock: number }[]
 }
 
 const isOwnerRole = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner"
@@ -90,6 +92,16 @@ export default function Suppliers() {
   const [supplierDetailItems, setSupplierDetailItems] = useState<{ name: string; price: number; unit: string; waste: number; stock: number; minStock: number; sku: string }[]>([])
   const [supplierDetailLoading, setSupplierDetailLoading] = useState(false)
   const [stockChipFilter, setStockChipFilter] = useState<"all"|"ok"|"low"|"zero">("all")
+  const [editSupplierOpen, setEditSupplierOpen] = useState(false)
+  const [editPhone, setEditPhone] = useState("")
+  const [editEmail, setEditEmail] = useState("")
+  const [editContact, setEditContact] = useState("")
+  const [editAddress, setEditAddress] = useState("")
+  const [editImageFile, setEditImageFile] = useState<File|null>(null)
+  const [editImageUrl, setEditImageUrl] = useState<string|null>(null)
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [uploadingImg, setUploadingImg] = useState(false)
+  const editImgRef = useRef<HTMLInputElement>(null)
   const [nsmName, setNsmName] = useState("")
   const [nsmItems, setNsmItems] = useState<{ name: string; price: number; unit: string; waste: number; stock: number; minStock: number; sku: string }[]>([])
   const [nsmItemName, setNsmItemName] = useState("")
@@ -442,6 +454,7 @@ export default function Suppliers() {
           contact: supData.contact ?? undefined,
           address: supData.address ?? undefined,
         })
+        setEditImageUrl(supData.imageUrl ?? null)
       }
       const items: { name: string; price: number; unit: string; waste: number; stock: number; minStock: number; sku: string }[] = []
       const addIng = (d: { id: string; data: () => Record<string, unknown> }) => {
@@ -640,49 +653,88 @@ export default function Suppliers() {
                 )}
                 onClick={() => { if(supplier.name !== "ללא ספק") { setSelectedSupplierDetail(selectedSupplierDetail === supplier.name ? null : supplier.name); setStockChipFilter("all") } }}
               >
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <Truck className="w-5 h-5 text-primary" />
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                    <Truck className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold truncate">{supplier.name === "ללא ספק" ? t("pages.suppliers.noSupplier") : supplier.name}</p>
+                    <p className="text-xs text-muted-foreground">{supplier.products} {t("pages.suppliers.products")}</p>
+                  </div>
+                  <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 shrink-0 text-xs">₪{supplier.totalValue.toLocaleString()}</Badge>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold truncate">{supplier.name === "ללא ספק" ? t("pages.suppliers.noSupplier") : supplier.name}</p>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Package className="w-3 h-3" />
-                    {supplier.products} {t("pages.suppliers.products")}
-                    {supplier.source === "assigned" && (
-                      <Badge variant="outline" className="mr-1 text-xs font-normal">שויך</Badge>
-                    )}
-                    {supplier.source === "restaurant" && supplier.name !== "ללא ספק" && (
-                      <Badge variant="secondary" className="mr-1 text-xs font-normal">של המסעדה</Badge>
-                    )}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Badge variant="secondary" className="bg-emerald-50 text-emerald-700">
-                    ₪{supplier.totalValue.toLocaleString()}
-                  </Badge>
-                  <span className="text-muted-foreground">›</span>
-                </div>
+                {supplier.name !== "ללא ספק" && (supplier.ingredientsForChips||[]).length > 0 && (()=>{
+                  const items = supplier.ingredientsForChips||[]
+                  const ok = items.filter(i=>i.stock>0&&(i.minStock===0||i.stock>=i.minStock)).length
+                  const low = items.filter(i=>i.stock>0&&i.minStock>0&&i.stock<i.minStock).length
+                  const zero = items.filter(i=>i.stock===0).length
+                  return (
+                    <div className="flex gap-1.5 flex-wrap">
+                      {ok>0&&<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-700">✓ {ok} במלאי</span>}
+                      {low>0&&<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">⚠ {low} נמוך</span>}
+                      {zero>0&&<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700">✕ {zero} אזל</span>}
+                    </div>
+                  )
+                })()}
               </CardContent>
             </Card>
           ))}
           </div>
           {selectedSupplierDetail && selectedSupplierDetail !== "ללא ספק" && (
             <div className="space-y-4 p-5 rounded-xl border bg-muted/30">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <h3 className="text-lg font-semibold">{supplierDetailName || selectedSupplierDetail}</h3>
-                {isOwner && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => setDeleteSupplierDialogOpen(true)}
-                  >
-                    <Trash2 className="w-4 h-4 ml-1" />
-                    {t("pages.suppliers.deleteSupplier")}
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                <div className="flex items-center gap-3">
+                  {editImageUrl
+                    ? <img src={editImageUrl} className="w-10 h-10 rounded-xl object-cover shrink-0" alt=""/>
+                    : <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0"><Truck className="w-5 h-5 text-primary"/></div>
+                  }
+                  <h3 className="text-lg font-semibold">{supplierDetailName || selectedSupplierDetail}</h3>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <Button variant="outline" size="sm" onClick={()=>{ setEditPhone(supplierDetailInfo?.phone||""); setEditEmail(supplierDetailInfo?.email||""); setEditContact(supplierDetailInfo?.contact||""); setEditAddress(supplierDetailInfo?.address||""); setEditImageFile(null); setEditSupplierOpen(true) }}>
+                    <Edit2 className="w-4 h-4 ml-1"/>ערוך
                   </Button>
-                )}
+                  {isOwner && (
+                    <Button variant="outline" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setDeleteSupplierDialogOpen(true)}>
+                      <Trash2 className="w-4 h-4 ml-1"/>{t("pages.suppliers.deleteSupplier")}
+                    </Button>
+                  )}
+                </div>
               </div>
+              {editSupplierOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={e=>{if(e.target===e.currentTarget)setEditSupplierOpen(false)}}>
+                  <div className="bg-background rounded-xl shadow-2xl p-6 w-full max-w-md space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-lg">עריכת ספק — {selectedSupplierDetail}</h3>
+                      <button onClick={()=>setEditSupplierOpen(false)} className="text-muted-foreground hover:text-foreground"><X className="w-5 h-5"/></button>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="relative w-16 h-16 rounded-xl overflow-hidden border bg-muted cursor-pointer hover:opacity-80" onClick={()=>editImgRef.current?.click()}>
+                        {(editImageFile||editImageUrl)
+                          ? <img src={editImageFile?URL.createObjectURL(editImageFile):editImageUrl!} className="w-full h-full object-cover" alt=""/>
+                          : <div className="w-full h-full flex items-center justify-center"><Truck className="w-6 h-6 text-muted-foreground"/></div>
+                        }
+                        {uploadingImg && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><Loader2 className="w-4 h-4 animate-spin text-white"/></div>}
+                      </div>
+                      <div><button onClick={()=>editImgRef.current?.click()} className="text-sm text-primary hover:underline block">החלף תמונה</button><p className="text-xs text-muted-foreground">PNG, JPG עד 5MB</p></div>
+                      <input ref={editImgRef} type="file" accept="image/*" className="hidden" onChange={e=>{const f=e.currentTarget.files?.[0];if(f&&f.size<=5242880){setEditImageFile(f)}else if(f){toast.error("קובץ גדול מדי")}e.currentTarget.value=""}}/>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><label className="text-xs text-muted-foreground block mb-1">טלפון</label><input dir="ltr" value={editPhone} onChange={e=>setEditPhone(e.target.value)} placeholder="050-0000000" className="w-full h-9 rounded-md border px-3 text-sm bg-background"/></div>
+                      <div><label className="text-xs text-muted-foreground block mb-1">אימייל</label><input dir="ltr" value={editEmail} onChange={e=>setEditEmail(e.target.value)} placeholder="email@example.com" className="w-full h-9 rounded-md border px-3 text-sm bg-background"/></div>
+                      <div><label className="text-xs text-muted-foreground block mb-1">איש קשר</label><input value={editContact} onChange={e=>setEditContact(e.target.value)} placeholder="שם איש קשר" className="w-full h-9 rounded-md border px-3 text-sm bg-background"/></div>
+                      <div><label className="text-xs text-muted-foreground block mb-1">כתובת</label><input value={editAddress} onChange={e=>setEditAddress(e.target.value)} placeholder="רחוב, עיר" className="w-full h-9 rounded-md border px-3 text-sm bg-background"/></div>
+                    </div>
+                    <div className="flex gap-2 justify-end pt-1">
+                      <button onClick={()=>setEditSupplierOpen(false)} className="px-4 py-2 rounded-md border text-sm hover:bg-muted">ביטול</button>
+                      <button onClick={handleSaveEdit} disabled={savingEdit} className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm flex items-center gap-1.5 hover:opacity-90 disabled:opacity-50">
+                        {savingEdit&&<Loader2 className="w-3 h-3 animate-spin"/>}שמור
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
               {supplierDetailLoading ? (
                 <div className="flex justify-center py-12">
                   <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
