@@ -73,7 +73,6 @@ function formatTime(): string {
 
 const getUploadTypes = (t: (k: string) => string) => [
   { id: "prices", label: t("pages.upload.pricesLabel"), icon: FileSpreadsheet, description: t("pages.upload.pricesDesc") },
-  { id: "recipe", label: t("pages.upload.recipeLabel"), icon: Camera, description: t("pages.upload.recipeDesc") },
   { id: "sales", label: t("pages.upload.salesLabel"), icon: FileSpreadsheet, description: t("pages.upload.salesDesc") },
   { id: "inventory", label: t("pages.upload.inventoryLabel"), icon: FileSpreadsheet, description: t("pages.upload.inventoryDesc") },
 ]
