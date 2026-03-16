@@ -1020,7 +1020,7 @@ export default function ProductTree() {
       </Card>
 
       {/* Recipe & Cost Layout */}
-      <div className={cn("grid gap-4", canSeeCosts ? "lg:grid-cols-[300px,1fr]" : "")}>
+      <div className="grid gap-4" style={canSeeCosts ? {gridTemplateColumns:"300px 1fr"} : {}}>
         {/* Cost Panel — לבעלים בלבד */}
         {canSeeCosts && (
         <Card className={cn(
