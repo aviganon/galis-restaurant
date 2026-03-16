@@ -264,7 +264,7 @@ function WebPriceCell({
             variant="default"
             size="sm"
             className="flex-1"
-            onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(ingredientName)}&tbm=shop`, "_blank")}
+            onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(ingredientName + " " + data.store + " מחיר קנייה")}`, "_blank")}
           >
             <Globe className="w-4 h-4 ml-2" />
             {t("pages.adminPanel.buyOnline")} →
@@ -1010,7 +1010,7 @@ export function AdminPanel() {
       setEditAdminIngredientOpen(false)
       setEditAdminIngredient(null)
       setRefreshAdminIngredientsKey((k) => k + 1)
-      setAdminIngredients(prev => prev.map(ing => ing.id === editAdminIngredient!.id ? { ...ing, price: parseFloat(editAdminIngPrice)||ing.price, unit: editAdminIngUnit||ing.unit, waste: parseFloat(editAdminIngWaste)||ing.waste, stock: parseFloat(editAdminIngStock)||ing.stock, minStock: parseFloat(editAdminIngMinStock)||ing.minStock, sku: editAdminIngSku||ing.sku, supplier: editAdminIngSupplier||ing.supplier } : ing))
+      setIngredientsList(prev => prev.map(ing => ing.id === editAdminIngredient!.id ? { ...ing, price: parseFloat(editAdminIngPrice)||ing.price, unit: editAdminIngUnit||ing.unit, waste: parseFloat(editAdminIngWaste)||ing.waste, stock: parseFloat(editAdminIngStock)||ing.stock, minStock: parseFloat(editAdminIngMinStock)||ing.minStock, sku: editAdminIngSku||ing.sku, supplier: editAdminIngSupplier||ing.supplier } : ing))
     } catch (e) {
       toast.error((e as Error)?.message || t("pages.adminPanel.error"))
     } finally {
@@ -1927,7 +1927,7 @@ export function AdminPanel() {
       const batch = writeBatch(db)
       selectedIngIds.forEach(id => batch.set(doc(db,"ingredients",id),{supplier:supTrim,lastUpdated:now},{merge:true}))
       await batch.commit()
-      setAdminIngredients(prev=>prev.map(ing=>selectedIngIds.has(ing.id)?{...ing,supplier:supTrim}:ing))
+      setIngredientsList(prev=>prev.map(ing=>selectedIngIds.has(ing.id)?{...ing,supplier:supTrim}:ing))
       toast.success(`שויכו ${selectedIngIds.size} רכיבים לספק "${supTrim}"`)
       setSelectedIngIds(new Set()); setBulkAssignSupplier("")
     } catch(e){toast.error((e as Error).message||"שגיאה")} finally{setSavingBulkAssign(false)}
@@ -1943,7 +1943,7 @@ export function AdminPanel() {
       const batch = writeBatch(db)
       selectedIngIds.forEach(id => batch.delete(doc(db,"ingredients",id)))
       await batch.commit()
-      setAdminIngredients(prev => prev.filter(ing => !selectedIngIds.has(ing.id)))
+      setIngredientsList(prev => prev.filter(ing => !selectedIngIds.has(ing.id)))
       toast.success(`נמחקו ${selectedIngIds.size} רכיבים`)
       setSelectedIngIds(new Set())
     } catch(e){toast.error((e as Error).message||"שגיאה")} finally{setSavingBulkAssign(false)}
