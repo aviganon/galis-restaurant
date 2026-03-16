@@ -1944,6 +1944,7 @@ export function AdminPanel() {
       setAdminIngredients(prev=>prev.map(ing=>selectedIngIds.has(ing.id)?{...ing,supplier:supTrim}:ing))
       toast.success(`שויכו ${selectedIngIds.size} רכיבים לספק "${supTrim}"`)
       setSelectedIngIds(new Set()); setBulkAssignSupplier("")
+      loadSystemOwnerData()
     } catch(e){toast.error((e as Error).message||"שגיאה")} finally{setSavingBulkAssign(false)}
   }
 
@@ -1960,6 +1961,7 @@ export function AdminPanel() {
       setAdminIngredients(prev => prev.filter(ing => !selectedIngIds.has(ing.id)))
       toast.success(`נמחקו ${selectedIngIds.size} רכיבים`)
       setSelectedIngIds(new Set())
+      loadSystemOwnerData()
     } catch(e){toast.error((e as Error).message||"שגיאה")} finally{setSavingBulkAssign(false)}
   }
 
