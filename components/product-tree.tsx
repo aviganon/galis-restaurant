@@ -23,7 +23,8 @@ import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { doc, collection, getDocs, getDoc, setDoc, deleteDoc, writeBatch } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { db, storage } from "@/lib/firebase"
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage"
 import { useApp } from "@/contexts/app-context"
 import { FilePreviewModal } from "@/components/file-preview-modal"
 import { suggestDishFromIngredients, type ExtractedDishItem } from "@/lib/ai-extract"
@@ -49,6 +50,7 @@ interface Dish {
   portions?: number
   yieldQty?: number
   yieldUnit?: string
+  imageUrl?: string
 }
 
 interface SupplierPrice {
@@ -84,6 +86,14 @@ const CATEGORY_TO_KEY: Record<string, string> = {
 }
 export default function ProductTree() {
   const [activeTab, setActiveTab] = useState<"ingredients"|"suppliers"|null>(null)
+  const [dishImages, setDishImages] = useState<Record<string,string>>({})
+  const [editDishDialogOpen, setEditDishDialogOpen] = useState(false)
+  const [editDishTarget, setEditDishTarget] = useState<string|null>(null)
+  const [editDishName, setEditDishName] = useState("")
+  const [editDishCategory, setEditDishCategory] = useState("")
+  const [editDishImgFile, setEditDishImgFile] = useState<File|null>(null)
+  const [savingDishEdit, setSavingDishEdit] = useState(false)
+  const editDishImgInputRef = useRef<HTMLInputElement>(null)
   const t = useTranslations()
   const { dir } = useLanguage()
   const isRtl = dir === "rtl"
@@ -161,6 +171,7 @@ export default function ProductTree() {
             isCompound: !!data.isCompound,
             yieldQty: typeof data.yieldQty === "number" ? data.yieldQty : 1,
             yieldUnit: (data.yieldUnit as string) || "מנה",
+            imageUrl: (data.imageUrl as string) || undefined,
           }
         })
 
@@ -187,6 +198,9 @@ export default function ProductTree() {
         }
         restIngSnap.forEach((d) => mergePrice(d.id, d.data() as IngData))
 
+        const imgs: Record<string,string> = {}
+        Object.entries(newDishes).forEach(([n,d])=>{ if(d.imageUrl) imgs[n]=d.imageUrl })
+        setDishImages(imgs)
         setDishes(newDishes)
         setSelectedDish(prev => (prev && newDishes[prev] ? prev : Object.keys(newDishes)[0] || null))
         setSupplierPrices(newPrices)
@@ -605,6 +619,42 @@ export default function ProductTree() {
     navigator.clipboard.writeText(toCopy).then(() => toast.success(t("pages.productTree.copiedToClipboard")))
   }
 
+  const openDishEditDialog = (name) => {
+    const dish = dishes[name]; if (!dish) return
+    setEditDishTarget(name); setEditDishName(name)
+    setEditDishCategory(dish.category || "עיקריות")
+    setEditDishImgFile(null); setEditDishDialogOpen(true)
+  }
+  const handleSaveDishEdit = async () => {
+    if (!currentRestaurantId || !editDishTarget) return
+    setSavingDishEdit(true)
+    try {
+      const dish = dishes[editDishTarget]; if (!dish) return
+      let imgUrl = dishImages[editDishTarget] || undefined
+      if (editDishImgFile) {
+        const safe = editDishTarget.replace(/[^a-zA-Z0-9]/g,'_')
+        const sRef = storageRef(storage, 'restaurants/'+currentRestaurantId+'/dishes/'+safe+'/cover.jpg')
+        await new Promise((res,rej) => {
+          const task = uploadBytesResumable(sRef, editDishImgFile)
+          task.on('state_changed',()=>{},rej,async()=>{ imgUrl=await getDownloadURL(sRef); res() })
+        })
+        setDishImages(prev=>({...prev,[editDishTarget]:imgUrl}))
+      }
+      const newName = (editDishName||'').trim() || editDishTarget
+      const updatedDish = {...dish, name:newName, category:editDishCategory, ...(imgUrl?{imageUrl:imgUrl}:{})}
+      if (newName !== editDishTarget) {
+        await setDoc(doc(db,'restaurants',currentRestaurantId,'recipes',newName), updatedDish, {merge:true})
+        await deleteDoc(doc(db,'restaurants',currentRestaurantId,'recipes',editDishTarget))
+        setDishes(prev=>{ const n={...prev}; delete n[editDishTarget]; n[newName]=updatedDish; return n })
+        if(selectedDish===editDishTarget) setSelectedDish(newName)
+      } else {
+        await setDoc(doc(db,'restaurants',currentRestaurantId,'recipes',editDishTarget), updatedDish, {merge:true})
+        setDishes(prev=>({...prev,[editDishTarget]:updatedDish}))
+      }
+      toast.success('המנה עודכנה'); setEditDishDialogOpen(false)
+    } catch(e){ toast.error(e.message||'שגיאה') }
+    finally{ setSavingDishEdit(false) }
+  }
   return (
     <div className="flex flex-col bg-background">
       {loading && (
@@ -642,6 +692,58 @@ export default function ProductTree() {
           e.currentTarget.value="";
         }}
       />
+
+      <input ref={editDishImgInputRef} type="file" accept="image/*" className="hidden"
+        onChange={e=>{const f=e.currentTarget.files?.[0];if(f)setEditDishImgFile(f);e.currentTarget.value=""}}/>
+      {editDishDialogOpen && editDishTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={e=>{if(e.target===e.currentTarget)setEditDishDialogOpen(false)}}>
+          <div className="bg-background rounded-xl shadow-2xl p-6 w-full max-w-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-lg">עריכת מנה</h3>
+              <button onClick={()=>setEditDishDialogOpen(false)} className="text-muted-foreground hover:text-foreground"><X className="w-5 h-5"/></button>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-xl overflow-hidden border bg-muted cursor-pointer hover:opacity-80 shrink-0 flex items-center justify-center"
+                onClick={()=>editDishImgInputRef.current?.click()}>
+                {(editDishImgFile||dishImages[editDishTarget])
+                  ?<img src={editDishImgFile?URL.createObjectURL(editDishImgFile):dishImages[editDishTarget]} className="w-full h-full object-cover" alt=""/>
+                  :<ImageIcon className="w-6 h-6 text-muted-foreground"/>}
+              </div>
+              <div>
+                <button onClick={()=>editDishImgInputRef.current?.click()} className="text-sm text-primary hover:underline block">
+                  {dishImages[editDishTarget]||editDishImgFile?"החלף תמונה":"הוסף תמונה"}</button>
+                <p className="text-xs text-muted-foreground">PNG, JPG</p>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">שם המנה</label>
+              <input value={editDishName} onChange={e=>setEditDishName(e.target.value)}
+                className="w-full h-9 rounded-md border px-3 text-sm bg-background" placeholder="שם המנה"/>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">קטגוריה</label>
+              <select value={editDishCategory} onChange={e=>setEditDishCategory(e.target.value)}
+                className="w-full h-9 rounded-md border px-3 text-sm bg-background">
+                {CATEGORIES.map(cat=><option key={cat} value={cat}>{cat}</option>)}
+              </select>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button onClick={()=>{if(window.confirm('למחוק את "'+editDishTarget+'"?')){deleteDish(editDishTarget);setEditDishDialogOpen(false)}}}
+                className="px-3 py-2 rounded-md border border-red-200 text-red-600 text-sm hover:bg-red-50 flex items-center gap-1">
+                <Trash2 className="w-3.5 h-3.5"/>מחק</button>
+              <button onClick={()=>{duplicateDish(editDishTarget);setEditDishDialogOpen(false)}}
+                className="px-3 py-2 rounded-md border text-sm hover:bg-muted flex items-center gap-1">
+                <Copy className="w-3.5 h-3.5"/>שכפל</button>
+              <div className="flex-1"/>
+              <button onClick={()=>setEditDishDialogOpen(false)} className="px-3 py-2 rounded-md border text-sm hover:bg-muted">ביטול</button>
+              <button onClick={handleSaveDishEdit} disabled={savingDishEdit}
+                className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm flex items-center gap-1.5 hover:opacity-90 disabled:opacity-50">
+                {savingDishEdit&&<Loader2 className="w-3 h-3 animate-spin"/>}שמור</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Scrollable content */}
       <div className="px-4 pb-2">
       {/* Header Alert - compact */}
@@ -954,38 +1056,12 @@ export default function ProductTree() {
                         : "bg-card border border-border hover:border-primary/50 hover:shadow-md"
                     )}
                   >
-                    {/* Edit button */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button 
-                          onClick={e => e.stopPropagation()}
-                          className={cn(
-                            "absolute top-1.5 left-1.5 p-1 rounded-md transition-colors",
-                            isActive ? "hover:bg-white/20" : "hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                          )}
-                        >
-                          <MoreVertical className="w-3.5 h-3.5" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start">
-                        <DropdownMenuItem onClick={e=>{ e.stopPropagation(); setPendingImgDish(name); setTimeout(()=>dishImgInputRef.current?.click(),50) }}>
-                          <ImageIcon className="w-4 h-4 ml-2" />
-                          שנה תמונה
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => duplicateDish(name)}>
-                          <Copy className="w-4 h-4 ml-2" />
-                          {t("pages.productTree.duplicateDish")}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          onClick={() => deleteDish(name)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4 ml-2" />
-                          {t("pages.productTree.deleteDish")}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {dishImages[name]&&<div className="absolute inset-0 rounded-xl" style={{background:'linear-gradient(to top,rgba(0,0,0,0.6) 0%,transparent 60%)'}}/>}
+                    <button onClick={e=>{e.stopPropagation();openDishEditDialog(name)}}
+                      className={cn("absolute top-1.5 left-1.5 p-1 rounded-md z-10 transition-colors",
+                        dishImages[name]||isActive?"text-white/80 hover:bg-white/20":"text-muted-foreground hover:bg-muted")}>
+                      <MoreVertical className="w-3.5 h-3.5"/>
+                    </button>
                     
                     {/* Category */}
                     {dish.category && (
