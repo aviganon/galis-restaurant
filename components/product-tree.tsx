@@ -1023,7 +1023,7 @@ export default function ProductTree() {
       </Card>
 
       {/* Recipe & Cost Layout */}
-      <div className="grid gap-4" style={canSeeCosts ? {gridTemplateColumns: isRtl ? "3fr 220px" : "220px 3fr"} : {}}>
+      <div className="grid gap-4" style={canSeeCosts ? {gridTemplateColumns: isRtl ? "3fr 300px" : "300px 3fr"} : {}}>
         {/* Cost Panel — לבעלים בלבד */}
         {canSeeCosts && (
         <Card style={{order: isRtl ? 2 : 1}} className={cn(
