@@ -1904,6 +1904,25 @@ export function AdminPanel() {
     }
   }
 
+  const loadRestChipData = async (restId: string, chip: "dishes"|"fc"|"suppliers"|"orders") => {
+    if (activeRestChip === chip) { setActiveRestChip(null); return }
+    setActiveRestChip(chip)
+    if (chip === "dishes" || chip === "fc") {
+      setRestChipLoading(true); setRestChipDishes([])
+      try {
+        const snap = await getDocs(collection(db, "restaurants", restId, "recipes"))
+        setRestChipDishes(snap.docs.filter(d=>!d.data().isCompound).map(d=>{const dt=d.data();return{name:d.id,price:typeof dt.sellingPrice==="number"?dt.sellingPrice:0,fc:typeof dt.foodCostPct==="number"?Math.round(dt.foodCostPct*10)/10:0}}).sort((a,b)=>b.price-a.price))
+      } catch{toast.error("שגיאה")} finally{setRestChipLoading(false)}
+    }
+    if (chip === "orders") {
+      setRestChipLoading(true); setRestChipOrders([])
+      try {
+        const snap = await getDocs(collection(db, "restaurants", restId, "purchaseOrders"))
+        setRestChipOrders(snap.docs.map(d=>{const dt=d.data();return{id:d.id,supplier:(dt.supplierName||dt.supplier||"לא ידוע") as string,date:(dt.createdAt||dt.date||"") as string,total:typeof dt.totalAmount==="number"?dt.totalAmount:typeof dt.total==="number"?dt.total:0,status:(dt.status||"") as string}}).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,15))
+      } catch{toast.error("שגיאה")} finally{setRestChipLoading(false)}
+    }
+  }
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl space-y-6">
       <Card>
