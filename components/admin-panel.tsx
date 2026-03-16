@@ -56,7 +56,8 @@ import { FilePreviewModal } from "@/components/file-preview-modal"
 import type { ExtractedSupplierItem } from "@/lib/ai-extract"
 import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplier-ingredients"
 import { firestoreConfig } from "@/lib/firestore-config"
-import { db, auth } from "@/lib/firebase"
+import { db, auth, storage } from "@/lib/firebase"
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage"
 import type { UserPermissions } from "@/contexts/app-context"
 
 const VAT_RATE = 1.17
@@ -414,6 +415,10 @@ export function AdminPanel() {
   const INVOICE_ACCEPT = ".xlsx,.xls,.csv,.pdf,.rtf,image/*"
   const [selectedSupplierDetail, setSelectedSupplierDetail] = useState<string | null>(null)
   const [selectedRestDetail, setSelectedRestDetail] = useState<string | null>(null)
+  const [editRestImageFile, setEditRestImageFile] = useState<File|null>(null)
+  const [editRestImageUrl, setEditRestImageUrl] = useState<string|null>(null)
+  const [uploadingRestImage, setUploadingRestImage] = useState(false)
+  const restImageInputRef = useRef<HTMLInputElement>(null)
   const [activeRestChip, setActiveRestChip] = useState<"dishes"|"fc"|"suppliers"|"orders"|null>(null)
   const [restChipLoading, setRestChipLoading] = useState(false)
   const [restChipDishes, setRestChipDishes] = useState<{name:string;price:number;fc:number}[]>([])
@@ -2175,8 +2180,14 @@ export function AdminPanel() {
                         className={cn("relative rounded-xl overflow-hidden cursor-pointer border-2 transition-all duration-200 shadow-sm hover:shadow-lg hover:-translate-y-0.5",
                           selectedRestDetail===rest.id?"border-primary shadow-lg -translate-y-0.5":"border-transparent")}
                         style={{height:140}}
-                        onClick={()=>{setSelectedRestDetail(selectedRestDetail===rest.id?null:rest.id);setActiveRestChip(null)}}>
-                        <img src={getRestaurantImageUrl(rest.name)} alt={rest.name}
+                        onClick={()=>{
+    const newId=selectedRestDetail===rest.id?null:rest.id;
+    setSelectedRestDetail(newId);
+    setActiveRestChip(null);
+    setEditRestImageFile(null);
+    setEditRestImageUrl(newId?(rest as any).imageUrl||null:null);
+  }}>
+                        <img src={(rest as any).imageUrl||getRestaurantImageUrl(rest.name)} alt={rest.name}
                           className="absolute inset-0 w-full h-full object-cover"
                           onError={e=>{(e.target as HTMLImageElement).style.display="none";(e.target as HTMLImageElement).parentElement!.style.background=colors[_ri%5]}}/>
                         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-black/10"/>
@@ -2209,7 +2220,43 @@ export function AdminPanel() {
                   return (
                     <motion.div initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} className="space-y-4 p-5 rounded-xl border bg-muted/30 mb-4">
                       <div className="flex flex-wrap items-center justify-between gap-4">
-                        <h3 className="text-lg font-semibold">{selectedRest.emoji&&<span className="ml-2">{selectedRest.emoji}</span>}{selectedRest.name}</h3>
+                        <div className="flex items-center gap-3">
+                          {/* Restaurant image upload */}
+                          <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-muted shrink-0 cursor-pointer border hover:opacity-80 transition-opacity"
+                            onClick={()=>restImageInputRef.current?.click()}>
+                            {(editRestImageFile||editRestImageUrl) ? (
+                              <img src={editRestImageFile?URL.createObjectURL(editRestImageFile):editRestImageUrl!} className="w-full h-full object-cover" alt=""/>
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xl">
+                                {selectedRest.emoji||"🍽️"}
+                              </div>
+                            )}
+                            {uploadingRestImage&&<div className="absolute inset-0 bg-black/50 flex items-center justify-center"><Loader2 className="w-4 h-4 animate-spin text-white"/></div>}
+                          </div>
+                          <h3 className="text-lg font-semibold">{selectedRest.emoji&&<span className="ml-2">{selectedRest.emoji}</span>}{selectedRest.name}</h3>
+                          <input ref={restImageInputRef} type="file" accept="image/*" className="hidden"
+                            onChange={async e=>{
+                              const f=e.currentTarget.files?.[0];
+                              if(!f)return;
+                              if(f.size>5*1024*1024){toast.error("קובץ גדול מדי — מקסימום 5MB");return;}
+                              setEditRestImageFile(f);
+                              setUploadingRestImage(true);
+                              try{
+                                const restId=selectedRest.id;
+                                const sRef=storageRef(storage,'restaurants/'+restId+'/cover.jpg');
+                                await new Promise<void>((res,rej)=>{
+                                  const task=uploadBytesResumable(sRef,f);
+                                  task.on("state_changed",()=>{},rej,async()=>{
+                                    const url=await getDownloadURL(sRef);
+                                    await setDoc(doc(db,"restaurants",restId),{imageUrl:url,lastUpdated:new Date().toISOString()},{merge:true});
+                                    setEditRestImageUrl(url);
+                                    toast.success("תמונה עודכנה");
+                                    res();
+                                  });
+                                });
+                              }catch(e){toast.error("שגיאה בהעלאה")}finally{setUploadingRestImage(false);e.currentTarget.value="";}
+                            }}/>
+                        </div>
                         <div className="flex gap-2 flex-wrap">
                           {onImpersonate&&(
                             <Button size="sm" variant="outline" onClick={()=>{onImpersonate({id:selectedRest.id,name:selectedRest.name,emoji:selectedRest.emoji});toast.success(t("pages.adminPanel.impersonatingRest")+": "+selectedRest.name)}}>
