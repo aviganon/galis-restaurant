@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
   Search, Plus, FileSpreadsheet, Copy, Camera, Trash2, ChevronDown, 
@@ -11,6 +11,9 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Ingredients } from "@/components/ingredients"
+import SuppliersComp from "@/components/suppliers"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -80,6 +83,7 @@ const CATEGORY_TO_KEY: Record<string, string> = {
   "אחר": "other",
 }
 export default function ProductTree() {
+  const [activeTab, setActiveTab] = useState<"ingredients"|"suppliers"|null>(null)
   const t = useTranslations()
   const { currentRestaurantId, userRole, userPermissions, isSystemOwner, refreshIngredientsKey, refreshIngredients } = useApp()
   const canSeeCosts = userRole === "owner" || userRole === "admin" || userRole === "manager" || !!userPermissions?.canSeeCosts
@@ -599,7 +603,7 @@ export default function ProductTree() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-6.5rem)] md:h-[calc(100dvh-5rem)] bg-background overflow-hidden">
+    <div className="flex flex-col bg-background">
       {loading && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-3">
@@ -619,7 +623,7 @@ export default function ProductTree() {
         onConfirmDishes={handleConfirmDishes}
       />
       {/* Scrollable content */}
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 pb-4">
+      <div className="px-4 pb-2">
       {/* Header Alert - compact */}
       <motion.div 
         initial={{ opacity: 0, y: -10 }}
@@ -1557,6 +1561,24 @@ export default function ProductTree() {
         </Card>
         )}
       </div>
+      </div>
+
+      {/* ── Section tabs: רכיבים / ספקים ── */}
+      <div className="px-4 pb-10 mt-4 border-t pt-4">
+        <div className="flex gap-3 mb-4">
+          <button
+            onClick={()=>setActiveTab(activeTab==="ingredients"?null:"ingredients")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border ${activeTab==="ingredients"?"bg-primary text-primary-foreground border-primary":"bg-muted/50 hover:bg-muted border-transparent"}`}>
+            🥬 רכיבים
+          </button>
+          <button
+            onClick={()=>setActiveTab(activeTab==="suppliers"?null:"suppliers")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border ${activeTab==="suppliers"?"bg-primary text-primary-foreground border-primary":"bg-muted/50 hover:bg-muted border-transparent"}`}>
+            🚚 ספקים
+          </button>
+        </div>
+        {activeTab==="ingredients" && <Ingredients />}
+        {activeTab==="suppliers" && <SuppliersComp />}
       </div>
     </div>
   )
