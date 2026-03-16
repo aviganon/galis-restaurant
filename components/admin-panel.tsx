@@ -2614,6 +2614,50 @@ export function AdminPanel() {
                             </Button>
                           </div>
                         </div>
+                        {/* KPI chips */}
+                        {(()=>{
+                          const ings=supplierToIngredients[s.name]||[]
+                          const totalCost=ings.reduce((sum,ing)=>sum+(typeof ing.price==="number"?ing.price:0),0)
+                          const assignedRests=(s.restaurantIds||[]).map(rid=>restsWithDetails.find(r=>r.id===rid)?.name||rid).filter(Boolean)
+                          const lastUpdated=ings.reduce((latest,ing)=>{const d=(ing as any).lastUpdated||"";return d>latest?d:latest},(s as any).lastUpdated||"")
+                          const lastStr=lastUpdated?new Date(lastUpdated).toLocaleDateString("he-IL"):"—"
+                          return (
+                            <div className="flex flex-wrap gap-3 pb-2">
+                              <div className="rounded-lg overflow-hidden shadow-sm" style={{minWidth:80}}>
+                                <div className="bg-gradient-to-br from-emerald-400 to-teal-500 px-3 py-1.5 flex items-center gap-1.5">
+                                  <Building2 className="w-3.5 h-3.5 text-white/80"/><span className="text-base font-bold text-white">{assignedRests.length}</span>
+                                </div>
+                                <div className="bg-muted/60 px-2 py-0.5"><p className="text-[10px] text-muted-foreground font-medium">מסעדות</p></div>
+                              </div>
+                              <div className="rounded-lg overflow-hidden shadow-sm" style={{minWidth:80}}>
+                                <div className="bg-gradient-to-br from-violet-400 to-purple-500 px-3 py-1.5 flex items-center gap-1.5">
+                                  <ShoppingCart className="w-3.5 h-3.5 text-white/80"/><span className="text-base font-bold text-white">{ings.length}</span>
+                                </div>
+                                <div className="bg-muted/60 px-2 py-0.5"><p className="text-[10px] text-muted-foreground font-medium">רכיבים</p></div>
+                              </div>
+                              <div className="rounded-lg overflow-hidden shadow-sm" style={{minWidth:90}}>
+                                <div className="bg-gradient-to-br from-amber-400 to-orange-500 px-3 py-1.5 flex items-center gap-1.5">
+                                  <TrendingUp className="w-3.5 h-3.5 text-white/80"/><span className="text-sm font-bold text-white">₪{totalCost.toLocaleString("he-IL",{maximumFractionDigits:0})}</span>
+                                </div>
+                                <div className="bg-muted/60 px-2 py-0.5"><p className="text-[10px] text-muted-foreground font-medium">עלות רכיבים</p></div>
+                              </div>
+                              <div className="rounded-lg overflow-hidden shadow-sm" style={{minWidth:90}}>
+                                <div className="bg-gradient-to-br from-slate-400 to-slate-500 px-3 py-1.5 flex items-center gap-1.5">
+                                  <RefreshCw className="w-3.5 h-3.5 text-white/80"/><span className="text-xs font-bold text-white">{lastStr}</span>
+                                </div>
+                                <div className="bg-muted/60 px-2 py-0.5"><p className="text-[10px] text-muted-foreground font-medium">עדכון אחרון</p></div>
+                              </div>
+                              {assignedRests.length>0&&(
+                                <div className="w-full flex flex-wrap gap-1.5">
+                                  {assignedRests.map(r=>(
+                                    <span key={r} className="text-xs bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 px-2 py-0.5 rounded-full">{r}</span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })()}
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                           <div>
                             <p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.phone")}</p>
@@ -2630,19 +2674,6 @@ export function AdminPanel() {
                           <div>
                             <p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.address")}</p>
                             <p className="font-medium">{s.address || "—"}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.assignedToRestaurantsLabel")}</p>
-                            <p className="font-medium">
-                              {(s.restaurantIds?.length ?? 0) === 0 ? (
-                                t("pages.adminPanel.notAssigned")
-                              ) : (
-                                (s.restaurantIds || [])
-                                  .map((rid) => restsWithDetails.find((r) => r.id === rid)?.name || rid)
-                                  .filter(Boolean)
-                                  .join(", ")
-                              )}
-                            </p>
                           </div>
                         </div>
                         {showSupplierInvUpload && (
