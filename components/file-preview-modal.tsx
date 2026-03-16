@@ -49,6 +49,7 @@ export function FilePreviewModal({
   currentRestaurantId,
 }: FilePreviewModalProps) {
   const [loading, setLoading] = useState(false)
+  const [extractKey, setExtractKey] = useState(0)
   const [items, setItems] = useState<ExtractedItem[]>([])
   const [supplierName, setSupplierName] = useState(initialSupplier)
   const [invoiceDate, setInvoiceDate] = useState<string | null>(null)
@@ -76,6 +77,10 @@ export function FilePreviewModal({
   }, [open, currentRestaurantId])
 
   useEffect(() => {
+    if (open) setExtractKey(k=>k+1)
+  }, [open])
+
+  useEffect(() => {
     if (!open || !file) return
     setItems([])
     setError(null)
@@ -85,6 +90,7 @@ export function FilePreviewModal({
     setSaveToGlobal(forceSaveToGlobal)
     setIsDeliveryNote(false)
     setWebPriceByName({})
+    if (extractKey === 0) return
     const ext = (file.name.split(".").pop()?.toLowerCase() ?? "").trim()
     const isPdf = ext === "pdf"
     const isImage = ["png", "jpg", "jpeg", "gif", "webp"].includes(ext)
@@ -122,7 +128,7 @@ export function FilePreviewModal({
         toast.error(e.message)
       })
       .finally(() => setLoading(false))
-  }, [open, file, type, initialSupplier, forceSaveToGlobal])
+  }, [open, file, type, initialSupplier, forceSaveToGlobal, extractKey])
 
   const updateItem = useCallback((idx: number, field: string, value: string | number) => {
     setItems((prev) => {
