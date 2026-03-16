@@ -725,7 +725,7 @@ export default function Suppliers() {
                         const ok = items.filter(i=>i.stock>0&&(i.minStock===0||i.stock>=i.minStock)).length
                         const low = items.filter(i=>i.stock>0&&i.minStock>0&&i.stock<i.minStock).length
                         const zero = items.filter(i=>i.stock===0).length
-                        return <><<span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/90 text-white">✓ {ok}</span>{low>0&&<span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/90 text-white">⚠ {low}</span>}{zero>0&&<span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-500/90 text-white">✕ {zero}</span>}</>
+                        return <><span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/90 text-white">{ok} ✓</span>{low>0&&<span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/90 text-white">⚠ {low}</span>}{zero>0&&<span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-500/90 text-white">✕ {zero}</span>}</>
                       })()}
                     </div>
                   </div>
