@@ -625,6 +625,23 @@ export default function ProductTree() {
         type="d"
         onConfirmDishes={handleConfirmDishes}
       />
+
+      {/* Camera input for dish recognition — must be at root level */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        id="camera-dish-file"
+        name="cameraDishFile"
+        accept="image/*"
+        className="hidden"
+        onChange={e=>{
+          const f=e.currentTarget.files?.[0];
+          if(!f)return;
+          setImportFile(f);
+          setFpmOpen(true);
+          e.currentTarget.value="";
+        }}
+      />
       {/* Scrollable content */}
       <div className="px-4 pb-2">
       {/* Header Alert - compact */}
@@ -822,22 +839,7 @@ export default function ProductTree() {
                       className="hidden"
                       onChange={handleImportFileSelect}
                     />
-                    <input
-                      ref={cameraInputRef}
-                      type="file"
-                      id="camera-dish-file"
-                      name="cameraDishFile"
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                      onChange={e=>{
-                        const f=e.currentTarget.files?.[0];
-                        if(!f)return;
-                        setImportFile(f);
-                        setFpmOpen(true);
-                        e.currentTarget.value="";
-                      }}
-                    />
+
                     <div
                       onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
                       onDragLeave={(e) => { e.preventDefault(); e.stopPropagation() }}
