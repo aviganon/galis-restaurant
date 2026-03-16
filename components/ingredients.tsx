@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from "react"
-import { collection, collectionGroup, getDocs, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore"
+import { collection, collectionGroup, getDocs, doc, getDoc, setDoc, deleteDoc, writeBatch } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
 import { motion } from "framer-motion"
@@ -51,6 +51,7 @@ import {
   ChevronDown,
   GripVertical,
   Columns3,
+  Check,
 } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -227,6 +228,9 @@ export function Ingredients() {
   const isOwner = isOwnerRole(userRole, isSystemOwner)
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [suppliers, setSuppliers] = useState<string[]>([])
+  const [selectedIngIds, setSelectedIngIds] = useState<Set<string>>(new Set())
+  const [bulkAssignSupplier, setBulkAssignSupplier] = useState("")
+  const [savingBulk, setSavingBulk] = useState(false)
   const [restaurantSuppliers, setRestaurantSuppliers] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -839,6 +843,35 @@ export function Ingredients() {
     )
   }
 
+  const handleBulkAssign = async () => {
+    if (!bulkAssignSupplier || selectedIngIds.size === 0 || !currentRestaurantId) return
+    setSavingBulk(true)
+    try {
+      const now = new Date().toISOString()
+      const supTrim = bulkAssignSupplier.trim()
+      const batch = writeBatch(db)
+      selectedIngIds.forEach(id => batch.set(doc(db, "restaurants", currentRestaurantId, "ingredients", id), { supplier: supTrim, lastUpdated: now }, { merge: true }))
+      await batch.commit()
+      setIngredients(prev => prev.map(ing => selectedIngIds.has(ing.id) ? { ...ing, supplier: supTrim } : ing))
+      toast.success(`שויכו ${selectedIngIds.size} רכיבים לספק "${supTrim}"`)
+      setSelectedIngIds(new Set()); setBulkAssignSupplier("")
+    } catch(e) { toast.error((e as Error).message || "שגיאה") } finally { setSavingBulk(false) }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIngIds.size === 0 || !currentRestaurantId) return
+    if (!window.confirm(`למחוק ${selectedIngIds.size} רכיבים לצמיתות?`)) return
+    setSavingBulk(true)
+    try {
+      const batch = writeBatch(db)
+      selectedIngIds.forEach(id => batch.delete(doc(db, "restaurants", currentRestaurantId, "ingredients", id)))
+      await batch.commit()
+      setIngredients(prev => prev.filter(ing => !selectedIngIds.has(ing.id)))
+      toast.success(`נמחקו ${selectedIngIds.size} רכיבים`)
+      setSelectedIngIds(new Set())
+    } catch(e) { toast.error((e as Error).message || "שגיאה") } finally { setSavingBulk(false) }
+  }
+
   return (
     <div className="p-4 md:p-6 space-y-6" dir={dir}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1317,12 +1350,48 @@ export function Ingredients() {
         </CardContent>
       </Card>
 
+      {selectedIngIds.size > 0 && (
+        <div className="flex items-center gap-2 px-px py-2 bg-primary/10 rounded-lg border border-primary/30 flex-wrap">
+          <span className="text-sm font-medium text-primary mr-1">{selectedIngIds.size} נבחרו</span>
+          <select className="h-8 rounded-md border border-input bg-background px-2 text-sm min-w-[130px]" value={bulkAssignSupplier} onChange={e=>setBulkAssignSupplier(e.target.value)}>
+            <option value="">— בחר ספק —</option>
+            {suppliers.filter(s=>s!=="כל הספקים"&&s!=="מתכון מורכב").map(s=><option key={s} value={s}>{s}</option>)}
+          </select>
+          <Button size="sm" onClick={handleBulkAssign} disabled={!bulkAssignSupplier||savingBulk}>
+            {savingBulk?<Loader2 className="w-3 h-3 animate-spin ml-1"/>:<Check className="w-3 h-3 ml-1"/>}שייך
+          </Button>
+          <Button size="sm" variant="destructive" onClick={handleBulkDelete} disabled={savingBulk}>
+            <Trash2 className="w-3 h-3 ml-1"/>מחק
+          </Button>
+          <Button size="sm" variant="ghost" onClick={()=>setSelectedIngIds(new Set())} className="text-muted-foreground">
+            <X className="w-3 h-3 ml-1"/>בטל
+          </Button>
+        </div>
+      )}
+
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto" dir={dir}>
-            <Table>
+            <Table className="w-full table-fixed text-sm">
+              <colgroup>
+                <col style={{width:"40px",minWidth:"40px",maxWidth:"40px"}}/>
+                {displayColumnOrder.map((k:string) => (
+                  <col key={k} style={{
+                    width: k==="name"?"160px":k==="price"?"84px":k==="cheapest"?"124px":k==="sku"?"110px":k==="status"?"80px":k==="source"?"80px":k==="supplier"?"110px":k==="minStock"?"70px":k==="stock"?"70px":k==="waste"?"70px":k==="unit"?"72px":"88px",
+                    minWidth: k==="name"?"130px":k==="cheapest"?"110px":k==="sku"?"90px":k==="supplier"?"90px":"58px"
+                  }} />
+                ))}
+                <col style={{width:"80px"}}/>
+              </colgroup>
               <TableHeader>
                 <TableRow>
+                  <TableHead style={{width:"40px",minWidth:"40px",maxWidth:"40px",padding:0}}>
+                    <div style={{display:"flex",justifyContent:"center",alignItems:"center",minHeight:"36px"}}>
+                      <input type="checkbox" style={{cursor:"pointer"}}
+                        checked={filteredIngredients.filter(i=>!("isCompound" in i&&i.isCompound)).length>0&&filteredIngredients.filter(i=>!("isCompound" in i&&i.isCompound)).every(i=>selectedIngIds.has(i.id))}
+                        onChange={e=>{if(e.target.checked)setSelectedIngIds(new Set(filteredIngredients.filter(i=>!("isCompound" in i&&i.isCompound)).map(i=>i.id)));else setSelectedIngIds(new Set())}}/>
+                    </div>
+                  </TableHead>
                   {displayColumnOrder.map((key, colIndex) => {
                     const labels: Record<string, string> = {
                       name: t("pages.ingredients.ingredientName"),
@@ -1443,6 +1512,12 @@ export function Ingredients() {
                         transition={{ delay: index * 0.02 }}
                         className={cn("hover:bg-muted/50", isCompound && "bg-primary/5")}
                       >
+                        <TableCell style={{width:"40px",minWidth:"40px",maxWidth:"40px",padding:0}} onClick={e=>e.stopPropagation()}>
+                          {!isCompound && <div style={{display:"flex",justifyContent:"center",alignItems:"center",minHeight:"36px"}}>
+                            <input type="checkbox" style={{cursor:"pointer"}} checked={selectedIngIds.has(ingredient.id)}
+                              onChange={e=>{setSelectedIngIds(prev=>{const n=new Set(prev);e.target.checked?n.add(ingredient.id):n.delete(ingredient.id);return n})}}/>
+                          </div>}
+                        </TableCell>
                         {displayColumnOrder.map((k) => cellByKey[k] ? <React.Fragment key={k}>{cellByKey[k]}</React.Fragment> : null)}
                       </motion.tr>
                     )
