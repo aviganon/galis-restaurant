@@ -339,6 +339,9 @@ export function AdminPanel() {
   const [suppliersWithRests, setSuppliersWithRests] = useState<SupplierWithRests[]>([])
   const [supplierToIngredients, setSupplierToIngredients] = useState<Record<string, IngredientRow[]>>({})
   const [ingredientsList, setIngredientsList] = useState<IngredientRow[]>([])
+  const [selectedIngIds, setSelectedIngIds] = useState<Set<string>>(new Set())
+  const [bulkAssignSupplier, setBulkAssignSupplier] = useState("")
+  const [savingBulkAssign, setSavingBulkAssign] = useState(false)
   const [ingredientsSearchText, setIngredientsSearchText] = useState("")
   const [ingredientsSortBy, setIngredientsSortBy] = useState<keyof IngredientRow | "">("")
   const [ingredientsSortDir, setIngredientsSortDir] = useState<"asc" | "desc">("asc")
@@ -1914,6 +1917,21 @@ export function AdminPanel() {
     }
   }
 
+  const handleBulkAssign = async () => {
+    if (!bulkAssignSupplier || selectedIngIds.size === 0) return
+    setSavingBulkAssign(true)
+    try {
+      const now = new Date().toISOString()
+      const supTrim = bulkAssignSupplier.trim()
+      const batch = writeBatch(db)
+      selectedIngIds.forEach(id => batch.set(doc(db,"ingredients",id),{supplier:supTrim,lastUpdated:now},{merge:true}))
+      await batch.commit()
+      setAdminIngredients(prev=>prev.map(ing=>selectedIngIds.has(ing.id)?{...ing,supplier:supTrim}:ing))
+      toast.success(`שויכו ${selectedIngIds.size} רכיבים לספק "${supTrim}"`)
+      setSelectedIngIds(new Set()); setBulkAssignSupplier("")
+    } catch(e){toast.error((e as Error).message||"שגיאה")} finally{setSavingBulkAssign(false)}
+  }
+
   const loadRestChipData = async (restId: string, chip: "dishes"|"fc"|"suppliers"|"orders") => {
     if (activeRestChip === chip) { setActiveRestChip(null); return }
     setActiveRestChip(chip)
@@ -2703,6 +2721,21 @@ export function AdminPanel() {
                       <Plus className="w-4 h-4 ml-1" />
                       {t("pages.adminPanel.addIngredient")}
                     </Button>
+                    {selectedIngIds.size > 0 && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-lg border border-primary/30 flex-wrap">
+                        <span className="text-sm font-medium text-primary">{selectedIngIds.size} נבחרו</span>
+                        <select className="h-8 rounded-md border border-input bg-background px-2 text-sm min-w-[130px]" value={bulkAssignSupplier} onChange={e=>setBulkAssignSupplier(e.target.value)}>
+                          <option value="">— בחר ספק —</option>
+                          {suppliersWithRests.map(s=><option key={s.name} value={s.name}>{s.name}</option>)}
+                        </select>
+                        <Button size="sm" onClick={handleBulkAssign} disabled={!bulkAssignSupplier||savingBulkAssign}>
+                          {savingBulkAssign?<Loader2 className="w-3 h-3 animate-spin ml-1"/>:<Check className="w-3 h-3 ml-1"/>}שייך
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={()=>setSelectedIngIds(new Set())} className="text-muted-foreground">
+                          <X className="w-3 h-3 ml-1"/>בטל
+                        </Button>
+                      </div>
+                    )}
                     <span className="text-sm text-muted-foreground">
                       {filteredAndSortedIngredients.length === (ingredientsList?.length ?? 0)
                         ? `${ingredientsList?.length ?? 0} ${t("pages.adminPanel.ingredientsCount")}`
@@ -2751,6 +2784,7 @@ export function AdminPanel() {
                     </colgroup>
                     <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
                       <TableRow className="border-b">
+                        <TableHead className="w-8 pl-3 pr-1"><input type="checkbox" className="cursor-pointer rounded" checked={filteredAndSortedIngredients.length>0&&filteredAndSortedIngredients.every(i=>selectedIngIds.has(i.id))} onChange={e=>{if(e.target.checked)setSelectedIngIds(new Set(filteredAndSortedIngredients.map(i=>i.id)));else setSelectedIngIds(new Set())}}/></TableHead>
                         {visibleColumnOrder.map((key, colIndex) => {
                           if (key === "cheapest") {
                             return (
@@ -2839,7 +2873,8 @@ export function AdminPanel() {
                           unit: <TableCell key="unit" className={`${textAlign} ${densityCellClass}`}>{ing.unit}</TableCell>,
                         }
                         return (
-                        <TableRow key={`${ing.source}-${ing.id}`}>
+                        <TableRow key={`${ing.source}-${ing.id}`} className={selectedIngIds.has(ing.id)?"bg-primary/5":""}>
+                          <TableCell className="w-8 pl-3 pr-1" onClick={e=>e.stopPropagation()}><input type="checkbox" className="cursor-pointer rounded" checked={selectedIngIds.has(ing.id)} onChange={e=>{setSelectedIngIds(prev=>{const n=new Set(prev);e.target.checked?n.add(ing.id):n.delete(ing.id);return n})}}/></TableCell>
                           {visibleColumnOrder.map((k) => cellByKey[k] ? <React.Fragment key={k}>{cellByKey[k]}</React.Fragment> : null)}
                           <TableCell className={`${textAlign} ${densityCellClass}`}>
                             <div className={`flex gap-1 ${justify}`}>
