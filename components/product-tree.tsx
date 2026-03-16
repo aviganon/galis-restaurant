@@ -1448,6 +1448,15 @@ export default function ProductTree() {
                                   <div className="px-3 py-1.5 text-[10px] font-bold text-muted-foreground bg-muted/50 border-t border-border">🥬 {t("pages.productTree.ingredientsCountShort")}</div>
                                   {(filteredIngredients.simple || []).map(name => {
                                     const sp = supplierPrices[name]
+                                    const stk = ingredientStock[name]
+                                    const hasMinStock = sp && typeof (sp as any).minStock === "number"
+                                    const minStk = hasMinStock ? (sp as any).minStock : 0
+                                    const stockBadge = stk == null ? null
+                                      : stk === 0
+                                        ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-medium shrink-0">אזל</span>
+                                        : minStk > 0 && stk < minStk
+                                          ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium shrink-0">נמוך {stk}</span>
+                                          : <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium shrink-0">מלאי {stk}</span>
                                     return (
                                       <button
                                         key={name}
@@ -1458,12 +1467,15 @@ export default function ProductTree() {
                                           setShowIngredientDropdown(false)
                                           setAddIngredientUnit(normalizeUnit(sp?.unit))
                                         }}
-                                        className="w-full px-3 py-2 text-right hover:bg-muted flex items-center justify-between transition-colors"
+                                        className="w-full px-3 py-2 text-right hover:bg-muted flex items-center justify-between gap-2 transition-colors"
                                       >
-                                        <span className="font-medium">{name}</span>
-                                        <span className="text-xs text-muted-foreground">
-                                          ₪{(sp?.price ?? 0).toFixed(2)} / {sp?.unit || ""}
-                                        </span>
+                                        <span className="font-medium truncate">{name}</span>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                          {stockBadge}
+                                          <span className="text-xs text-muted-foreground">
+                                            ₪{(sp?.price ?? 0).toFixed(2)} / {sp?.unit || ""}
+                                          </span>
+                                        </div>
                                       </button>
                                     )
                                   })}
