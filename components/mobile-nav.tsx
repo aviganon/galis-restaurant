@@ -1,4 +1,4 @@
-"use client"
+בעליםבהתחזות—כפתורחזרהלפאנלבעלים🎭מצבהתחזותחזורלבעלים✕"use client"
 
 import { useState } from "react"
 import { 
