@@ -93,6 +93,7 @@ export default function Suppliers() {
   const [supplierDetailItems, setSupplierDetailItems] = useState<{ name: string; price: number; unit: string; waste: number; stock: number; minStock: number; sku: string }[]>([])
   const [supplierDetailLoading, setSupplierDetailLoading] = useState(false)
   const [stockChipFilter, setStockChipFilter] = useState<"all"|"ok"|"low"|"zero">("all")
+  const [supplierIngFilter, setSupplierIngFilter] = useState("")
   const [editSupplierOpen, setEditSupplierOpen] = useState(false)
   const [editPhone, setEditPhone] = useState("")
   const [editEmail, setEditEmail] = useState("")
@@ -858,18 +859,29 @@ export default function Suppliers() {
                         </div>
                       );
                     })()}
-                    <p className="text-sm font-medium mb-2">רכיבים ({(supplierDetailItems || []).filter(i=>
-                      stockChipFilter==="all"||
-                      (stockChipFilter==="ok"&&i.stock>0&&(i.minStock===0||i.stock>=i.minStock))||
-                      (stockChipFilter==="low"&&i.stock>0&&i.minStock>0&&i.stock<i.minStock)||
-                      (stockChipFilter==="zero"&&i.stock===0)
-                    ).length})</p>
+                    <div className="flex items-center justify-between mb-2 gap-2">
+                      <p className="text-sm font-medium">רכיבים ({(supplierDetailItems || []).filter(i=>
+                        stockChipFilter==="all"||
+                        (stockChipFilter==="ok"&&i.stock>0&&(i.minStock===0||i.stock>=i.minStock))||
+                        (stockChipFilter==="low"&&i.stock>0&&i.minStock>0&&i.stock<i.minStock)||
+                        (stockChipFilter==="zero"&&i.stock===0)
+                      ).filter(i=>!supplierIngFilter||i.name.includes(supplierIngFilter)).length})</p>
+                      {(supplierDetailItems||[]).length>5&&(
+                        <div className="relative">
+                          <Search className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground"/>
+                          <input value={supplierIngFilter} onChange={e=>setSupplierIngFilter(e.target.value)}
+                            placeholder="חיפוש..." dir="rtl"
+                            className="h-8 pl-3 pr-8 rounded-md border text-sm bg-background w-40 focus:outline-none focus:ring-1 focus:ring-primary"/>
+                        </div>
+                      )}
+                    </div>
                     {(supplierDetailItems || []).length === 0 ? (
                       <p className="text-sm text-muted-foreground">אין רכיבים להצגה</p>
                     ) : (
-                      <div className="overflow-x-auto rounded-lg border">
+                      <div className="rounded-lg border overflow-hidden">
+                      <div className="overflow-y-auto overflow-x-auto" style={{maxHeight:"320px"}}>
                         <Table>
-                          <TableHeader>
+                          <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
                             <TableRow>
                               <TableHead className="text-right">רכיב</TableHead>
                               <TableHead className="text-right">מחיר</TableHead>
@@ -888,7 +900,7 @@ export default function Suppliers() {
                               (stockChipFilter==="ok"&&i.stock>0&&(i.minStock===0||i.stock>=i.minStock))||
                               (stockChipFilter==="low"&&i.stock>0&&i.minStock>0&&i.stock<i.minStock)||
                               (stockChipFilter==="zero"&&i.stock===0)
-                            ).map((i) => (
+                            ).filter(i=>!supplierIngFilter||i.name.includes(supplierIngFilter)).map((i) => (
                               <TableRow key={i.name}>
                                 <TableCell className="font-medium text-right">{i.name}</TableCell>
                                 <TableCell className="text-right">₪{i.price.toFixed(2)}</TableCell>
@@ -934,6 +946,7 @@ export default function Suppliers() {
                             ))}
                           </TableBody>
                         </Table>
+                      </div>
                       </div>
                     )}
                   </div>
