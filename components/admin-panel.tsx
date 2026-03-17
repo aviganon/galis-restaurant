@@ -2696,14 +2696,7 @@ export function AdminPanel() {
                             ? <img src={s.imageUrl} alt={s.name} className="absolute inset-0 w-full h-full object-cover"/>
                             : <div className="absolute inset-0" style={{background:["linear-gradient(135deg,#0F6E56,#1D9E75)","linear-gradient(135deg,#185FA5,#378ADD)","linear-gradient(135deg,#533AAB,#7F77DD)","linear-gradient(135deg,#854F0B,#BA7517)","linear-gradient(135deg,#993C1D,#D85A30)"][(s.name.charCodeAt(0)||0)%5]}}/>
                           }
-                          {/* Edit button */}
-                          <div className="absolute top-2 right-2 z-10">
-                            <button onClick={e=>{e.stopPropagation();openEditSupplierDetails(s)}}
-                              className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center transition-colors"
-                              title="ערוך פרטים">
-                              <Edit2 className="w-3.5 h-3.5 text-white"/>
-                            </button>
-                          </div>
+
                           {/* Dark overlay */}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10"/>
                           {/* Content */}
