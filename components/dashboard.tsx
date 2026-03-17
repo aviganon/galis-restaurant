@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { toast } from "@/components/ui/sonner"
 import { collection, getDocs, getDoc, doc, query, where, orderBy, limit, setDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
@@ -199,6 +200,7 @@ export function Dashboard() {
           setAlerts(alertList)
         } catch (e) {
           console.error("load owner dashboard:", e)
+          toast.error("שגיאה בטעינת נתוני לוח בקרה")
         } finally {
           setLoading(false)
         }
@@ -343,6 +345,7 @@ export function Dashboard() {
         setAlerts(alertList)
       } catch (e) {
         console.error("load dashboard:", e)
+        toast.error("שגיאה בטעינת לוח בקרה")
       } finally {
         setLoading(false)
       }
