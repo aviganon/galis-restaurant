@@ -87,6 +87,7 @@ const CATEGORY_TO_KEY: Record<string, string> = {
 export default function ProductTree() {
   const [activeTab, setActiveTab] = useState<"ingredients"|"suppliers"|null>(null)
   const [dishImages, setDishImages] = useState<Record<string,string>>({})
+  const [loadedDishImages, setLoadedDishImages] = useState<Set<string>>(new Set())
   const [editDishDialogOpen, setEditDishDialogOpen] = useState(false)
   const [editDishTarget, setEditDishTarget] = useState<string|null>(null)
   const [editDishName, setEditDishName] = useState("")
@@ -201,6 +202,11 @@ export default function ProductTree() {
         const imgs: Record<string,string> = {}
         Object.entries(newDishes).forEach(([n,d])=>{ if(d.imageUrl) imgs[n]=d.imageUrl })
         setDishImages(imgs)
+        Object.entries(imgs).forEach(([name, url]) => {
+          const img = new window.Image()
+          img.onload = () => setLoadedDishImages(prev => { const s = new Set(prev); s.add(name); return s })
+          img.src = url
+        })
         setDishes(newDishes)
         setSelectedDish(prev => (prev && newDishes[prev] ? prev : Object.keys(newDishes)[0] || null))
         setSupplierPrices(newPrices)
@@ -639,7 +645,12 @@ export default function ProductTree() {
           const task = uploadBytesResumable(sRef, editDishImgFile)
           task.on('state_changed',()=>{},rej,async()=>{ imgUrl=await getDownloadURL(sRef); res(undefined) })
         })
-        if(imgUrl) setDishImages(prev=>({...prev,[editDishTarget]:imgUrl!}))
+        if(imgUrl) {
+        setDishImages(prev=>({...prev,[editDishTarget]:imgUrl!}))
+        const img = new window.Image()
+        img.onload = () => setLoadedDishImages(prev => { const s = new Set(prev); s.add(editDishTarget); return s })
+        img.src = imgUrl!
+      }
       }
       const newName = (editDishName||'').trim() || editDishTarget
       const updatedDish = {...dish, name:newName, category:editDishCategory, ...(imgUrl?{imageUrl:imgUrl}:{})}
@@ -1058,12 +1069,17 @@ export default function ProductTree() {
                         ? "shadow-lg ring-2 ring-primary/50" 
                         : "bg-card border border-border hover:border-primary/50 hover:shadow-md"
                     )}
-                    style={dishImages[name]
+                    style={dishImages[name] && loadedDishImages.has(name)
                       ? {backgroundImage:`url(${dishImages[name]})`,backgroundSize:'cover',backgroundPosition:'center'}
                       : isActive ? {background:'var(--primary)'} : undefined
                     }
                   >
-                    {dishImages[name]&&<div className="absolute inset-0 rounded-lg" style={{background:'linear-gradient(to top,rgba(0,0,0,0.65) 0%,rgba(0,0,0,0.1) 60%,transparent 100%)'}}/>}
+                    {dishImages[name] && !loadedDishImages.has(name) && (
+                      <div className="absolute inset-0 rounded-lg overflow-hidden">
+                        <div className="w-full h-full animate-pulse bg-muted"/>
+                      </div>
+                    )}
+                    {dishImages[name] && loadedDishImages.has(name) && <div className="absolute inset-0 rounded-lg" style={{background:'linear-gradient(to top,rgba(0,0,0,0.65) 0%,rgba(0,0,0,0.1) 60%,transparent 100%)'}}/>}
                     <button onClick={e=>{e.stopPropagation();openDishEditDialog(name)}}
                       className={cn("absolute top-1.5 left-1.5 p-1 rounded-md z-10 transition-colors",
                         dishImages[name]||isActive?"text-white/80 hover:bg-white/20":"text-muted-foreground hover:bg-muted")}>
