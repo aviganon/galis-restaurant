@@ -433,6 +433,7 @@ export function AdminPanel() {
   const editRestImgInputRef = useRef<HTMLInputElement>(null)
   const [uploadingRestImage, setUploadingRestImage] = useState(false)
   const restImageInputRef = useRef<HTMLInputElement>(null)
+  const [restPanelSupplier, setRestPanelSupplier] = useState<string|null>(null)
   const [activeRestChip, setActiveRestChip] = useState<"dishes"|"fc"|"suppliers"|"orders"|null>(null)
   const [restChipLoading, setRestChipLoading] = useState(false)
   const [restChipDishes, setRestChipDishes] = useState<{name:string;price:number;fc:number}[]>([])
@@ -2427,21 +2428,57 @@ export function AdminPanel() {
                               )}
                             </div>
                           ) : activeRestChip==="suppliers" ? (
-                            <div className="space-y-3">
-                              <p className="text-sm font-semibold flex items-center gap-1.5"><Truck className="w-4 h-4 text-violet-500"/>ספקים משויכים</p>
-                              <div className="flex flex-wrap gap-2">
-                                {(selectedRest.assignedSuppliers?.length??0)===0?<span className="text-sm text-muted-foreground">{t("pages.adminPanel.noAssignedSuppliers")}</span>
-                                  :(selectedRest.assignedSuppliers||[]).map(s=>(<Button key={s} size="sm" variant="secondary" className="text-destructive hover:bg-destructive/10"
-                                    onClick={()=>handleRemoveSupplier(selectedRest.id,s)} disabled={removingSupplier===selectedRest.id+":"+s}>
-                                    {removingSupplier===selectedRest.id+":"+s?<Loader2 className="w-3 h-3 animate-spin ml-1"/>:<X className="w-3 h-3 ml-1"/>}{s}</Button>))}
-                              </div>
-                              <p className="text-xs text-muted-foreground">הוסף ספק:</p>
-                              <div className="flex flex-wrap gap-2">
-                                {suppliersWithRests.filter(s=>!(selectedRest.assignedSuppliers||[]).includes(s.name)).map(s=>(
-                                  <Button key={s.name} size="sm" variant="outline" onClick={()=>handleAssignSupplier(selectedRest.id,s.name)} disabled={assigningSupplier===selectedRest.id+":"+s.name}>
-                                    {assigningSupplier===selectedRest.id+":"+s.name?<Loader2 className="w-3 h-3 animate-spin ml-1"/>:<Check className="w-3 h-3 ml-1"/>}{s.name}</Button>
-                                ))}
-                                {suppliersWithRests.filter(s=>!(selectedRest.assignedSuppliers||[]).includes(s.name)).length===0&&<span className="text-sm text-muted-foreground">{t("pages.adminPanel.allSuppliersAssigned")}</span>}
+                            <div className="space-y-4">
+                              <p className="text-sm font-semibold flex items-center gap-1.5"><Truck className="w-4 h-4 text-violet-500"/>ספקים משויכים ({(selectedRest.assignedSuppliers||[]).length})</p>
+                              {(selectedRest.assignedSuppliers?.length??0)===0
+                                ? <span className="text-sm text-muted-foreground">{t("pages.adminPanel.noAssignedSuppliers")}</span>
+                                : <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {(selectedRest.assignedSuppliers||[]).map(sName=>{
+                                      const sup = suppliersWithRests.find(x=>x.name===sName)
+                                      const isSelected = restPanelSupplier===sName
+                                      const bgColors = ["linear-gradient(135deg,#0F6E56,#1D9E75)","linear-gradient(135deg,#185FA5,#378ADD)","linear-gradient(135deg,#533AAB,#7F77DD)","linear-gradient(135deg,#854F0B,#BA7517)","linear-gradient(135deg,#993C1D,#D85A30)"]
+                                      return (
+                                        <div key={sName} className={"rounded-xl border overflow-hidden cursor-pointer transition-all "+(isSelected?"ring-2 ring-primary":"hover:shadow-md")}
+                                          onClick={()=>setRestPanelSupplier(isSelected?null:sName)}>
+                                          <div className="relative h-20 overflow-hidden">
+                                            {sup?.imageUrl
+                                              ?<img src={sup.imageUrl} className="w-full h-full object-cover" alt=""/>
+                                              :<div className="w-full h-full" style={{background:bgColors[(sName.charCodeAt(0)||0)%5]}}/>
+                                            }
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"/>
+                                            <p className="absolute bottom-2 right-3 font-bold text-white text-sm drop-shadow">{sName}</p>
+                                            <button className="absolute top-1.5 left-1.5 w-6 h-6 rounded-full bg-red-500/80 hover:bg-red-600 flex items-center justify-center"
+                                              onClick={e=>{e.stopPropagation();handleRemoveSupplier(selectedRest.id,sName)}}>
+                                              <X className="w-3 h-3 text-white"/>
+                                            </button>
+                                          </div>
+                                          {isSelected && (
+                                            <div className="p-3 space-y-2 bg-muted/30 text-sm">
+                                              {sup && (sup.phone||sup.email||sup.contact||sup.address) && (
+                                                <div className="grid grid-cols-2 gap-2">
+                                                  {sup.phone&&<div><p className="text-xs text-muted-foreground">טלפון</p><p className="font-medium">{sup.phone}</p></div>}
+                                                  {sup.email&&<div><p className="text-xs text-muted-foreground">אימייל</p><p className="font-medium text-xs">{sup.email}</p></div>}
+                                                  {sup.contact&&<div><p className="text-xs text-muted-foreground">איש קשר</p><p className="font-medium">{sup.contact}</p></div>}
+                                                  {sup.address&&<div><p className="text-xs text-muted-foreground">כתובת</p><p className="font-medium">{sup.address}</p></div>}
+                                                </div>
+                                              )}
+                                              <p className="text-xs text-muted-foreground">{(supplierToIngredients[sName]||[]).length} רכיבים</p>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                              }
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-2">הוסף ספק:</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {suppliersWithRests.filter(s=>!(selectedRest.assignedSuppliers||[]).includes(s.name)).map(s=>(
+                                    <Button key={s.name} size="sm" variant="outline" onClick={()=>handleAssignSupplier(selectedRest.id,s.name)} disabled={assigningSupplier===selectedRest.id+":"+s.name}>
+                                      {assigningSupplier===selectedRest.id+":"+s.name?<Loader2 className="w-3 h-3 animate-spin ml-1"/>:<Check className="w-3 h-3 ml-1"/>}{s.name}</Button>
+                                  ))}
+                                  {suppliersWithRests.filter(s=>!(selectedRest.assignedSuppliers||[]).includes(s.name)).length===0&&<span className="text-sm text-muted-foreground">{t("pages.adminPanel.allSuppliersAssigned")}</span>}
+                                </div>
                               </div>
                             </div>
                           ) : activeRestChip==="orders" ? (
