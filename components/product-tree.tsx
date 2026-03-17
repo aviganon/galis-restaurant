@@ -1048,8 +1048,15 @@ export default function ProductTree() {
           
           {/* Dishes Grid */}
           <div className="flex flex-wrap gap-1.5 max-h-[180px] overflow-y-auto hide-scrollbar">
+            {loading && (
+              <div className="flex flex-wrap gap-2">
+                {Array.from({length:6}).map((_,i)=>(
+                  <div key={i} className="relative rounded-lg min-w-[100px] max-w-[150px] h-[90px] flex-1 animate-pulse bg-muted border border-border"/>
+                ))}
+              </div>
+            )}
             <AnimatePresence mode="popLayout">
-              {filteredDishes.map(name => {
+              {!loading && filteredDishes.map(name => {
                 const dish = dishes[name]
                 const pct = calcFoodCostPct(name)
                 const status = getStatusColor(pct)
