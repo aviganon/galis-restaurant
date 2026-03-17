@@ -2360,6 +2360,9 @@ export function AdminPanel() {
                             }}/>
                         </div>
                         <div className="flex gap-2 flex-wrap">
+                          <Button size="sm" variant="outline" onClick={()=>openRestEditDialog(selectedRest)}>
+                            <Edit2 className="w-4 h-4 ml-1"/>ערוך פרטים
+                          </Button>
                           {onImpersonate&&(
                             <Button size="sm" variant="outline" onClick={()=>{onImpersonate({id:selectedRest.id,name:selectedRest.name,emoji:selectedRest.emoji});toast.success(t("pages.adminPanel.impersonatingRest")+": "+selectedRest.name)}}>
                               <UserCircle className="w-4 h-4 ml-1"/>{t("pages.adminPanel.impersonate")}
