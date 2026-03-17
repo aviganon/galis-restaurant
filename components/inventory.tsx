@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { toast } from "@/components/ui/sonner"
 import { collection, getDocs, doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
@@ -102,6 +103,7 @@ export function Inventory() {
         setItems(Array.from(byId.values()))
       } catch (e) {
         console.error("load inventory:", e)
+     toast.error("שגיאה בטעינת המלאי")
       } finally {
         setLoading(false)
       }
