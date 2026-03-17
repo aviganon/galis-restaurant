@@ -70,6 +70,9 @@ type RestWithDetails = {
   fcAvg: number
   assignedSuppliers: string[]
   imageUrl?: string | null
+  phone?: string | null
+  email?: string | null
+  address?: string | null
 }
 
 type SupplierWithRests = {
@@ -420,6 +423,14 @@ export function AdminPanel() {
   const [selectedRestDetail, setSelectedRestDetail] = useState<string | null>(null)
   const [editRestImageFile, setEditRestImageFile] = useState<File|null>(null)
   const [editRestImageUrl, setEditRestImageUrl] = useState<string|null>(null)
+  const [editRestDialogOpen, setEditRestDialogOpen] = useState(false)
+  const [editRestId, setEditRestId] = useState<string|null>(null)
+  const [editRestName, setEditRestName] = useState("")
+  const [editRestPhone, setEditRestPhone] = useState("")
+  const [editRestEmail, setEditRestEmail] = useState("")
+  const [editRestAddress, setEditRestAddress] = useState("")
+  const [savingRestEdit, setSavingRestEdit] = useState(false)
+  const editRestImgInputRef = useRef<HTMLInputElement>(null)
   const [uploadingRestImage, setUploadingRestImage] = useState(false)
   const restImageInputRef = useRef<HTMLInputElement>(null)
   const [activeRestChip, setActiveRestChip] = useState<"dishes"|"fc"|"suppliers"|"orders"|null>(null)
@@ -775,6 +786,9 @@ export function AdminPanel() {
           fcAvg: Math.round(fcAvg * 10) / 10,
           assignedSuppliers: assignedList,
           imageUrl: (data.imageUrl as string) || null,
+          phone: (data.phone as string) || null,
+          email: (data.email as string) || null,
+          address: (data.address as string) || null,
         })
       }
 
@@ -1625,6 +1639,43 @@ export function AdminPanel() {
     }
   }
 
+  const openRestEditDialog = (rest: RestWithDetails) => {
+    setEditRestId(rest.id); setEditRestName(rest.name)
+    setEditRestPhone(rest.phone || ""); setEditRestEmail(rest.email || "")
+    setEditRestAddress(rest.address || ""); setEditRestImageFile(null)
+    setEditRestImageUrl(rest.imageUrl || null); setEditRestDialogOpen(true)
+  }
+
+  const handleSaveRestEdit = async () => {
+    if (!editRestId || !editRestName.trim()) return
+    setSavingRestEdit(true)
+    try {
+      let imgUrl: string|null = editRestImageUrl
+      if (editRestImageFile) {
+        const sRef = storageRef(storage, 'restaurants/'+editRestId+'/cover.jpg')
+        await new Promise<void>((res, rej) => {
+          const task = uploadBytesResumable(sRef, editRestImageFile!)
+          task.on("state_changed", ()=>{}, rej, async () => { imgUrl = await getDownloadURL(sRef); res() })
+        })
+        setEditRestImageUrl(imgUrl)
+      }
+      await setDoc(doc(db, "restaurants", editRestId), {
+        name: editRestName.trim(),
+        phone: editRestPhone.trim() || null,
+        email: editRestEmail.trim() || null,
+        address: editRestAddress.trim() || null,
+        ...(imgUrl ? { imageUrl: imgUrl } : {}),
+        lastUpdated: new Date().toISOString(),
+      }, { merge: true })
+      setRestsWithDetails(prev => prev.map(r => r.id === editRestId
+        ? {...r, name: editRestName.trim(), phone: editRestPhone.trim()||null,
+           email: editRestEmail.trim()||null, address: editRestAddress.trim()||null, imageUrl: imgUrl}
+        : r))
+      toast.success("פרטי המסעדה עודכנו"); setEditRestDialogOpen(false)
+    } catch(e) { toast.error((e as Error).message || "שגיאה") }
+    finally { setSavingRestEdit(false) }
+  }
+
   const handleDeleteRestaurant = async (rest: RestWithDetails) => {
     setDeletingRestId(rest.id)
     try {
@@ -2177,7 +2228,50 @@ export function AdminPanel() {
               </div>
             ) : (
               <div className="space-y-4">
-                {/* Restaurant image cards */}
+                {/* Rest edit dialog */}
+              <input ref={editRestImgInputRef} type="file" accept="image/*" className="hidden"
+                onChange={e=>{const f=e.currentTarget.files?.[0];if(f&&f.size<=5242880)setEditRestImageFile(f);else if(f)toast.error("קובץ גדול מדי");e.currentTarget.value=""}}/>
+              {editRestDialogOpen && editRestId && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                  onClick={e=>{if(e.target===e.currentTarget)setEditRestDialogOpen(false)}}>
+                  <div className="bg-background rounded-xl shadow-2xl p-6 w-full max-w-sm space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-lg">עריכת מסעדה</h3>
+                      <button onClick={()=>setEditRestDialogOpen(false)} className="text-muted-foreground hover:text-foreground"><X className="w-5 h-5"/></button>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-xl overflow-hidden border bg-muted cursor-pointer hover:opacity-80 shrink-0 flex items-center justify-center"
+                        onClick={()=>editRestImgInputRef.current?.click()}>
+                        {(editRestImageFile||editRestImageUrl)
+                          ?<img src={editRestImageFile?URL.createObjectURL(editRestImageFile):editRestImageUrl!} className="w-full h-full object-cover" alt=""/>
+                          :<span className="text-2xl">{restsWithDetails.find(r=>r.id===editRestId)?.emoji||"🍽️"}</span>}
+                      </div>
+                      <div>
+                        <button onClick={()=>editRestImgInputRef.current?.click()} className="text-sm text-primary hover:underline block">
+                          {editRestImageUrl||editRestImageFile?"החלף תמונה":"הוסף תמונה"}</button>
+                        <p className="text-xs text-muted-foreground">PNG, JPG עד 5MB</p>
+                      </div>
+                    </div>
+                    <div><label className="text-xs text-muted-foreground block mb-1">שם המסעדה</label>
+                      <input value={editRestName} onChange={e=>setEditRestName(e.target.value)} className="w-full h-9 rounded-md border px-3 text-sm bg-background" placeholder="שם המסעדה"/></div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><label className="text-xs text-muted-foreground block mb-1">טלפון</label>
+                        <input dir="ltr" value={editRestPhone} onChange={e=>setEditRestPhone(e.target.value)} placeholder="050-0000000" className="w-full h-9 rounded-md border px-3 text-sm bg-background"/></div>
+                      <div><label className="text-xs text-muted-foreground block mb-1">אימייל</label>
+                        <input dir="ltr" value={editRestEmail} onChange={e=>setEditRestEmail(e.target.value)} placeholder="email@example.com" className="w-full h-9 rounded-md border px-3 text-sm bg-background"/></div>
+                    </div>
+                    <div><label className="text-xs text-muted-foreground block mb-1">כתובת</label>
+                      <input value={editRestAddress} onChange={e=>setEditRestAddress(e.target.value)} placeholder="רחוב, עיר" className="w-full h-9 rounded-md border px-3 text-sm bg-background"/></div>
+                    <div className="flex gap-2 justify-end pt-1">
+                      <button onClick={()=>setEditRestDialogOpen(false)} className="px-4 py-2 rounded-md border text-sm hover:bg-muted">ביטול</button>
+                      <button onClick={handleSaveRestEdit} disabled={savingRestEdit}
+                        className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm flex items-center gap-1.5 hover:opacity-90 disabled:opacity-50">
+                        {savingRestEdit&&<Loader2 className="w-3 h-3 animate-spin"/>}שמור</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* Restaurant image cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
                   {restsWithDetails.map((rest, _ri) => {
                     const colors = ["linear-gradient(135deg,#0F6E56,#1D9E75)","linear-gradient(135deg,#185FA5,#378ADD)","linear-gradient(135deg,#533AAB,#7F77DD)","linear-gradient(135deg,#854F0B,#BA7517)","linear-gradient(135deg,#993C1D,#D85A30)"]
@@ -2197,7 +2291,7 @@ export function AdminPanel() {
                           className="absolute inset-0 w-full h-full object-cover"
                           onError={e=>{(e.target as HTMLImageElement).style.display="none";(e.target as HTMLImageElement).parentElement!.style.background=colors[_ri%5]}}/>
                         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-black/10"/>
-                        <div className="absolute top-2 right-2 z-10"><button onClick={e=>{e.stopPropagation();const newId=rest.id;setSelectedRestDetail(newId);setActiveRestChip(null);setEditRestImageFile(null);setEditRestImageUrl(rest.imageUrl||null);setTimeout(()=>restImageInputRef.current?.click(),100)}} className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center transition-colors"><Camera className="w-3.5 h-3.5 text-white"/></button></div>
+                        <div className="absolute top-2 right-2 z-10"><button onClick={e=>{e.stopPropagation();openRestEditDialog(rest)}} className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center transition-colors" title="ערוך פרטים"><Edit2 className="w-3.5 h-3.5 text-white"/></button></div>
                         <div className="absolute inset-0 flex flex-col justify-end p-3">
                           <p className="font-bold text-white text-sm leading-tight drop-shadow truncate">
                             {rest.emoji&&<span className="ml-1">{rest.emoji}</span>}{rest.name}
