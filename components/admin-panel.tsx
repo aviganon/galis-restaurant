@@ -2844,13 +2844,7 @@ export function AdminPanel() {
                                 </motion.div>
                               )}
 
-                              {/* Contact details */}
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm pt-1">
-                                <div><p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.phone")}</p><p className="font-medium">{s.phone||"—"}</p></div>
-                                <div><p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.email")}</p><p className="font-medium">{s.email||"—"}</p></div>
-                                <div><p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.contact")}</p><p className="font-medium">{s.contact||"—"}</p></div>
-                                <div><p className="text-muted-foreground mb-0.5">{t("pages.adminPanel.address")}</p><p className="font-medium">{s.address||"—"}</p></div>
-                              </div>
+
                             </>
                           )
                         })()}
