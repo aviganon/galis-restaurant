@@ -331,7 +331,6 @@ export const translations = {
         loadError: "שגיאה בטעינת פרטי הספק",
         subtitle: "ספקים לפי רכיבים במערכת",
         newSupplier: "ספק חדש",
-        searchPlaceholder: "חפש ספק...",
         noSuppliersDesc: "אין ספקים. ספקים מופיעים אוטומטית כאשר מוסיפים רכיבים עם שדה ספק.",
         clickForDetails: "לחץ על ספק כדי לראות את הפרטים והרכיבים שלו",
         deleteSupplier: "מחק ספק",
@@ -541,6 +540,8 @@ export const translations = {
       },
       adminPanel: {
         restaurants: "מסעדות",
+        dishes: "מנות",
+        ingredients: "רכיבים",
         suppliers: "ספקים",
         globalIngredients: "רכיבים גלובליים",
         api: "API",
@@ -1090,7 +1091,6 @@ export const translations = {
         loadError: "Error loading supplier details",
         subtitle: "Suppliers by ingredients in system",
         newSupplier: "New supplier",
-        searchPlaceholder: "Search suppliers...",
         noSuppliersDesc: "No suppliers. Suppliers appear automatically when adding ingredients with supplier field.",
         clickForDetails: "Click on supplier to see details and ingredients",
         deleteSupplier: "Delete supplier",
@@ -1300,6 +1300,8 @@ export const translations = {
       },
       adminPanel: {
         restaurants: "Restaurants",
+        dishes: "Dishes",
+        ingredients: "Ingredients",
         suppliers: "Suppliers",
         globalIngredients: "Global ingredients",
         api: "API",
