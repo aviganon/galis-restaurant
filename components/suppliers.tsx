@@ -54,7 +54,7 @@ import {
   Edit2,
   Upload as UploadIcon,
   ShoppingCart,
-  X,
+  X as XIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
@@ -99,7 +99,6 @@ export default function Suppliers() {
   const [supplierIngFilter, setSupplierIngFilter] = useState("")
   const [reorderPanelOpen, setReorderPanelOpen] = useState(false)
   const [globalReorderOpen, setGlobalReorderOpen] = useState(false)
-  const [reorderPanelOpen, setReorderPanelOpen] = useState(false)
   const [editSupplierOpen, setEditSupplierOpen] = useState(false)
   const [editPhone, setEditPhone] = useState("")
   const [editEmail, setEditEmail] = useState("")
@@ -719,7 +718,7 @@ export default function Suppliers() {
                 <p className="text-sm font-semibold flex items-center gap-1.5 text-blue-700 dark:text-blue-400">
                   <ShoppingCart className="w-4 h-4"/>המלצות הזמנה — כל הספקים
                 </p>
-                <button onClick={()=>setGlobalReorderOpen(false)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4"/></button>
+                <button onClick={()=>setGlobalReorderOpen(false)} className="text-muted-foreground hover:text-foreground"><XIcon className="w-4 h-4"/></button>
               </div>
               <div className="rounded-md border overflow-hidden"><div className="overflow-y-auto" style={{maxHeight:"340px"}}>
                 <table className="w-full text-sm">
@@ -822,7 +821,7 @@ export default function Suppliers() {
                   <div className="bg-background rounded-xl shadow-2xl p-6 w-full max-w-md space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold text-lg">עריכת ספק — {selectedSupplierDetail}</h3>
-                      <button onClick={()=>setEditSupplierOpen(false)} className="text-muted-foreground hover:text-foreground"><X className="w-5 h-5"/></button>
+                      <button onClick={()=>setEditSupplierOpen(false)} className="text-muted-foreground hover:text-foreground"><XIcon className="w-5 h-5"/></button>
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="relative w-16 h-16 rounded-xl overflow-hidden border bg-muted cursor-pointer hover:opacity-80" onClick={()=>editImgRef.current?.click()}>
@@ -1159,7 +1158,7 @@ export default function Suppliers() {
                       {i.sku ? ` | מק״ט ${i.sku}` : ""}
                     </span>
                     <Button size="sm" variant="ghost" onClick={() => removeNsmItem(i.name)} className="text-destructive h-8 w-8 p-0 shrink-0">
-                      <X className="w-3 h-3" />
+                      <XIcon className="w-3 h-3" />
                     </Button>
                   </div>
                 ))}
