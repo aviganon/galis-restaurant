@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
-import { Shield, Key, Loader2, LogOut, Settings2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown, GripVertical, Columns3, Upload as UploadIcon, FileText, TrendingUp, DollarSign, Utensils, AlertTriangle, ShoppingCart } from "lucide-react"
+import { Shield, Key, Loader2, Camera, LogOut, Settings2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown, GripVertical, Columns3, Upload as UploadIcon, FileText, TrendingUp, DollarSign, Utensils, AlertTriangle, ShoppingCart } from "lucide-react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -69,6 +69,7 @@ type RestWithDetails = {
   dishesCount: number
   fcAvg: number
   assignedSuppliers: string[]
+  imageUrl?: string | null
 }
 
 type SupplierWithRests = {
@@ -675,7 +676,7 @@ export function AdminPanel() {
       })
 
       const supplierSet = new Set<string>()
-      const supplierDetails: Record<string, { phone?: string | null; email?: string | null; contact?: string | null; address?: string | null }> = {}
+      const supplierDetails: Record<string, { phone?: string | null; email?: string | null; contact?: string | null; address?: string | null; imageUrl?: string | null }> = {}
       const supplierToIng: Record<string, IngredientRow[]> = {}
       globalIngSnap.forEach((d) => {
         const data = d.data()
@@ -710,6 +711,7 @@ export function AdminPanel() {
             email: data.email ?? null,
             contact: data.contact ?? null,
             address: data.address ?? null,
+            imageUrl: (data.imageUrl as string) ?? null,
           }
         }
       })
@@ -772,6 +774,7 @@ export function AdminPanel() {
           dishesCount: dishes.length,
           fcAvg: Math.round(fcAvg * 10) / 10,
           assignedSuppliers: assignedList,
+          imageUrl: (data.imageUrl as string) || null,
         })
       }
 
@@ -1401,6 +1404,7 @@ export function AdminPanel() {
       }, { merge: true })
       toast.success(`פרטי ספק "${editSupplierDetailsName}" עודכנו`)
       setEditSupplierDetailsOpen(false)
+      setSuppliersWithRests(prev=>prev.map(s=>s.name===editSupplierDetailsName?{...s,imageUrl:finalImageUrl||null}:s))
       loadSystemOwnerData()
     } catch (e) {
       toast.error((e as Error).message)
@@ -2187,12 +2191,13 @@ export function AdminPanel() {
     setSelectedRestDetail(newId);
     setActiveRestChip(null);
     setEditRestImageFile(null);
-    setEditRestImageUrl(newId?(rest as any).imageUrl||null:null);
+    setEditRestImageUrl(newId?rest.imageUrl||null:null);
   }}>
                         <img src={(rest as any).imageUrl||getRestaurantImageUrl(rest.name)} alt={rest.name}
                           className="absolute inset-0 w-full h-full object-cover"
                           onError={e=>{(e.target as HTMLImageElement).style.display="none";(e.target as HTMLImageElement).parentElement!.style.background=colors[_ri%5]}}/>
                         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-black/10"/>
+                        <div className="absolute top-2 right-2 z-10"><button onClick={e=>{e.stopPropagation();const newId=rest.id;setSelectedRestDetail(newId);setActiveRestChip(null);setEditRestImageFile(null);setEditRestImageUrl(rest.imageUrl||null);setTimeout(()=>restImageInputRef.current?.click(),100)}} className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center transition-colors"><Camera className="w-3.5 h-3.5 text-white"/></button></div>
                         <div className="absolute inset-0 flex flex-col justify-end p-3">
                           <p className="font-bold text-white text-sm leading-tight drop-shadow truncate">
                             {rest.emoji&&<span className="ml-1">{rest.emoji}</span>}{rest.name}
