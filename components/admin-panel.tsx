@@ -78,6 +78,7 @@ type SupplierWithRests = {
   email?: string | null
   contact?: string | null
   address?: string | null
+  imageUrl?: string | null
 }
 
 type GlobalCheapest = { price: number; supplier: string; unit: string }
@@ -2555,18 +2556,10 @@ export function AdminPanel() {
                           style={{height:130}}
                           onClick={() => { setSelectedSupplierDetail(selectedSupplierDetail === s.name ? null : s.name); setActiveSupplierChip(null) }}
                         >
-                          {/* Background image */}
-                          <img
-                            src={(s as any).imageUrl || `https://source.unsplash.com/400x200/?food,supplier,wholesale,${encodeURIComponent(s.name)}`}
-                            alt={s.name}
-                            className="absolute inset-0 w-full h-full object-cover"
-                            onError={e => {
-                              const el = e.target as HTMLImageElement
-                              el.style.display = "none"
-                              const parent = el.parentElement!
-                              parent.style.background = ["linear-gradient(135deg,#0F6E56,#1D9E75)","linear-gradient(135deg,#185FA5,#378ADD)","linear-gradient(135deg,#533AAB,#7F77DD)","linear-gradient(135deg,#854F0B,#BA7517)","linear-gradient(135deg,#993C1D,#D85A30)"][(s.name.charCodeAt(0)||0)%5]
-                            }}
-                          />
+                          {s.imageUrl
+                            ? <img src={s.imageUrl} alt={s.name} className="absolute inset-0 w-full h-full object-cover"/>
+                            : <div className="absolute inset-0" style={{background:["linear-gradient(135deg,#0F6E56,#1D9E75)","linear-gradient(135deg,#185FA5,#378ADD)","linear-gradient(135deg,#533AAB,#7F77DD)","linear-gradient(135deg,#854F0B,#BA7517)","linear-gradient(135deg,#993C1D,#D85A30)"][(s.name.charCodeAt(0)||0)%5]}}/>
+                          }
                           {/* Dark overlay */}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10"/>
                           {/* Content */}
