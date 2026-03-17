@@ -1112,7 +1112,7 @@ export default function ProductTree() {
                             "text-xs",
                             isActive ? "text-primary-foreground/80" : "text-muted-foreground"
                           )}>
-                            {dish.sellingPrice > 0 ? `₪${dish.sellingPrice}` : "—"}
+                            {dish.sellingPrice > 0 ? `₪${(dish.sellingPrice/VAT_RATE).toFixed(0)} לפמ` : "—"}
                           </span>
                           <Badge 
                             variant="secondary"
@@ -1187,20 +1187,28 @@ export default function ProductTree() {
                 >
                   <div className="px-4 pb-4 space-y-4">
                     {/* Selling Price */}
-                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                      <Label htmlFor="selling-price" className="text-sm">{t("pages.productTree.sellingPriceLabel")}:</Label>
-                      <div className="flex items-center gap-1 flex-1">
-                        <span className="text-lg font-semibold">₪</span>
-                        <Input
-                          id="selling-price"
-                          name="sellingPrice"
-                          type="number"
-                          value={currentDish?.sellingPrice || 0}
-                          onChange={e => updateSellingPrice(Number(e.target.value))}
-                          className="h-9 font-bold"
-                          min={0}
-                        />
+                    <div className="p-3 bg-muted/50 rounded-lg space-y-1.5">
+                      <div className="flex items-center gap-3">
+                        <Label htmlFor="selling-price" className="text-sm">{t("pages.productTree.sellingPriceLabel")}:</Label>
+                        <div className="flex items-center gap-1 flex-1">
+                          <span className="text-lg font-semibold">₪</span>
+                          <Input
+                            id="selling-price"
+                            name="sellingPrice"
+                            type="number"
+                            value={currentDish?.sellingPrice || 0}
+                            onChange={e => updateSellingPrice(Number(e.target.value))}
+                            className="h-9 font-bold"
+                            min={0}
+                          />
+                        </div>
                       </div>
+                      {currentPriceBeforeVat > 0 && (
+                        <p className="text-xs text-muted-foreground flex justify-between">
+                          <span>לפני מע"מ:</span>
+                          <span className="font-medium">₪{currentPriceBeforeVat.toFixed(2)}</span>
+                        </p>
+                      )}
                     </div>
                     
                     {/* Cost Meter */}
@@ -1328,8 +1336,14 @@ export default function ProductTree() {
                           <span>{t("pages.productTree.totalDishCost")}</span>
                           <span>₪{currentCost.toFixed(2)}</span>
                         </div>
+                        {currentPriceBeforeVat > 0 && (
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>מחיר מכירה לפני מע"מ</span>
+                            <span>₪{currentPriceBeforeVat.toFixed(2)}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between font-semibold">
-                          <span>{t("pages.productTree.grossProfit")}</span>
+                          <span>{t("pages.productTree.grossProfit")} <span className="text-xs font-normal text-muted-foreground">(לפני מע"מ)</span></span>
                           <span className={currentProfit > 0 ? "text-emerald-600" : "text-red-600"}>
                             ₪{currentProfit.toFixed(2)}
                           </span>
