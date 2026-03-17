@@ -655,8 +655,8 @@ export function AdminPanel() {
     try {
       const [restsSnap, globalIngSnap, suppliersSnap] = await Promise.all([
         getDocs(collection(db, "restaurants")),
-        getDocsFromServer(collection(db, "ingredients")),
-        getDocsFromServer(collection(db, "suppliers")),
+        getDocs(collection(db, "ingredients")),
+        getDocs(collection(db, "suppliers")),
       ])
       let pricesSnap: Awaited<ReturnType<typeof getDocs>>
       try {
@@ -737,68 +737,51 @@ export function AdminPanel() {
       const supplierToRests: Record<string, string[]> = {}
       allSuppliers.forEach((s) => { supplierToRests[s] = [] })
 
-      const restsWithDetailsList: RestWithDetails[] = []
-      for (const r of restsSnap.docs) {
-        const data = r.data()
-        const [recSnap, asDoc, restIngSnap] = await Promise.all([
-          getDocs(collection(db, "restaurants", r.id, "recipes")),
-          getDocFromServer(doc(db, "restaurants", r.id, "appState", "assignedSuppliers")).catch(() => getDoc(doc(db, "restaurants", r.id, "appState", "assignedSuppliers"))),
-          getDocs(collection(db, "restaurants", r.id, "ingredients")),
-        ])
-        const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
-        assignedList.forEach((s) => {
-          if (supplierToRests[s]) supplierToRests[s].push(r.id)
-        })
-
-        const dishes = recSnap.docs.filter((d) => !d.data().isCompound)
-        const prices: Record<string, number> = {}
-        restIngSnap.forEach((d) => {
-          const ddata = d.data()
-          prices[d.id] = typeof ddata.price === "number" ? ddata.price : 0
-        })
-        globalIngSnap.forEach((d) => {
-          const ddata = d.data()
-          const sup = (ddata.supplier as string) || ""
-          if (!(d.id in prices) && (!sup || assignedList.includes(sup))) {
-            prices[d.id] = typeof ddata.price === "number" ? ddata.price : 0
+      // Fetch all restaurants in parallel
+      const restsWithDetailsList: RestWithDetails[] = await Promise.all(
+        restsSnap.docs.map(async (r) => {
+          const data = r.data()
+          const [recSnap, asDoc, restIngSnap] = await Promise.all([
+            getDocs(collection(db, "restaurants", r.id, "recipes")),
+            getDoc(doc(db, "restaurants", r.id, "appState", "assignedSuppliers")),
+            getDocs(collection(db, "restaurants", r.id, "ingredients")),
+          ])
+          const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
+          assignedList.forEach((s) => { if (supplierToRests[s]) supplierToRests[s].push(r.id) })
+          const dishes = recSnap.docs.filter((d) => !d.data().isCompound)
+          const prices: Record<string, number> = {}
+          restIngSnap.forEach((d) => { const ddata = d.data(); prices[d.id] = typeof ddata.price === "number" ? ddata.price : 0 })
+          globalIngSnap.forEach((d) => {
+            const ddata = d.data(); const sup = (ddata.supplier as string) || ""
+            if (!(d.id in prices) && (!sup || assignedList.includes(sup))) prices[d.id] = typeof ddata.price === "number" ? ddata.price : 0
+          })
+          let fcSum = 0, fcCount = 0
+          dishes.forEach((d) => {
+            const ddata = d.data()
+            const sellingPrice = (typeof ddata.sellingPrice === "number" ? ddata.sellingPrice : 0) / VAT_RATE
+            const ing = Array.isArray(ddata.ingredients) ? ddata.ingredients : []
+            let cost = 0
+            ing.forEach((i: { name?: string; qty?: number; waste?: number; unit?: string }) => {
+              const p = prices[i.name || ""] ?? 0
+              let mult = 1
+              if (i.unit === "גרם") mult = 0.001
+              else if (i.unit === "מל") mult = 0.001
+              cost += (i.qty || 0) * p * mult * (1 + (i.waste || 0) / 100)
+            })
+            const fcPct = sellingPrice > 0 ? (cost / sellingPrice) * 100 : 0
+            fcSum += fcPct; fcCount++
+          })
+          return {
+            id: r.id, name: data.name || r.id, emoji: data.emoji,
+            dishesCount: dishes.length, fcAvg: Math.round((fcCount > 0 ? fcSum/fcCount : 0) * 10) / 10,
+            assignedSuppliers: assignedList, imageUrl: (data.imageUrl as string) || null,
+            phone: (data.phone as string) || null, email: (data.email as string) || null, address: (data.address as string) || null,
           }
         })
-
-        let fcSum = 0
-        let fcCount = 0
-        dishes.forEach((d) => {
-          const ddata = d.data()
-          const sellingPrice = (typeof ddata.sellingPrice === "number" ? ddata.sellingPrice : 0) / VAT_RATE
-          const ing = Array.isArray(ddata.ingredients) ? ddata.ingredients : []
-          let cost = 0
-          ing.forEach((i: { name?: string; qty?: number; waste?: number; unit?: string }) => {
-            const p = prices[i.name || ""] ?? 0
-            let mult = 1
-            if (i.unit === "גרם") mult = 0.001
-            else if (i.unit === "מל") mult = 0.001
-            cost += (i.qty || 0) * p * mult * (1 + (i.waste || 0) / 100)
-          })
-          const fcPct = sellingPrice > 0 ? (cost / sellingPrice) * 100 : 0
-          fcSum += fcPct
-          fcCount++
-        })
-        const fcAvg = fcCount > 0 ? fcSum / fcCount : 0
-
-        restsWithDetailsList.push({
-          id: r.id,
-          name: data.name || r.id,
-          emoji: data.emoji,
-          dishesCount: dishes.length,
-          fcAvg: Math.round(fcAvg * 10) / 10,
-          assignedSuppliers: assignedList,
-          imageUrl: (data.imageUrl as string) || null,
-          phone: (data.phone as string) || null,
-          email: (data.email as string) || null,
-          address: (data.address as string) || null,
-        })
-      }
+      )
 
       setRestsWithDetails(restsWithDetailsList)
+      restsWithDetailsList.forEach(r => { if(r.imageUrl){const img=new window.Image();img.src=r.imageUrl} })
       setSuppliersWithRests(
         allSuppliers.map((s) => ({
           name: s,
@@ -806,6 +789,7 @@ export function AdminPanel() {
           ...supplierDetails[s],
         }))
       )
+      suppliersSnap.docs.forEach(d=>{ const url=d.data().imageUrl; if(url){const img=new window.Image();img.src=url as string} })
       setSupplierToIngredients(supplierToIng)
       const allIngredients: IngredientRow[] = globalIngSnap.docs.map((d) => {
         const data = d.data()
