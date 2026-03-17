@@ -126,8 +126,10 @@ export function LoginScreen(_props: LoginScreenProps) {
     setError("")
     setIsLoading(true)
     try {
-      await sendPasswordResetEmail(auth, email.trim())
-      setError(t("login.resetEmailSent"))
+      auth.languageCode = "he"
+      const actionCodeSettings = { url: window.location.origin + "/", handleCodeInApp: false }
+      await sendPasswordResetEmail(auth, email.trim(), actionCodeSettings)
+      setError(t("login.resetEmailSent") + " — בדוק גם תיקיית ספאם")
     } catch (err: unknown) {
       const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
       if (code === "auth/user-not-found") setError(t("login.userNotFound"))
