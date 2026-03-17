@@ -420,6 +420,9 @@ export function AdminPanel() {
   const INVOICE_ACCEPT = ".xlsx,.xls,.csv,.pdf,.rtf,image/*"
   const [selectedSupplierDetail, setSelectedSupplierDetail] = useState<string | null>(null)
   const [activeSupplierChip, setActiveSupplierChip] = useState<"restaurants"|"ingredients"|"cost"|null>(null)
+  const [ingFilter, setIngFilter] = useState("")
+  const [ingSortBy, setIngSortBy] = useState<"name"|"price"|"unit">("name")
+  const [ingSortAsc, setIngSortAsc] = useState(true)
   const [selectedRestDetail, setSelectedRestDetail] = useState<string | null>(null)
   const [editRestImageFile, setEditRestImageFile] = useState<File|null>(null)
   const [editRestImageUrl, setEditRestImageUrl] = useState<string|null>(null)
@@ -2811,21 +2814,55 @@ export function AdminPanel() {
                                       )}
                                     </div>
                                   ) : activeSupplierChip==="ingredients" ? (
-                                    <div>
-                                      <p className="text-sm font-semibold mb-3 flex items-center gap-1.5"><ShoppingCart className="w-4 h-4 text-violet-500"/>רכיבים ({ings.length})</p>
-                                      {ings.length===0?<p className="text-sm text-muted-foreground">אין רכיבים</p>:(
-                                        <div className="overflow-x-auto"><table className="w-full text-sm">
-                                          <thead><tr className="border-b text-xs text-muted-foreground"><th className="text-right pb-1.5">רכיב</th><th className="text-center pb-1.5 w-20">מחיר</th><th className="text-center pb-1.5 w-20">יחידה</th><th className="text-center pb-1.5 w-24">מקט</th></tr></thead>
-                                          <tbody>{ings.map((ing,i)=>(
-                                            <tr key={i} className="border-b last:border-0 hover:bg-muted/30">
-                                              <td className="py-1.5 font-medium">{ing.name}</td>
-                                              <td className="py-1.5 text-center">₪{typeof ing.price==="number"?ing.price.toFixed(2):"—"}</td>
-                                              <td className="py-1.5 text-center text-muted-foreground">{(ing as any).unit||"—"}</td>
-                                              <td className="py-1.5 text-center text-muted-foreground text-xs">{(ing as any).sku||"—"}</td>
-                                            </tr>
-                                          ))}</tbody>
-                                        </table></div>
-                                      )}
+                                    <div className="space-y-2">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <p className="text-sm font-semibold flex items-center gap-1.5"><ShoppingCart className="w-4 h-4 text-violet-500"/>רכיבים ({ings.length})</p>
+                                        <div className="relative">
+                                          <Search className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground"/>
+                                          <input value={ingFilter} onChange={e=>setIngFilter(e.target.value)}
+                                            placeholder="חיפוש..." dir="rtl"
+                                            className="h-8 pl-3 pr-8 rounded-md border text-sm bg-background w-40 focus:outline-none focus:ring-1 focus:ring-primary"/>
+                                        </div>
+                                      </div>
+                                      {ings.length===0?<p className="text-sm text-muted-foreground">אין רכיבים</p>:(()=>{
+                                        const filtered=ings.filter(ing=>!ingFilter||ing.name.includes(ingFilter)||(ing as any).sku?.includes(ingFilter))
+                                        const sorted=[...filtered].sort((a,b)=>{
+                                          const av=ingSortBy==="price"?(typeof a.price==="number"?a.price:0):ingSortBy==="unit"?(a as any).unit||"":a.name
+                                          const bv=ingSortBy==="price"?(typeof b.price==="number"?b.price:0):ingSortBy==="unit"?(b as any).unit||"":b.name
+                                          if(typeof av==="number"&&typeof bv==="number")return ingSortAsc?av-bv:bv-av
+                                          return ingSortAsc?(av as string).localeCompare(bv as string,"he"):(bv as string).localeCompare(av as string,"he")
+                                        })
+                                        const thCls="pb-2 pt-1 px-2 cursor-pointer hover:text-foreground select-none text-xs text-muted-foreground"
+                                        const Arr=({f}:{f:string})=>ingSortBy===f?<span className="mr-0.5">{ingSortAsc?"↑":"↓"}</span>:<ArrowUpDown className="w-2.5 h-2.5 opacity-30 inline mr-0.5"/>
+                                        return (
+                                          <div className="rounded-md border overflow-hidden">
+                                            <div className="overflow-y-auto" style={{maxHeight:"300px"}}>
+                                              <table className="w-full text-sm">
+                                                <thead className="sticky top-0 bg-background border-b z-10">
+                                                  <tr>
+                                                    <th className={thCls+" text-right"} onClick={()=>{ingSortBy==="name"?setIngSortAsc(v=>!v):(setIngSortBy("name"),setIngSortAsc(true))}}>רכיב<Arr f="name"/></th>
+                                                    <th className={thCls+" text-center w-20"} onClick={()=>{ingSortBy==="price"?setIngSortAsc(v=>!v):(setIngSortBy("price"),setIngSortAsc(true))}}>מחיר<Arr f="price"/></th>
+                                                    <th className={thCls+" text-center w-20"} onClick={()=>{ingSortBy==="unit"?setIngSortAsc(v=>!v):(setIngSortBy("unit"),setIngSortAsc(true))}}>יחידה<Arr f="unit"/></th>
+                                                    <th className="pb-2 pt-1 px-2 text-center w-24 text-xs text-muted-foreground">מקט</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {sorted.length===0
+                                                    ?<tr><td colSpan={4} className="py-4 text-center text-sm text-muted-foreground">אין תוצאות</td></tr>
+                                                    :sorted.map((ing,i)=>(
+                                                      <tr key={i} className="border-b last:border-0 hover:bg-muted/30">
+                                                        <td className="py-1.5 px-2 font-medium">{ing.name}</td>
+                                                        <td className="py-1.5 text-center">₪{typeof ing.price==="number"?ing.price.toFixed(2):"—"}</td>
+                                                        <td className="py-1.5 text-center text-muted-foreground">{(ing as any).unit||"—"}</td>
+                                                        <td className="py-1.5 text-center text-muted-foreground text-xs">{(ing as any).sku||"—"}</td>
+                                                      </tr>
+                                                    ))}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          </div>
+                                        )
+                                      })()}
                                     </div>
                                   ) : activeSupplierChip==="cost" ? (
                                     <div>
