@@ -213,6 +213,7 @@ export default function ProductTree() {
         setIngredientStock(newStock)
       } catch (e) {
         console.error("load recipes/ingredients:", e)
+        toast.error("שגיאה בטעינת עץ מוצר")
       } finally {
         setLoading(false)
       }

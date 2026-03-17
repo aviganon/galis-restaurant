@@ -102,6 +102,7 @@ export function Reports() {
         setMargin(rev > 0 ? ((rev - cost) / rev) * 100 : 0)
       } catch (e) {
         console.error("load reports:", e)
+        toast.error("שגיאה בטעינת דוחות")
       } finally {
         setLoading(false)
       }

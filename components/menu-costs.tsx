@@ -166,6 +166,7 @@ export function MenuCosts() {
         setCategories(["הכל", ...Array.from(catSet).sort()])
       } catch (e) {
         console.error("load menu costs:", e)
+        toast.error("שגיאה בטעינת עלויות תפריט")
       } finally {
         setLoading(false)
       }

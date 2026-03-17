@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { toast } from "@/components/ui/sonner"
 import { collection, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
@@ -118,6 +119,7 @@ export function Recipes() {
         setRecipes(list)
       } catch (e) {
         console.error("load recipes:", e)
+        toast.error("שגיאה בטעינת מתכונים")
       } finally {
         setLoading(false)
       }
