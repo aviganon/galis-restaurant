@@ -54,6 +54,8 @@ import {
   Edit2,
   Upload as UploadIcon,
   ShoppingCart,
+  X,
+  ShoppingCart,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
@@ -71,7 +73,7 @@ interface SupplierInfo {
   products: number
   totalValue: number
   source: "assigned" | "restaurant"
-  ingredientsForChips?: { stock: number; minStock: number }[]
+  ingredientsForChips?: { name: string; stock: number; minStock: number; unit: string; price: number }[]
   imageUrl?: string
 }
 
@@ -96,6 +98,8 @@ export default function Suppliers() {
   const [supplierDetailLoading, setSupplierDetailLoading] = useState(false)
   const [stockChipFilter, setStockChipFilter] = useState<"all"|"ok"|"low"|"zero">("all")
   const [supplierIngFilter, setSupplierIngFilter] = useState("")
+  const [reorderPanelOpen, setReorderPanelOpen] = useState(false)
+  const [globalReorderOpen, setGlobalReorderOpen] = useState(false)
   const [reorderPanelOpen, setReorderPanelOpen] = useState(false)
   const [editSupplierOpen, setEditSupplierOpen] = useState(false)
   const [editPhone, setEditPhone] = useState("")
@@ -171,7 +175,7 @@ export default function Suppliers() {
           totalValue: existing.totalValue + price * stock,
           source: existing.source === "assigned" ? "assigned" : src,
         })
-        const chips0 = chipsBySupplier.get(sup) || []; chips0.push({ stock, minStock: typeof data.minStock === "number" ? data.minStock : 0 }); chipsBySupplier.set(sup, chips0)
+        const chips0 = chipsBySupplier.get(sup) || []; chips0.push({ name: d.id, stock, minStock: typeof data.minStock === "number" ? data.minStock : 0, unit: (data.unit as string)||"יחידה", price: typeof data.price === "number" ? data.price : 0 }); chipsBySupplier.set(sup, chips0)
       })
       globalSnap.forEach((d) => {
         if (seenIds.has(d.id)) return
@@ -190,7 +194,7 @@ export default function Suppliers() {
           totalValue: existing.totalValue + price * stock,
           source: assignedList.includes(sup) ? "assigned" : existing.source,
         })
-        const chips1 = chipsBySupplier.get(supKey) || []; chips1.push({ stock, minStock: typeof data.minStock === "number" ? data.minStock : 0 }); chipsBySupplier.set(supKey, chips1)
+        const chips1 = chipsBySupplier.get(supKey) || []; chips1.push({ name: d.id, stock, minStock: typeof data.minStock === "number" ? data.minStock : 0, unit: (data.unit as string)||"יחידה", price: typeof data.price === "number" ? data.price : 0 }); chipsBySupplier.set(supKey, chips1)
       })
       const supplierDocs = await Promise.all(
         Array.from(bySupplier.keys()).map(name => {
@@ -660,6 +664,12 @@ export default function Suppliers() {
             <Package className="w-4 h-4 ml-1" />
             מלאי
           </Button>
+          {(()=>{
+            const total=suppliers.reduce((s,sup)=>s+(sup.ingredientsForChips||[]).filter(i=>i.stock<i.minStock||(i.stock===0&&i.minStock===0)).length,0)
+            return total>0?(<Button variant="outline" className={globalReorderOpen?"ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-950/30":""} onClick={()=>setGlobalReorderOpen(v=>!v)}>
+              <ShoppingCart className="w-4 h-4 ml-1 text-blue-600"/><span className="text-blue-600 font-medium">הזמנות ({total})</span>
+            </Button>):null
+          })()}
           <Button variant="outline" onClick={() => setShowInvoiceUploadArea((v) => !v)}>
             <UploadIcon className="w-4 h-4 ml-1" />
             העלאת חשבונית
@@ -704,6 +714,47 @@ export default function Suppliers() {
         </Card>
       ) : (
         <>
+          {globalReorderOpen&&(
+            <div className="mb-4 p-4 rounded-xl border border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-semibold flex items-center gap-1.5 text-blue-700 dark:text-blue-400">
+                  <ShoppingCart className="w-4 h-4"/>המלצות הזמנה — כל הספקים
+                </p>
+                <button onClick={()=>setGlobalReorderOpen(false)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4"/></button>
+              </div>
+              <div className="rounded-md border overflow-hidden"><div className="overflow-y-auto" style={{maxHeight:"340px"}}>
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-blue-50/90 dark:bg-blue-950/80 border-b z-10"><tr className="text-xs text-muted-foreground">
+                    <th className="text-right py-2 px-3">ספק</th>
+                    <th className="text-right py-2 px-3">רכיב</th>
+                    <th className="text-center py-2 w-16">מלאי</th>
+                    <th className="text-center py-2 w-16">מינ׳</th>
+                    <th className="text-center py-2 w-24 text-blue-600 font-semibold">כמות להזמין</th>
+                    <th className="text-center py-2 w-16">יחידה</th>
+                    <th className="text-center py-2 w-20">עלות</th>
+                  </tr></thead>
+                  <tbody>
+                    {suppliers.flatMap(s=>(s.ingredientsForChips||[]).filter(i=>i.stock<i.minStock||(i.stock===0&&i.minStock===0)).map((i,idx)=>{
+                      const sq=i.minStock>0?Math.max(i.minStock-i.stock,1):1
+                      return (<tr key={s.name+idx} className="border-b last:border-0 hover:bg-blue-50/50 dark:hover:bg-blue-950/30">
+                        <td className="py-1.5 px-3 text-xs text-muted-foreground font-medium">{s.name}</td>
+                        <td className="py-1.5 px-3 font-medium">{i.name}</td>
+                        <td className="py-1.5 text-center text-red-500 font-medium">{i.stock}</td>
+                        <td className="py-1.5 text-center text-muted-foreground">{i.minStock}</td>
+                        <td className="py-1.5 text-center font-bold text-blue-600">{sq}</td>
+                        <td className="py-1.5 text-center text-muted-foreground text-xs">{i.unit}</td>
+                        <td className="py-1.5 text-center">₪{(sq*i.price).toFixed(0)}</td>
+                      </tr>)
+                    }))}
+                  </tbody>
+                </table>
+              </div></div>
+              <div className="flex justify-between items-center mt-3 text-xs text-muted-foreground">
+                <span>{suppliers.reduce((s,sup)=>s+(sup.ingredientsForChips||[]).filter(i=>i.stock<i.minStock||(i.stock===0&&i.minStock===0)).length,0)} פריטים מ-{suppliers.filter(s=>(s.ingredientsForChips||[]).some(i=>i.stock<i.minStock||(i.stock===0&&i.minStock===0))).length} ספקים | סה"כ משוער: <strong className="text-foreground">₪{suppliers.reduce((tot,s)=>tot+(s.ingredientsForChips||[]).filter(i=>i.stock<i.minStock||(i.stock===0&&i.minStock===0)).reduce((s2,i)=>s2+(i.minStock>0?Math.max(i.minStock-i.stock,1):1)*i.price,0),0).toFixed(0)}</strong></span>
+                <button onClick={()=>setCurrentPage?.("purchase-orders")} className="text-blue-600 hover:underline font-medium">עבור להזמנות ←</button>
+              </div>
+            </div>
+          )}
           <p className="text-sm text-muted-foreground mb-4">{t("pages.suppliers.clickForDetails")}</p>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
             {safeFilteredSuppliers.map((supplier) => (
@@ -718,7 +769,7 @@ export default function Suppliers() {
                     ? 'url('+supplier.imageUrl+') center/cover'
                     : 'linear-gradient(135deg,hsl(var(--primary)/0.15),hsl(var(--primary)/0.05))'
                 }}
-                onClick={() => { if(supplier.name !== "ללא ספק") { setSelectedSupplierDetail(selectedSupplierDetail === supplier.name ? null : supplier.name); setStockChipFilter("all"); setReorderPanelOpen(false) } }}
+                onClick={() => { if(supplier.name !== "ללא ספק") { setSelectedSupplierDetail(selectedSupplierDetail === supplier.name ? null : supplier.name); setStockChipFilter("all"); setReorderPanelOpen(false); setReorderPanelOpen(false) } }}
               >
                 <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/30 to-black/80"/>
                 <div className="absolute inset-0 p-3 flex flex-col justify-between">
@@ -841,6 +892,7 @@ export default function Suppliers() {
                       const okCount = items.filter(i=>i.stock>0&&(i.minStock===0||i.stock>=i.minStock)).length;
                       const lowCount = items.filter(i=>i.stock>0&&i.minStock>0&&i.stock<i.minStock).length;
                       const zeroCount = items.filter(i=>i.stock===0).length;
+                      const reorderCount=items.filter(i=>i.stock<i.minStock||(i.stock===0&&i.minStock===0)).length;
                       const reorderCount=items.filter(i=>i.stock<i.minStock||(i.stock===0&&i.minStock===0)).length;
                       const chips=[
                         {key:"ok" as const, label:"פריטים במלאי", val:okCount, grad:"from-emerald-400 to-teal-500"},
