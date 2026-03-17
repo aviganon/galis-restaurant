@@ -203,7 +203,6 @@ export function Settings() {
       toast.success(`מייל לאיפוס סיסמא נשלח ל-${targetEmail} — בדוק גם תיקיית ספאם`)
     } catch (e: unknown) {
       const err = e instanceof Error ? e : new Error(String(e))
-      console.error("Password reset error:", err)
       toast.error(err.message || t("authErrors.resetError"))
     }
   }
@@ -234,7 +233,6 @@ export function Settings() {
       URL.revokeObjectURL(url)
       toast.success(t("pages.settings.exportSuccess"))
     } catch (e) {
-      console.error(e)
       toast.error(t("pages.settings.exportError"))
     } finally {
       setExporting(false)
@@ -271,7 +269,6 @@ export function Settings() {
       toast.success(t("pages.settings.importSuccess"))
       refreshIngredients?.()
     } catch (err) {
-      console.error(err)
       toast.error(t("pages.settings.importError"))
     } finally {
       setImporting(false)
@@ -301,7 +298,6 @@ export function Settings() {
       toast.success(t("pages.settings.deleteSuccess"))
       setDeleteDialogOpen(false)
     } catch (err) {
-      console.error(err)
       toast.error(t("pages.settings.deleteError"))
     } finally {
       setDeleting(false)
