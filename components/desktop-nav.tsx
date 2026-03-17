@@ -85,7 +85,6 @@ const moreNavItems = (
   if (isSystemOwner && !isImpersonating) return items
   // בעלים בהתחזות — כפתור חזרה לפאנל בעלים
   if (isSystemOwner && isImpersonating) items.push({ id: "admin-panel", label: t("nav.adminPanel"), icon: Shield })
-  if (full || userCanSee(perms, "canSeeInventory")) items.push({ id: "inventory", label: t("nav.inventory"), icon: Package })
   if (full || userCanSee(perms, "canSeePurchaseOrders")) items.push({ id: "purchase-orders", label: t("nav.purchaseOrders"), icon: ClipboardList })
   if (full || userCanSee(perms, "canSeeUpload")) items.push({ id: "upload", label: t("nav.upload"), icon: Upload })
   if (full || userCanSeeOptIn(perms, "canSeeReports")) items.push({ id: "reports", label: t("nav.reports"), icon: BarChart3 })
