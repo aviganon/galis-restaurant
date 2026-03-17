@@ -620,7 +620,7 @@ export default function ProductTree() {
     navigator.clipboard.writeText(toCopy).then(() => toast.success(t("pages.productTree.copiedToClipboard")))
   }
 
-  const openDishEditDialog = (name) => {
+  const openDishEditDialog = (name: string) => {
     const dish = dishes[name]; if (!dish) return
     setEditDishTarget(name); setEditDishName(name)
     setEditDishCategory(dish.category || "עיקריות")
@@ -637,9 +637,9 @@ export default function ProductTree() {
         const sRef = storageRef(storage, 'restaurants/'+currentRestaurantId+'/dishes/'+safe+'/cover.jpg')
         await new Promise((res,rej) => {
           const task = uploadBytesResumable(sRef, editDishImgFile)
-          task.on('state_changed',()=>{},rej,async()=>{ imgUrl=await getDownloadURL(sRef); res() })
+          task.on('state_changed',()=>{},rej,async()=>{ imgUrl=await getDownloadURL(sRef); res(undefined) })
         })
-        setDishImages(prev=>({...prev,[editDishTarget]:imgUrl}))
+        if(imgUrl) setDishImages(prev=>({...prev,[editDishTarget]:imgUrl!}))
       }
       const newName = (editDishName||'').trim() || editDishTarget
       const updatedDish = {...dish, name:newName, category:editDishCategory, ...(imgUrl?{imageUrl:imgUrl}:{})}
@@ -1055,11 +1055,15 @@ export default function ProductTree() {
                     className={cn(
                       "relative rounded-lg p-2 text-right transition-all min-w-[100px] max-w-[150px] flex-1",
                       isActive 
-                        ? "bg-primary text-primary-foreground shadow-lg ring-2 ring-primary/50" 
+                        ? "shadow-lg ring-2 ring-primary/50" 
                         : "bg-card border border-border hover:border-primary/50 hover:shadow-md"
                     )}
+                    style={dishImages[name]
+                      ? {backgroundImage:`url(${dishImages[name]})`,backgroundSize:'cover',backgroundPosition:'center'}
+                      : isActive ? {background:'var(--primary)'} : undefined
+                    }
                   >
-                    {dishImages[name]&&<div className="absolute inset-0 rounded-xl" style={{background:'linear-gradient(to top,rgba(0,0,0,0.6) 0%,transparent 60%)'}}/>}
+                    {dishImages[name]&&<div className="absolute inset-0 rounded-lg" style={{background:'linear-gradient(to top,rgba(0,0,0,0.65) 0%,rgba(0,0,0,0.1) 60%,transparent 100%)'}}/>}
                     <button onClick={e=>{e.stopPropagation();openDishEditDialog(name)}}
                       className={cn("absolute top-1.5 left-1.5 p-1 rounded-md z-10 transition-colors",
                         dishImages[name]||isActive?"text-white/80 hover:bg-white/20":"text-muted-foreground hover:bg-muted")}>
