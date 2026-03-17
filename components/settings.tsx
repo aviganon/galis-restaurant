@@ -188,15 +188,23 @@ export function Settings() {
   const roleLabel = effectiveRole === "owner" ? t("pages.settings.owner") : effectiveRole === "manager" ? t("pages.settings.manager") : effectiveRole === "user" ? t("pages.settings.user") : t("pages.settings.manager")
 
   const handleChangePassword = async () => {
-    if (!email) {
+    const targetEmail = email || auth.currentUser?.email
+    if (!targetEmail) {
       toast.error(t("pages.settings.noEmailForReset"))
       return
     }
     try {
-      await sendPasswordResetEmail(auth, email)
-      toast.success(t("pages.settings.resetEmailSent"))
+      auth.languageCode = "he"
+      const actionCodeSettings = {
+        url: window.location.origin + "/",
+        handleCodeInApp: false,
+      }
+      await sendPasswordResetEmail(auth, targetEmail, actionCodeSettings)
+      toast.success(`מייל לאיפוס סיסמא נשלח ל-${targetEmail} — בדוק גם תיקיית ספאם`)
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : t("authErrors.resetError"))
+      const err = e instanceof Error ? e : new Error(String(e))
+      console.error("Password reset error:", err)
+      toast.error(err.message || t("authErrors.resetError"))
     }
   }
 
