@@ -420,6 +420,10 @@ export function AdminPanel() {
   const INVOICE_ACCEPT = ".xlsx,.xls,.csv,.pdf,.rtf,image/*"
   const [selectedSupplierDetail, setSelectedSupplierDetail] = useState<string | null>(null)
   const [activeSupplierChip, setActiveSupplierChip] = useState<"restaurants"|"ingredients"|"cost"|null>(null)
+  const [ingFilter, setIngFilter] = useState("")
+  const [ingSortBy, setIngSortBy] = useState<"name"|"price"|"unit">("name")
+  const [ingSortAsc, setIngSortAsc] = useState(true)
+  const [ingTableFilter, setIngTableFilter] = useState("")
   const [selectedRestDetail, setSelectedRestDetail] = useState<string | null>(null)
   const [editRestImageFile, setEditRestImageFile] = useState<File|null>(null)
   const [editRestImageUrl, setEditRestImageUrl] = useState<string|null>(null)
