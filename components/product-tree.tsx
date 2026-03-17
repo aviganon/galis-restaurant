@@ -226,7 +226,8 @@ export default function ProductTree() {
       try {
         const ref = doc(db, "restaurants", currentRestaurantId, "recipes", name)
         if (dish) {
-          await setDoc(ref, { ...dish, isCompound: dish.isCompound ?? false }, { merge: true })
+          const cleanDish = Object.fromEntries(Object.entries({ ...dish, isCompound: dish.isCompound ?? false }).filter(([,v])=>v!==undefined))
+          await setDoc(ref, cleanDish, { merge: true })
         } else {
           await deleteDoc(ref)
         }
