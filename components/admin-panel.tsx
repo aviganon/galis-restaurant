@@ -2925,11 +2925,21 @@ export function AdminPanel() {
                         )}
 
                         <div>
-                          <p className="text-sm font-medium mb-2">{t("pages.adminPanel.ingredientsCount")} ({supplierIngs.length})</p>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-sm font-medium">{t("pages.adminPanel.ingredientsCount")} ({supplierIngs.length})</p>
+                            {supplierIngs.length > 5 && (
+                              <div className="relative">
+                                <Search className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground"/>
+                                <input value={ingTableFilter} onChange={e=>setIngTableFilter(e.target.value)}
+                                  placeholder="חיפוש רכיב..." dir="rtl"
+                                  className="h-8 pl-3 pr-8 rounded-md border text-sm bg-background w-44 focus:outline-none focus:ring-1 focus:ring-primary"/>
+                              </div>
+                            )}
+                          </div>
                           {supplierIngs.length === 0 ? (
                             <p className="text-sm text-muted-foreground">{t("pages.adminPanel.noIngredientsAddFirst")}</p>
                           ) : (
-                            <div className="overflow-x-auto rounded-lg border">
+                            <div className="rounded-lg border overflow-hidden"><div className="overflow-y-auto overflow-x-auto" style={{maxHeight:"340px"}}>
                               <table className="w-full text-sm table-fixed">
                                 <colgroup>
                                   <col className="w-[5%]" />
@@ -2942,8 +2952,8 @@ export function AdminPanel() {
                                   <col className="w-[9%]" />
                                   <col className="w-[20%]" />
                                 </colgroup>
-                                <thead>
-                                  <tr className="border-b bg-muted/50">
+                                <thead className="sticky top-0 z-10">
+                                  <tr className="border-b bg-muted/80 backdrop-blur-sm">
                                     <th className="text-right py-2 px-2 font-medium w-14"></th>
                                     <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.skuLabel")}</th>
                                     <th className="text-right py-2 px-2 font-medium">{t("pages.adminPanel.minStockLabel")}</th>
@@ -2956,7 +2966,7 @@ export function AdminPanel() {
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {supplierIngs.map((i) => (
+                                  {supplierIngs.filter(i=>!ingTableFilter||i.name.includes(ingTableFilter)||(i.sku||"").includes(ingTableFilter)).map((i) => (
                                     <tr key={i.id} className="border-b last:border-0">
                                       <td className="py-2 px-2 text-right">
                                         <div className="flex gap-1 items-center">
@@ -2987,7 +2997,7 @@ export function AdminPanel() {
                                   ))}
                                 </tbody>
                               </table>
-                            </div>
+                            </div></div>
                           )}
                         </div>
 
