@@ -54,7 +54,6 @@ const mainItems = (
   if (full || userCanSee(perms, "canSeeProductTree")) items.push({ id: "calc", label: t("nav.productTree"), icon: Calculator })
   if (full && !isImpersonating) items.push({ id: "admin-panel", label: t("nav.adminPanelShort"), icon: Shield })
   // ingredients moved into product-tree tabs
-  if (full || userCanSee(perms, "canSeeInventory")) items.push({ id: "inventory", label: t("nav.inventory"), icon: Package })
   items.push({ id: "more", label: t("common.more"), icon: Menu })
   return items
 }
