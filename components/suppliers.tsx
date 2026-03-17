@@ -78,7 +78,7 @@ const isOwnerRole = (role: string, isSystemOwner?: boolean) => isSystemOwner || 
 
 export default function Suppliers() {
   const t = useTranslations()
-  const { currentRestaurantId, userRole, isSystemOwner, refreshIngredients, restaurants } = useApp()
+  const { currentRestaurantId, userRole, isSystemOwner, refreshIngredients, restaurants, setCurrentPage } = useApp()
   const isOwner = isOwnerRole(userRole, isSystemOwner)
   const [suppliers, setSuppliers] = useState<SupplierInfo[]>([])
   const [loading, setLoading] = useState(true)
@@ -653,6 +653,10 @@ export default function Suppliers() {
           <p className="text-muted-foreground">{t("pages.suppliers.subtitle")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={() => setCurrentPage("inventory")}>
+            <Package className="w-4 h-4 ml-1" />
+            מלאי
+          </Button>
           <Button variant="outline" onClick={() => setShowInvoiceUploadArea((v) => !v)}>
             <UploadIcon className="w-4 h-4 ml-1" />
             העלאת חשבונית
