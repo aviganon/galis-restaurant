@@ -55,7 +55,6 @@ import {
   Upload as UploadIcon,
   ShoppingCart,
   X,
-  ShoppingCart,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
@@ -892,7 +891,6 @@ export default function Suppliers() {
                       const okCount = items.filter(i=>i.stock>0&&(i.minStock===0||i.stock>=i.minStock)).length;
                       const lowCount = items.filter(i=>i.stock>0&&i.minStock>0&&i.stock<i.minStock).length;
                       const zeroCount = items.filter(i=>i.stock===0).length;
-                      const reorderCount=items.filter(i=>i.stock<i.minStock||(i.stock===0&&i.minStock===0)).length;
                       const reorderCount=items.filter(i=>i.stock<i.minStock||(i.stock===0&&i.minStock===0)).length;
                       const chips=[
                         {key:"ok" as const, label:"פריטים במלאי", val:okCount, grad:"from-emerald-400 to-teal-500"},
