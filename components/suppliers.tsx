@@ -53,6 +53,7 @@ import {
   Trash2,
   Edit2,
   Upload as UploadIcon,
+  ShoppingCart,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
@@ -95,6 +96,7 @@ export default function Suppliers() {
   const [supplierDetailLoading, setSupplierDetailLoading] = useState(false)
   const [stockChipFilter, setStockChipFilter] = useState<"all"|"ok"|"low"|"zero">("all")
   const [supplierIngFilter, setSupplierIngFilter] = useState("")
+  const [reorderPanelOpen, setReorderPanelOpen] = useState(false)
   const [editSupplierOpen, setEditSupplierOpen] = useState(false)
   const [editPhone, setEditPhone] = useState("")
   const [editEmail, setEditEmail] = useState("")
@@ -716,7 +718,7 @@ export default function Suppliers() {
                     ? 'url('+supplier.imageUrl+') center/cover'
                     : 'linear-gradient(135deg,hsl(var(--primary)/0.15),hsl(var(--primary)/0.05))'
                 }}
-                onClick={() => { if(supplier.name !== "ללא ספק") { setSelectedSupplierDetail(selectedSupplierDetail === supplier.name ? null : supplier.name); setStockChipFilter("all") } }}
+                onClick={() => { if(supplier.name !== "ללא ספק") { setSelectedSupplierDetail(selectedSupplierDetail === supplier.name ? null : supplier.name); setStockChipFilter("all"); setReorderPanelOpen(false) } }}
               >
                 <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/30 to-black/80"/>
                 <div className="absolute inset-0 p-3 flex flex-col justify-between">
@@ -735,7 +737,8 @@ export default function Suppliers() {
                         const ok = items.filter(i=>i.stock>0&&(i.minStock===0||i.stock>=i.minStock)).length
                         const low = items.filter(i=>i.stock>0&&i.minStock>0&&i.stock<i.minStock).length
                         const zero = items.filter(i=>i.stock===0).length
-                        return <><span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/90 text-white">{ok} ✓</span>{low>0&&<span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/90 text-white">⚠ {low}</span>}{zero>0&&<span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-500/90 text-white">✕ {zero}</span>}</>
+                        const reorder=items.filter(i=>i.stock<i.minStock||(i.stock===0&&i.minStock===0)).length
+        return <><span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/90 text-white">{ok} ✓</span>{low>0&&<span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/90 text-white">⚠ {low}</span>}{zero>0&&<span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-500/90 text-white">✕ {zero}</span>}{reorder>0&&<span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/90 text-white">🛒 {reorder}</span>}</>
                       })()}
                     </div>
                   </div>
@@ -838,12 +841,14 @@ export default function Suppliers() {
                       const okCount = items.filter(i=>i.stock>0&&(i.minStock===0||i.stock>=i.minStock)).length;
                       const lowCount = items.filter(i=>i.stock>0&&i.minStock>0&&i.stock<i.minStock).length;
                       const zeroCount = items.filter(i=>i.stock===0).length;
+                      const reorderCount=items.filter(i=>i.stock<i.minStock||(i.stock===0&&i.minStock===0)).length;
                       const chips=[
                         {key:"ok" as const, label:"פריטים במלאי", val:okCount, grad:"from-emerald-400 to-teal-500"},
                         {key:"low" as const, label:"מלאי נמוך", val:lowCount, grad:"from-amber-400 to-orange-500"},
                         {key:"zero" as const, label:"אזל מהמלאי", val:zeroCount, grad:"from-red-400 to-rose-500"},
                       ];
                       return (
+                        <>
                         <div className="flex flex-wrap gap-3 mb-4">
                           {chips.map(chip=>(
                             <div key={chip.key}
@@ -861,7 +866,48 @@ export default function Suppliers() {
                           {stockChipFilter!=="all"&&(
                             <button onClick={()=>setStockChipFilter("all")} className="text-xs text-muted-foreground hover:text-foreground self-center mr-1">✕ הצג הכל</button>
                           )}
+                          {reorderCount>0&&(
+                            <div className={`rounded-lg overflow-hidden shadow-sm cursor-pointer hover:-translate-y-0.5 transition-all ${reorderPanelOpen?"ring-2 ring-offset-1 ring-blue-500 scale-105":""}`} style={{minWidth:90}} onClick={()=>setReorderPanelOpen(v=>!v)}>
+                              <div className="bg-gradient-to-br from-blue-400 to-indigo-500 px-3 py-1.5 flex items-center gap-1.5">
+                                <ShoppingCart className="w-3.5 h-3.5 text-white/80"/><span className="text-base font-bold text-white">{reorderCount}</span>
+                              </div>
+                              <div className={`px-2 py-0.5 ${reorderPanelOpen?"bg-blue-50 dark:bg-blue-950/30":"bg-muted/60"}`}>
+                                <p className={`text-[10px] font-medium ${reorderPanelOpen?"text-blue-600":"text-muted-foreground"}`}>להזמנה</p>
+                              </div>
+                            </div>
+                          )}
                         </div>
+                        {reorderPanelOpen&&reorderCount>0&&(
+                          <div className="mb-4 p-4 rounded-xl border border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800">
+                            <p className="text-sm font-semibold mb-3 flex items-center gap-1.5 text-blue-700 dark:text-blue-400"><ShoppingCart className="w-4 h-4"/>המלצות להזמנה ({reorderCount} פריטים)</p>
+                            <div className="rounded-md border overflow-hidden"><div className="overflow-y-auto" style={{maxHeight:"260px"}}>
+                              <table className="w-full text-sm">
+                                <thead className="sticky top-0 bg-blue-50/90 dark:bg-blue-950/80 border-b z-10"><tr className="text-xs text-muted-foreground">
+                                  <th className="text-right py-2 px-3">רכיב</th><th className="text-center py-2 w-20">מלאי</th><th className="text-center py-2 w-20">מינ׳</th>
+                                  <th className="text-center py-2 w-24 text-blue-600 font-semibold">כמות להזמין</th><th className="text-center py-2 w-16">יחידה</th><th className="text-center py-2 w-20">עלות</th>
+                                </tr></thead>
+                                <tbody>
+                                  {(supplierDetailItems||[]).filter(i=>i.stock<i.minStock||(i.stock===0&&i.minStock===0)).map((i,idx)=>{
+                                    const sq=i.minStock>0?Math.max(i.minStock-i.stock,1):1
+                                    return (<tr key={idx} className="border-b last:border-0 hover:bg-blue-50/50">
+                                      <td className="py-2 px-3 font-medium">{i.name}</td>
+                                      <td className="py-2 text-center text-red-500 font-medium">{i.stock}</td>
+                                      <td className="py-2 text-center text-muted-foreground">{i.minStock}</td>
+                                      <td className="py-2 text-center font-bold text-blue-600">{sq}</td>
+                                      <td className="py-2 text-center text-muted-foreground text-xs">{i.unit}</td>
+                                      <td className="py-2 text-center">₪{(sq*i.price).toFixed(0)}</td>
+                                    </tr>)
+                                  })}
+                                </tbody>
+                              </table>
+                            </div></div>
+                            <div className="flex justify-between items-center mt-3 text-xs text-muted-foreground">
+                              <span>סה"כ משוער: <strong className="text-foreground">₪{(supplierDetailItems||[]).filter(i=>i.stock<i.minStock||(i.stock===0&&i.minStock===0)).reduce((s,i)=>s+(i.minStock>0?Math.max(i.minStock-i.stock,1):1)*i.price,0).toFixed(0)}</strong></span>
+                              <button onClick={()=>setCurrentPage?.("purchase-orders")} className="text-blue-600 hover:underline">עבור להזמנות ←</button>
+                            </div>
+                          </div>
+                        )}
+                        </>
                       );
                     })()}
                     <div className="flex items-center justify-between mb-2 gap-2">
