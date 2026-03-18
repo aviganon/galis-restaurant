@@ -38,8 +38,15 @@ export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userRole, setUserRole] = useState<"admin" | "owner" | "manager" | "user">("owner")
   const [currentPage, setCurrentPage] = useState("dashboard")
+  const [previousPage, setPreviousPage] = useState("dashboard")
   const [currentRestaurant, setCurrentRestaurant] = useState(() => t("common.loading"))
   const [currentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null)
+  const navigateTo = useCallback((page: string) => {
+    if (page === "purchase-orders") {
+      setPreviousPage(currentPage)
+    }
+    setCurrentPage(page)
+  }, [currentPage])
   const [restaurants, setRestaurants] = useState<{ id: string; name: string; branch?: string; emoji?: string }[]>([])
   const [isSystemOwner, setIsSystemOwner] = useState(false)
   const [userPermissions, setUserPermissions] = useState<UserPermissions | undefined>(undefined)
@@ -350,7 +357,16 @@ export default function Home() {
       case "inventory":
         return <Inventory />
       case "purchase-orders":
-        return <PurchaseOrders />
+        return (
+          <div>
+            <div className="container mx-auto px-4 py-4">
+              <button onClick={() => setCurrentPage(previousPage)} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors">
+                ← חזרה לספקים
+              </button>
+            </div>
+            <PurchaseOrders />
+          </div>
+        )
       case "upload":
         return <Upload />
       case "recipes":
