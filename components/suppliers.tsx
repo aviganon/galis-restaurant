@@ -1219,7 +1219,6 @@ export default function Suppliers() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
 
       {showPurchaseOrdersPanel && (
         <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -1232,5 +1231,6 @@ export default function Suppliers() {
           </div>
         </div>
       )}
+    </div>
   )
 }
