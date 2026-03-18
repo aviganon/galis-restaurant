@@ -862,12 +862,19 @@ export default function ProductTree() {
                 <BarChart2 className="w-4 h-4" />
                 <span className="hidden sm:inline">עלויות תפריט</span>
               </Button>
-              <Dialog open={showMenuCosts} onOpenChange={setShowMenuCosts}>
-                <DialogContent className="max-w-[93vw] h-[90vh] overflow-y-auto p-0" aria-describedby={undefined}>
-                  <DialogTitle className="sr-only">Menu Costs</DialogTitle>
-                  <MenuCosts />
-                </DialogContent>
-              </Dialog>
+              {showMenuCosts && (
+                <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.5)'}} onClick={() => setShowMenuCosts(false)} />
+                  <div style={{position:'relative',width:'92vw',height:'88vh',background:'var(--background)',borderRadius:'12px',boxShadow:'0 25px 50px rgba(0,0,0,0.3)',overflow:'hidden',display:'flex',flexDirection:'column'}}>
+                    <button onClick={() => setShowMenuCosts(false)} style={{position:'absolute',top:'12px',left:'12px',zIndex:10,width:'32px',height:'32px',borderRadius:'50%',border:'none',background:'var(--muted)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                      <X style={{width:'16px',height:'16px'}} />
+                    </button>
+                    <div style={{overflowY:'auto',flex:1}}>
+                      <MenuCosts />
+                    </div>
+                  </div>
+                </div>
+              )}
               
               <Button
                 size="sm"
