@@ -659,20 +659,6 @@ export default function Suppliers() {
           <p className="text-muted-foreground">{t("pages.suppliers.subtitle")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={navToInventory}>
-            <Package className="w-4 h-4 ml-1" />
-            מלאי
-          </Button>
-          <Button variant="outline" className={globalReorderOpen?"ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-950/30":""} onClick={() => setGlobalReorderOpen(v=>!v)}>
-            <ShoppingCart className="w-4 h-4 ml-1 text-blue-600"/>
-            <span className="text-blue-600 font-medium">הזמנות ספקים</span>
-          </Button>
-          {(()=>{
-            const total=suppliers.reduce((s,sup)=>s+(sup.ingredientsForChips||[]).filter(i=>i.stock<i.minStock||(i.stock===0&&i.minStock===0)).length,0)
-            return total>0?(<Button variant="outline" className={globalReorderOpen?"ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-950/30":""} onClick={()=>setGlobalReorderOpen(v=>!v)}>
-              <ShoppingCart className="w-4 h-4 ml-1 text-blue-600"/><span className="text-blue-600 font-medium">הזמנות ({total})</span>
-            </Button>):null
-          })()}
           <Button variant="outline" onClick={() => setShowInvoiceUploadArea((v) => !v)}>
             <UploadIcon className="w-4 h-4 ml-1" />
             העלאת חשבונית
@@ -957,7 +943,7 @@ export default function Suppliers() {
                             </div></div>
                             <div className="flex justify-between items-center mt-3 text-xs text-muted-foreground">
                               <span>סה"כ משוער: <strong className="text-foreground">₪{(supplierDetailItems||[]).filter(i=>i.stock<i.minStock||(i.stock===0&&i.minStock===0)).reduce((s,i)=>s+(i.minStock>0?Math.max(i.minStock-i.stock,1):1)*i.price,0).toFixed(0)}</strong></span>
-                              <button onClick={()=>setCurrentPage?.("purchase-orders")} className="inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">📋 רשימת הזמנות ←</button>
+                              <button onClick={()=>setCurrentPage?.("purchase-orders")} className="text-blue-600 hover:underline">עבור להזמנות ←</button>
                             </div>
                           </div>
                         )}
