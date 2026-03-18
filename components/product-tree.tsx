@@ -863,7 +863,7 @@ export default function ProductTree() {
                 <span className="hidden sm:inline">עלויות תפריט</span>
               </Button>
               <Dialog open={showMenuCosts} onOpenChange={setShowMenuCosts}>
-                <DialogContent className="max-w-7xl w-full h-[95vh] overflow-y-auto" aria-describedby={undefined}>
+                <DialogContent className="max-w-[95vw] w-full h-[90vh] overflow-y-auto" aria-describedby={undefined}>
                   <DialogTitle className="sr-only">Menu Costs</DialogTitle>
                   <MenuCosts />
                 </DialogContent>
