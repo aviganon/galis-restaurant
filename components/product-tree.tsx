@@ -862,12 +862,22 @@ export default function ProductTree() {
                 <BarChart2 className="w-4 h-4" />
                 <span className="hidden sm:inline">עלויות תפריט</span>
               </Button>
-              <Dialog open={showMenuCosts} onOpenChange={setShowMenuCosts}>
-                <DialogContent className="max-w-[98vw] w-[98vw] h-[90vh] overflow-y-auto p-0" aria-describedby={undefined}>
-                  <DialogTitle className="sr-only">Menu Costs</DialogTitle>
-                  <MenuCosts />
-                </DialogContent>
-              </Dialog>
+              {showMenuCosts && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowMenuCosts(false)} />
+                  <div className="relative w-[95vw] h-[92vh] bg-background rounded-xl shadow-2xl overflow-hidden flex flex-col">
+                    <button
+                      onClick={() => setShowMenuCosts(false)}
+                      className="absolute top-3 left-3 z-10 w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                    <div className="overflow-y-auto flex-1">
+                      <MenuCosts />
+                    </div>
+                  </div>
+                </div>
+              )}
               
               <Button
                 size="sm"
