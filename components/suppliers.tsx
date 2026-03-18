@@ -1,6 +1,5 @@
 "use client"
 
-import { PurchaseOrders } from "@/components/purchase-orders"
 import React, { useState, useEffect, useCallback, useRef } from "react"
 import { collection, getDocs, doc, getDoc, setDoc, writeBatch, deleteDoc, addDoc } from "firebase/firestore"
 import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplier-ingredients"
@@ -100,7 +99,6 @@ export default function Suppliers() {
   const [supplierIngFilter, setSupplierIngFilter] = useState("")
   const [reorderPanelOpen, setReorderPanelOpen] = useState(false)
   const [globalReorderOpen, setGlobalReorderOpen] = useState(false)
-  const [showPO, setShowPO] = useState(false)
   const [showPurchaseOrdersPanel, setShowPurchaseOrdersPanel] = useState(false)
   const [editSupplierOpen, setEditSupplierOpen] = useState(false)
   const [editPhone, setEditPhone] = useState("")
@@ -665,8 +663,8 @@ export default function Suppliers() {
             <Package className="w-4 h-4 ml-1" />
             מלאי
           </Button>
-          <Button variant="outline" onClick={() => setShowPO(true)}>
-            <ShoppingCart className="w-4 h-4 ml-1 text-blue-600" />
+          <Button variant="outline" className={globalReorderOpen?"ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-950/30":""} onClick={() => setGlobalReorderOpen(v=>!v)}>
+            <ShoppingCart className="w-4 h-4 ml-1 text-blue-600"/>
             <span className="text-blue-600 font-medium">הזמנות ספקים</span>
           </Button>
           {(()=>{
@@ -1238,17 +1236,5 @@ export default function Suppliers() {
         </div>
       )}
     </div>
-
-      {showPO && (
-        <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center'}}>
-          <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.5)'}} onClick={()=>setShowPO(false)}/>
-          <div style={{position:'relative',width:'92vw',height:'88vh',background:'var(--background)',borderRadius:'12px',overflow:'hidden',display:'flex',flexDirection:'column',boxShadow:'0 25px 50px rgba(0,0,0,0.3)'}}>
-            <button onClick={()=>setShowPO(false)} style={{position:'absolute',top:'12px',left:'12px',zIndex:10,width:'32px',height:'32px',borderRadius:'50%',border:'none',background:'var(--muted)',cursor:'pointer',fontSize:'18px'}}>✕</button>
-            <div style={{overflowY:'auto',flex:1}}>
-              <PurchaseOrders />
-            </div>
-          </div>
-        </div>
-      )}
   )
 }
