@@ -1132,7 +1132,7 @@ export default function Suppliers() {
       </Dialog>
 
       <Dialog open={addSupplierOpen} onOpenChange={(o) => { setAddSupplierOpen(o); if (!o) resetAddSupplierModal() }}>
-        <DialogContent className="max-w-2xl w-[calc(100vw-2rem)] max-h-[90dvh] overflow-hidden flex flex-col">
+        <DialogContent style={{width:"92vw",maxWidth:"92vw",height:"88vh",maxHeight:"88vh",overflow:"hidden",display:"flex",flexDirection:"column"}}>
           <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <span className="text-2xl">🏭</span>
