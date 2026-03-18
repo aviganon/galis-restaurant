@@ -957,7 +957,7 @@ export default function Suppliers() {
                             </div></div>
                             <div className="flex justify-between items-center mt-3 text-xs text-muted-foreground">
                               <span>סה"כ משוער: <strong className="text-foreground">₪{(supplierDetailItems||[]).filter(i=>i.stock<i.minStock||(i.stock===0&&i.minStock===0)).reduce((s,i)=>s+(i.minStock>0?Math.max(i.minStock-i.stock,1):1)*i.price,0).toFixed(0)}</strong></span>
-                              <button onClick={()=>setCurrentPage?.("purchase-orders")} className="text-blue-600 hover:underline">עבור להזמנות ←</button>
+                              <button onClick={()=>setCurrentPage?.("purchase-orders")} className="inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">📋 רשימת הזמנות ←</button>
                             </div>
                           </div>
                         )}
