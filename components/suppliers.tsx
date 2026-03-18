@@ -100,6 +100,7 @@ export default function Suppliers() {
   const [supplierIngFilter, setSupplierIngFilter] = useState("")
   const [reorderPanelOpen, setReorderPanelOpen] = useState(false)
   const [globalReorderOpen, setGlobalReorderOpen] = useState(false)
+  const [showPO, setShowPO] = useState(false)
   const [showPurchaseOrdersPanel, setShowPurchaseOrdersPanel] = useState(false)
   const [editSupplierOpen, setEditSupplierOpen] = useState(false)
   const [editPhone, setEditPhone] = useState("")
@@ -664,7 +665,7 @@ export default function Suppliers() {
             <Package className="w-4 h-4 ml-1" />
             מלאי
           </Button>
-          <Button variant="outline" onClick={() => setGlobalReorderOpen(v=>!v)}>
+          <Button variant="outline" onClick={() => setShowPO(true)}>
             <ShoppingCart className="w-4 h-4 ml-1 text-blue-600" />
             <span className="text-blue-600 font-medium">הזמנות ספקים</span>
           </Button>
@@ -756,9 +757,6 @@ export default function Suppliers() {
               <div className="flex justify-between items-center mt-3 text-xs text-muted-foreground">
                 <span>{suppliers.reduce((s,sup)=>s+(sup.ingredientsForChips||[]).filter(i=>i.stock<i.minStock||(i.stock===0&&i.minStock===0)).length,0)} פריטים מ-{suppliers.filter(s=>(s.ingredientsForChips||[]).some(i=>i.stock<i.minStock||(i.stock===0&&i.minStock===0))).length} ספקים | סה"כ משוער: <strong className="text-foreground">₪{suppliers.reduce((tot,s)=>tot+(s.ingredientsForChips||[]).filter(i=>i.stock<i.minStock||(i.stock===0&&i.minStock===0)).reduce((s2,i)=>s2+(i.minStock>0?Math.max(i.minStock-i.stock,1):1)*i.price,0),0).toFixed(0)}</strong></span>
                 <button onClick={()=>setShowPurchaseOrdersPanel(true)} className="text-blue-600 hover:underline font-medium">הזמנות ספקים ←</button>
-              </div>
-              <div className="mt-4 pt-4 border-t">
-                <PurchaseOrders />
               </div>
             </div>
           )}
@@ -1240,5 +1238,17 @@ export default function Suppliers() {
         </div>
       )}
     </div>
+
+      {showPO && (
+        <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.5)'}} onClick={()=>setShowPO(false)}/>
+          <div style={{position:'relative',width:'92vw',height:'88vh',background:'var(--background)',borderRadius:'12px',overflow:'hidden',display:'flex',flexDirection:'column',boxShadow:'0 25px 50px rgba(0,0,0,0.3)'}}>
+            <button onClick={()=>setShowPO(false)} style={{position:'absolute',top:'12px',left:'12px',zIndex:10,width:'32px',height:'32px',borderRadius:'50%',border:'none',background:'var(--muted)',cursor:'pointer',fontSize:'18px'}}>✕</button>
+            <div style={{overflowY:'auto',flex:1}}>
+              <PurchaseOrders />
+            </div>
+          </div>
+        </div>
+      )}
   )
 }
