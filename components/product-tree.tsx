@@ -713,7 +713,7 @@ export default function ProductTree() {
       <input ref={editDishImgInputRef} type="file" accept="image/*" className="hidden"
         onChange={e=>{const f=e.currentTarget.files?.[0];if(f)setEditDishImgFile(f);e.currentTarget.value=""}}/>
       {editDishDialogOpen && editDishTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-8"
           onClick={e=>{if(e.target===e.currentTarget)setEditDishDialogOpen(false)}}>
           <div className="bg-background rounded-xl shadow-2xl p-6 w-full max-w-sm space-y-4">
             <div className="flex items-center justify-between">
