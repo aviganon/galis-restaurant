@@ -6,12 +6,13 @@ import {
   Search, Plus, FileSpreadsheet, Copy, Camera, Trash2, ChevronDown, 
   ChevronUp, X, Edit2, MoreVertical, Filter, SortAsc, SortDesc,
   Package, Utensils, DollarSign, TrendingUp, TrendingDown, ImageIcon, AlertTriangle,
-  CheckCircle2, Info, ChefHat, Scale, Percent, Sparkles, Loader2
+  CheckCircle2, Info, ChefHat, Scale, Percent, Sparkles, BarChart2, Loader2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Ingredients } from "@/components/ingredients"
+import { MenuCosts } from "@/components/menu-costs"
 import SuppliersComp from "@/components/suppliers"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog"
@@ -112,6 +113,7 @@ export default function ProductTree() {
   const [isAddDishModalOpen, setIsAddDishModalOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [isAiSuggestOpen, setIsAiSuggestOpen] = useState(false)
+  const [showMenuCosts, setShowMenuCosts] = useState(false)
   const [aiSuggestLoading, setAiSuggestLoading] = useState(false)
   const [aiSuggestedDish, setAiSuggestedDish] = useState<ExtractedDishItem | null>(null)
   const [ingredientStock, setIngredientStock] = useState<Record<string, number>>({})
@@ -701,7 +703,7 @@ export default function ProductTree() {
         className="hidden"
         onChange={e=>{
           const f=e.currentTarget.files?.[0];
-          if(!f)return;
+          if(!f)return
           setImportFile(f);
           setFpmOpen(true);
           e.currentTarget.value="";
@@ -827,6 +829,16 @@ export default function ProductTree() {
                           ))}
                         </SelectContent>
                       </Select>
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowMenuCosts(true)}>
+                <BarChart2 className="w-4 h-4" />
+                <span className="hidden sm:inline">עלויות תפריט</span>
+              </Button>
+
+              <Dialog open={showMenuCosts} onOpenChange={setShowMenuCosts}>
+                <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-0">
+                  <MenuCosts />
+                </DialogContent>
+              </Dialog>
                     </div>
                     
                     <div>
