@@ -1221,13 +1221,11 @@ export default function Suppliers() {
       </Dialog>
     </div>
       {showPO && (
-        <div style={{position:"fixed",inset:0,zIndex:50,display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.5)"}} onClick={() => setShowPO(false)} />
-          <div style={{position:"relative",width:"92vw",height:"88vh",background:"var(--background)",borderRadius:"12px",boxShadow:"0 25px 50px rgba(0,0,0,0.3)",overflow:"hidden",display:"flex",flexDirection:"column"}}>
-            <button onClick={() => setShowPO(false)} style={{position:"absolute",top:"12px",left:"12px",zIndex:10,width:"32px",height:"32px",borderRadius:"50%",border:"none",background:"var(--muted)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"16px"}}>&#x2715;</button>
-            <div style={{overflowY:"auto",flex:1}}>
-              <PurchaseOrders />
-            </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowPO(false)} />
+          <div className="relative bg-background rounded-xl shadow-2xl overflow-hidden flex flex-col" style={{width:"92vw",height:"88vh"}}>
+            <button onClick={() => setShowPO(false)} className="absolute top-3 left-3 z-10 w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm">✕</button>
+            <div className="overflow-y-auto flex-1"><PurchaseOrders /></div>
           </div>
         </div>
       )}
