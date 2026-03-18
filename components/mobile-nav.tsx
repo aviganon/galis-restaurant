@@ -1,6 +1,6 @@
 "use client"
 import { useState } from "react"
-import { LayoutDashboard, ChefHat, Truck, BarChart3, Menu, Settings, Calculator, X, Package, Upload, ClipboardList, UtensilsCrossed, Shield } from "lucide-react"
+import { LayoutDashboard, BarChart3, Menu, Settings, Calculator, X, Package, Upload, ClipboardList, UtensilsCrossed, Shield } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { UserPermissions } from "@/contexts/app-context"
 import { LanguageSwitcher } from "@/components/language-switcher"
@@ -53,7 +53,6 @@ const moreItems = (
   if (isSystemOwner && !isImpersonating) return items
   if (isSystemOwner && isImpersonating) items.push({ id: "admin-panel", label: t("nav.adminPanel"), icon: Shield })
   if (full && !isImpersonating) items.push({ id: "admin-panel", label: t("nav.adminPanel"), icon: Shield })
-  if (full || userCanSeeOptIn(perms, "canSeeCosts")) items.push({ id: "menu", label: t("nav.menuCosts"), icon: UtensilsCrossed })
   if (full || userCanSee(perms, "canSeePurchaseOrders")) items.push({ id: "purchase-orders", label: t("nav.purchaseOrders"), icon: ClipboardList })
   if (full || userCanSee(perms, "canSeeUpload")) items.push({ id: "upload", label: t("nav.upload"), icon: Upload })
   if (full || userCanSeeOptIn(perms, "canSeeReports")) items.push({ id: "reports", label: t("nav.reports"), icon: BarChart3 })
