@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Ingredients } from "@/components/ingredients"
 import { MenuCosts } from "@/components/menu-costs"
-import { PurchaseOrders } from "@/components/purchase-orders"
 import SuppliersComp from "@/components/suppliers"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog"
@@ -877,7 +876,7 @@ export default function ProductTree() {
                       <X style={{width:'16px',height:'16px'}} />
                     </button>
                     <div style={{overflowY:'auto',flex:1}}>
-                      <PurchaseOrders />
+                      <SuppliersComp />
                     </div>
                   </div>
                 </div>
