@@ -1,5 +1,6 @@
 "use client"
 
+import { PurchaseOrders } from "@/components/purchase-orders"
 import React, { useState, useEffect, useCallback, useRef } from "react"
 import { collection, getDocs, doc, getDoc, setDoc, writeBatch, deleteDoc, addDoc } from "firebase/firestore"
 import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplier-ingredients"
