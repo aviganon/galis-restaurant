@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Ingredients } from "@/components/ingredients"
 import { MenuCosts } from "@/components/menu-costs"
-import SuppliersComp from "@/components/suppliers"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -85,6 +84,15 @@ const CATEGORY_TO_KEY: Record<string, string> = {
   "תוספות": "sides",
   "אחר": "other",
 }
+function DynamicSuppliers() {
+  const [Comp, setComp] = React.useState<React.ComponentType | null>(null);
+  React.useEffect(() => {
+    import("@/components/suppliers").then(m => setComp(() => m.default));
+  }, []);
+  if (!Comp) return <div className="p-4 text-center text-muted-foreground">טוען...</div>;
+  return <Comp />;
+}
+
 export default function ProductTree() {
   const [activeTab, setActiveTab] = useState<"ingredients"|"suppliers"|null>(null)
   const [dishImages, setDishImages] = useState<Record<string,string>>({})
@@ -1766,7 +1774,7 @@ export default function ProductTree() {
         )}
         {activeTab==="suppliers" && (
           <div className="pb-10">
-            <Suspense fallback={<div className="p-4 text-center text-muted-foreground">טוען...</div>}><SuppliersComp /></Suspense>
+            <DynamicSuppliers />
           </div>
         )}
       </div>
