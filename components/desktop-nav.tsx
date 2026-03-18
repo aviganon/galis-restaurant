@@ -1,6 +1,6 @@
 "use client"
 import { useState } from "react"
-import { LayoutDashboard, ChefHat, Truck, BarChart3, Settings, LogOut, ChevronDown, UtensilsCrossed, Calculator, Package, Upload, ClipboardList, Menu, Shield } from "lucide-react"
+import { LayoutDashboard, BarChart3, Settings, LogOut, ChevronDown, UtensilsCrossed, Calculator, Package, Upload, ClipboardList, Menu, Shield } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { UserPermissions } from "@/contexts/app-context"
 import { Button } from "@/components/ui/button"
@@ -45,7 +45,6 @@ const mainNavItems = (
   if (full || userCanSee(perms, "canSeeDashboard")) items.push({ id: "dashboard", label: t("nav.dashboard"), icon: LayoutDashboard })
   if (full || userCanSee(perms, "canSeeProductTree")) items.push({ id: "calc", label: t("nav.productTree"), icon: Calculator })
   if (full && !isImpersonating) items.push({ id: "admin-panel", label: t("nav.adminPanel"), icon: Shield })
-  if (full || userCanSeeOptIn(perms, "canSeeCosts")) items.push({ id: "menu", label: t("nav.menuCosts"), icon: UtensilsCrossed })
   return items
 }
 
