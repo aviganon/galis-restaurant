@@ -430,7 +430,7 @@ export default function Home() {
             >
               {renderPage()}
             </motion.div>
-            {currentPage === "purchase-orders" && previousPage === "calc" && (
+            {currentPage === "purchase-orders" && (
               <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.5)'}} onClick={()=>setCurrentPage("calc")}/>
                 <div style={{position:'relative',width:'92vw',height:'88vh',background:'var(--background)',borderRadius:'12px',overflow:'hidden',display:'flex',flexDirection:'column',boxShadow:'0 25px 50px rgba(0,0,0,0.3)'}}>
