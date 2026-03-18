@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Ingredients } from "@/components/ingredients"
 import { MenuCosts } from "@/components/menu-costs"
-import SuppliersComp from "@/components/suppliers"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -114,7 +113,6 @@ export default function ProductTree() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [isAiSuggestOpen, setIsAiSuggestOpen] = useState(false)
   const [showMenuCosts, setShowMenuCosts] = useState(false)
-  const [showPurchaseOrders, setShowPurchaseOrders] = useState(false)
   const [aiSuggestLoading, setAiSuggestLoading] = useState(false)
   const [aiSuggestedDish, setAiSuggestedDish] = useState<ExtractedDishItem | null>(null)
   const [ingredientStock, setIngredientStock] = useState<Record<string, number>>({})
@@ -858,13 +856,7 @@ export default function ProductTree() {
                     </Button>
                   </div>
                 </DialogContent>
-              </Dialog>
-              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowPurchaseOrders(true)}>
-                <ShoppingCart className="w-4 h-4" />
-                <span className="hidden sm:inline">הזמנות ספקים</span>
-              </Button>
-
-              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowMenuCosts(true)}>
+              </Dialog><Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowMenuCosts(true)}>
                 <BarChart2 className="w-4 h-4" />
                 <span className="hidden sm:inline">עלויות תפריט</span>
               </Button>
