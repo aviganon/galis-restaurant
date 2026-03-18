@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import React, { useState, useMemo, useCallback, useRef, useEffect, Suspense } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
   Search, Plus, FileSpreadsheet, Copy, Camera, Trash2, ChevronDown, 
@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Ingredients } from "@/components/ingredients"
 import { MenuCosts } from "@/components/menu-costs"
-const SuppliersComp = React.lazy(() => import("@/components/suppliers"))
+import SuppliersComp from "@/components/suppliers"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -1766,7 +1766,7 @@ export default function ProductTree() {
         )}
         {activeTab==="suppliers" && (
           <div className="pb-10">
-            <SuppliersComp />
+            <Suspense fallback={<div className="p-4 text-center text-muted-foreground">טוען...</div>}><SuppliersComp /></Suspense>
           </div>
         )}
       </div>
