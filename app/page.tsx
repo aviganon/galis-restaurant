@@ -436,7 +436,10 @@ export default function Home() {
                 <div style={{position:'relative',width:'92vw',height:'88vh',background:'var(--background)',borderRadius:'12px',overflow:'hidden',display:'flex',flexDirection:'column',boxShadow:'0 25px 50px rgba(0,0,0,0.3)'}}>
                   <button onClick={()=>setCurrentPage("calc")} style={{position:'absolute',top:'12px',left:'12px',zIndex:10,width:'32px',height:'32px',borderRadius:'50%',border:'none',background:'var(--muted)',cursor:'pointer',fontSize:'18px'}}>✕</button>
                   <div style={{overflowY:'auto',flex:1}}>
-                    <PurchaseOrders />
+                    <Suppliers />
+                    <div style={{borderTop:'1px solid var(--border)',marginTop:'16px',paddingTop:'16px'}}>
+                      <PurchaseOrders />
+                    </div>
                   </div>
                 </div>
               </div>
