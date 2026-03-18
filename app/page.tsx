@@ -430,6 +430,17 @@ export default function Home() {
             >
               {renderPage()}
             </motion.div>
+            {currentPage === "purchase-orders" && previousPage === "calc" && (
+              <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.5)'}} onClick={()=>{setCurrentPage("calc")}}/>
+                <div style={{position:'relative',width:'92vw',height:'88vh',background:'var(--background)',borderRadius:'12px',overflow:'hidden',display:'flex',flexDirection:'column',boxShadow:'0 25px 50px rgba(0,0,0,0.3)'}}>
+                  <button onClick={()=>setCurrentPage("calc")} style={{position:'absolute',top:'12px',left:'12px',zIndex:10,width:'32px',height:'32px',borderRadius:'50%',border:'none',background:'var(--muted)',cursor:'pointer',fontSize:'18px'}}>✕</button>
+                  <div style={{overflowY:'auto',flex:1}}>
+                    <PurchaseOrders />
+                  </div>
+                </div>
+              </div>
+            )}
           </AnimatePresence>
         </main>
       </AppProvider>
