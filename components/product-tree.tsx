@@ -829,16 +829,6 @@ export default function ProductTree() {
                           ))}
                         </SelectContent>
                       </Select>
-              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowMenuCosts(true)}>
-                <BarChart2 className="w-4 h-4" />
-                <span className="hidden sm:inline">עלויות תפריט</span>
-              </Button>
-
-              <Dialog open={showMenuCosts} onOpenChange={setShowMenuCosts}>
-                <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-0">
-                  <MenuCosts />
-                </DialogContent>
-              </Dialog>
                     </div>
                     
                     <div>
@@ -866,6 +856,15 @@ export default function ProductTree() {
                       {t("pages.productTree.add")}
                     </Button>
                   </div>
+                </DialogContent>
+              </Dialog>
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowMenuCosts(true)}>
+                <BarChart2 className="w-4 h-4" />
+                <span className="hidden sm:inline">עלויות תפריט</span>
+              </Button>
+              <Dialog open={showMenuCosts} onOpenChange={setShowMenuCosts}>
+                <DialogContent className="max-w-7xl w-full h-[95vh]">
+                  <MenuCosts />
                 </DialogContent>
               </Dialog>
               
