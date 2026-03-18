@@ -99,17 +99,9 @@ export function DesktopNav({ currentPage, setCurrentPage, currentRestaurant, res
         </div>
         <div className="flex items-center gap-1">
           {mainNavItems(t, userRole, userPermissions, isSystemOwner, isImpersonating).map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setCurrentPage(item.id)}
-              className={cn(
-                "flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium transition-all",
-                currentPage === item.id
-                  ? "bg-primary-foreground/20 text-primary-foreground"
-                  : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
-              )}
-            >
+            <button key={item.id} type="button" onClick={() => setCurrentPage(item.id)}
+              className={cn("flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium transition-all",
+                currentPage === item.id ? "bg-primary-foreground/20 text-primary-foreground" : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10")}>
               <item.icon className="w-4 h-4" />
               {item.label}
             </button>
@@ -117,15 +109,10 @@ export function DesktopNav({ currentPage, setCurrentPage, currentRestaurant, res
           {moreNavItems(t, userRole, userPermissions, isSystemOwner, isImpersonating).length > 0 && (
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className={cn(
-                    "h-9 px-3 gap-2 rounded-full",
+                <Button variant="ghost" className={cn("h-9 px-3 gap-2 rounded-full",
                     moreNavItems(t, userRole, userPermissions, isSystemOwner, isImpersonating).some((i) => i.id === currentPage)
                       ? "bg-primary-foreground/20 text-primary-foreground"
-                      : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
-                  )}
-                >
+                      : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10")}>
                   <Menu className="w-4 h-4" />
                   {t("common.more")}
                   <ChevronDown className="w-4 h-4 opacity-60" />
@@ -133,11 +120,8 @@ export function DesktopNav({ currentPage, setCurrentPage, currentRestaurant, res
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 {moreNavItems(t, userRole, userPermissions, isSystemOwner, isImpersonating).map((item) => (
-                  <DropdownMenuItem
-                    key={item.id}
-                    onSelect={() => setCurrentPage(item.id)}
-                    className={cn("gap-2 cursor-pointer", currentPage === item.id && "bg-accent text-accent-foreground")}
-                  >
+                  <DropdownMenuItem key={item.id} onSelect={() => setCurrentPage(item.id)}
+                    className={cn("gap-2 cursor-pointer", currentPage === item.id && "bg-accent text-accent-foreground")}>
                     <item.icon className="w-4 h-4" />
                     {item.label}
                   </DropdownMenuItem>
@@ -147,12 +131,8 @@ export function DesktopNav({ currentPage, setCurrentPage, currentRestaurant, res
           )}
         </div>
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onLogout}
-            className="text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
-          >
+          <Button variant="ghost" size="sm" onClick={onLogout}
+            className="text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10">
             <LogOut className="w-4 h-4 ml-2" />
             {t("common.logout")}
           </Button>
