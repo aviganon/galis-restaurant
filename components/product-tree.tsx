@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Ingredients } from "@/components/ingredients"
 import { MenuCosts } from "@/components/menu-costs"
-import SuppliersComp from "@/components/suppliers"
+const SuppliersComp = React.lazy(() => import("@/components/suppliers"))
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
