@@ -89,7 +89,7 @@ export function PurchaseOrders() {
         const price = typeof data.price === "number" ? data.price : 0
         const unit = (data.unit as string) || "יח"
         const supplier = (data.supplier as string) || ""
-        if (stock < minStock) {
+        if (stock < minStock || (stock === 0 && minStock === 0)) {
           sugg.push({ name: d.id, currentStock: stock, minStock, suggestedQty: minStock - stock, unit, price, supplier: supplier || "—" })
         }
       })
