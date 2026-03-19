@@ -225,7 +225,7 @@ export function PurchaseOrders() {
                               <SelectTrigger className="w-full"><SelectValue placeholder="בחר ספק מהמסעדה..." /></SelectTrigger>
                                               <SelectContent position="popper" className="z-[9999] w-full">{restaurantSuppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
                                                             </Select>
-            </div
+            </div>
             <div>
               <label className="text-sm font-medium mb-1 block">הוסף רכיב מהמלצות</label>
 <Select onValueChange={v => { const ing = suggestions.find(i => i.name === v); if (ing) addItem(ing.name, ing.unit, ing.price, ing.suggestedQty); }}>
