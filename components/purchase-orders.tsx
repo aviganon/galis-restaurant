@@ -15,7 +15,7 @@ import { FileText, Clock, CheckCircle2, DollarSign, Loader2, Search, ShoppingCar
 import { useTranslations } from "@/lib/use-translations"
 
 interface OrderSuggestion {
-  name: string
+  name: strin
   currentStock: number
   minStock: number
   suggestedQty: number
@@ -215,7 +215,7 @@ export function PurchaseOrders() {
         </TabsContent>
 
         <TabsContent value="new-order">
-          <div className="bg-card border rounded-xl p-4 space-y-4">
+          <div className="bg-card border rounded-xl p-4 space-y-4 max-h-[70vh] overflow-y-auto">
             <h3 className="font-bold text-lg">יצירת הזמנה חדשה</h3>
             <div>
               <label className="text-sm font-medium mb-1 block">ספק</label>
