@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Ingredients } from "@/components/ingredients"
 import { MenuCosts } from "@/components/menu-costs"
+import { OrdersPanel } from "@/components/orders-panel"
 import SuppliersComp from "@/components/suppliers"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog"
@@ -114,6 +115,7 @@ export default function ProductTree() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [isAiSuggestOpen, setIsAiSuggestOpen] = useState(false)
   const [showMenuCosts, setShowMenuCosts] = useState(false)
+  const [showOrdersPanel, setShowOrdersPanel] = useState(false)
   const [aiSuggestLoading, setAiSuggestLoading] = useState(false)
   const [aiSuggestedDish, setAiSuggestedDish] = useState<ExtractedDishItem | null>(null)
   const [ingredientStock, setIngredientStock] = useState<Record<string, number>>({})
@@ -857,10 +859,27 @@ export default function ProductTree() {
                     </Button>
                   </div>
                 </DialogContent>
-              </Dialog><Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowMenuCosts(true)}>
+              </Dialog><Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowOrdersPanel(true)}>
+                <ShoppingCart className="w-4 h-4" />
+                <span className="hidden sm:inline">הזמנות ספקים</span>
+              </Button>
+
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowMenuCosts(true)}>
                 <BarChart2 className="w-4 h-4" />
                 <span className="hidden sm:inline">עלויות תפריט</span>
               </Button>
+
+              {showOrdersPanel && (
+                <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.5)'}} onClick={() => setShowOrdersPanel(false)}/>
+                  <div style={{position:'relative',width:'92vw',height:'88vh',background:'var(--background)',borderRadius:'12px',overflow:'hidden',display:'flex',flexDirection:'column',boxShadow:'0 25px 50px rgba(0,0,0,0.3)'}}>
+                    <button onClick={() => setShowOrdersPanel(false)} style={{position:'absolute',top:'12px',left:'12px',zIndex:10,width:'32px',height:'32px',borderRadius:'50%',border:'none',background:'var(--muted)',cursor:'pointer',fontSize:'18px'}}>✕</button>
+                    <div style={{overflowY:'auto',flex:1}}>
+                      <OrdersPanel />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {showMenuCosts && (
                 <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center'}}>
