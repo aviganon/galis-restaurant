@@ -1,15 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { collection, getDocs, query, where, addDoc, updateDoc, doc, getDoc } from "firebase/firestore"
+import { Mail, MessageCircle, useState, useEffect } from "react"
+import { collection, getDocs, query, where, addDoc, updateDoc, deleteDoc, doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { FileText, Clock, CheckCircle2, DollarSign, Loader2, Search, ShoppingCart, Package, Plus, Send, X, ChevronDown, ChevronUp } from "lucide-react"
+import { FileText, Clock, CheckCircle2, DollarSign, Loader2, Search, ShoppingCart, Package, Plus, Send, X, ChevronDown, ChevronUp , Mail, MessageCircle, Plus, Trash2 } from "lucide-react"
 import { useTranslations } from "@/lib/use-translations"
 
 interface OrderSuggestion { name: string; currentStock: number; minStock: number; suggestedQty: number; unit: string; price: number; supplier: string }
@@ -21,6 +22,11 @@ export function PurchaseOrders() {
   const { currentRestaurantId } = useApp()
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
   const [restaurantSuppliers, setRestaurantSuppliers] = useState<{id:string;name:string;email:string;phone:string}[]>([])
+  const [activeTab, setActiveTab] = useState("suggestions")
+  const [selSup, setSelSup] = useState<{id:string;name:string;email:string;phone:string}|null>(null)
+  const [orderItems, setOrderItems] = useState<{name:string;quantity:number;unit:string;price:number}[]>([])
+  const [orderNotes, setOrderNotes] = useState("")
+  const [saving, setSaving] = useState(false)
   const [suggestions, setSuggestions] = useState<OrderSuggestion[]>([])
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [loading, setLoading] = useState(true)
@@ -133,7 +139,54 @@ export function PurchaseOrders() {
     { id: "inventory", label: "📦 מלאי" },
   ]
 
+  const addItem = (name: string, unit: string, price: number, qty: number) => {
+    setOrderItems(prev => {
+      const ex = prev.find(i=>i.name===name)
+      if (ex) return prev.map(i=>i.name===name?{...i,quantity:i.quantity+qty}:i)
+      return [...prev,{name,quantity:qty,unit,price}]
+    })
+    setActiveTab("new-order")
+  }
+
+  const orderTotal = orderItems.reduce((s,i)=>s+i.quantity*i.price,0)
+
+  const saveOrder = async (method?:"email"|"whatsapp") => {
+    if(!currentRestaurantId||!selSup||!orderItems.length) return
+    setSaving(true)
+    try {
+      const num="ORD-"+Date.now().toString().slice(-6)
+      await addDoc(collection(db,"purchaseOrders"),{
+        restaurantId:currentRestaurantId, orderNumber:num,
+        supplier:selSup.name, supplierEmail:selSup.email||"",
+        supplierPhone:selSup.phone||"", items:orderItems,
+        total:orderTotal, status:method?"sent":"draft",
+        createdAt:new Date().toISOString().split("T")[0], notes:orderNotes,
+      })
+      if(method==="email"&&selSup.email){const b=orderItems.map(i=>i.name+": "+i.quantity+" "+i.unit).join("%0A");window.open("mailto:"+selSup.email+"?subject=הזמנה "+num+"&body="+b)}
+      if(method==="whatsapp"&&selSup.phone){const b=orderItems.map(i=>"* "+i.name+": "+i.quantity+" "+i.unit).join("%0A");window.open("https://wa.me/"+selSup.phone.replace(/[^0-9]/g,"")+"?text=הזמנה "+num+"%0A"+b)}
+      setOrderItems([]);setSelSup(null);setOrderNotes("")
+      await loadData();setActiveTab("orders")
+    } catch(e){console.error(e)} finally{setSaving(false)}
+  }
+
+  const deleteOrder = async (id:string) => {
+    if(!confirm("למחוק הזמנה?")) return
+    await deleteDoc(doc(db,"purchaseOrders",id))
+    setOrders(prev=>prev.filter(o=>o.id!==id))
+  }
+
+
   return (
+    <div className="p-4 md:p-6 space-y-4" dir="rtl">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid grid-cols-3 w-full mb-4">
+          <TabsTrigger value="suggestions" className="text-xs gap-1">💡 המלצות {suggestions.length>0&&<span className="bg-amber-500 text-white text-xs px-1 rounded-full mr-1">{suggestions.length}</span>}</TabsTrigger>
+          <TabsTrigger value="new-order" className="text-xs gap-1">➕ הזמנה חדשה {orderItems.length>0&&<span className="bg-blue-500 text-white text-xs px-1 rounded-full mr-1">{orderItems.length}</span>}</TabsTrigger>
+          <TabsTrigger value="orders" className="text-xs gap-1">📋 הזמנות ({orders.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="suggestions">
+          return (
     <div className="p-4 md:p-6 space-y-4" dir="rtl">
       {/* סטטיסטיקות */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -341,9 +394,94 @@ export function PurchaseOrders() {
         </CardContent></Card>
       )}
     </div>
+        </TabsContent>
+
+        <TabsContent value="new-order">
+          <div className="space-y-4">
+            <div className="bg-card border rounded-xl p-4 space-y-4">
+              <h3 className="font-bold text-lg">יצירת הזמנה חדשה</h3>
+              <div>
+                <label className="text-sm font-medium mb-1 block">ספק</label>
+                <select className="w-full border rounded-lg px-3 py-2 bg-background text-sm" value={selSup?.id||""} onChange={e=>{const s=restaurantSuppliers.find(x=>x.id===e.target.value);setSelSup(s||null)}}>
+                  <option value="">בחר ספק...</option>
+                  {restaurantSuppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">הוסף רכיב</label>
+                <select className="w-full border rounded-lg px-3 py-2 bg-background text-sm" onChange={e=>{const ing=suggestions.find(i=>i.name===e.target.value)||{name:e.target.value,currentStock:0,minStock:0,suggestedQty:1,unit:"יח",price:0,supplier:""};if(ing.name)addItem(ing.name,ing.unit,ing.price,Math.max(1,ing.suggestedQty));e.target.value=""}}>
+                  <option value="">בחר רכיב...</option>
+                  {suggestions.map(i=><option key={i.name} value={i.name}>{i.name} (מוצע: {i.suggestedQty} {i.unit})</option>)}
+                </select>
+              </div>
+              {orderItems.length>0&&(
+                <table className="w-full text-sm">
+                  <thead><tr className="border-b"><th className="text-right py-2">רכיב</th><th className="text-center py-2">כמות</th><th className="text-center py-2">מחיר</th><th/></tr></thead>
+                  <tbody>
+                    {orderItems.map((item,idx)=>(
+                      <tr key={idx} className="border-b">
+                        <td className="py-2 font-medium">{item.name}</td>
+                        <td className="py-2 text-center">
+                          <Input type="number" value={item.quantity} min={1} className="w-20 text-center mx-auto h-8"
+                            onChange={e=>setOrderItems(prev=>prev.map((i,j)=>j===idx?{...i,quantity:Number(e.target.value)}:i))}/>
+                        </td>
+                        <td className="py-2 text-center">₪{(item.quantity*item.price).toFixed(2)}</td>
+                        <td className="py-2 text-center">
+                          <button onClick={()=>setOrderItems(prev=>prev.filter((_,j)=>j!==idx))} className="text-red-500 hover:text-red-700 p-1">✕</button>
+                        </td>
+                      </tr>
+                    ))}
+                    <tr><td colSpan={2} className="pt-2 font-bold">סהכ</td><td className="pt-2 text-center font-bold text-lg">₪{orderTotal.toFixed(2)}</td><td/></tr>
+                  </tbody>
+                </table>
+              )}
+              <div>
+                <label className="text-sm font-medium mb-1 block">הערות</label>
+                <textarea className="w-full border rounded-lg px-3 py-2 bg-background text-sm resize-none" rows={2} value={orderNotes} onChange={e=>setOrderNotes(e.target.value)} placeholder="הערות אופציונליות..."/>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <button disabled={saving||!selSup||!orderItems.length} onClick={()=>saveOrder()} className="flex items-center gap-1 px-3 py-2 text-sm border rounded-lg hover:bg-muted disabled:opacity-50">💾 שמור טיוטה</button>
+                <button disabled={saving||!selSup||!orderItems.length||!selSup?.email} onClick={()=>saveOrder("email")} className="flex items-center gap-1 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">✉️ שלח במייל</button>
+                <button disabled={saving||!selSup||!orderItems.length||!selSup?.phone} onClick={()=>saveOrder("whatsapp")} className="flex items-center gap-1 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">💬 שלח בווצאפ</button>
+                {saving&&<span className="text-sm text-muted-foreground animate-pulse">שומר...</span>}
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="orders">
+          <div className="space-y-4">
+            {orders.length===0?(
+              <div className="text-center py-8 text-muted-foreground">אין הזמנות עדיין</div>
+            ):orders.map(order=>{
+              const sc = order.status==="sent"?"bg-blue-100 text-blue-700":order.status==="confirmed"?"bg-emerald-100 text-emerald-700":order.status==="delivered"?"bg-purple-100 text-purple-700":order.status==="cancelled"?"bg-red-100 text-red-700":"bg-gray-100 text-gray-700"
+              const statusLabel = order.status==="sent"?"נשלחה":order.status==="confirmed"?"אושרה":order.status==="delivered"?"התקבלה":order.status==="cancelled"?"בוטלה":"טיוטה"
+              return(
+                <div key={order.id} className="bg-card border rounded-xl p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <span className="font-bold">{order.orderNumber}</span>
+                      <span className="text-muted-foreground mr-2">·</span>
+                      <span>{order.supplier}</span>
+                    </div>
+                    <span className={"text-xs px-2 py-1 rounded-full font-medium "+sc}>{statusLabel}</span>
+                  </div>
+                  <div className="text-sm text-muted-foreground mb-2">{order.items.length} פריטים · ₪{order.total.toLocaleString()} · {order.createdAt}</div>
+                  <div className="flex gap-2 flex-wrap">
+                    <select className="text-xs border rounded px-2 py-1 bg-background" value={order.status}
+                      onChange={e=>updateDoc(doc(db,"purchaseOrders",order.id),{status:e.target.value}).then(()=>setOrders(prev=>prev.map(o=>o.id===order.id?{...o,status:e.target.value as typeof order.status}:o)))}>
+                      {["draft","sent","confirmed","delivered","cancelled"].map(s=><option key={s} value={s}>{s==="sent"?"נשלחה":s==="confirmed"?"אושרה":s==="delivered"?"התקבלה":s==="cancelled"?"בוטלה":"טיוטה"}</option>)}
+                    </select>
+                    <button onClick={()=>deleteOrder(order.id)} className="text-xs text-red-500 border rounded px-2 py-1 hover:bg-red-50">🗑 מחק</button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
   )
 }
 
-
-// OrdersPanel is an alias used from product-tree
 export { PurchaseOrders as OrdersPanel }
