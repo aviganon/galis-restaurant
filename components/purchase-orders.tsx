@@ -224,14 +224,14 @@ export function PurchaseOrders() {
               <Select value={selSup?.id || ""} onValueChange={v => setSelSup(restaurantSuppliers.find(x => x.id === v) || null)}>
                               <SelectTrigger className="w-full"><SelectValue placeholder="בחר ספק מהמסעדה..." /></SelectTrigger>
                                               <SelectContent position="popper" className="z-[9999] w-full">{restaurantSuppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-                                                            </Select>>
+                                                            </Select>
             </div
             <div>
               <label className="text-sm font-medium mb-1 block">הוסף רכיב מהמלצות</label>
 <Select onValueChange={v => { const ing = suggestions.find(i => i.name === v); if (ing) addItem(ing.name, ing.unit, ing.price, ing.suggestedQty); }}>
                 <SelectTrigger className="w-full"><SelectValue placeholder="בחר רכיב..." /></SelectTrigger>
                                 <SelectContent position="popper" className="z-[9999] w-full">{suggestions.map(i => <SelectItem key={i.name} value={i.name}>{i.name} ({i.suggestedQty} {i.unit} מוצע)</SelectItem>)}</SelectContent>
-                                              </Select>>
+                                              </Select>
             </div
             {orderItems.length > 0 && (
               <div className="border rounded-lg overflow-hidden">
