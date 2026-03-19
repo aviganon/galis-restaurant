@@ -42,7 +42,7 @@ interface PurchaseOrder {
   status: string
   createdAt: string
   expectedDelivery?: string
-}[]; total: number; status: string; createdAt: string; expectedDelivery?: string }
+}
 interface Ingredient {
   id: string
   name: string
