@@ -222,14 +222,14 @@ export function PurchaseOrders() {
               <label className="text-sm font-medium mb-1 block">ספק</label>
               <Select value={selSup?.id || ""} onValueChange={v => setSelSup(restaurantSuppliers.find(x => x.id === v) || null)}>
                               <SelectTrigger className="w-full"><SelectValue placeholder="בחר ספק מהמסעדה..." /></SelectTrigger>
-                                              <SelectContent>{restaurantSuppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+                                              <SelectContent className="z-[9999]">{restaurantSuppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
                                                             </Select>>
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">הוסף רכיב מהמלצות</label>
 <Select onValueChange={v => { const ing = suggestions.find(i => i.name === v); if (ing) addItem(ing.name, ing.unit, ing.price, ing.suggestedQty); }}>
                 <SelectTrigger className="w-full"><SelectValue placeholder="בחר רכיב..." /></SelectTrigger>
-                                <SelectContent>{suggestions.map(i => <SelectItem key={i.name} value={i.name}>{i.name} ({i.suggestedQty} {i.unit} מוצע)</SelectItem>)}</SelectContent>
+                                <SelectContent className="z-[9999]">{suggestions.map(i => <SelectItem key={i.name} value={i.name}>{i.name} ({i.suggestedQty} {i.unit} מוצע)</SelectItem>)}</SelectContent>
                                               </Select>>
             </div>
             {orderItems.length > 0 && (
