@@ -232,7 +232,7 @@ export function PurchaseOrders() {
                 <SelectTrigger className="w-full"><SelectValue placeholder="בחר רכיב..." /></SelectTrigger>
                                 <SelectContent position="popper" className="z-[9999] w-full">{suggestions.map(i => <SelectItem key={i.name} value={i.name}>{i.name} ({i.suggestedQty} {i.unit} מוצע)</SelectItem>)}</SelectContent>
                                               </Select>
-            </div
+            </div>
             {orderItems.length > 0 && (
               <div className="border rounded-lg overflow-hidden">
                 <table className="w-full text-sm">
