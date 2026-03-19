@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 
 interface OrderSuggestion {
-  name: strin
+  name: string
   currentStock: number
   minStock: number
   suggestedQty: number
@@ -238,7 +238,8 @@ export function PurchaseOrders() {
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50">
                     <tr><th className="text-right px-3 py-2">רכיב</th><th className="text-center px-3 py-2">כמות</th><th className="text-center px-3 py-2">מחיר</th><th className="w-8" /></tr>
-                  </thead>
+                  </thead>20
+                  g
                   <tbody>
                     {orderItems.map((item, idx) => (
                       <tr key={idx} className="border-t">
