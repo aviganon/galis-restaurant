@@ -342,3 +342,7 @@ export function PurchaseOrders() {
     </div>
   )
 }
+
+
+// OrdersPanel is an alias used from product-tree
+export { PurchaseOrders as OrdersPanel }
