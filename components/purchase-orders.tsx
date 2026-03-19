@@ -15,6 +15,7 @@ import { FileText, Clock, CheckCircle2, DollarSign, Loader2, Search, ShoppingCar
 import { useTranslations } from "@/lib/use-translations"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
+
 interface OrderSuggestion {
   name: strin
   currentStock: number
