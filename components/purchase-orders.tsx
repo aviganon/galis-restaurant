@@ -24,9 +24,34 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { FileText, Clock, CheckCircle2, DollarSign, Loader2, Search, ShoppingCart, Package, Plus, Send, X, ChevronDown, ChevronUp } from "lucide-react"
 import { useTranslations } from "@/lib/use-translations"
 
-interface OrderSuggestion { name: string; currentStock: number; minStock: number; suggestedQty: number; unit: string; price: number; supplier: string }
-interface PurchaseOrder { id: string; orderNumber: string; supplier: string; items: { name: string; quantity: number; unit: string; price: number }[]; total: number; status: string; createdAt: string; expectedDelivery?: string }
-interface Ingredient { id: string; name: string; unit: string; price: number; supplier: string; stock: number; minStock: number }
+interface OrderSuggestion {
+  name: string
+  currentStock: number
+  minStock: number
+  suggestedQty: number
+  unit: string
+  price: number
+  supplier: string
+}
+interface PurchaseOrder {
+  id: string
+  orderNumber: string
+  supplier: string
+  items: { name: string; quantity: number; unit: string; price: number }[]
+  total: number
+  status: string
+  createdAt: string
+  expectedDelivery?: string
+}[]; total: number; status: string; createdAt: string; expectedDelivery?: string }
+interface Ingredient {
+  id: string
+  name: string
+  unit: string
+  price: number
+  supplier: string
+  stock: number
+  minStock: number
+}
 
 export function PurchaseOrders() {
   const t = useTranslations()
