@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { collection, getDocs, query, where, addDoc, updateDoc, doc } from "firebase/firestore"
+import { collection, getDocs, query, where, addDoc, updateDoc, doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
 import { Card, CardContent } from "@/components/ui/card"
@@ -20,6 +20,7 @@ export function PurchaseOrders() {
   const t = useTranslations()
   const { currentRestaurantId } = useApp()
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
+  const [restaurantSuppliers, setRestaurantSuppliers] = useState<{id:string;name:string;email:string;phone:string}[]>([])
   const [suggestions, setSuggestions] = useState<OrderSuggestion[]>([])
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [loading, setLoading] = useState(true)
