@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table"
 import { FileText, Clock, CheckCircle2, DollarSign, Loader2, Search, ShoppingCart, Package } from "lucide-react"
 import { useTranslations } from "@/lib/use-translations"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface OrderSuggestion {
   name: strin
@@ -219,17 +220,17 @@ export function PurchaseOrders() {
             <h3 className="font-bold text-lg">יצירת הזמנה חדשה</h3>
             <div>
               <label className="text-sm font-medium mb-1 block">ספק</label>
-              <select className="w-full border rounded-lg px-3 py-2 bg-background text-sm" value={selSup?.id || ""} onChange={e => setSelSup(restaurantSuppliers.find(x => x.id === e.target.value) || null)}>
-                <option value="">בחר ספק מהמסעדה...</option>
-                {restaurantSuppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+              <Select value={selSup?.id || ""} onValueChange={v => setSelSup(restaurantSuppliers.find(x => x.id === v) || null)}>
+                              <SelectTrigger className="w-full"><SelectValue placeholder="בחר ספק מהמסעדה..." /></SelectTrigger>
+                                              <SelectContent>{restaurantSuppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+                                                            </Select>>
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">הוסף רכיב מהמלצות</label>
-              <select className="w-full border rounded-lg px-3 py-2 bg-background text-sm" onChange={e => { const ing = suggestions.find(i => i.name === e.target.value); if (ing) addItem(ing.name, ing.unit, ing.price, ing.suggestedQty); e.target.value = "" }}>
-                <option value="">בחר רכיב...</option>
-                {suggestions.map(i => <option key={i.name} value={i.name}>{i.name} ({i.suggestedQty} {i.unit} מוצע)</option>)}
-              </select>
+<Select onValueChange={v => { const ing = suggestions.find(i => i.name === v); if (ing) addItem(ing.name, ing.unit, ing.price, ing.suggestedQty); }}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="בחר רכיב..." /></SelectTrigger>
+                                <SelectContent>{suggestions.map(i => <SelectItem key={i.name} value={i.name}>{i.name} ({i.suggestedQty} {i.unit} מוצע)</SelectItem>)}</SelectContent>
+                                              </Select>>
             </div>
             {orderItems.length > 0 && (
               <div className="border rounded-lg overflow-hidden">
