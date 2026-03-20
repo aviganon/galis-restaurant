@@ -49,6 +49,7 @@ import { getClaudeApiKey, setClaudeApiKey, testClaudeConnection } from "@/lib/cl
 import { supplierFirestoreDocId } from "@/lib/supplier-firestore-id"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
+import { getTranslation, type Locale } from "@/lib/translations"
 import { useLanguage } from "@/contexts/language-context"
 import { LanguageSwitcher } from "@/components/language-switcher"
 import { signOut } from "firebase/auth"
@@ -324,7 +325,7 @@ function WebPriceCell({
 
 export function AdminPanel() {
   const t = useTranslations()
-  const { dir } = useLanguage()
+  const { dir, locale } = useLanguage()
   const { userRole, isSystemOwner, currentRestaurantId, restaurants, onImpersonate, onStopImpersonate, isImpersonating, onRestaurantDeleted, refreshRestaurants, refreshIngredients, setCurrentPage } = useApp()
   const isRtl = dir === "rtl"
   const textAlign = isRtl ? "text-right" : "text-left"
@@ -853,11 +854,11 @@ export function AdminPanel() {
       setWebPriceByIngredient(webCache)
     } catch (e) {
       console.error("load system owner data:", e)
-      toast.error(t("pages.adminPanel.loadError"))
+      toast.error(getTranslation(locale as Locale, "pages.adminPanel.loadError"))
     } finally {
       setLoadingSystemOwner(false)
     }
-  }, [isSystemOwner, t])
+  }, [isSystemOwner, locale])
 
   useEffect(() => {
     if (isSystemOwner) {

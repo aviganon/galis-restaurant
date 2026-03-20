@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { AnimatePresence, motion, type Variants } from "framer-motion"
 import { onAuthStateChanged, signOut } from "firebase/auth"
 import { doc, getDoc, getDocFromServer, getDocsFromServer, setDoc, collection, getDocs } from "firebase/firestore"
@@ -61,6 +61,8 @@ const pageVariants: Variants = {
 export default function Home() {
   const t = useTranslations()
   const { locale } = useLanguage()
+  const localeRef = useRef(locale)
+  localeRef.current = locale
   const [authLoading, setAuthLoading] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userRole, setUserRole] = useState<"admin" | "owner" | "manager" | "user">("owner")
@@ -194,7 +196,7 @@ export default function Home() {
             setCurrentRestaurant(first.emoji ? `${first.emoji} ${first.name}` : first.name)
             setCurrentRestaurantId(first.id)
           } else {
-            setCurrentRestaurant(getTranslation(locale, "app.noRestaurants"))
+            setCurrentRestaurant(getTranslation(localeRef.current, "app.noRestaurants"))
           }
         } else if (userRestaurantId) {
           const restDoc = await getDoc(doc(db, restaurantsCollection, userRestaurantId))
@@ -249,11 +251,11 @@ export default function Home() {
             setUserPermissions(defaultPermissions)
           } else {
             setRestaurants([])
-            setCurrentRestaurant(getTranslation(locale, "app.noRestaurantLabel"))
+            setCurrentRestaurant(getTranslation(localeRef.current, "app.noRestaurantLabel"))
           }
         } else {
           setRestaurants([])
-          setCurrentRestaurant(getTranslation(locale, "app.noRestaurantLabel"))
+          setCurrentRestaurant(getTranslation(localeRef.current, "app.noRestaurantLabel"))
         }
         setIsLoggedIn(true)
       } catch (err) {
@@ -263,7 +265,8 @@ export default function Home() {
       }
     })
     return () => unsub()
-  }, [locale])
+    // locale דרך localeRef — לא מפעילים מחדש onAuthStateChanged כשהשפה משתנה (מונע מרוצים / איפוס state)
+  }, [])
 
   const hasFullMenu = !!isSystemOwner || userRole === "owner" || userRole === "admin" || userRole === "manager"
   const canAccessPage = useCallback(
