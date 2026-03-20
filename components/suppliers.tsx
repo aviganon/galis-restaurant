@@ -58,7 +58,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
-import { OrdersPanel } from "@/components/purchase-orders"
+import { PurchaseOrders as OrdersPanel } from "@/components/purchase-orders"
 
 interface InvoiceItem {
   name: string
