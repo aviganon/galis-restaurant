@@ -46,12 +46,28 @@ import {
   DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu"
 import { getClaudeApiKey, setClaudeApiKey, testClaudeConnection } from "@/lib/claude"
+import { supplierFirestoreDocId } from "@/lib/supplier-firestore-id"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
 import { useLanguage } from "@/contexts/language-context"
 import { LanguageSwitcher } from "@/components/language-switcher"
 import { signOut } from "firebase/auth"
-import { doc, setDoc, getDoc, getDocFromServer, collection, collectionGroup, query, where, getDocs, getDocsFromServer, deleteDoc, writeBatch } from "firebase/firestore"
+import {
+  doc,
+  setDoc,
+  getDoc,
+  getDocFromServer,
+  collection,
+  collectionGroup,
+  query,
+  where,
+  getDocs,
+  getDocsFromServer,
+  deleteDoc,
+  writeBatch,
+  type DocumentData,
+  type QueryDocumentSnapshot,
+} from "firebase/firestore"
 import { FilePreviewModal } from "@/components/file-preview-modal"
 import type { ExtractedSupplierItem } from "@/lib/ai-extract"
 import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplier-ingredients"
@@ -69,6 +85,8 @@ type RestWithDetails = {
   dishesCount: number
   fcAvg: number
   assignedSuppliers: string[]
+  /** מספר הזמנות רכש למסעדה */
+  poCount?: number
   imageUrl?: string | null
   phone?: string | null
   email?: string | null
@@ -270,7 +288,7 @@ function WebPriceCell({
     } finally {
       setLoading(false)
     }
-  }, [ingredientName, onSaved])
+  }, [ingredientName, onSaved, t])
   if (data) {
     return (
       <div className="space-y-3">
@@ -545,29 +563,27 @@ export function AdminPanel() {
   const hasFullAccess = userRole === "owner" || userRole === "admin" || userRole === "manager"
   const canAddUsers = (isSystemOwner || userRole === "manager" || userRole === "admin") && currentRestaurantId
 
-  if (userRole === "user") {
-    return (
-      <div className="container mx-auto px-4 py-16 text-center">
-        <p className="text-lg text-muted-foreground mb-2">{t("pages.adminPanel.noPermission")}</p>
-        <p className="text-sm text-muted-foreground">{t("pages.adminPanel.adminOnly")}</p>
-      </div>
-    )
-  }
-
   useEffect(() => {
     if (!isSystemOwner || isImpersonating) return
     setDashLoadingKpis(true)
     const loadKpis = async () => {
       try {
-        const restsSnap = await getDocs(collection(db, "restaurants"))
+        const [restsSnap, allPoSnap] = await Promise.all([
+          getDocs(collection(db, "restaurants")),
+          getDocs(collection(db, "purchaseOrders")),
+        ])
+        const poByRest = new Map<string, number>()
+        allPoSnap.forEach((d) => {
+          const rid = d.data().restaurantId
+          if (typeof rid === "string" && rid) {
+            poByRest.set(rid, (poByRest.get(rid) ?? 0) + 1)
+          }
+        })
         let totalRev = 0, totalDishes = 0, poCount = 0
         const fcList: number[] = []
         for (const r of restsSnap.docs) {
-          const [recSnap, poSnap] = await Promise.all([
-            getDocs(collection(db, "restaurants", r.id, "recipes")),
-            getDocs(collection(db, "restaurants", r.id, "purchaseOrders")),
-          ])
-          poCount += poSnap.docs.length
+          poCount += poByRest.get(r.id) ?? 0
+          const recSnap = await getDocs(collection(db, "restaurants", r.id, "recipes"))
           recSnap.docs.filter(d => !d.data().isCompound).forEach(d => {
             const data = d.data()
             const sp = (typeof data.sellingPrice === "number" ? data.sellingPrice : 0) / 1.17
@@ -653,20 +669,29 @@ export function AdminPanel() {
     if (!isSystemOwner) return
     setLoadingSystemOwner(true)
     try {
-      const [restsSnap, globalIngSnap, suppliersSnap] = await Promise.all([
+      const [restsSnap, globalIngSnap, suppliersSnap, allPoSnap] = await Promise.all([
         getDocs(collection(db, "restaurants")),
         getDocs(collection(db, "ingredients")),
         getDocs(collection(db, "suppliers")),
+        getDocs(collection(db, "purchaseOrders")),
       ])
-      let pricesSnap: Awaited<ReturnType<typeof getDocs>>
+      let priceDocs: QueryDocumentSnapshot<DocumentData>[] = []
       try {
-        pricesSnap = await getDocs(collectionGroup(db, "prices"))
+        const pricesSnap = await getDocs(collectionGroup(db, "prices"))
+        priceDocs = pricesSnap.docs
       } catch {
-        pricesSnap = { docs: [], empty: true, size: 0, forEach: () => {} } as Awaited<ReturnType<typeof getDocs>>
+        // collectionGroup דורש אינדקס — נמשיך בלי מחירי subcollection
       }
 
+      const poCountByRest = new Map<string, number>()
+      allPoSnap.forEach((d) => {
+        const rid = d.data().restaurantId
+        if (typeof rid !== "string" || !rid) return
+        poCountByRest.set(rid, (poCountByRest.get(rid) ?? 0) + 1)
+      })
+
       const globalCheapestByIngredient = new Map<string, GlobalCheapest>()
-      pricesSnap.forEach((d) => {
+      priceDocs.forEach((d) => {
         const data = d.data()
         const parentId = d.ref.parent.parent?.id
         if (!parentId) return
@@ -774,7 +799,8 @@ export function AdminPanel() {
           return {
             id: r.id, name: data.name || r.id, emoji: data.emoji,
             dishesCount: dishes.length, fcAvg: Math.round((fcCount > 0 ? fcSum/fcCount : 0) * 10) / 10,
-            assignedSuppliers: assignedList, imageUrl: (data.imageUrl as string) || null,
+            assignedSuppliers: assignedList, poCount: poCountByRest.get(r.id) ?? 0,
+            imageUrl: (data.imageUrl as string) || null,
             phone: (data.phone as string) || null, email: (data.email as string) || null, address: (data.address as string) || null,
           }
         })
@@ -831,7 +857,7 @@ export function AdminPanel() {
     } finally {
       setLoadingSystemOwner(false)
     }
-  }, [isSystemOwner])
+  }, [isSystemOwner, t])
 
   useEffect(() => {
     if (isSystemOwner) {
@@ -1038,7 +1064,6 @@ export function AdminPanel() {
       setEditAdminIngredientOpen(false)
       setEditAdminIngredient(null)
       setRefreshAdminIngredientsKey((k) => k + 1)
-      setAdminIngredients(prev => prev.map(ing => ing.id === editAdminIngredient!.id ? { ...ing, price: parseFloat(editAdminIngPrice)||ing.price, unit: editAdminIngUnit||ing.unit, waste: parseFloat(editAdminIngWaste)||ing.waste, stock: parseFloat(editAdminIngStock)||ing.stock, minStock: parseFloat(editAdminIngMinStock)||ing.minStock, sku: editAdminIngSku||ing.sku, supplier: editAdminIngSupplier||ing.supplier } : ing))
     } catch (e) {
       toast.error((e as Error)?.message || t("pages.adminPanel.error"))
     } finally {
@@ -1114,7 +1139,7 @@ export function AdminPanel() {
         )
         await batch.commit()
       }
-      const supplierId = sn.replace(/\//g, "_").trim() || "supplier"
+      const supplierId = supplierFirestoreDocId(sn)
       const supplierDoc = await getDoc(doc(db, "suppliers", supplierId))
       if (!supplierDoc.exists()) {
         await setDoc(doc(db, "suppliers", supplierId), { name: sn, lastUpdated: new Date().toISOString() }, { merge: true })
@@ -1163,7 +1188,7 @@ export function AdminPanel() {
           sku: item.sku ?? "",
         }
         batch.set(doc(db, "ingredients", docId), payload, { merge: true })
-        const priceId = supTrim.replace(/\//g, "_").replace(/\./g, "_").trim() || "default"
+        const priceId = supplierFirestoreDocId(supTrim) || "default"
         if (item.price > 0) {
           batch.set(doc(db, "ingredients", docId, "prices", priceId), {
             price: item.price, unit: item.unit || "קג", supplier: supTrim, lastUpdated: now,
@@ -1174,7 +1199,7 @@ export function AdminPanel() {
       })
       if (count > 0) {
         await batch.commit()
-        const supplierId = supTrim.replace(/\//g, "_").replace(/\./g, "_").trim() || "supplier"
+        const supplierId = supplierFirestoreDocId(supTrim)
         await setDoc(doc(db, "suppliers", supplierId), { name: supTrim, lastUpdated: now, createdBy: "owner" }, { merge: true })
         const toSync = items.filter((i) => i.name?.trim() && i.price > 0).map((i) => ({ name: i.name!.trim(), price: i.price, unit: i.unit || "קג", supplier: supTrim, waste: 0, sku: i.sku ?? "", ...(typeof i.qty === "number" && i.qty > 0 ? { qty: i.qty } : {}) }))
         if (toSync.length > 0) {
@@ -1322,7 +1347,7 @@ export function AdminPanel() {
       })
       await batch.commit()
 
-      const supplierId = supName.replace(/\//g, "_").trim() || "supplier"
+      const supplierId = supplierFirestoreDocId(supName)
       await setDoc(doc(db, "suppliers", supplierId), {
         name: supName,
         phone: nsmPhone.trim() || null,
@@ -1382,7 +1407,7 @@ export function AdminPanel() {
     if (!editSupplierDetailsName) return
     setEditSupplierDetailsSaving(true)
     try {
-      const supplierId = editSupplierDetailsName.replace(/\//g, "_").trim() || "supplier"
+      const supplierId = supplierFirestoreDocId(editSupplierDetailsName)
       let finalImageUrl = editSupplierDetailsImageUrl
       if (editSupplierDetailsImageFile) {
         setUploadingSupplierImage(true)
@@ -1578,7 +1603,7 @@ export function AdminPanel() {
     if (!s) return
     setDeletingSupplierName(s.name)
     try {
-      const supplierId = s.name.replace(/\//g, "_").trim() || "supplier"
+      const supplierId = supplierFirestoreDocId(s.name)
       const ingList = supplierToIngredients[s.name] || []
       const restIds = s.restaurantIds || []
 
@@ -1993,7 +2018,7 @@ export function AdminPanel() {
       const batch = writeBatch(db)
       selectedIngIds.forEach(id => batch.set(doc(db,"ingredients",id),{supplier:supTrim,lastUpdated:now},{merge:true}))
       await batch.commit()
-      setAdminIngredients(prev=>prev.map(ing=>selectedIngIds.has(ing.id)?{...ing,supplier:supTrim}:ing))
+      setRefreshAdminIngredientsKey((k) => k + 1)
       toast.success(`שויכו ${selectedIngIds.size} רכיבים לספק "${supTrim}"`)
       setSelectedIngIds(new Set()); setBulkAssignSupplier("")
       loadSystemOwnerData()
@@ -2010,7 +2035,7 @@ export function AdminPanel() {
       const batch = writeBatch(db)
       selectedIngIds.forEach(id => batch.delete(doc(db,"ingredients",id)))
       await batch.commit()
-      setAdminIngredients(prev => prev.filter(ing => !selectedIngIds.has(ing.id)))
+      setRefreshAdminIngredientsKey((k) => k + 1)
       toast.success(`נמחקו ${selectedIngIds.size} רכיבים`)
       setSelectedIngIds(new Set())
       loadSystemOwnerData()
@@ -2030,10 +2055,19 @@ export function AdminPanel() {
     if (chip === "orders") {
       setRestChipLoading(true); setRestChipOrders([])
       try {
-        const snap = await getDocs(collection(db, "restaurants", restId, "purchaseOrders"))
-        setRestChipOrders(snap.docs.map(d=>{const dt=d.data();return{id:d.id,supplier:(dt.supplierName||dt.supplier||"לא ידוע") as string,date:(dt.createdAt||dt.date||"") as string,total:typeof dt.totalAmount==="number"?dt.totalAmount:typeof dt.total==="number"?dt.total:0,status:(dt.status||"") as string}}).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,15))
+        const snap = await getDocs(query(collection(db, "purchaseOrders"), where("restaurantId", "==", restId)))
+        setRestChipOrders(snap.docs.map(d=>{const dt=d.data();return{id:d.id,supplier:(dt.supplierName||dt.supplier||"לא ידוע") as string,date:(dt.createdAt||dt.date||"") as string,total:typeof dt.totalAmount==="number"?dt.totalAmount:typeof dt.total==="number"?dt.total:0,status:(dt.status||"") as string}}).sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,15))
       } catch{toast.error("שגיאה")} finally{setRestChipLoading(false)}
     }
+  }
+
+  if (userRole === "user") {
+    return (
+      <div className="container mx-auto px-4 py-16 text-center">
+        <p className="text-lg text-muted-foreground mb-2">{t("pages.adminPanel.noPermission")}</p>
+        <p className="text-sm text-muted-foreground">{t("pages.adminPanel.adminOnly")}</p>
+      </div>
+    )
   }
 
   return (
@@ -3174,7 +3208,7 @@ export function AdminPanel() {
                                   if (ingredientsSortDir === "asc") setIngredientsSortDir("desc")
                                   else { setIngredientsSortBy(""); setIngredientsSortDir("asc") }
                                 } else {
-                                  setIngredientsSortBy(key)
+                                  setIngredientsSortBy(key as keyof IngredientRow)
                                   setIngredientsSortDir("asc")
                                 }
                               }}

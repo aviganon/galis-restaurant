@@ -1,12 +1,19 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react"
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react"
 import { type Locale, SUPPORTED_LOCALES } from "@/lib/translations"
 
 export type { Locale }
 
 const STORAGE_KEY = "restaurant-pro-locale"
-const RTL_LOCALES: Locale[] = ["he"] // עברית, ערבית (ar) וכו'
+const RTL_LOCALES: Locale[] = ["he"]
 
 interface LanguageContextValue {
   locale: Locale
@@ -17,33 +24,50 @@ interface LanguageContextValue {
 
 const LanguageContext = createContext<LanguageContextValue | null>(null)
 
-function getInitialLocale(): Locale {
+/** מאזינים לעדכון שפה (אותו טאב) */
+const localeListeners = new Set<() => void>()
+
+function subscribeLocale(onStoreChange: () => void) {
+  localeListeners.add(onStoreChange)
+  return () => localeListeners.delete(onStoreChange)
+}
+
+function emitLocaleChange() {
+  localeListeners.forEach((l) => l())
+}
+
+function readLocaleFromStorage(): Locale {
   if (typeof window === "undefined") return "he"
   const stored = localStorage.getItem(STORAGE_KEY) as Locale | null
   if (stored && SUPPORTED_LOCALES.includes(stored)) return stored
   return "he"
 }
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("he")
-  const [mounted, setMounted] = useState(false)
+function getServerLocaleSnapshot(): Locale {
+  return "he"
+}
 
-  useEffect(() => {
-    setLocaleState(getInitialLocale())
-    setMounted(true)
+export function LanguageProvider({ children }: { children: ReactNode }) {
+  const locale = useSyncExternalStore(subscribeLocale, readLocaleFromStorage, getServerLocaleSnapshot)
+
+  const setLocale = useCallback((next: Locale) => {
+    localStorage.setItem(STORAGE_KEY, next)
+    emitLocaleChange()
   }, [])
 
-  const setLocale = (next: Locale) => {
-    setLocaleState(next)
-    localStorage.setItem(STORAGE_KEY, next)
-  }
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY) emitLocaleChange()
+    }
+    window.addEventListener("storage", onStorage)
+    return () => window.removeEventListener("storage", onStorage)
+  }, [])
 
   useEffect(() => {
-    if (!mounted) return
     const dir = RTL_LOCALES.includes(locale) ? "rtl" : "ltr"
     document.documentElement.dir = dir
     document.documentElement.lang = locale
-  }, [locale, mounted])
+  }, [locale])
 
   return (
     <LanguageContext.Provider

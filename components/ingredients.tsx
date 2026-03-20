@@ -371,13 +371,13 @@ export function Ingredients() {
       const globalCheapestByIngredient = new Map<string, GlobalCheapest>()
       if (isOwner && pricesSnap) {
         pricesSnap.forEach((d) => {
-          const data = d.data()
+          const data = d.data() as { price?: unknown; unit?: unknown; supplier?: unknown }
           const parentId = d.ref.parent.parent?.id
           if (!parentId) return
           const price = typeof data.price === "number" ? data.price : 0
           if (price <= 0) return
-          const unit = (data.unit as string) || "ק\"ג"
-          const supplier = (data.supplier as string) || ""
+          const unit = (typeof data.unit === "string" ? data.unit : "") || "ק\"ג"
+          const supplier = typeof data.supplier === "string" ? data.supplier : ""
           const existing = globalCheapestByIngredient.get(parentId)
           const ppkg = pricePerKg(price, unit)
           if (!existing || ppkg < pricePerKg(existing.price, existing.unit)) {

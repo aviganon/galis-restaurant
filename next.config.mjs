@@ -3,7 +3,7 @@
 const nextConfig = {
   ...(process.env.VERCEL === "1" ? {} : { output: "export" }),
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
     unoptimized: true,

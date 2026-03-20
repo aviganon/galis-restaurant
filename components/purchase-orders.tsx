@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { collection, getDocs, query, where, addDoc, updateDoc, deleteDoc, doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table"
 import { FileText, Clock, CheckCircle2, DollarSign, Loader2, Search, ShoppingCart, Package } from "lucide-react"
 import { useTranslations } from "@/lib/use-translations"
+import { supplierFirestoreDocId } from "@/lib/supplier-firestore-id"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface OrderSuggestion {
@@ -65,7 +66,7 @@ export function PurchaseOrders() {
   const [saving, setSaving] = useState(false)
   const [uploads, setUploads] = useState<UploadRecord[]>([])
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!currentRestaurantId) { setLoading(false); return }
     setLoading(true)
     try {
@@ -96,7 +97,9 @@ export function PurchaseOrders() {
       try {
         const asDoc = await getDoc(doc(db, "restaurants", currentRestaurantId, "appState", "assignedSuppliers"))
         const ids: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
-        const supDocs = await Promise.all(ids.map(id => getDoc(doc(db, "suppliers", id))))
+        const supDocs = await Promise.all(
+          ids.map((name) => getDoc(doc(db, "suppliers", supplierFirestoreDocId(name))))
+        )
         setRestaurantSuppliers(supDocs.filter(d => d.exists()).map(d => ({ id: d.id, name: (d.data()?.name as string) || d.id, email: (d.data()?.email as string) || "", phone: (d.data()?.phone as string) || "" })))
       } catch(e) { console.error(e) }
       try {
@@ -106,9 +109,9 @@ export function PurchaseOrders() {
         setUploads(ups)
       } catch(e) { console.error(e) }
     } catch { setOrders([]); setSuggestions([]) } finally { setLoading(false) }
-  }
+  }, [currentRestaurantId])
 
-  useEffect(() => { loadData() }, [currentRestaurantId])
+  useEffect(() => { void loadData() }, [loadData])
 
   const addItem = (name: string, unit: string, price: number, qty: number) => {
     setOrderItems(prev => { const ex = prev.find(i => i.name === name); if (ex) return prev.map(i => i.name === name ? {...i, quantity: i.quantity + qty} : i); return [...prev, {name, quantity: qty, unit, price}] })

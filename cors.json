@@ -1,0 +1,8 @@
+[
+  {
+    "origin": ["https://galis-restaurant.vercel.app", "https://galis-6ebbc.web.app", "http://localhost:3000"],
+    "method": ["GET", "POST", "PUT", "DELETE", "HEAD"],
+    "responseHeader": ["Content-Type", "Authorization", "x-goog-meta-*"],
+    "maxAgeSeconds": 3600
+  }
+]

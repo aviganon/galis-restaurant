@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { AnimatePresence, motion } from "framer-motion"
+import { AnimatePresence, motion, type Variants } from "framer-motion"
 import { onAuthStateChanged, signOut } from "firebase/auth"
 import { doc, getDoc, getDocFromServer, getDocsFromServer, setDoc, collection, getDocs } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
@@ -25,15 +25,42 @@ import { AppProvider, type UserPermissions } from "@/contexts/app-context"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useTranslations } from "@/lib/use-translations"
+import { useLanguage } from "@/contexts/language-context"
+import { getTranslation } from "@/lib/translations"
 
-const pageVariants = {
+const RESTRICTED_PAGES = [
+  "admin-panel",
+  "dashboard",
+  "calc",
+  "ingredients",
+  "inventory",
+  "suppliers",
+  "purchase-orders",
+  "upload",
+  "reports",
+  "menu",
+] as const
+
+const RESTAURANT_ONLY_PAGES = [
+  "calc",
+  "ingredients",
+  "inventory",
+  "suppliers",
+  "purchase-orders",
+  "upload",
+  "reports",
+  "menu",
+] as const
+
+const pageVariants: Variants = {
   initial: { opacity: 0, x: 20 },
-  animate: { opacity: 1, x: 0, transition: { duration: 0.3, ease: "easeOut" } },
-  exit: { opacity: 0, x: -20, transition: { duration: 0.2, ease: "easeIn" } }
+  animate: { opacity: 1, x: 0, transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] } },
+  exit: { opacity: 0, x: -20, transition: { duration: 0.2, ease: [0.4, 0, 1, 1] } },
 }
 
 export default function Home() {
   const t = useTranslations()
+  const { locale } = useLanguage()
   const [authLoading, setAuthLoading] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userRole, setUserRole] = useState<"admin" | "owner" | "manager" | "user">("owner")
@@ -167,7 +194,7 @@ export default function Home() {
             setCurrentRestaurant(first.emoji ? `${first.emoji} ${first.name}` : first.name)
             setCurrentRestaurantId(first.id)
           } else {
-            setCurrentRestaurant(t("app.noRestaurants"))
+            setCurrentRestaurant(getTranslation(locale, "app.noRestaurants"))
           }
         } else if (userRestaurantId) {
           const restDoc = await getDoc(doc(db, restaurantsCollection, userRestaurantId))
@@ -222,11 +249,11 @@ export default function Home() {
             setUserPermissions(defaultPermissions)
           } else {
             setRestaurants([])
-            setCurrentRestaurant(t("app.noRestaurantLabel"))
+            setCurrentRestaurant(getTranslation(locale, "app.noRestaurantLabel"))
           }
         } else {
           setRestaurants([])
-          setCurrentRestaurant(t("app.noRestaurantLabel"))
+          setCurrentRestaurant(getTranslation(locale, "app.noRestaurantLabel"))
         }
         setIsLoggedIn(true)
       } catch (err) {
@@ -236,38 +263,39 @@ export default function Home() {
       }
     })
     return () => unsub()
-  }, [])
+  }, [locale])
 
-  const restrictedPages = ["admin-panel", "dashboard", "calc", "ingredients", "inventory", "suppliers", "purchase-orders", "upload", "reports", "menu"]
-  const isRestrictedPage = restrictedPages.includes(currentPage)
   const hasFullMenu = !!isSystemOwner || userRole === "owner" || userRole === "admin" || userRole === "manager"
-  const canAccessPage = (page: string) => {
-    if (isSystemOwner || hasFullMenu) return true
-    if (userRole !== "user") return false
-    const p = userPermissions
-    switch (page) {
-      case "admin-panel": return false
-      case "dashboard": return p?.canSeeDashboard !== false
-      case "calc": return p?.canSeeProductTree !== false
-      case "ingredients": return p?.canSeeIngredients !== false
-      case "inventory": return p?.canSeeInventory !== false
-      case "suppliers": return p?.canSeeSuppliers !== false
-      case "purchase-orders": return p?.canSeePurchaseOrders !== false
-      case "upload": return p?.canSeeUpload !== false
-      case "reports": return !!p?.canSeeReports
-      case "menu": return !!p?.canSeeCosts
-      case "settings": return !!p?.canSeeSettings
-      default: return true
-    }
-  }
+  const canAccessPage = useCallback(
+    (page: string) => {
+      if (isSystemOwner || hasFullMenu) return true
+      if (userRole !== "user") return false
+      const p = userPermissions
+      switch (page) {
+        case "admin-panel": return false
+        case "dashboard": return p?.canSeeDashboard !== false
+        case "calc": return p?.canSeeProductTree !== false
+        case "ingredients": return p?.canSeeIngredients !== false
+        case "inventory": return p?.canSeeInventory !== false
+        case "suppliers": return p?.canSeeSuppliers !== false
+        case "purchase-orders": return p?.canSeePurchaseOrders !== false
+        case "upload": return p?.canSeeUpload !== false
+        case "reports": return !!p?.canSeeReports
+        case "menu": return !!p?.canSeeCosts
+        case "settings": return !!p?.canSeeSettings
+        default: return true
+      }
+    },
+    [isSystemOwner, hasFullMenu, userRole, userPermissions]
+  )
 
   useEffect(() => {
-    if (isRestrictedPage && !canAccessPage(currentPage)) {
+    if ((RESTRICTED_PAGES as readonly string[]).includes(currentPage) && !canAccessPage(currentPage)) {
       const fallback = ["dashboard", "calc", "ingredients", "inventory", "suppliers", "purchase-orders", "upload", "reports", "menu", ]
         .find((p) => canAccessPage(p))
       setCurrentPage(fallback || "dashboard")
     }
-  }, [userRole, currentPage, isRestrictedPage, hasFullMenu, userPermissions])
+  }, [currentPage, canAccessPage])
 
   useEffect(() => {
     if (isSystemOwner && !impersonatingRestaurant) {
@@ -275,9 +303,8 @@ export default function Home() {
     }
   }, [isSystemOwner, impersonatingRestaurant])
 
-  const restaurantOnlyPages = ["calc", "ingredients", "inventory", "suppliers", "purchase-orders", "upload", "reports", "menu"]
   useEffect(() => {
-    if (isSystemOwner && !impersonatingRestaurant && restaurantOnlyPages.includes(currentPage)) {
+    if (isSystemOwner && !impersonatingRestaurant && (RESTAURANT_ONLY_PAGES as readonly string[]).includes(currentPage)) {
       setCurrentPage("admin-panel")
     }
   }, [isSystemOwner, impersonatingRestaurant, currentPage])
@@ -337,7 +364,7 @@ export default function Home() {
   }
 
   const renderPage = () => {
-    if (isRestrictedPage && !canAccessPage(currentPage)) {
+    if ((RESTRICTED_PAGES as readonly string[]).includes(currentPage) && !canAccessPage(currentPage)) {
       return (
         <div className="container mx-auto px-4 py-16 text-center">
           <p className="text-lg text-muted-foreground mb-2">{t("app.noPermission")}</p>

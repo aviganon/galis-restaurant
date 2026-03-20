@@ -247,7 +247,7 @@ export default function ProductTree() {
         toast.error(t("pages.productTree.saveError") + ": " + (e as Error).message)
       }
     },
-    [currentRestaurantId, refreshIngredients]
+    [currentRestaurantId, refreshIngredients, t]
   )
 
   const debouncedSaveDish = useCallback(
@@ -509,7 +509,7 @@ export default function ProductTree() {
     } finally {
       setAiSuggestLoading(false)
     }
-  }, [supplierPrices, ingredientStock])
+  }, [supplierPrices, ingredientStock, t])
 
   const handleAddAiSuggestedDish = useCallback(() => {
     if (!aiSuggestedDish?.name?.trim()) return
@@ -671,7 +671,9 @@ export default function ProductTree() {
         setDishes(prev=>({...prev,[editDishTarget]:updatedDish}))
       }
       toast.success('המנה עודכנה'); setEditDishDialogOpen(false)
-    } catch(e){ toast.error(e.message||'שגיאה') }
+    } catch (e) {
+      toast.error((e as Error)?.message || "שגיאה")
+    }
     finally{ setSavingDishEdit(false) }
   }
   return (

@@ -147,12 +147,12 @@ export function FilePreviewModal({
         toast.error(e.message)
       })
       .finally(() => setLoading(false))
-  }, [open, file, type, initialSupplier, forceSaveToGlobal, extractKey])
+  }, [open, file, type, initialSupplier, forceSaveToGlobal, extractKey, currentRestaurantId])
 
   const updateItem = useCallback((idx: number, field: string, value: string | number) => {
     setItems((prev) => {
       const next = [...prev]
-      const it = next[idx] as Record<string, unknown>
+      const it = next[idx] as unknown as Record<string, unknown>
       if (it) it[field] = value
       return next
     })
@@ -377,7 +377,7 @@ export function FilePreviewModal({
                             <Input
                               id={`fpm-item-${idx}-name`}
                               name={`fpmItemName-${idx}`}
-                              value={(item as Record<string, unknown>).name ?? ""}
+                              value={String((item as unknown as Record<string, unknown>).name ?? "")}
                               onChange={(e) => updateItem(idx, "name", e.target.value)}
                               className="h-8 text-sm"
                               aria-label="שם"

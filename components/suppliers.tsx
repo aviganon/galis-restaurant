@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react"
 import { collection, getDocs, doc, getDoc, setDoc, writeBatch, deleteDoc, addDoc } from "firebase/firestore"
 import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplier-ingredients"
+import { supplierFirestoreDocId } from "@/lib/supplier-firestore-id"
 import {
   Table,
   TableBody,
@@ -159,7 +160,7 @@ export default function Suppliers() {
       ])
       const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
       const bySupplier = new Map<string, { products: number; totalValue: number; source: "assigned" | "restaurant" }>()
-      const chipsBySupplier = new Map<string, { stock: number; minStock: number }[]>()
+      const chipsBySupplier = new Map<string, { name: string; stock: number; minStock: number; unit: string; price: number }[]>()
       const seenIds = new Set<string>()
       restSnap.forEach((d) => {
         seenIds.add(d.id)
@@ -195,10 +196,26 @@ export default function Suppliers() {
         })
         const chips1 = chipsBySupplier.get(supKey) || []; chips1.push({ name: d.id, stock, minStock: typeof data.minStock === "number" ? data.minStock : 0, unit: (data.unit as string)||"יחידה", price: typeof data.price === "number" ? data.price : 0 }); chipsBySupplier.set(supKey, chips1)
       })
+      // ספקים ששויכו מבעלים בלי רכיבים גלובליים — עדיין להציג כרטיס (0 מוצרים)
+      for (const raw of assignedList) {
+        const assignedName = String(raw || "").trim()
+        if (!assignedName) continue
+        if (!bySupplier.has(assignedName)) {
+          bySupplier.set(assignedName, { products: 0, totalValue: 0, source: "assigned" })
+          chipsBySupplier.set(assignedName, [])
+        }
+      }
       const supplierDocs = await Promise.all(
-        Array.from(bySupplier.keys()).map(name => {
-          const id = name.replace(/\//g,"_").replace(/\./g,"_").trim()||"supplier"
-          return getDoc(doc(db,"suppliers",id)).then(d=>({name,imageUrl:(d.data()?.imageUrl as string)||undefined}))
+        Array.from(bySupplier.keys()).map(async (name) => {
+          const id = supplierFirestoreDocId(name)
+          let snap = await getDoc(doc(db, "suppliers", id))
+          let imageUrl = (snap.data()?.imageUrl as string) || undefined
+          // תאימות לאחור: תמונה שנשמרה תחת מזהה גולמי (לפני התיקון)
+          if (!imageUrl && id !== name && !String(name).includes("/")) {
+            const legacy = await getDoc(doc(db, "suppliers", name))
+            if (legacy.exists()) imageUrl = (legacy.data()?.imageUrl as string) || undefined
+          }
+          return { name, imageUrl }
         })
       )
       const imageUrlMap: Record<string,string> = {}
@@ -218,7 +235,7 @@ export default function Suppliers() {
     } finally {
       setLoading(false)
     }
-  }, [currentRestaurantId, isOwner])
+  }, [currentRestaurantId])
 
   const handleConfirmSupplier = useCallback(
     async (items: InvoiceItem[], supName: string, saveToGlobal?: boolean) => {
@@ -239,7 +256,7 @@ export default function Suppliers() {
       if (!toGlobal && supTrim) {
         if (!supplierExists) {
           await setDoc(asRef, { list: [...currentList, supTrim] }, { merge: true })
-          const supplierId = supTrim.replace(/\//g, "_").replace(/\./g, "_").trim() || "supplier"
+          const supplierId = supplierFirestoreDocId(supTrim)
           await setDoc(doc(db, "suppliers", supplierId), {
             name: supTrim,
             lastUpdated: now,
@@ -461,7 +478,7 @@ export default function Suppliers() {
     setSupplierDetailInfo(null)
     setSupplierDetailItems([])
     try {
-      const supplierId = supplierName.replace(/\//g, "_").trim()
+      const supplierId = supplierFirestoreDocId(supplierName)
       const [supDoc, restIngSnap, globalIngSnap] = await Promise.all([
         getDoc(doc(db, "suppliers", supplierId)),
         getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients")),
@@ -503,7 +520,7 @@ export default function Suppliers() {
     } finally {
       setSupplierDetailLoading(false)
     }
-  }, [currentRestaurantId])
+  }, [currentRestaurantId, t])
 
   useEffect(() => {
     if (selectedSupplierDetail && selectedSupplierDetail !== "ללא ספק") {
@@ -627,7 +644,9 @@ export default function Suppliers() {
         })
         setUploadingImg(false)
       }
-      await setDoc(doc(db, "suppliers", selectedSupplierDetail), {
+      const supplierDocId = supplierFirestoreDocId(selectedSupplierDetail)
+      await setDoc(doc(db, "suppliers", supplierDocId), {
+        name: selectedSupplierDetail.trim(),
         phone: editPhone.trim() || null,
         email: editEmail.trim() || null,
         contact: editContact.trim() || null,
@@ -644,7 +663,9 @@ export default function Suppliers() {
       setEditSupplierOpen(false)
       toast.success("פרטי הספק עודכנו")
       if(imgUrl) setSuppliers(prev=>prev.map(s=>s.name===selectedSupplierDetail?{...s,imageUrl:imgUrl!}:s))
-    } catch(e) { toast.error(e.message || "שגיאה") }
+    } catch (e) {
+      toast.error((e as Error)?.message || "שגיאה")
+    }
     finally { setSavingEdit(false); setUploadingImg(false) }
   }
 

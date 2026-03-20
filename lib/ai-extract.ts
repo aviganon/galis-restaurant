@@ -194,7 +194,8 @@ export async function parseSpreadsheet(file: File, ext: string): Promise<Record<
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
-        complete: (r) => resolve((r.data as Record<string, unknown>[]) || []),
+        complete: (r: { data: unknown }) =>
+          resolve(Array.isArray(r.data) ? (r.data as Record<string, unknown>[]) : []),
       })
     })
   }

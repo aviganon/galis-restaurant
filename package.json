@@ -16,7 +16,10 @@
     "build:export": "next build",
     "deploy": "npm run build && firebase deploy --only hosting",
     "push": "git add . && (git diff --cached --quiet || git commit -m 'עדכון') && git push",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run typecheck && npm run lint"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -79,6 +82,9 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "dotenv": "^17.3.1",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.0",
+    "eslint-module-utils": "^2.12.1",
     "firebase-admin": "^13.7.0",
     "postcss": "^8.5",
     "tailwindcss": "^4.2.0",
