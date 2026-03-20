@@ -58,6 +58,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
+import { OrdersPanel } from "@/components/purchase-orders"
 
 interface InvoiceItem {
   name: string
@@ -667,7 +668,7 @@ export default function Suppliers() {
             <Plus className="w-4 h-4 ml-1" />
             ספק חדש
           </Button>
-          <Button variant="outline" onClick={() => setCurrentPage?.("purchase-orders")} className="gap-1">
+          <Button variant="outline" onClick={() => setShowPurchaseOrdersPanel(true)} className="gap-1">
             <ShoppingCart className="w-4 h-4 text-blue-600" />
             <span className="text-blue-600 font-medium">הזמנות ספקים</span>
           </Button>
@@ -947,7 +948,7 @@ export default function Suppliers() {
                             </div></div>
                             <div className="flex justify-between items-center mt-3 text-xs text-muted-foreground">
                               <span>סה"כ משוער: <strong className="text-foreground">₪{(supplierDetailItems||[]).filter(i=>i.stock<i.minStock||(i.stock===0&&i.minStock===0)).reduce((s,i)=>s+(i.minStock>0?Math.max(i.minStock-i.stock,1):1)*i.price,0).toFixed(0)}</strong></span>
-                              <button onClick={()=>setCurrentPage?.("purchase-orders")} className="text-blue-600 hover:underline">עבור להזמנות ←</button>
+                              <button onClick={()=>setShowPurchaseOrdersPanel(true)} className="text-blue-600 hover:underline">עבור להזמנות ←</button>
                             </div>
                           </div>
                         )}
