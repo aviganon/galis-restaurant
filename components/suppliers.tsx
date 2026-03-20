@@ -57,9 +57,8 @@ import {
   X as XIcon,
 } from "lucide-react"
 import { toast } from "sonner"
-import { useTranslations } from "@/lib/use-translations"
-import { PurchaseOrders as OrdersPanel } from "@/components/purchase-orders"
-
+import { useTranslations } from "@/libuse-translations"
+import { OrdersPanel } from "@/components/purchase-orders"
 interface InvoiceItem {
   name: string
   price: number
