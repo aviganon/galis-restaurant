@@ -35,8 +35,6 @@ interface PurchaseOrder {
   createdAt: string
   expectedDelivery?: string
 }
-<app />
-<page className="tsx"></page>
 interface RestaurantSupplier {
   id: string
   name: string
