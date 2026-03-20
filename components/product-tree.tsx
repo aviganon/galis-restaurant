@@ -859,10 +859,7 @@ export default function ProductTree() {
                     </Button>
                   </div>
                 </DialogContent>
-              </Dialog><Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowOrdersPanel(true)}>
-                <ShoppingCart className="w-4 h-4" />
-                <span className="hidden sm:inline">הזמנות ספקים</span>
-              </Button>
+                      </Dialog>
 
               <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowMenuCosts(true)}>
                 <BarChart2 className="w-4 h-4" />
