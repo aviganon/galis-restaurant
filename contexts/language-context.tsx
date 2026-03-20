@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useSyncExternalStore,
   type ReactNode,
 } from "react"
@@ -47,8 +48,28 @@ function getServerLocaleSnapshot(): Locale {
   return "he"
 }
 
+/**
+ * עד אחרי hydration חייבים להחזיר אותו ערך כמו ב-SSR ("he"), אחרת React יבצע
+ * remount של העץ — state של האפליקציה (מסעדות, בעלים וכו') מתאפס ונראה "נעלם".
+ * אחרי mount קוראים מ-localStorage ומפעילים emit כדי לסנכרן שפה אמיתית.
+ */
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const locale = useSyncExternalStore(subscribeLocale, readLocaleFromStorage, getServerLocaleSnapshot)
+  const hydratedRef = useRef(false)
+
+  useEffect(() => {
+    hydratedRef.current = true
+    emitLocaleChange()
+  }, [])
+
+  const locale = useSyncExternalStore(
+    subscribeLocale,
+    () => {
+      if (typeof window === "undefined") return "he"
+      if (!hydratedRef.current) return "he"
+      return readLocaleFromStorage()
+    },
+    getServerLocaleSnapshot
+  )
 
   const setLocale = useCallback((next: Locale) => {
     localStorage.setItem(STORAGE_KEY, next)
