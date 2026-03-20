@@ -56,6 +56,7 @@ import {
   ShoppingCart,
   X as XIcon,
 } from "lucide-react"
+import { OrdersPanel } from "@/components/purchase-orders"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
 interface InvoiceItem {
