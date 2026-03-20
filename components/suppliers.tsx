@@ -1220,7 +1220,7 @@ export default function Suppliers() {
           <div style={{position:'relative',width:'92vw',height:'88vh',background:'var(--background)',borderRadius:'12px',boxShadow:'0 25px 50px rgba(0,0,0,0.3)',overflow:'visible',display:'flex',flexDirection:'column'}}>
             <button onClick={() => setShowPurchaseOrdersPanel(false)} style={{position:'absolute',top:'12px',left:'12px',zIndex:10,width:'32px',height:'32px',borderRadius:'50%',border:'none',background:'var(--muted)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px'}}>✕</button>
             <div style={{overflowY:'auto',flex:1}}>
-              <PurchaseOrders />
+              <OrdersPanel />
             </div>
           </div>
         </div>
