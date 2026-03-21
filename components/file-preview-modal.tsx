@@ -18,12 +18,14 @@ import {
   type ExtractedSupplierItem,
   type ExtractedDishItem,
   type SalesReportPeriod,
+  type MenuDishNameLanguage,
 } from "@/lib/ai-extract"
 import { toast } from "sonner"
 import { db } from "@/lib/firebase"
 import { collection, getDocs, getDoc, doc } from "firebase/firestore"
 import { Loader2, X, Plus, Globe } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useTranslations } from "@/lib/use-translations"
 import { useLanguage } from "@/contexts/language-context"
 import { normalizeSalesReportDateField } from "@/lib/ai-extract"
@@ -31,6 +33,19 @@ import { normalizeSalesReportDateField } from "@/lib/ai-extract"
 function formatIsoDateDisplay(iso: string | undefined, loc: string) {
   if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return ""
   return new Date(`${iso}T12:00:00`).toLocaleDateString(loc === "he" ? "he-IL" : "en-GB")
+}
+
+const MENU_DISH_LANG_STORAGE_KEY = "restaurant-pro-menu-dish-lang"
+
+function readMenuDishLanguage(): MenuDishNameLanguage {
+  if (typeof window === "undefined") return "he"
+  try {
+    const v = localStorage.getItem(MENU_DISH_LANG_STORAGE_KEY)
+    if (v === "he" || v === "original" || v === "en") return v
+  } catch {
+    /* ignore */
+  }
+  return "he"
 }
 
 interface FilePreviewModalProps {
@@ -90,6 +105,11 @@ export function FilePreviewModal({
   const [salesReportPeriod, setSalesReportPeriod] = useState<SalesReportPeriod | undefined>(undefined)
   const [salesReportDateFrom, setSalesReportDateFrom] = useState<string | undefined>(undefined)
   const [salesReportDateTo, setSalesReportDateTo] = useState<string | undefined>(undefined)
+  const [menuDishLanguage, setMenuDishLanguage] = useState<MenuDishNameLanguage>("he")
+
+  useEffect(() => {
+    setMenuDishLanguage(readMenuDishLanguage())
+  }, [])
 
   const MAX_PDF_MB = 8
   const MAX_IMAGE_MB = 5
@@ -141,7 +161,7 @@ export function FilePreviewModal({
     setSalesReportPeriod(undefined)
     setSalesReportDateFrom(undefined)
     setSalesReportDateTo(undefined)
-    extractWithAI(file, type, initialSupplier || undefined)
+    extractWithAI(file, type, initialSupplier || undefined, type === "d" ? { menuDishLanguage } : undefined)
       .then((res) => {
         if (type === "s") {
           setSalesReportPeriod(res.sales_report_period)
@@ -185,7 +205,7 @@ export function FilePreviewModal({
         toast.error(e.message)
       })
       .finally(() => setLoading(false))
-  }, [open, file, type, initialSupplier, forceSaveToGlobal, extractKey, currentRestaurantId, stockCountMode, t])
+  }, [open, file, type, initialSupplier, forceSaveToGlobal, extractKey, currentRestaurantId, stockCountMode, t, menuDishLanguage])
 
   const updateItem = useCallback((idx: number, field: string, value: string | number) => {
     setItems((prev) => {
@@ -339,6 +359,36 @@ export function FilePreviewModal({
           </DialogTitle>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto space-y-4 py-2">
+          {type === "d" && (
+            <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+              <Label htmlFor="fpm-menu-dish-lang" className="text-sm font-medium">
+                {t("pages.filePreview.menuDishLanguageLabel")}
+              </Label>
+              <Select
+                value={menuDishLanguage}
+                disabled={loading}
+                onValueChange={(v) => {
+                  const next = v as MenuDishNameLanguage
+                  setMenuDishLanguage(next)
+                  try {
+                    localStorage.setItem(MENU_DISH_LANG_STORAGE_KEY, next)
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+              >
+                <SelectTrigger id="fpm-menu-dish-lang" className="w-full max-w-md h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="he">{t("pages.filePreview.menuDishLanguageHe")}</SelectItem>
+                  <SelectItem value="original">{t("pages.filePreview.menuDishLanguageOriginal")}</SelectItem>
+                  <SelectItem value="en">{t("pages.filePreview.menuDishLanguageEn")}</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">{t("pages.filePreview.menuDishLanguageHint")}</p>
+            </div>
+          )}
           {loading && (
             <div className="flex flex-col items-center gap-4 py-12">
               <Loader2 className="w-10 h-10 animate-spin text-primary" />

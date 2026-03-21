@@ -29,6 +29,7 @@ import {
   isSupportedFormat,
 } from "@/lib/ai-extract"
 import { safeFirestoreRecipeId } from "@/lib/recipe-id"
+import { normalizeDishCategoryToHebrew } from "@/lib/dish-category-hebrew"
 import { loadRestaurantPantryForAi } from "@/lib/restaurant-pantry"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
@@ -250,10 +251,13 @@ export function MenuCosts() {
           else if (foodCostPct <= 30) status = "good"
           else if (foodCostPct <= 35) status = "warning"
           else status = "critical"
-          catSet.add((data.category as string) || "עיקריות")
+          const normCat = normalizeDishCategoryToHebrew(
+            typeof data.category === "string" ? data.category : "עיקריות"
+          )
+          catSet.add(normCat)
           list.push({
             id: r.id, name: r.id,
-            category: (data.category as string) || "עיקריות",
+            category: normCat,
             salePrice: sellingPrice, foodCost: cost,
             foodCostPercent: foodCostPct, profit, profitMargin, status,
             salesCount: Math.round(sales),
@@ -376,7 +380,7 @@ export function MenuCosts() {
           ref: doc(db, "restaurants", currentRestaurantId, "recipes", row.recipeId),
           data: {
             name: row.name,
-            category: sug?.category || "עיקריות",
+            category: normalizeDishCategoryToHebrew(sug?.category || "עיקריות"),
             sellingPrice,
             ingredients,
             isCompound: false,

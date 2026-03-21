@@ -33,6 +33,7 @@ import { FilePreviewModal } from "@/components/file-preview-modal"
 import { Dashboard } from "@/components/dashboard"
 import { Reports } from "@/components/reports"
 import { suggestDishFromIngredients, type ExtractedDishItem } from "@/lib/ai-extract"
+import { normalizeDishCategoryToHebrew } from "@/lib/dish-category-hebrew"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
 import { useLanguage } from "@/contexts/language-context"
@@ -60,6 +61,13 @@ interface Dish {
   recipeDescription?: string
   /** שלבי הכנה / מתכון מלא */
   preparationNotes?: string
+}
+
+/** Firestore דוחה ערכי undefined — מסיר שדות ברמה העליונה לפני set/batch */
+function dishToFirestoreData(dish: Dish): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries({ ...dish, isCompound: dish.isCompound ?? false }).filter(([, v]) => v !== undefined)
+  )
 }
 
 interface SupplierPrice {
@@ -205,9 +213,13 @@ export default function ProductTree() {
         recSnap.forEach((d) => {
           const data = d.data()
           const ing = Array.isArray(data.ingredients) ? data.ingredients : []
+          const displayName =
+            typeof data.name === "string" && data.name.trim() ? data.name.trim() : d.id
           newDishes[d.id] = {
-            name: d.id,
-            category: data.category || "עיקריות",
+            name: displayName,
+            category: normalizeDishCategoryToHebrew(
+              typeof data.category === "string" ? data.category : "עיקריות"
+            ),
             sellingPrice: typeof data.sellingPrice === "number" ? data.sellingPrice : 0,
             ingredients: ing.map((i: { name?: string; qty?: number; unit?: string; waste?: number; isSubRecipe?: boolean }) => ({
               name: i.name || "",
@@ -282,8 +294,7 @@ export default function ProductTree() {
       try {
         const ref = doc(db, "restaurants", currentRestaurantId, "recipes", name)
         if (dish) {
-          const cleanDish = Object.fromEntries(Object.entries({ ...dish, isCompound: dish.isCompound ?? false }).filter(([,v])=>v!==undefined))
-          await setDoc(ref, cleanDish, { merge: true })
+          await setDoc(ref, dishToFirestoreData(dish), { merge: true })
         } else {
           await deleteDoc(ref)
         }
@@ -566,7 +577,7 @@ export default function ProductTree() {
     }))
     const dish: Dish = {
       name: aiSuggestedDish.name.trim(),
-      category: aiSuggestedDish.category || "עיקריות",
+      category: normalizeDishCategoryToHebrew(aiSuggestedDish.category || "עיקריות"),
       sellingPrice: aiSuggestedDish.price || 0,
       ingredients,
       isCompound: false,
@@ -596,7 +607,7 @@ export default function ProductTree() {
       }))
       const dish: Dish = {
         name: it.name.trim(),
-        category: it.category || "עיקריות",
+        category: normalizeDishCategoryToHebrew(it.category || "עיקריות"),
         sellingPrice: it.price || 0,
         ingredients,
         recipeDescription: it.description?.trim() || undefined,
@@ -613,7 +624,7 @@ export default function ProductTree() {
         toSave.forEach(({ name, dish }) => {
           batch.set(
             doc(db, "restaurants", currentRestaurantId, "recipes", name),
-            { ...dish, isCompound: false },
+            dishToFirestoreData({ ...dish, isCompound: false }),
             { merge: true }
           )
         })
@@ -686,8 +697,7 @@ export default function ProductTree() {
       }
       const newName = (editDishName||'').trim() || editDishTarget
       const updatedDish = {...dish, name:newName, category:editDishCategory, ...(imgUrl?{imageUrl:imgUrl}:{})}
-      // Strip undefined — Firestore rejects undefined values
-      const clean = Object.fromEntries(Object.entries(updatedDish).filter(([,v])=>v!==undefined))
+      const clean = dishToFirestoreData(updatedDish)
       if (newName !== editDishTarget) {
         await setDoc(doc(db,'restaurants',currentRestaurantId,'recipes',newName), clean, {merge:true})
         await deleteDoc(doc(db,'restaurants',currentRestaurantId,'recipes',editDishTarget))
@@ -1386,7 +1396,9 @@ export default function ProductTree() {
                         "text-[10px] font-semibold uppercase tracking-wider mb-0.5 pr-1",
                         isActive ? "text-primary-foreground/70" : "text-muted-foreground"
                       )}>
-                        {dish.category}
+                        {CATEGORY_TO_KEY[dish.category]
+                          ? t(`pages.productTree.${CATEGORY_TO_KEY[dish.category]}`)
+                          : dish.category}
                       </p>
                     )}
                     

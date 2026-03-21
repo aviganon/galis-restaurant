@@ -203,6 +203,11 @@ export const translations = {
         hintStockCount: "מסמכים עם הרבה שורות עשויים לקחת עד דקה וחצי — אל תסגור את החלון",
         typeSupplierPrices: "מחירי ספקים",
         typeMenuImport: "ייבוא תפריט",
+        menuDishLanguageLabel: "שפת שמות מנות (חילוץ AI)",
+        menuDishLanguageHe: "עברית — אל תתרגם לאנגלית (מומלץ לתפריטים ישראליים)",
+        menuDishLanguageOriginal: "כמו במסמך — העתק מדויק בלי תרגום",
+        menuDishLanguageEn: "אנגלית — תרגם שמות לאנגלית כשהמקור בעברית",
+        menuDishLanguageHint: "הבחירה נשמרת במכשיר. שינוי אחרי טעינה מריץ ניתוח מחדש של הקובץ.",
         typeSalesReport: "דוח מכירות",
         fileFallback: "קובץ",
         errFileTooLarge:
@@ -1102,6 +1107,11 @@ export const translations = {
         hintStockCount: "Documents with many rows may take up to a minute and a half — don’t close this window",
         typeSupplierPrices: "Supplier prices",
         typeMenuImport: "Menu import",
+        menuDishLanguageLabel: "Dish name language (AI extraction)",
+        menuDishLanguageHe: "Hebrew — do not translate to English (recommended for Israeli menus)",
+        menuDishLanguageOriginal: "As in document — exact copy, no translation",
+        menuDishLanguageEn: "English — translate names from Hebrew when needed",
+        menuDishLanguageHint: "Your choice is saved on this device. Changing it re-runs analysis on the file.",
         typeSalesReport: "Sales report",
         fileFallback: "File",
         errFileTooLarge:

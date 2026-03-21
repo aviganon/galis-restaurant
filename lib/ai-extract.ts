@@ -3,6 +3,7 @@
 import Papa from "papaparse"
 import * as XLSX from "xlsx"
 import { fileToBase64, callClaude } from "./claude"
+import { normalizeDishCategoryToHebrew } from "./dish-category-hebrew"
 
 export type ExtractType = "p" | "d" | "s"
 // p = supplier prices/invoice, d = dishes/menu, s = sales report
@@ -97,11 +98,29 @@ const MENU_KNOWLEDGE = `
 מנות ישראליות טיפוסיות ורכיביהן (כמויות למנה): חומוס→גרגרי חומוס 80ג, טחינה 80ג, לימון 20ג, שמן 15ג; פלאפל→גרגרי חומוס 100ג, פטרוזיליה 15ג, שום 5ג; שווארמה→בשר עוף 150ג, פיתה 80ג, טחינה 80ג; שניצל→חזה עוף 150ג, פירורי לחם 30ג, ביצה 1 יח; קבב→בשר טחון 150ג, בצל 30ג, פטרוזיליה 10ג; סלמון→דג סלמון 180ג, לימון 20ג, שמן 15ג; פסטה→פסטה 120ג, רוטב 80ג, שום 5ג; המבורגר→בשר טחון 200ג, לחמניה 80ג, ירקות 50ג; סלט קיסר→חסה 80ג, פרמזן 20ג, קרוטונים 30ג; פיצה→בצק 200ג, עגבניות 50ג, מוצרלה 80ג; ברוסקטה→לחם 60ג, עגבניות 50ג, שום 5ג; טרטר→בשר נא 120ג, חלמון 1 יח; סטייק→בשר בקר 250ג, תבלינים 5ג; דניס→דג דניס 200ג, לימון 20ג; ריזוטו→אורז 80ג, יין 50מ"ל, פרמזן 30ג; מרק→ירקות 150ג או בשר 10ג, תבלינים; חומוס ביתי→גרגרי חומוס 100ג, טחינה 80ג, לימון 30ג; פלאפל→גרגרי חומוס 90ג, שום 5ג, פטרוזיליה 10ג; סלט ירקות→חסה 50ג, עגבניה 50ג, מלפפון 40ג, בצל 20ג; צ'יפס→תפוחי אדמה 150ג, שמן 15ג; פלאפל בפיתה→חמוצים 30ג, פלאפל 80ג, סלט 40ג; חומוס מלא→חומוס 150ג, ביצה 1 יח, פלאפל 30ג.
 `
 
-const DISH_SYSTEM = `אתה מנתח תפריטי מסעדות בישראל. חלץ מנות, מחירים, קטגוריות.
+/** העדפת שפת שמות מנות בחילוץ AI — נשלח לפרומפט */
+export type MenuDishNameLanguage = "he" | "original" | "en"
+
+const DISH_NAME_RULES: Record<MenuDishNameLanguage, string> = {
+  he: `שמות מנה (שדה name): כתוב **בעברית** כשהמקור בעברית, תפריט ישראלי טיפוסי, או ערבוב עברית/ערבית. אסור לתרגם שמות לאנגלית (לא Burger, Caesar Salad — השתמש במילים כמו המבורגר, סלט קיסר). אם מנה מופיעה במסמך **רק** באנגלית — שמור באנגלית.`,
+  original: `שמות מנה (שדה name): **העתק מדויק** מהמסמך — אותה שפה ואותו ניסוח, ללא תרגום וללא תיקון.`,
+  en: `שמות מנה (שדה name): כתוב שמות **באנגלית** (תרגום תקני וקצר כשהמקור בעברית). אם המסמך כבר באנגלית — שמור כפי שמופיע.`,
+}
+
+/** מערכת הודעות לחילוץ מנות — לפי העדפת שפת שמות */
+export function buildDishExtractionSystem(lang: MenuDishNameLanguage = "he"): string {
+  const nameRule = DISH_NAME_RULES[lang] ?? DISH_NAME_RULES.he
+  return `אתה מנתח תפריטי מסעדות בישראל. חלץ מנות, מחירים, קטגוריות.
 ${MENU_KNOWLEDGE}
 חשוב: לכל מנה ישייך רכיבים וכמויות לפי הבנתך — השתמש בכמויות הטיפוסיות מהרשימה למעלה. אם אין התאמה — השער כמויות סבירות (מנה עיקרית: 150–250ג בשר/דג, מנה קטנה: 50–100ג).
 רכיבים: עד 8 למנה. יחידות: גרם/קג/יחידה/מ"ל.
-החזר JSON בלבד: {"items":[{"name":"שם מנה","price":0,"category":"קטגוריה","ingredients":[{"name":"שם רכיב","qty":100,"unit":"גרם"}]}]}`
+
+**שפה וקטגוריות (חובה):**
+- שדה category חייב להיות **אחת** מהמחרוזות הבאות **בעברית בלבד**: עיקריות, ראשונות, סלטים, קינוחים, משקאות, משקאות אלכוהוליים, תוספות, אחר. אסור לכתוב קטגוריה באנגלית (לא Main dishes וכו').
+- ${nameRule}
+
+החזר JSON בלבד: {"items":[{"name":"שם מנה","price":0,"category":"עיקריות","ingredients":[{"name":"שם רכיב","qty":100,"unit":"גרם"}]}]}`
+}
 
 const SALES_SYSTEM = `אתה מנתח דוחות מכירות למסעדות (POS, Excel, יומן מכירות).
 חלץ לכל שורת מנה: name (שם המנה כפי שבדוח), qty (כמות יחידות שנמכרו בתקופת הדוח), price (מחיר ליחידה **לפני מע"מ** אם מופיע — אחרת 0).
@@ -189,8 +208,56 @@ export function normalizeSalesExtractResult(parsed: unknown): ExtractResult {
   return { items, sales_report_period, sales_report_date_from, sales_report_date_to }
 }
 
+function normalizeDishExtractResult(parsed: unknown): ExtractResult {
+  const o = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {}
+  const raw = Array.isArray(o.items) ? o.items : Array.isArray(o.dishes) ? o.dishes : []
+  const items: ExtractedDishItem[] = []
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue
+    const r = row as Record<string, unknown>
+    const name = typeof r.name === "string" ? r.name.trim() : ""
+    if (!name) continue
+    let price = 0
+    if (typeof r.price === "number" && !Number.isNaN(r.price)) price = Math.max(0, r.price)
+    else if (typeof r.suggested_selling_price_ils === "number" && !Number.isNaN(r.suggested_selling_price_ils))
+      price = Math.max(0, r.suggested_selling_price_ils)
+    const category = normalizeDishCategoryToHebrew(
+      typeof r.category === "string" ? r.category : undefined
+    )
+    let ingredients: ExtractedDishItem["ingredients"]
+    if (Array.isArray(r.ingredients)) {
+      const ingList = r.ingredients
+        .filter((ing): ing is Record<string, unknown> => !!ing && typeof ing === "object")
+        .map((ing) => ({
+          name: typeof ing.name === "string" ? ing.name.trim() : "",
+          qty:
+            typeof ing.qty === "number" && !Number.isNaN(ing.qty)
+              ? ing.qty
+              : typeof ing.qty === "string"
+                ? parseFloat(ing.qty.replace(/,/g, ".")) || 0
+                : 0,
+          unit: typeof ing.unit === "string" && ing.unit.trim() ? ing.unit.trim() : "גרם",
+        }))
+        .filter((ing) => ing.name.length > 0)
+      if (ingList.length > 0) ingredients = ingList
+    }
+    const description = typeof r.description === "string" ? r.description.trim() : undefined
+    const preparation = typeof r.preparation === "string" ? r.preparation.trim() : undefined
+    items.push({
+      name,
+      price,
+      category,
+      ingredients,
+      description: description || undefined,
+      preparation: preparation || undefined,
+    })
+  }
+  return { items }
+}
+
 function finishExtractResult(type: ExtractType, parsed: unknown): ExtractResult {
   if (type === "s") return normalizeSalesExtractResult(parsed)
+  if (type === "d") return normalizeDishExtractResult(parsed)
   return parsed as ExtractResult
 }
 
@@ -316,8 +383,11 @@ export async function parseSpreadsheet(file: File, ext: string): Promise<Record<
 export async function extractWithAI(
   file: File,
   type: ExtractType,
-  supplierName?: string
+  supplierName?: string,
+  options?: { menuDishLanguage?: MenuDishNameLanguage }
 ): Promise<ExtractResult> {
+  const menuDishLang: MenuDishNameLanguage = options?.menuDishLanguage ?? "he"
+  const dishSystem = buildDishExtractionSystem(menuDishLang)
   const ext = getFileExtension(file)
   if (!ext || !SUPPORTED_EXTENSIONS.includes(ext as (typeof SUPPORTED_EXTENSIONS)[number])) {
     throw new Error(
@@ -335,13 +405,13 @@ export async function extractWithAI(
       type === "p"
         ? SUPPLIER_SYSTEM + (supplierName ? ` שם הספק: "${supplierName}".` : "")
         : type === "d"
-          ? DISH_SYSTEM
+          ? dishSystem
           : SALES_SYSTEM
     const userContent =
       type === "p"
         ? "נתח את המסמך (חשבונית/מחירון/תעודת משלוח). אם כותרת 'מחירון' — כל שורה=פריט, qty=1, price=המחיר, sku=קוד. אם חשבונית — price=נטו, qty=כמות. אם ללא מחירים — no_prices:true. name=שם המוצר בלבד. JSON בלבד."
         : type === "d"
-          ? "חלץ מנות ומחירים מהתפריט. לכל מנה ישייך רכיבים לפי הבנתך (בשר, ירקות, קמח וכו') — גם אם לא מופיעים בתפריט. JSON בלבד."
+          ? "חלץ מנות ומחירים מהתפריט. לכל מנה ישייך רכיבים לפי הבנתך (בשר, ירקות, קמח וכו') — גם אם לא מופיעים בתפריט. עקוב אחרי כללי שפת שמות המנות בהוראות המערכת. JSON בלבד."
           : "חלץ דוח מכירות לפי SALES_SYSTEM — כולל sales_report_period, sales_report_date_from, sales_report_date_to. JSON בלבד."
     const data = await callClaude({
       model: "claude-haiku-4-5-20251001",
@@ -383,13 +453,13 @@ export async function extractWithAI(
       type === "p"
         ? SUPPLIER_SYSTEM + (supplierName ? ` שם הספק: "${supplierName}".` : "")
         : type === "d"
-          ? DISH_SYSTEM
+          ? dishSystem
           : SALES_SYSTEM
     const userContent =
       type === "p"
         ? "נתח את המסמך (חשבונית/מחירון/תעודת משלוח). אם כותרת 'מחירון' — כל שורה=פריט, qty=1, price=המחיר, sku=קוד. אם חשבונית — price=נטו, qty=כמות. אם ללא מחירים — no_prices:true. name=שם המוצר בלבד. JSON בלבד."
         : type === "d"
-          ? "חלץ מנות ומחירים מהתפריט. לכל מנה ישייך רכיבים לפי הבנתך (בשר, ירקות, קמח וכו') — גם אם לא מופיעים בתפריט. JSON בלבד."
+          ? "חלץ מנות ומחירים מהתפריט. לכל מנה ישייך רכיבים לפי הבנתך (בשר, ירקות, קמח וכו') — גם אם לא מופיעים בתפריט. עקוב אחרי כללי שפת שמות המנות בהוראות המערכת. JSON בלבד."
           : "חלץ דוח מכירות לפי SALES_SYSTEM — כולל sales_report_period, sales_report_date_from, sales_report_date_to. JSON בלבד."
     const mediaBlock =
       isPdf
@@ -436,11 +506,11 @@ export async function extractWithAI(
       type === "p"
         ? SUPPLIER_SYSTEM
         : type === "d"
-          ? DISH_SYSTEM
+          ? dishSystem
           : SALES_SYSTEM
     const sheetUserText =
       type === "d"
-        ? `הנתונים:\n${preview}\n\nחלץ מנות ומחירים. לכל מנה ישייך רכיבים וכמויות לפי הבנתך. JSON בלבד.`
+        ? `הנתונים:\n${preview}\n\nחלץ מנות ומחירים. לכל מנה ישייך רכיבים וכמויות לפי הבנתך. עקוב אחרי כללי שפת שמות המנות בהוראות המערכת. JSON בלבד.`
         : type === "p"
           ? `הנתונים:\n${preview}\n\nחלץ רכיבים (שם), מחיר, יחידה, כמות (qty). JSON בלבד.`
           : `הנתונים:\n${preview}\n\nחלץ דוח מכירות לפי SALES_SYSTEM — כולל sales_report_period, sales_report_date_from, sales_report_date_to. JSON בלבד.`
@@ -528,7 +598,9 @@ export async function suggestDishesFromSalesLines(
       }
       map.set(key, {
         name: key,
-        category: typeof d.category === "string" && d.category.trim() ? d.category.trim() : "עיקריות",
+        category: normalizeDishCategoryToHebrew(
+          typeof d.category === "string" && d.category.trim() ? d.category.trim() : undefined
+        ),
         suggested_selling_price_ils:
           typeof d.suggested_selling_price_ils === "number" && !Number.isNaN(d.suggested_selling_price_ils)
             ? Math.max(0, d.suggested_selling_price_ils)
@@ -701,7 +773,9 @@ export async function suggestDishFromIngredients(
   return {
     name: parsed.name.trim(),
     price: parseSuggestDishSellingPrice(parsed.sellingPrice),
-    category: typeof parsed.category === "string" && parsed.category.trim() ? parsed.category.trim() : "עיקריות",
+    category: normalizeDishCategoryToHebrew(
+      typeof parsed.category === "string" && parsed.category.trim() ? parsed.category.trim() : undefined
+    ),
     description: typeof parsed.description === "string" ? parsed.description.trim() : undefined,
     preparation: preparation || undefined,
     ingredients: mappedIngredients,

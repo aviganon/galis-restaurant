@@ -12,6 +12,7 @@ import type { ExtractedSupplierItem, ExtractedDishItem, SalesReportPeriod } from
 import { detectDocumentType, type DetectedDocType } from "@/lib/ai-extract"
 import { getClaudeApiKey } from "@/lib/claude"
 import { safeFirestoreRecipeId } from "@/lib/recipe-id"
+import { normalizeDishCategoryToHebrew } from "@/lib/dish-category-hebrew"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -367,7 +368,7 @@ export function Upload() {
             doc(db, "restaurants", currentRestaurantId, "recipes", name),
             {
               name,
-              category: it.category || "עיקריות",
+              category: normalizeDishCategoryToHebrew(it.category || "עיקריות"),
               sellingPrice: it.price || 0,
               ingredients,
               isCompound: false,
