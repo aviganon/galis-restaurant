@@ -1,22 +1,23 @@
 "use client"
 
-import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import React, { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect } from "react"
+import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
   Search, Plus, FileSpreadsheet, Copy, Camera, Trash2, ChevronDown, 
   ChevronUp, X, Edit2, MoreVertical, Filter, SortAsc, SortDesc,
   Package, Utensils, DollarSign, TrendingUp, TrendingDown, ImageIcon, AlertTriangle,
-  CheckCircle2, Info, ChefHat, Scale, Percent, Sparkles, BarChart2, Loader2, ShoppingCart
+  CheckCircle2, Info, ChefHat, Scale, Percent, Sparkles, BarChart2, BarChart3, Loader2, LayoutDashboard,
+  Truck, Leaf,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Ingredients } from "@/components/ingredients"
 import { MenuCosts } from "@/components/menu-costs"
-import { OrdersPanel } from "@/components/purchase-orders"
 import SuppliersComp from "@/components/suppliers"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -29,6 +30,8 @@ import { db, storage } from "@/lib/firebase"
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage"
 import { useApp } from "@/contexts/app-context"
 import { FilePreviewModal } from "@/components/file-preview-modal"
+import { Dashboard } from "@/components/dashboard"
+import { Reports } from "@/components/reports"
 import { suggestDishFromIngredients, type ExtractedDishItem } from "@/lib/ai-extract"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
@@ -53,6 +56,10 @@ interface Dish {
   yieldQty?: number
   yieldUnit?: string
   imageUrl?: string
+  /** תיאור קצר מה-AI או ידני */
+  recipeDescription?: string
+  /** שלבי הכנה / מתכון מלא */
+  preparationNotes?: string
 }
 
 interface SupplierPrice {
@@ -64,7 +71,7 @@ interface SupplierPrice {
 }
 
 const VAT_RATE = 1.17
-const CATEGORIES = ["עיקריות", "ראשונות", "סלטים", "קינוחים", "משקאות", "תוספות", "אחר"]
+const CATEGORIES = ["עיקריות", "ראשונות", "סלטים", "קינוחים", "משקאות", "משקאות אלכוהוליים", "תוספות", "אחר"]
 const UNITS = ["גרם", "קג", 'ק"ג', "מל", "ליטר", "יחידה", "מנה", "כף", "כפית", "חבילה"]
 
 // נרמול יחידה — מחזיר ערך תקין מתוך UNITS (למניעת קריסת Select כש-unit לא ברשימה)
@@ -83,11 +90,13 @@ const CATEGORY_TO_KEY: Record<string, string> = {
   "סלטים": "salads",
   "קינוחים": "desserts",
   "משקאות": "drinks",
+  "משקאות אלכוהוליים": "alcoholicDrinks",
   "תוספות": "sides",
   "אחר": "other",
 }
 export default function ProductTree() {
-  const [activeTab, setActiveTab] = useState<"ingredients"|"suppliers"|null>(null)
+  const [ingredientsModalOpen, setIngredientsModalOpen] = useState(false)
+  const [suppliersModalOpen, setSuppliersModalOpen] = useState(false)
   const [dishImages, setDishImages] = useState<Record<string,string>>({})
   const [loadedDishImages, setLoadedDishImages] = useState<Set<string>>(new Set())
   const [editDishDialogOpen, setEditDishDialogOpen] = useState(false)
@@ -102,6 +111,10 @@ export default function ProductTree() {
   const isRtl = dir === "rtl"
   const { currentRestaurantId, userRole, userPermissions, isSystemOwner, refreshIngredientsKey, refreshIngredients } = useApp()
   const canSeeCosts = userRole === "owner" || userRole === "admin" || userRole === "manager" || !!userPermissions?.canSeeCosts
+  const hasFullMenu = isSystemOwner || userRole === "owner" || userRole === "admin" || userRole === "manager"
+  const canSeeDashboardContent = hasFullMenu || userPermissions?.canSeeDashboard !== false
+  const canSeeReportsContent = hasFullMenu || !!userPermissions?.canSeeReports
+  const canOpenProductDashboardModal = canSeeDashboardContent || canSeeReportsContent
   const isOwner = isOwnerRole(userRole, isSystemOwner)
   const [dishes, setDishes] = useState<Record<string, Dish>>({})
   const [supplierPrices, setSupplierPrices] = useState<Record<string, SupplierPrice>>({})
@@ -115,7 +128,8 @@ export default function ProductTree() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [isAiSuggestOpen, setIsAiSuggestOpen] = useState(false)
   const [showMenuCosts, setShowMenuCosts] = useState(false)
-  const [showOrdersPanel, setShowOrdersPanel] = useState(false)
+  const [dashboardModalOpen, setDashboardModalOpen] = useState(false)
+  const [dashboardModalTab, setDashboardModalTab] = useState<"dashboard" | "reports">("dashboard")
   const [aiSuggestLoading, setAiSuggestLoading] = useState(false)
   const [aiSuggestedDish, setAiSuggestedDish] = useState<ExtractedDishItem | null>(null)
   const [ingredientStock, setIngredientStock] = useState<Record<string, number>>({})
@@ -124,7 +138,36 @@ export default function ProductTree() {
   const importFileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const [isCostPanelExpanded, setIsCostPanelExpanded] = useState(true)
+  /** סרגל לוח בקרה / עלויות תפריט / AI — ניתן להסתיר; העדפה נשמרת במכשיר */
+  const [menuToolsOpen, setMenuToolsOpen] = useState(true)
   const [editingDish, setEditingDish] = useState<string | null>(null)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("product-tree-menu-tools-open")
+      if (raw === "false") setMenuToolsOpen(false)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const toggleMenuTools = useCallback(() => {
+    setMenuToolsOpen((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem("product-tree-menu-tools-open", String(next))
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+  }, [])
+
+  const [headerToolsHost, setHeaderToolsHost] = useState<HTMLElement | null>(null)
+  useLayoutEffect(() => {
+    const el = document.getElementById("product-tree-header-tools-root")
+    setHeaderToolsHost(el)
+  }, [])
   
   // New dish form state
   const [newDishName, setNewDishName] = useState("")
@@ -177,6 +220,8 @@ export default function ProductTree() {
             yieldQty: typeof data.yieldQty === "number" ? data.yieldQty : 1,
             yieldUnit: (data.yieldUnit as string) || "מנה",
             imageUrl: (data.imageUrl as string) || undefined,
+            recipeDescription: typeof data.recipeDescription === "string" ? data.recipeDescription : undefined,
+            preparationNotes: typeof data.preparationNotes === "string" ? data.preparationNotes : undefined,
           }
         })
 
@@ -500,7 +545,7 @@ export default function ProductTree() {
       if (suggested) {
         setAiSuggestedDish(suggested)
       } else {
-        toast.error("לא הצלחתי להציע מנה — נסה שוב")
+        toast.error("לא הצלחתי להציע מתכון — נסה שוב")
         setIsAiSuggestOpen(false)
       }
     } catch (e) {
@@ -527,6 +572,8 @@ export default function ProductTree() {
       isCompound: false,
       yieldQty: 1,
       yieldUnit: "מנה",
+      recipeDescription: aiSuggestedDish.description?.trim() || undefined,
+      preparationNotes: aiSuggestedDish.preparation?.trim() || undefined,
     }
     saveDishToFirestore(aiSuggestedDish.name.trim(), dish)
     setDishes((prev) => ({ ...prev, [aiSuggestedDish.name.trim()]: dish }))
@@ -552,6 +599,8 @@ export default function ProductTree() {
         category: it.category || "עיקריות",
         sellingPrice: it.price || 0,
         ingredients,
+        recipeDescription: it.description?.trim() || undefined,
+        preparationNotes: it.preparation?.trim() || undefined,
       }
       next[it.name.trim()] = dish
       toSave.push({ name: it.name.trim(), dish })
@@ -609,28 +658,6 @@ export default function ProductTree() {
     toast.success(`המנה ${newName} נוספה`)
   }
 
-  // Copy to clipboard
-  const handleCopyToClipboard = () => {
-    const toCopy = selectedDish
-      ? (() => {
-          const d = dishes[selectedDish]
-          if (!d) return ""
-          const lines = [`מנה: ${selectedDish}`, `קטגוריה: ${d.category}`, `מחיר: ₪${(d.sellingPrice / VAT_RATE).toFixed(2)}`, "רכיבים:"]
-          d.ingredients.forEach(i => lines.push(`  - ${i.name}: ${i.qty} ${i.unit}${i.waste ? ` (פחת ${i.waste}%)` : ""}`))
-          return lines.join("\n")
-        })()
-      : filteredDishes.map(n => {
-          const d = dishes[n]
-          const p = (d?.sellingPrice || 0) / VAT_RATE
-          return `${n} | ${d?.category || ""} | ₪${p.toFixed(2)}`
-        }).join("\n")
-    if (!toCopy) {
-      toast.error(t("pages.productTree.noDishesToCopy"))
-      return
-    }
-    navigator.clipboard.writeText(toCopy).then(() => toast.success(t("pages.productTree.copiedToClipboard")))
-  }
-
   const openDishEditDialog = (name: string) => {
     const dish = dishes[name]; if (!dish) return
     setEditDishTarget(name); setEditDishName(name)
@@ -676,16 +703,241 @@ export default function ProductTree() {
     }
     finally{ setSavingDishEdit(false) }
   }
+  const headerToolsToolbar =
+    headerToolsHost &&
+    createPortal(
+      <div
+        className="flex flex-wrap items-center gap-2"
+        dir={isRtl ? "rtl" : "ltr"}
+      >
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="gap-1 h-9 shrink-0 text-muted-foreground hover:text-foreground"
+          onClick={toggleMenuTools}
+          aria-expanded={menuToolsOpen}
+          aria-controls="product-tree-menu-tools"
+          title={menuToolsOpen ? t("pages.productTree.menuToolsHide") : t("pages.productTree.menuToolsShow")}
+        >
+          {menuToolsOpen ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
+          <span className="hidden sm:inline max-w-[9rem] truncate">
+            {menuToolsOpen ? t("pages.productTree.menuToolsHide") : t("pages.productTree.menuToolsShow")}
+          </span>
+        </Button>
+        {menuToolsOpen && (
+          <div
+            id="product-tree-menu-tools"
+            role="group"
+            className="flex flex-wrap items-center gap-2"
+          >
+            {canOpenProductDashboardModal && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5 border-primary/30 bg-primary/5 hover:bg-primary/10"
+                onClick={() => {
+                  setDashboardModalTab(canSeeDashboardContent ? "dashboard" : "reports")
+                  setDashboardModalOpen(true)
+                }}
+              >
+                {canSeeDashboardContent ? (
+                  <LayoutDashboard className="w-4 h-4" />
+                ) : (
+                  <BarChart3 className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline">
+                  {canSeeDashboardContent ? t("pages.productTree.openDashboard") : t("nav.reports")}
+                </span>
+              </Button>
+            )}
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowMenuCosts(true)}>
+              <BarChart2 className="w-4 h-4" />
+              <span className="hidden sm:inline">{t("nav.menuCosts")}</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={handleAiSuggest}
+              disabled={aiSuggestLoading || Object.keys(supplierPrices).length === 0}
+            >
+              {aiSuggestLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              <span className="hidden sm:inline">{t("pages.productTree.aiSuggest")}</span>
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="gap-1.5 bg-gradient-to-l from-purple-500/10 to-violet-500/10 border-purple-500/30 text-purple-600 hover:bg-purple-500/20 dark:text-purple-300 dark:border-purple-500/40"
+              onClick={() => cameraInputRef.current?.click()}
+              title={t("pages.productTree.identify")}
+            >
+              <Camera className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">{t("pages.productTree.identify")}</span>
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => setIngredientsModalOpen(true)}
+            >
+              <Leaf className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">{t("nav.ingredients")}</span>
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => setSuppliersModalOpen(true)}
+            >
+              <Truck className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">{t("nav.suppliers")}</span>
+            </Button>
+          </div>
+        )}
+      </div>,
+      headerToolsHost
+    )
+
   return (
     <div className="flex flex-col bg-background">
+      {headerToolsToolbar}
       {loading && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-background/80 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-3">
             <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             <p className="text-sm text-muted-foreground">{t("pages.productTree.loading")}</p>
           </div>
         </div>
       )}
+      {canOpenProductDashboardModal && (
+        <Dialog
+          open={dashboardModalOpen}
+          onOpenChange={(open) => {
+            setDashboardModalOpen(open)
+            if (open) setDashboardModalTab(canSeeDashboardContent ? "dashboard" : "reports")
+          }}
+        >
+          <DialogContent
+            className="flex max-h-[min(92vh,56rem)] w-[calc(100vw-1rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl sm:p-0"
+            showCloseButton
+          >
+            <DialogHeader className="shrink-0 border-b px-4 py-3 pe-14 text-start sm:px-6 sm:py-4 sm:pe-16">
+              <DialogTitle className="text-start text-lg leading-snug">
+                {canSeeDashboardContent && canSeeReportsContent
+                  ? t("pages.productTree.dashboardModalTitleWithReports")
+                  : canSeeDashboardContent
+                    ? t("pages.productTree.dashboardModalTitle")
+                    : t("nav.reports")}
+              </DialogTitle>
+              <DialogDescription className="sr-only">
+                {t("pages.productTree.dashboardModalA11y")}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              {canSeeDashboardContent && canSeeReportsContent ? (
+                <Tabs
+                  value={dashboardModalTab}
+                  onValueChange={(v) => setDashboardModalTab(v as "dashboard" | "reports")}
+                  className="flex min-h-0 flex-1 flex-col gap-0"
+                >
+                  <TabsList className="mx-4 mt-2 mb-0 h-9 w-fit shrink-0 justify-start bg-muted/40 p-1">
+                    <TabsTrigger value="dashboard" className="gap-1.5 text-xs sm:text-sm">
+                      <LayoutDashboard className="h-4 w-4 shrink-0" />
+                      {t("pages.productTree.dashboardTabOverview")}
+                    </TabsTrigger>
+                    <TabsTrigger value="reports" className="gap-1.5 text-xs sm:text-sm">
+                      <BarChart3 className="h-4 w-4 shrink-0" />
+                      {t("nav.reports")}
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent
+                    value="dashboard"
+                    className="mt-0 min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 pb-3 pt-2 data-[state=inactive]:hidden sm:px-4 sm:pb-4 [-webkit-overflow-scrolling:touch]"
+                  >
+                    <Dashboard embedded onCloseEmbedded={() => setDashboardModalOpen(false)} />
+                  </TabsContent>
+                  <TabsContent
+                    value="reports"
+                    className="mt-0 min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 pb-3 pt-2 data-[state=inactive]:hidden sm:px-4 sm:pb-4 [-webkit-overflow-scrolling:touch]"
+                  >
+                    <Reports />
+                  </TabsContent>
+                </Tabs>
+              ) : canSeeDashboardContent ? (
+                <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 pb-3 sm:px-4 sm:pb-4 [-webkit-overflow-scrolling:touch]">
+                  <Dashboard embedded onCloseEmbedded={() => setDashboardModalOpen(false)} />
+                </div>
+              ) : (
+                <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 pb-3 sm:px-4 sm:pb-4 [-webkit-overflow-scrolling:touch]">
+                  <Reports />
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      <Dialog open={ingredientsModalOpen} onOpenChange={setIngredientsModalOpen}>
+        <DialogContent
+          className={cn(
+            "flex flex-col gap-0 overflow-hidden p-0 shadow-2xl",
+            "h-[88vh] max-h-[88vh] w-[92vw] !max-w-[92vw]",
+            "rounded-xl border border-border sm:!max-w-[92vw] sm:max-h-[88vh]",
+            "top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%]"
+          )}
+          showCloseButton
+        >
+          <DialogHeader className="shrink-0 border-b border-border bg-background px-4 py-3 pe-14 text-start sm:px-6 sm:py-4 sm:pe-16">
+            <DialogTitle className="flex items-center gap-2 text-start text-lg">
+              <Leaf className="h-5 w-5 shrink-0 text-primary" />
+              {t("nav.ingredients")}
+            </DialogTitle>
+            <DialogDescription className="sr-only">{t("nav.ingredients")}</DialogDescription>
+          </DialogHeader>
+          <div
+            className={cn(
+              "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-auto overscroll-contain",
+              "px-2 pb-4 pt-2 sm:px-4 sm:pb-4 [-webkit-overflow-scrolling:touch]"
+            )}
+          >
+            <Ingredients />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={suppliersModalOpen} onOpenChange={setSuppliersModalOpen}>
+        <DialogContent
+          className={cn(
+            "flex flex-col gap-0 overflow-hidden p-0 shadow-2xl",
+            "h-[88vh] max-h-[88vh] w-[92vw] !max-w-[92vw]",
+            "rounded-xl border border-border sm:!max-w-[92vw] sm:max-h-[88vh]",
+            "top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%]"
+          )}
+          showCloseButton
+        >
+          <DialogHeader className="shrink-0 border-b border-border bg-background px-4 py-3 pe-14 text-start sm:px-6 sm:py-4 sm:pe-16">
+            <DialogTitle className="flex items-center gap-2 text-start text-lg">
+              <Truck className="h-5 w-5 shrink-0 text-primary" />
+              {t("nav.suppliers")}
+            </DialogTitle>
+            <DialogDescription className="sr-only">{t("nav.suppliers")}</DialogDescription>
+          </DialogHeader>
+          <div
+            className={cn(
+              "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-auto overscroll-contain",
+              "px-2 pb-4 pt-2 sm:px-4 sm:pb-4 [-webkit-overflow-scrolling:touch]"
+            )}
+          >
+            <SuppliersComp />
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <FilePreviewModal
         open={fpmOpen}
         onOpenChange={(o) => {
@@ -717,7 +969,7 @@ export default function ProductTree() {
       <input ref={editDishImgInputRef} type="file" accept="image/*" className="hidden"
         onChange={e=>{const f=e.currentTarget.files?.[0];if(f)setEditDishImgFile(f);e.currentTarget.value=""}}/>
       {editDishDialogOpen && editDishTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-8"
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-8"
           onClick={e=>{if(e.target===e.currentTarget)setEditDishDialogOpen(false)}}>
           <div className="bg-background rounded-xl shadow-2xl p-6 w-full max-w-sm space-y-4">
             <div className="flex items-center justify-between">
@@ -767,18 +1019,6 @@ export default function ProductTree() {
       )}
       {/* Scrollable content */}
       <div className="px-4 pb-2">
-      {/* Header Alert - compact */}
-      <motion.div 
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-2 rounded-lg bg-gradient-to-l from-primary/5 to-primary/10 border border-primary/20 p-2 flex items-center gap-2 shrink-0"
-      >
-        <TrendingUp className="w-4 h-4 text-primary shrink-0" />
-        <p className="text-xs text-foreground/80">
-          {t("pages.productTree.pricesSynced")}
-        </p>
-      </motion.div>
-
       {/* Dishes Card */}
       <Card className="mb-2 border-0 shadow-lg">
         <CardContent className="p-3">
@@ -863,111 +1103,6 @@ export default function ProductTree() {
                 </DialogContent>
                       </Dialog>
 
-              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowMenuCosts(true)}>
-                <BarChart2 className="w-4 h-4" />
-                <span className="hidden sm:inline">עלויות תפריט</span>
-              </Button>
-
-              {showOrdersPanel && (
-                <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.5)'}} onClick={() => setShowOrdersPanel(false)}/>
-                  <div style={{position:'relative',width:'92vw',height:'88vh',background:'var(--background)',borderRadius:'12px',overflow:'visible',display:'flex',flexDirection:'column',boxShadow:'0 25px 50px rgba(0,0,0,0.3)'}}>
-                    <button onClick={() => setShowOrdersPanel(false)} style={{position:'absolute',top:'12px',left:'12px',zIndex:10,width:'32px',height:'32px',borderRadius:'50%',border:'none',background:'var(--muted)',cursor:'pointer',fontSize:'18px'}}>✕</button>
-                    <div style={{overflowY:'auto',flex:1}}>
-                      <OrdersPanel />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {showMenuCosts && (
-                <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.5)'}} onClick={() => setShowMenuCosts(false)} />
-                  <div style={{position:'relative',width:'92vw',height:'88vh',background:'var(--background)',borderRadius:'12px',boxShadow:'0 25px 50px rgba(0,0,0,0.3)',overflow:'visible',display:'flex',flexDirection:'column'}}>
-                    <button onClick={() => setShowMenuCosts(false)} style={{position:'absolute',top:'12px',left:'12px',zIndex:10,width:'32px',height:'32px',borderRadius:'50%',border:'none',background:'var(--muted)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                      <X style={{width:'16px',height:'16px'}} />
-                    </button>
-                    <div style={{overflowY:'auto',flex:1}}>
-                      <MenuCosts />
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5"
-                onClick={handleAiSuggest}
-                disabled={aiSuggestLoading || Object.keys(supplierPrices).length === 0}
-              >
-                {aiSuggestLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                <span className="hidden sm:inline">הצעת AI</span>
-              </Button>
-              <Dialog open={isAiSuggestOpen} onOpenChange={(o) => { setIsAiSuggestOpen(o); if (!o) setAiSuggestedDish(null) }}>
-                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 text-primary" />
-                      הצעת מנה מ-AI
-                    </DialogTitle>
-                  </DialogHeader>
-                  {aiSuggestedDish ? (
-                    <div className="space-y-4 py-2">
-                      <div>
-                        <p className="font-medium">{aiSuggestedDish.name}</p>
-                        <p className="text-sm text-muted-foreground">{aiSuggestedDish.category} • ₪{(aiSuggestedDish.price || 0).toFixed(0)}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium mb-2">{t("pages.productTree.ingredientsInDishLabel")}</p>
-                        <ul className="space-y-1 text-sm">
-                          {(aiSuggestedDish.ingredients || []).map((ing, i) => (
-                            <li key={i}>{ing.name} — {ing.qty} {ing.unit}</li>
-                          ))}
-                        </ul>
-                      </div>
-                      <details className="text-sm border rounded-lg p-3 bg-muted/30">
-                        <summary className="cursor-pointer font-medium">{t("pages.productTree.existingIngredientsLabel")} ({Object.keys(supplierPrices).length})</summary>
-                        <ul className="mt-2 space-y-1 max-h-40 overflow-y-auto text-muted-foreground">
-                          {Object.entries(supplierPrices).map(([name, sp]) => (
-                            <li key={name}>
-                              {name} — ₪{sp.price.toFixed(1)}/{sp.unit}
-                              {sp.supplier && <span className="text-primary"> • איפה לרכוש: {sp.supplier}</span>}
-                              {ingredientStock[name] != null ? ` (מלאי: ${ingredientStock[name]})` : ""}
-                            </li>
-                          ))}
-                        </ul>
-                      </details>
-                      <div className="flex gap-2 justify-end">
-                        <Button variant="outline" onClick={() => { setAiSuggestedDish(null); setIsAiSuggestOpen(false) }}>{t("pages.productTree.cancel")}</Button>
-                        <Button onClick={handleAddAiSuggestedDish}>
-                          <Plus className="w-4 h-4 ml-1" />
-                          {t("pages.productTree.add")} מנה
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-4 py-2">
-                      <div className="py-4 flex flex-col items-center gap-2 text-muted-foreground">
-                        <Loader2 className="w-8 h-8 animate-spin" />
-                        <p>{t("pages.productTree.aiAnalyzing")}</p>
-                      </div>
-                      <details open className="text-sm border rounded-lg p-3 bg-muted/30">
-                        <summary className="cursor-pointer font-medium">{t("pages.productTree.existingIngredientsLabel")} ({Object.keys(supplierPrices).length})</summary>
-                        <ul className="mt-2 space-y-1 max-h-40 overflow-y-auto text-muted-foreground">
-                          {Object.entries(supplierPrices).map(([name, sp]) => (
-                            <li key={name}>
-                              {name} — ₪{sp.price.toFixed(1)}/{sp.unit}
-                              {sp.supplier && <span className="text-primary"> • איפה לרכוש: {sp.supplier}</span>}
-                              {ingredientStock[name] != null ? ` (מלאי: ${ingredientStock[name]})` : ""}
-                            </li>
-                          ))}
-                        </ul>
-                      </details>
-                    </div>
-                  )}
-                </DialogContent>
-              </Dialog>
               <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" variant="outline" className="gap-1.5">
@@ -1024,23 +1159,129 @@ export default function ProductTree() {
                   </div>
                 </DialogContent>
               </Dialog>
-              
-              <Button size="sm" variant="outline" className="gap-1.5" onClick={handleCopyToClipboard}>
-                <Copy className="w-4 h-4" />
-                <span className="hidden sm:inline">{t("pages.productTree.copy")}</span>
-              </Button>
-              
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 bg-gradient-to-l from-purple-500/10 to-violet-500/10 border-purple-500/30 text-purple-600 hover:bg-purple-500/20"
-                onClick={() => cameraInputRef.current?.click()}
-              >
-                <Camera className="w-4 h-4" />
-                <span className="hidden sm:inline">{t("pages.productTree.identify")}</span>
-              </Button>
             </div>
           </div>
+
+          {showMenuCosts && (
+            <div style={{position:'fixed',inset:0,zIndex:70,display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.5)'}} onClick={() => setShowMenuCosts(false)} />
+              <div style={{position:'relative',width:'92vw',height:'88vh',background:'var(--background)',borderRadius:'12px',boxShadow:'0 25px 50px rgba(0,0,0,0.3)',overflow:'visible',display:'flex',flexDirection:'column'}}>
+                <button onClick={() => setShowMenuCosts(false)} style={{position:'absolute',top:'12px',left:'12px',zIndex:10,width:'32px',height:'32px',borderRadius:'50%',border:'none',background:'var(--muted)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  <X style={{width:'16px',height:'16px'}} />
+                </button>
+                <div style={{overflowY:'auto',flex:1}}>
+                  <MenuCosts />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <Dialog open={isAiSuggestOpen} onOpenChange={(o) => { setIsAiSuggestOpen(o); if (!o) setAiSuggestedDish(null) }}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                  {t("pages.productTree.aiSuggestTitle")}
+                </DialogTitle>
+                <DialogDescription className="sr-only">{t("pages.productTree.aiSuggestDialogDesc")}</DialogDescription>
+              </DialogHeader>
+              {aiSuggestedDish ? (
+                <div className="space-y-4 py-2">
+                  <div>
+                    <p className="font-medium text-lg">{aiSuggestedDish.name}</p>
+                    <p className="text-sm text-muted-foreground">{aiSuggestedDish.category} • ₪{(aiSuggestedDish.price || 0).toFixed(0)}</p>
+                    {aiSuggestedDish.description ? (
+                      <p className="text-sm mt-2 text-muted-foreground leading-relaxed">{aiSuggestedDish.description}</p>
+                    ) : null}
+                  </div>
+                  {aiSuggestedDish.preparation ? (
+                    <div className="rounded-lg border bg-muted/40 p-3">
+                      <p className="text-sm font-semibold mb-2">{t("pages.productTree.preparationNotesLabel")}</p>
+                      <div className="text-sm whitespace-pre-wrap leading-relaxed">{aiSuggestedDish.preparation}</div>
+                    </div>
+                  ) : null}
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                    <p className="text-sm font-semibold mb-3">{t("pages.productTree.aiSuggestNeededIngredients")}</p>
+                    {(aiSuggestedDish.ingredients || []).length === 0 ? (
+                      <p className="text-sm text-amber-700 dark:text-amber-400">{t("pages.productTree.aiSuggestNoMatchedIngredients")}</p>
+                    ) : (
+                      <ul className="space-y-2.5 text-sm">
+                        {(aiSuggestedDish.ingredients || []).map((ing, i) => {
+                          const sp = supplierPrices[ing.name]
+                          return (
+                            <li
+                              key={`${ing.name}-${i}`}
+                              className="rounded-md bg-background/80 border border-border/60 px-3 py-2"
+                            >
+                              <div className="font-medium">{ing.name}</div>
+                              <div className="text-muted-foreground text-xs sm:text-sm mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
+                                <span>
+                                  {t("pages.productTree.quantity")}: {ing.qty} {ing.unit}
+                                </span>
+                                {sp ? (
+                                  <>
+                                    <span aria-hidden>·</span>
+                                    <span>
+                                      {t("pages.productTree.priceLabelShort")}: ₪{sp.price.toFixed(1)}/{sp.unit}
+                                    </span>
+                                  </>
+                                ) : null}
+                                {sp?.supplier ? (
+                                  <>
+                                    <span aria-hidden>·</span>
+                                    <span>
+                                      {t("pages.productTree.supplierLabelShort")}: {sp.supplier}
+                                    </span>
+                                  </>
+                                ) : null}
+                                {ingredientStock[ing.name] != null ? (
+                                  <>
+                                    <span aria-hidden>·</span>
+                                    <span>
+                                      {t("pages.productTree.stockShort")}: {ingredientStock[ing.name]}
+                                    </span>
+                                  </>
+                                ) : null}
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                  <details className="text-sm border rounded-lg p-3 bg-muted/30">
+                    <summary className="cursor-pointer font-medium text-muted-foreground">
+                      {t("pages.productTree.aiSuggestShowAllPantry")} ({Object.keys(supplierPrices).length})
+                    </summary>
+                    <ul className="mt-2 space-y-1 max-h-40 overflow-y-auto text-muted-foreground">
+                      {Object.entries(supplierPrices).map(([name, sp]) => (
+                        <li key={name}>
+                          {name} — ₪{sp.price.toFixed(1)}/{sp.unit}
+                          {sp.supplier && <span className="text-primary"> • איפה לרכוש: {sp.supplier}</span>}
+                          {ingredientStock[name] != null ? ` (מלאי: ${ingredientStock[name]})` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={() => { setAiSuggestedDish(null); setIsAiSuggestOpen(false) }}>{t("pages.productTree.cancel")}</Button>
+                    <Button onClick={handleAddAiSuggestedDish}>
+                      <Plus className="w-4 h-4 ml-1" />
+                      {t("pages.productTree.add")} {t("pages.dish")}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4 py-2">
+                  <div className="py-6 flex flex-col items-center gap-3 text-muted-foreground text-center px-2">
+                    <Loader2 className="w-8 h-8 animate-spin" />
+                    <p className="font-medium">{t("pages.productTree.aiAnalyzing")}</p>
+                    <p className="text-sm max-w-sm">{t("pages.productTree.aiSuggestLoadingHint")}</p>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
           
           {/* Search + Filters */}
           <div className="flex flex-wrap gap-2 mb-2">
@@ -1101,15 +1342,23 @@ export default function ProductTree() {
                 const isActive = name === selectedDish
                 
                 return (
-                  <motion.button
+                  <motion.div
                     key={name}
+                    role="button"
+                    tabIndex={0}
                     layout
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.9 }}
                     onClick={() => setSelectedDish(name)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault()
+                        setSelectedDish(name)
+                      }
+                    }}
                     className={cn(
-                      "relative rounded-lg p-2 text-right transition-all min-w-[100px] max-w-[150px] flex-1",
+                      "relative cursor-pointer rounded-lg p-2 text-right transition-all min-w-[100px] max-w-[150px] flex-1 outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       isActive 
                         ? "shadow-lg ring-2 ring-primary/50" 
                         : "bg-card border border-border hover:border-primary/50 hover:shadow-md"
@@ -1177,7 +1426,7 @@ export default function ProductTree() {
                         </span>
                       )}
                     </div>
-                  </motion.button>
+                  </motion.div>
                 )
               })}
             </AnimatePresence>
@@ -1186,7 +1435,15 @@ export default function ProductTree() {
       </Card>
 
       {/* Recipe & Cost Layout */}
-      <div className="grid gap-4" style={canSeeCosts ? {gridTemplateColumns: isRtl ? "3fr 300px" : "300px 3fr"} : {}}>
+      <div
+        className={cn(
+          "grid gap-4",
+          canSeeCosts &&
+            !isRtl &&
+            "max-lg:grid-cols-1 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)]",
+          canSeeCosts && isRtl && "max-lg:grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,300px)]"
+        )}
+      >
         {/* Cost Panel — לבעלים בלבד */}
         {canSeeCosts && (
         <Card style={{order: isRtl ? 2 : 1}} className={cn(
@@ -1426,6 +1683,19 @@ export default function ProductTree() {
             
             {currentDish ? (
               <>
+                {(currentDish.recipeDescription || currentDish.preparationNotes) ? (
+                  <div className="mb-3 space-y-2 rounded-lg border bg-muted/30 p-3 text-sm">
+                    {currentDish.recipeDescription ? (
+                      <p className="text-muted-foreground leading-relaxed">{currentDish.recipeDescription}</p>
+                    ) : null}
+                    {currentDish.preparationNotes ? (
+                      <div>
+                        <p className="font-semibold mb-1">{t("pages.productTree.preparationNotesLabel")}</p>
+                        <div className="whitespace-pre-wrap leading-relaxed text-muted-foreground">{currentDish.preparationNotes}</div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
                 {/* Ingredients Table */}
                 <div className="overflow-auto -mx-2 px-2 max-h-[220px] min-h-[60px]">
                   <table className="w-full text-sm">
@@ -1751,42 +2021,6 @@ export default function ProductTree() {
           </CardContent>
         </Card>
       </div>
-      </div>
-
-      {/* ── Section tabs: רכיבים / ספקים — same style as owner panel ── */}
-      <div className="mt-2">
-        {/* Divider */}
-        <div className="h-px bg-border mx-0 mb-0"/>
-        {/* Tab buttons — matching owner panel style */}
-        <div className="flex w-full border-b bg-background sticky top-0 z-10">
-          <button
-            onClick={()=>setActiveTab(activeTab==="ingredients"?null:"ingredients")}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3.5 text-sm font-medium transition-all relative
-              ${activeTab==="ingredients"
-                ?"text-primary after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary"
-                :"text-muted-foreground hover:text-foreground hover:bg-muted/40"}`}>
-            <span className="text-base">🥬</span> רכיבים
-          </button>
-          <button
-            onClick={()=>setActiveTab(activeTab==="suppliers"?null:"suppliers")}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3.5 text-sm font-medium transition-all relative
-              ${activeTab==="suppliers"
-                ?"text-primary after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary"
-                :"text-muted-foreground hover:text-foreground hover:bg-muted/40"}`}>
-            <span className="text-base">🚚</span> ספקים
-          </button>
-        </div>
-        {/* Content */}
-        {activeTab==="ingredients" && (
-          <div className="pb-10">
-            <Ingredients />
-          </div>
-        )}
-        {activeTab==="suppliers" && (
-          <div className="pb-10">
-            <SuppliersComp />
-          </div>
-        )}
       </div>
     </div>
   )

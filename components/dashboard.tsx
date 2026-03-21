@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, type ReactNode } from "react"
 import { toast } from "sonner"
 import { collection, getDocs, getDoc, doc, query, where, orderBy, limit, setDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -13,12 +13,15 @@ import {
   DollarSign,
   ShoppingCart,
   Utensils,
-  Users,
   AlertTriangle,
   ArrowUpLeft,
   Loader2,
   RefreshCw,
   Upload,
+  ClipboardList,
+  Building2,
+  Package,
+  Truck,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useTranslations } from "@/lib/use-translations"
@@ -44,11 +47,36 @@ function alertDisplayMessage(alert: DashboardAlert, t: (k: string) => string): s
   return ""
 }
 
-export function Dashboard() {
+export type DashboardProps = {
+  /** מוצג בתוך Dialog מעץ מוצר — סוגרים לפני ניווט כדי שלא יישאר חלון פתוח */
+  embedded?: boolean
+  onCloseEmbedded?: () => void
+}
+
+export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps = {}) {
   const t = useTranslations()
-  const { currentRestaurantId, userRole, isSystemOwner, setCurrentPage, restaurants, isImpersonating, onImpersonate } = useApp()
+  const { currentRestaurantId, userRole, isSystemOwner, setCurrentPage, restaurants, isImpersonating } = useApp()
   const isOwner = isOwnerRole(userRole, isSystemOwner)
   const isOwnerDashboard = isSystemOwner && !isImpersonating
+
+  const rootMainClass = embedded
+    ? "w-full max-w-none mx-auto px-1 sm:px-2 py-2"
+    : isOwnerDashboard
+      ? "container mx-auto px-4 py-2 sm:py-3"
+      : "container mx-auto px-4 py-6"
+  const rootLoadingClass = embedded
+    ? "w-full max-w-none mx-auto px-2 sm:px-4 py-8 flex items-center justify-center min-h-[20vh]"
+    : isOwnerDashboard
+      ? "container mx-auto px-4 py-4 flex items-center justify-center min-h-[30vh]"
+      : "container mx-auto px-4 py-6 flex items-center justify-center min-h-[60vh]"
+
+  /** מצב חלון (עץ מוצר): פריסה צפופה — הכול נשאר באותו חלון עם גלילה אחת */
+  const em = (compact: string, normal: string) => (embedded ? compact : normal)
+
+  const navigateToPage = (page: string) => {
+    onCloseEmbedded?.()
+    setCurrentPage?.(page)
+  }
   const [loading, setLoading] = useState(true)
   const [recipesCount, setRecipesCount] = useState(0)
   const [ingredientsCount, setIngredientsCount] = useState(0)
@@ -67,8 +95,6 @@ export function Dashboard() {
   const [profitabilityDishes, setProfitabilityDishes] = useState<{ name: string; sales: number; revenue: number; margin: number; foodCost: number }[]>([])
   const [recentDelivered, setRecentDelivered] = useState<{ supplier: string }[]>([])
   const [refreshKey, setRefreshKey] = useState(0)
-  const [restaurantCards, setRestaurantCards] = useState<{ id: string; name: string; emoji?: string; branch?: string; dishes: number; avgFoodCost: number; overTarget: number }[]>([])
-
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), [])
 
   const markNotificationRead = useCallback(async (id: string) => {
@@ -92,7 +118,6 @@ export function Dashboard() {
           let totalCostSum = 0
           let totalDishesSold = 0
           let overTargetAll = 0
-          const cards: { id: string; name: string; emoji?: string; branch?: string; dishes: number; avgFoodCost: number; overTarget: number }[] = []
           const globalIngSnap = await getDocs(collection(db, "ingredients"))
 
           for (const rest of restaurants) {
@@ -159,22 +184,11 @@ export function Dashboard() {
               restCostSum += cost * sales
             })
 
-            const avgCost = restRevSum > 0 ? (restCostSum / restRevSum) * 100 : 0
             totalDishes += recipes.length
             totalRev += restRevSum
             totalCostSum += restCostSum
             totalDishesSold += recipes.reduce((s, r) => s + (dailySales[r.id]?.avg ?? 0), 0)
             overTargetAll += restOver
-
-            cards.push({
-              id: rest.id,
-              name: rest.name,
-              emoji: rest.emoji,
-              branch: rest.branch,
-              dishes: recipes.length,
-              avgFoodCost: avgCost,
-              overTarget: restOver,
-            })
           }
 
           const poSnap = await getDocs(collection(db, "purchaseOrders"))
@@ -186,7 +200,6 @@ export function Dashboard() {
           setTotalDishesSold(Math.round(totalDishesSold))
           setAvgFoodCost(totalRev > 0 ? (totalCostSum / totalRev) * 100 : 0)
           setDishesOverTarget(overTargetAll)
-          setRestaurantCards(cards)
           setPurchaseOrdersCount(posCount)
           setTopDishes([])
           setProfitabilityDishes([])
@@ -385,7 +398,7 @@ export function Dashboard() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-6 flex items-center justify-center min-h-[60vh]">
+      <div className={rootLoadingClass}>
         <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
       </div>
     )
@@ -393,7 +406,7 @@ export function Dashboard() {
 
   if (!isOwnerDashboard && !currentRestaurantId) {
     return (
-      <div className="container mx-auto px-4 py-6">
+      <div className={rootMainClass}>
         <h1 className="text-2xl font-bold mb-1">{t("pages.dashboard.title")}</h1>
         <p className="text-muted-foreground">{t("pages.dashboard.selectRestaurant")}</p>
       </div>
@@ -415,109 +428,109 @@ export function Dashboard() {
       { label: t("pages.dashboard.foodCostPct"), value: `${avgFoodCost.toFixed(1)}%`, icon: DollarSign, color: "bg-blue-50 text-blue-700" },
       { label: "COGS", value: `₪${totalCost.toLocaleString()}`, icon: ShoppingCart, color: "bg-purple-50 text-purple-700" },
       { label: t("pages.dashboard.dishesOverTarget"), value: String(dishesOverTarget), icon: AlertTriangle, color: "bg-orange-50 text-orange-700" },
-      { label: t("pages.dashboard.purchaseOrders"), value: String(purchaseOrdersCount), icon: ShoppingCart, color: "bg-slate-50 text-slate-700" },
+      { label: t("pages.dashboard.purchaseOrders"), value: String(purchaseOrdersCount), icon: ClipboardList, color: "bg-slate-50 text-slate-700" },
     ]
 
+    const ownerHasDishTables = topDishes.length > 0 || profitabilityDishes.length > 0
+
+    const ownerStatItem = (icon: ReactNode, value: string | number, label: string, key: string) => (
+      <div
+        key={key}
+        className={em(
+          "flex items-center gap-2.5 rounded-lg border border-border/50 bg-muted/40 px-2.5 py-2",
+          "flex items-center gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5"
+        )}
+      >
+        <div className={cn(em("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", "h-10 w-10 rounded-xl"), "bg-background shadow-sm")}>
+          {icon}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className={em("text-sm font-bold leading-tight tabular-nums", "text-lg font-bold tabular-nums")}>{value}</p>
+          <p className={em("text-[10px] text-muted-foreground leading-tight", "text-xs text-muted-foreground")}>{label}</p>
+        </div>
+      </div>
+    )
+
     return (
-      <div className="container mx-auto px-4 py-6">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div className={rootMainClass}>
+        <div className={em("mb-2 flex flex-wrap items-center justify-between gap-2", "mb-6 flex flex-wrap items-center justify-between gap-4")}>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold mb-1">{t("pages.dashboard.ownerTitle")}</h1>
-            <p className="text-muted-foreground">{restaurants?.length || 0} {t("pages.dashboard.activeRestaurants")}</p>
+            <h1 className={em("text-lg font-bold mb-0", "text-2xl md:text-3xl font-bold mb-1")}>{t("pages.dashboard.ownerTitle")}</h1>
+            <p className={em("text-xs text-muted-foreground", "text-muted-foreground")}>
+              {restaurants?.length || 0} {t("pages.dashboard.activeRestaurants")}
+            </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-              <RefreshCw className={cn("w-4 h-4 ml-1.5", loading && "animate-spin")} />
-              {t("pages.refresh")}
+          <div className="flex gap-1.5 shrink-0">
+            <Button variant="outline" size={embedded ? "sm" : "sm"} className={em("h-8 px-2 text-xs", "")} onClick={refresh} disabled={loading}>
+              <RefreshCw className={cn("w-3.5 h-3.5 ml-1", loading && "animate-spin")} />
+              <span className={em("hidden sm:inline", "")}>{t("pages.refresh")}</span>
             </Button>
             {setCurrentPage && (
-              <Button variant="outline" size="sm" onClick={() => setCurrentPage("admin-panel")}>
+              <Button variant="outline" size="sm" className={em("h-8 px-2 text-xs", "")} onClick={() => navigateToPage("admin-panel")}>
                 {t("pages.dashboard.adminPanel")}
               </Button>
             )}
           </div>
         </div>
 
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold mb-3">{t("pages.dashboard.restaurants")}</h2>
-          <p className="text-sm text-muted-foreground mb-4">{t("pages.dashboard.clickToView")}</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {restaurantCards.map((card) => (
-              <Card
-                key={card.id}
-                className="border-0 shadow-sm cursor-pointer hover:bg-muted/50 transition-colors"
-                onClick={() => {
-                  const rest = restaurants?.find((r) => r.id === card.id)
-                  if (rest && onImpersonate) {
-                    onImpersonate(rest)
-                  }
-                }}
-              >
-                <CardContent className="p-4 flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center text-2xl">
-                    {card.emoji || "🍽️"}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">{card.name}</p>
-                    <p className="text-xs text-muted-foreground">{card.branch || t("pages.mainBranch")}</p>
-                  </div>
-                  <div className="text-left">
-                    <p className={cn("font-bold text-sm", card.avgFoodCost > 30 ? "text-orange-600" : "text-green-600")}>
-                      {card.avgFoodCost > 0 ? `${card.avgFoodCost.toFixed(1)}%` : "—"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{card.dishes} {t("pages.dishes")}{card.overTarget > 0 ? ` · ${card.overTarget} ⚠️` : ""}</p>
-                  </div>
-                  <span className="text-muted-foreground">›</span>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-6">
+        <p
+          className={em(
+            "mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
+            "mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+          )}
+        >
+          {t("pages.dashboard.ownerFinancialSection")}
+        </p>
+        <div className={em("mb-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4", "mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-4")}>
           {ownerKpis.map((kpi, i) => (
-            <Card key={i} className="border-0 shadow-sm overflow-hidden">
-              <CardContent className="p-4">
-                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center mb-3", kpi.color)}>
-                  <kpi.icon className="w-5 h-5" />
+            <Card key={i} className="border border-border/40 shadow-sm overflow-hidden transition-shadow hover:shadow-md">
+              <CardContent className={em("p-2.5", "p-4")}>
+                <div className={cn(em("mb-1 flex h-8 w-8 items-center justify-center rounded-lg", "mb-2 h-10 w-10 rounded-xl"), kpi.color)}>
+                  <kpi.icon className={em("w-4 h-4", "w-5 h-5")} />
                 </div>
-                <p className="text-2xl md:text-3xl font-bold mb-1">{kpi.value}</p>
-                <p className="text-sm text-muted-foreground">{kpi.label}</p>
+                <p className={em("text-sm font-bold leading-tight tabular-nums", "text-xl font-bold tabular-nums md:text-2xl")}>{kpi.value}</p>
+                <p className={em("mt-0.5 text-[9px] leading-snug text-muted-foreground line-clamp-2", "text-xs text-muted-foreground")}>{kpi.label}</p>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6 mb-6">
-          <Card className="lg:col-span-2 border-0 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <Utensils className="w-5 h-5 text-muted-foreground" />
-                {t("pages.dashboard.topDishes")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {topDishes.length === 0 ? (
-                <p className="text-muted-foreground text-sm">{t("pages.dashboard.noSalesData")}</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
+        <p
+          className={em(
+            "mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
+            "mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+          )}
+        >
+          {t("pages.dashboard.topDishes")} / {t("pages.dashboard.dishProfitability")}
+        </p>
+        {ownerHasDishTables ? (
+          <div className={em("mb-3 grid grid-cols-1 gap-2 xl:grid-cols-2", "mb-8 grid gap-6 lg:grid-cols-2")}>
+            <Card className="border border-border/40 shadow-sm min-w-0">
+              <CardHeader className={em("pb-1.5 px-3 pt-2", "pb-3")}>
+                <CardTitle className={em("text-sm font-semibold flex items-center gap-1.5", "text-lg font-semibold flex items-center gap-2")}>
+                  <Utensils className={cn(em("w-4 h-4", "w-5 h-5"), "text-muted-foreground shrink-0")} />
+                  {t("pages.dashboard.topDishes")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className={em("px-2 pb-2", "")}>
+                <div className={em("max-h-[min(32vh,280px)] min-h-0 overflow-y-auto overflow-x-auto overscroll-y-contain touch-pan-y", "overflow-x-auto")}>
+                  <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-xs text-muted-foreground border-b">
-                        <th className="text-right pb-3 font-medium">{t("pages.dish")}</th>
-                        <th className="text-center pb-3 font-medium">{t("pages.dashboard.sales")}</th>
-                        <th className="text-center pb-3 font-medium">{t("pages.dashboard.revenue")}</th>
-                        <th className="text-center pb-3 font-medium">{t("pages.dashboard.margin")}</th>
+                      <tr className="text-[10px] text-muted-foreground border-b">
+                        <th className={em("text-right pb-1.5 font-medium", "text-right pb-3 font-medium")}>{t("pages.dish")}</th>
+                        <th className={em("text-center pb-1.5 font-medium", "text-center pb-3 font-medium")}>{t("pages.dashboard.sales")}</th>
+                        <th className={em("text-center pb-1.5 font-medium", "text-center pb-3 font-medium")}>{t("pages.dashboard.revenue")}</th>
+                        <th className={em("text-center pb-1.5 font-medium", "text-center pb-3 font-medium")}>{t("pages.dashboard.margin")}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {topDishes.map((dish, i) => (
                         <tr key={i} className="border-b border-border/50 last:border-0">
-                          <td className="py-3 font-medium">{dish.name}</td>
-                          <td className="text-center py-3 text-muted-foreground">{dish.sales}</td>
-                          <td className="text-center py-3">₪{dish.revenue.toLocaleString()}</td>
-                          <td className="text-center py-3">
-                            <Badge variant="secondary" className="bg-green-50 text-green-700 text-xs">
+                          <td className={em("py-1 font-medium text-xs truncate max-w-[100px]", "py-3 font-medium")}>{dish.name}</td>
+                          <td className={em("text-center py-1 text-xs text-muted-foreground", "text-center py-3 text-muted-foreground")}>{dish.sales}</td>
+                          <td className={em("text-center py-1 text-xs", "text-center py-3")}>₪{dish.revenue.toLocaleString()}</td>
+                          <td className={em("text-center py-1", "text-center py-3")}>
+                            <Badge variant="secondary" className="bg-green-50 text-green-700 text-[10px] px-1">
                               {dish.margin.toFixed(0)}%
                             </Badge>
                           </td>
@@ -526,163 +539,154 @@ export function Dashboard() {
                     </tbody>
                   </table>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-muted-foreground" />
-                {t("pages.dashboard.dishProfitability")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {profitabilityDishes.length === 0 ? (
-                <p className="text-muted-foreground text-sm">{t("pages.dashboard.noSalesData")}</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
+              </CardContent>
+            </Card>
+            <Card className="border border-border/40 shadow-sm min-w-0">
+              <CardHeader className={em("pb-1.5 px-3 pt-2", "pb-3")}>
+                <CardTitle className={em("text-sm font-semibold flex items-center gap-1.5", "text-lg font-semibold flex items-center gap-2")}>
+                  <TrendingUp className={cn(em("w-4 h-4", "w-5 h-5"), "text-muted-foreground shrink-0")} />
+                  {t("pages.dashboard.dishProfitability")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className={em("px-2 pb-2", "")}>
+                <div className={em("max-h-[min(32vh,280px)] min-h-0 overflow-y-auto overflow-x-auto overscroll-y-contain touch-pan-y", "overflow-x-auto")}>
+                  <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-xs text-muted-foreground border-b">
-                        <th className="text-right pb-3 font-medium">{t("pages.dish")}</th>
-                        <th className="text-center pb-3 font-medium">{t("pages.dashboard.margin")}</th>
-                        <th className="text-center pb-3 font-medium">{t("pages.dashboard.foodCost")}</th>
+                      <tr className="text-[10px] text-muted-foreground border-b">
+                        <th className={em("text-right pb-1.5 font-medium", "text-right pb-3 font-medium")}>{t("pages.dish")}</th>
+                        <th className={em("text-center pb-1.5 font-medium", "text-center pb-3 font-medium")}>{t("pages.dashboard.margin")}</th>
+                        <th className={em("text-center pb-1.5 font-medium", "text-center pb-3 font-medium")}>{t("pages.dashboard.foodCost")}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {profitabilityDishes.map((dish, i) => (
                         <tr key={i} className="border-b border-border/50 last:border-0">
-                          <td className="py-3 font-medium">{dish.name}</td>
-                          <td className="text-center py-3">
-                            <Badge variant="secondary" className={cn("text-xs", dish.margin >= 60 ? "bg-green-50 text-green-700" : dish.margin >= 40 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700")}>
+                          <td className={em("py-1 font-medium text-xs truncate max-w-[90px]", "py-3 font-medium")}>{dish.name}</td>
+                          <td className={em("text-center py-1", "text-center py-3")}>
+                            <Badge
+                              variant="secondary"
+                              className={cn(
+                                "text-[10px] px-1",
+                                dish.margin >= 60 ? "bg-green-50 text-green-700" : dish.margin >= 40 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"
+                              )}
+                            >
                               {dish.margin.toFixed(0)}%
                             </Badge>
                           </td>
-                          <td className="text-center py-3 text-muted-foreground">{dish.foodCost.toFixed(0)}%</td>
+                          <td className={em("text-center py-1 text-xs text-muted-foreground", "text-center py-3 text-muted-foreground")}>
+                            {dish.foodCost.toFixed(0)}%
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              )}
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <Card className={em("mb-3 border border-dashed border-border/70 bg-muted/20", "mb-8 border-dashed")}>
+            <CardContent className={em("py-4 px-3", "py-6 px-5")}>
+              <p className={em("text-center text-xs leading-relaxed text-muted-foreground", "text-sm")}>{t("pages.dashboard.ownerPerRestaurantSalesHint")}</p>
             </CardContent>
           </Card>
-        </div>
+        )}
 
-        <div className="grid lg:grid-cols-3 gap-6 mb-6">
-          <Card className="lg:col-span-2 border-0 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-muted-foreground" />
-                {t("pages.dashboard.alerts")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {alerts.length === 0 ? (
-                <p className="text-muted-foreground text-sm py-2">{t("pages.dashboard.noAlerts")}</p>
-              ) : (
-                alerts.map((alert, i) => {
+        <p
+          className={em(
+            "mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
+            "mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+          )}
+        >
+          {t("pages.dashboard.alerts")}
+        </p>
+        <Card className={em("mb-3 border border-border/40 shadow-sm", "mb-8")}>
+          <CardContent className={em("max-h-[min(28vh,240px)] min-h-0 overflow-y-auto overscroll-y-contain touch-pan-y px-2 py-2", "px-4 py-4")}>
+            {alerts.length === 0 ? (
+              <p className="text-muted-foreground text-xs py-2 text-center">{t("pages.dashboard.noAlerts")}</p>
+            ) : (
+              <div className="space-y-2">
+                {alerts.map((alert, i) => {
                   const displayMessage = alertDisplayMessage(alert, t)
                   return (
-                  <div
-                    key={alert.id ?? i}
-                    className={cn(
-                      "p-3 rounded-xl text-sm mb-2 last:mb-0 flex items-start justify-between gap-2",
-                      alert.type === "warning" && "bg-amber-50 text-amber-800",
-                      alert.type === "info" && "bg-blue-50 text-blue-800",
-                      alert.type === "success" && "bg-green-50 text-green-800"
-                    )}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium mb-1">{displayMessage}</p>
-                      <p className="text-xs opacity-70">{t(alert.timeKey)}</p>
+                    <div
+                      key={alert.id ?? i}
+                      className={cn(
+                        em("flex items-start justify-between gap-2 rounded-lg border border-transparent p-2 text-xs", "p-3 text-sm"),
+                        alert.type === "warning" && "border-amber-200/80 bg-amber-50/90 text-amber-950 dark:bg-amber-950/20 dark:text-amber-100",
+                        alert.type === "info" && "border-blue-200/80 bg-blue-50/90 text-blue-950 dark:bg-blue-950/20 dark:text-blue-100",
+                        alert.type === "success" && "border-emerald-200/80 bg-emerald-50/90 text-emerald-950 dark:bg-emerald-950/20 dark:text-emerald-100"
+                      )}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium leading-snug">{displayMessage}</p>
+                        <p className="mt-0.5 text-[10px] opacity-70">{t(alert.timeKey)}</p>
+                      </div>
+                      {alert.id && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="shrink-0 h-7 px-1.5 text-[10px]"
+                          onClick={() => markNotificationRead(alert.id!)}
+                        >
+                          {t("pages.close")}
+                        </Button>
+                      )}
                     </div>
-                    {alert.id && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="shrink-0 h-8 px-2 text-xs"
-                        onClick={() => markNotificationRead(alert.id!)}
-                      >
-                        {t("pages.close")}
-                      </Button>
-                    )}
-                  </div>
-                )})
-              )}
-            </CardContent>
-          </Card>
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-4 flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
-                  <Users className="w-5 h-5 text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="text-xl font-bold">{restaurants?.length || 0}</p>
-                  <p className="text-xs text-muted-foreground">{t("login.restaurants")}</p>
-                </div>
+                  )
+                })}
               </div>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
-                  <Utensils className="w-5 h-5 text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="text-xl font-bold">{recipesCount}</p>
-                  <p className="text-xs text-muted-foreground">{t("pages.dashboard.menuItems")}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            )}
+          </CardContent>
+        </Card>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
-                <Users className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-xl font-bold">{suppliersCount}</p>
-                <p className="text-xs text-muted-foreground">{t("nav.suppliers")}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
-                <Utensils className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-xl font-bold">{recipesCount}</p>
-                <p className="text-xs text-muted-foreground">{t("pages.dashboard.menuItems")}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
-                <ShoppingCart className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-xl font-bold">{ingredientsCount}</p>
-                <p className="text-xs text-muted-foreground">{t("nav.ingredients")}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-xl font-bold">₪{inventoryValue.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">{t("pages.dashboard.inventoryValue")}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <p
+          className={em(
+            "mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
+            "mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+          )}
+        >
+          {t("pages.dashboard.ownerOperationsSection")}
+        </p>
+        <Card className="border border-border/40 shadow-sm">
+          <CardContent
+            className={em(
+              "grid grid-cols-2 gap-2 p-2.5 sm:grid-cols-3 lg:grid-cols-5",
+              "grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 lg:grid-cols-5"
+            )}
+          >
+            {ownerStatItem(
+              <Building2 className={cn(em("h-4 w-4", "h-5 w-5"), "text-muted-foreground")} />,
+              restaurants?.length ?? 0,
+              t("pages.dashboard.restaurants"),
+              "rests"
+            )}
+            {ownerStatItem(
+              <Utensils className={cn(em("h-4 w-4", "h-5 w-5"), "text-muted-foreground")} />,
+              recipesCount,
+              t("pages.dashboard.menuItems"),
+              "recipes"
+            )}
+            {ownerStatItem(
+              <Truck className={cn(em("h-4 w-4", "h-5 w-5"), "text-muted-foreground")} />,
+              suppliersCount,
+              t("nav.suppliers"),
+              "suppliers"
+            )}
+            {ownerStatItem(
+              <Package className={cn(em("h-4 w-4", "h-5 w-5"), "text-muted-foreground")} />,
+              ingredientsCount,
+              t("nav.ingredients"),
+              "ingredients"
+            )}
+            {ownerStatItem(
+              <TrendingUp className={cn(em("h-4 w-4", "h-5 w-5"), "text-muted-foreground")} />,
+              `₪${inventoryValue.toLocaleString()}`,
+              t("pages.dashboard.inventoryValue"),
+              "inventory"
+            )}
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -695,79 +699,113 @@ export function Dashboard() {
     { label: t("pages.dashboard.foodCostPct"), value: `${avgFoodCost.toFixed(1)}%`, target: "30%", change: 0, trend: avgFoodCost > 30 ? ("down" as const) : ("up" as const), icon: DollarSign, color: "bg-blue-50 text-blue-700" },
     { label: "COGS", value: `₪${totalCost.toLocaleString()}`, target: "", change: 0, trend: "up" as const, icon: ShoppingCart, color: "bg-purple-50 text-purple-700" },
     { label: t("pages.dashboard.dishesOverTarget"), value: String(dishesOverTarget), target: "30%", change: 0, trend: "down" as const, icon: AlertTriangle, color: "bg-orange-50 text-orange-700" },
-    { label: t("pages.dashboard.purchaseOrders"), value: String(purchaseOrdersCount), target: "", change: 0, trend: "up" as const, icon: ShoppingCart, color: "bg-slate-50 text-slate-700" },
+    { label: t("pages.dashboard.purchaseOrders"), value: String(purchaseOrdersCount), target: "", change: 0, trend: "up" as const, icon: ClipboardList, color: "bg-slate-50 text-slate-700" },
   ]
 
+  const salesEmptyHint = embedded ? t("pages.dashboard.noSalesData") : t("pages.dashboard.noSalesUploadHint")
+
+  const restStatItem = (icon: ReactNode, value: string | number, label: string, statKey: string) => (
+    <div
+      key={statKey}
+      className={em(
+        "flex items-center gap-2.5 rounded-lg border border-border/50 bg-muted/40 px-2.5 py-2",
+        "flex items-center gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5"
+      )}
+    >
+      <div className={cn(em("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", "h-10 w-10 rounded-xl"), "bg-background shadow-sm")}>
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className={em("text-sm font-bold leading-tight tabular-nums", "text-lg font-bold tabular-nums")}>{value}</p>
+        <p className={em("text-[10px] text-muted-foreground leading-tight", "text-xs text-muted-foreground")}>{label}</p>
+      </div>
+    </div>
+  )
+
   return (
-    <div className="container mx-auto px-4 py-6">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+    <div className={rootMainClass}>
+      <div className={em("mb-2 flex flex-wrap items-center justify-between gap-2", "mb-6 flex flex-wrap items-center justify-between gap-4")}>
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold mb-1">{t("pages.dashboard.title")}</h1>
-          <p className="text-muted-foreground">{t("pages.dashboard.overview")}</p>
+          <h1 className={em("text-lg font-bold mb-0", "text-2xl md:text-3xl font-bold mb-1")}>{t("pages.dashboard.title")}</h1>
+          <p className={em("text-xs text-muted-foreground", "text-muted-foreground")}>{t("pages.dashboard.overview")}</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-            <RefreshCw className={cn("w-4 h-4 ml-1.5", loading && "animate-spin")} />
-            {t("pages.refresh")}
+        <div className="flex gap-1.5 shrink-0">
+          <Button variant="outline" size="sm" className={em("h-8 px-2 text-xs", "")} onClick={refresh} disabled={loading}>
+            <RefreshCw className={cn(em("w-3.5 h-3.5", "w-4 h-4"), "ml-1", loading && "animate-spin")} />
+            <span className={em("hidden sm:inline", "")}>{t("pages.refresh")}</span>
           </Button>
-          {setCurrentPage && (
-            <Button variant="outline" size="sm" onClick={() => setCurrentPage("upload")}>
-              <Upload className="w-4 h-4 ml-1.5" />
-              {t("pages.dashboard.uploadReport")}
+          {setCurrentPage && !embedded && (
+            <Button variant="outline" size="sm" className={em("h-8 px-2 text-xs", "")} onClick={() => navigateToPage("upload")}>
+              <Upload className={em("w-3.5 h-3.5 ml-1", "w-4 h-4 ml-1.5")} />
+              <span className={em("hidden sm:inline", "")}>{t("pages.dashboard.uploadReport")}</span>
             </Button>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4 mb-6">
+      <p
+        className={em(
+          "mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
+          "mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+        )}
+      >
+        {t("pages.dashboard.restaurantFinancialSection")}
+      </p>
+      <div className={em("mb-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4", "mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4")}>
         {kpis.map((kpi, i) => (
-          <Card key={i} className="border-0 shadow-sm overflow-hidden">
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between mb-3">
-                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", kpi.color)}>
-                  <kpi.icon className="w-5 h-5" />
-                </div>
+          <Card key={i} className="border border-border/40 shadow-sm overflow-hidden transition-shadow hover:shadow-md">
+            <CardContent className={em("p-2.5", "p-4")}>
+              <div className={cn(em("mb-1 flex h-8 w-8 items-center justify-center rounded-lg", "mb-2 h-10 w-10 rounded-xl"), kpi.color)}>
+                <kpi.icon className={em("w-4 h-4", "w-5 h-5")} />
               </div>
-              <p className="text-2xl md:text-3xl font-bold mb-1">{kpi.value}</p>
-              <p className="text-sm text-muted-foreground">
+              <p className={em("text-sm font-bold leading-tight tabular-nums", "text-xl font-bold tabular-nums md:text-2xl")}>{kpi.value}</p>
+              <p className={em("mt-0.5 text-[9px] leading-snug text-muted-foreground line-clamp-2", "text-xs text-muted-foreground")}>
                 {kpi.label}
-                {kpi.target && <span className="text-xs"> (יעד: {kpi.target})</span>}
+                {kpi.target && <span className="text-[9px]"> ({kpi.target})</span>}
               </p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 border-0 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <Utensils className="w-5 h-5 text-muted-foreground" />
-              מנות מובילות
+      <p
+        className={em(
+          "mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
+          "mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+        )}
+      >
+        {t("pages.dashboard.restaurantSalesSection")}
+      </p>
+      <div className={em("mb-2 grid grid-cols-1 gap-2 xl:grid-cols-12", "mb-2 grid gap-6 lg:grid-cols-12")}>
+        <Card className={em("xl:col-span-5 border border-border/40 shadow-sm min-w-0", "lg:col-span-5 border border-border/40 shadow-sm min-w-0")}>
+          <CardHeader className={em("pb-1.5 px-3 pt-2", "pb-3")}>
+            <CardTitle className={em("text-sm font-semibold flex items-center gap-1.5", "text-lg font-semibold flex items-center gap-2")}>
+              <Utensils className={cn(em("w-4 h-4", "w-5 h-5"), "text-muted-foreground shrink-0")} />
+              {t("pages.dashboard.topDishes")}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className={em("px-2 pb-2", "")}>
             {topDishes.length === 0 ? (
-              <p className="text-muted-foreground text-sm">אין נתוני מכירות. העלה דוח מכירות בהעלאה.</p>
+              <p className="text-muted-foreground text-xs leading-relaxed">{salesEmptyHint}</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
+              <div className={em("max-h-[min(32vh,280px)] min-h-0 overflow-y-auto overflow-x-auto overscroll-y-contain touch-pan-y", "overflow-x-auto")}>
+                <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-xs text-muted-foreground border-b">
-                      <th className="text-right pb-3 font-medium">מנה</th>
-                      <th className="text-center pb-3 font-medium">מכירות</th>
-                      <th className="text-center pb-3 font-medium">הכנסה</th>
-                      <th className="text-center pb-3 font-medium">מרווח</th>
+                    <tr className="text-[10px] text-muted-foreground border-b">
+                      <th className={em("text-right pb-1.5 font-medium", "text-right pb-3 font-medium")}>{t("pages.dish")}</th>
+                      <th className={em("text-center pb-1.5 font-medium", "text-center pb-3 font-medium")}>{t("pages.dashboard.sales")}</th>
+                      <th className={em("text-center pb-1.5 font-medium", "text-center pb-3 font-medium")}>{t("pages.dashboard.revenue")}</th>
+                      <th className={em("text-center pb-1.5 font-medium", "text-center pb-3 font-medium")}>{t("pages.dashboard.margin")}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {topDishes.map((dish, i) => (
                       <tr key={i} className="border-b border-border/50 last:border-0">
-                        <td className="py-3 font-medium">{dish.name}</td>
-                        <td className="text-center py-3 text-muted-foreground">{dish.sales}</td>
-                        <td className="text-center py-3">₪{dish.revenue.toLocaleString()}</td>
-                        <td className="text-center py-3">
-                          <Badge variant="secondary" className="bg-green-50 text-green-700 text-xs">
+                        <td className={em("py-1 font-medium text-xs truncate max-w-[90px]", "py-3 font-medium")}>{dish.name}</td>
+                        <td className={em("text-center py-1 text-xs text-muted-foreground", "text-center py-3 text-muted-foreground")}>{dish.sales}</td>
+                        <td className={em("text-center py-1 text-xs", "text-center py-3")}>₪{dish.revenue.toLocaleString()}</td>
+                        <td className={em("text-center py-1", "text-center py-3")}>
+                          <Badge variant="secondary" className="bg-green-50 text-green-700 text-[10px] px-1">
                             {dish.margin.toFixed(0)}%
                           </Badge>
                         </td>
@@ -780,36 +818,42 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-muted-foreground" />
-              רווחיות מנות
+        <Card className={em("xl:col-span-4 border border-border/40 shadow-sm min-w-0", "lg:col-span-4 border border-border/40 shadow-sm min-w-0")}>
+          <CardHeader className={em("pb-1.5 px-3 pt-2", "pb-3")}>
+            <CardTitle className={em("text-sm font-semibold flex items-center gap-1.5", "text-lg font-semibold flex items-center gap-2")}>
+              <TrendingUp className={cn(em("w-4 h-4", "w-5 h-5"), "text-muted-foreground shrink-0")} />
+              {t("pages.dashboard.dishProfitability")}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className={em("px-2 pb-2", "")}>
             {profitabilityDishes.length === 0 ? (
-              <p className="text-muted-foreground text-sm">אין נתוני מכירות</p>
+              <p className="text-muted-foreground text-xs leading-relaxed">{salesEmptyHint}</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
+              <div className={em("max-h-[min(32vh,280px)] min-h-0 overflow-y-auto overflow-x-auto overscroll-y-contain touch-pan-y", "overflow-x-auto")}>
+                <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-xs text-muted-foreground border-b">
-                      <th className="text-right pb-3 font-medium">מנה</th>
-                      <th className="text-center pb-3 font-medium">מרווח</th>
-                      <th className="text-center pb-3 font-medium">עלות מזון</th>
+                    <tr className="text-[10px] text-muted-foreground border-b">
+                      <th className={em("text-right pb-1.5 font-medium", "text-right pb-3 font-medium")}>{t("pages.dish")}</th>
+                      <th className={em("text-center pb-1.5 font-medium", "text-center pb-3 font-medium")}>{t("pages.dashboard.margin")}</th>
+                      <th className={em("text-center pb-1.5 font-medium", "text-center pb-3 font-medium")}>{t("pages.dashboard.foodCost")}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {profitabilityDishes.map((dish, i) => (
                       <tr key={i} className="border-b border-border/50 last:border-0">
-                        <td className="py-3 font-medium">{dish.name}</td>
-                        <td className="text-center py-3">
-                          <Badge variant="secondary" className={cn("text-xs", dish.margin >= 60 ? "bg-green-50 text-green-700" : dish.margin >= 40 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700")}>
+                        <td className={em("py-1 font-medium text-xs truncate max-w-[80px]", "py-3 font-medium")}>{dish.name}</td>
+                        <td className={em("text-center py-1", "text-center py-3")}>
+                          <Badge
+                            variant="secondary"
+                            className={cn(
+                              "text-[10px] px-1",
+                              dish.margin >= 60 ? "bg-green-50 text-green-700" : dish.margin >= 40 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"
+                            )}
+                          >
                             {dish.margin.toFixed(0)}%
                           </Badge>
                         </td>
-                        <td className="text-center py-3 text-muted-foreground">{dish.foodCost.toFixed(0)}%</td>
+                        <td className={em("text-center py-1 text-xs text-muted-foreground", "text-center py-3 text-muted-foreground")}>{dish.foodCost.toFixed(0)}%</td>
                       </tr>
                     ))}
                   </tbody>
@@ -819,82 +863,79 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-muted-foreground" />
-              התראות
+        <Card className={em("xl:col-span-3 border border-border/40 shadow-sm min-w-0", "lg:col-span-3 border border-border/40 shadow-sm min-w-0")}>
+          <CardHeader className={em("pb-1.5 px-3 pt-2", "pb-3")}>
+            <CardTitle className={em("text-sm font-semibold flex items-center gap-1.5", "text-lg font-semibold flex items-center gap-2")}>
+              <AlertTriangle className={cn(em("w-4 h-4", "w-5 h-5"), "text-muted-foreground shrink-0")} />
+              {t("pages.dashboard.alerts")}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className={em("max-h-[min(28vh,240px)] min-h-0 overflow-y-auto overscroll-y-contain touch-pan-y px-2 pb-2", "px-3 pb-3")}>
             {alerts.length === 0 ? (
-              <p className="text-muted-foreground text-sm py-2">אין נתונים</p>
+              <p className="py-2 text-center text-xs text-muted-foreground">{t("pages.dashboard.noAlerts")}</p>
             ) : (
-              alerts.map((alert, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    "p-3 rounded-xl text-sm",
-                    alert.type === "warning" && "bg-amber-50 text-amber-800",
-                    alert.type === "info" && "bg-blue-50 text-blue-800",
-                    alert.type === "success" && "bg-green-50 text-green-800"
-                  )}
-                >
-                  <p className="font-medium mb-1">{alertDisplayMessage(alert, t)}</p>
-                  <p className="text-xs opacity-70">{t(alert.timeKey)}</p>
-                </div>
-              ))
+              <div className="space-y-2">
+                {alerts.map((alert, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      em("rounded-lg border border-transparent p-2 text-xs", "rounded-xl p-3 text-sm"),
+                      alert.type === "warning" && "border-amber-200/80 bg-amber-50/90 text-amber-950 dark:bg-amber-950/20 dark:text-amber-100",
+                      alert.type === "info" && "border-blue-200/80 bg-blue-50/90 text-blue-950 dark:bg-blue-950/20 dark:text-blue-100",
+                      alert.type === "success" && "border-emerald-200/80 bg-emerald-50/90 text-emerald-950 dark:bg-emerald-950/20 dark:text-emerald-100"
+                    )}
+                  >
+                    <p className="font-medium leading-snug">{alertDisplayMessage(alert, t)}</p>
+                    <p className="mt-0.5 text-[10px] opacity-70">{t(alert.timeKey)}</p>
+                  </div>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
-              <Users className="w-5 h-5 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="text-xl font-bold">{suppliersCount}</p>
-              <p className="text-xs text-muted-foreground">ספקים</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
-              <Utensils className="w-5 h-5 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="text-xl font-bold">{recipesCount}</p>
-              <p className="text-xs text-muted-foreground">מנות בתפריט</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
-              <ShoppingCart className="w-5 h-5 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="text-xl font-bold">{ingredientsCount}</p>
-              <p className="text-xs text-muted-foreground">רכיבים</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="text-xl font-bold">₪{inventoryValue.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground">שווי מלאי</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <p
+        className={em(
+          "mb-1.5 mt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
+          "mb-2 mt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+        )}
+      >
+        {t("pages.dashboard.restaurantOperationsSection")}
+      </p>
+      <Card className="border border-border/40 shadow-sm">
+        <CardContent
+          className={em(
+            "grid grid-cols-2 gap-2 p-2.5 sm:grid-cols-4",
+            "grid grid-cols-2 gap-3 p-4 sm:grid-cols-4"
+          )}
+        >
+          {restStatItem(
+            <Truck className={cn(em("h-4 w-4", "h-5 w-5"), "text-muted-foreground")} />,
+            suppliersCount,
+            t("nav.suppliers"),
+            "suppliers"
+          )}
+          {restStatItem(
+            <Utensils className={cn(em("h-4 w-4", "h-5 w-5"), "text-muted-foreground")} />,
+            recipesCount,
+            t("pages.dashboard.menuItems"),
+            "recipes"
+          )}
+          {restStatItem(
+            <Package className={cn(em("h-4 w-4", "h-5 w-5"), "text-muted-foreground")} />,
+            ingredientsCount,
+            t("nav.ingredients"),
+            "ingredients"
+          )}
+          {restStatItem(
+            <TrendingUp className={cn(em("h-4 w-4", "h-5 w-5"), "text-muted-foreground")} />,
+            `₪${inventoryValue.toLocaleString()}`,
+            t("pages.dashboard.inventoryValue"),
+            "inventory"
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

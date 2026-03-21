@@ -7,8 +7,8 @@ import { Languages } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface LanguageSwitcherProps {
-  /** light = רקע בהיר (מסך כניסה), dark = רקע כהה (ניווט) */
-  variant?: "light" | "dark"
+  /** light = רקע בהיר (מסך כניסה), dark = רקע כהה (ניווט), surface = סרגל מסעדה */
+  variant?: "light" | "dark" | "surface"
 }
 
 export function LanguageSwitcher({ variant = "dark" }: LanguageSwitcherProps) {
@@ -30,7 +30,9 @@ export function LanguageSwitcher({ variant = "dark" }: LanguageSwitcherProps) {
         "gap-1.5",
         variant === "dark"
           ? "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
-          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+          : variant === "surface"
+            ? "h-9 rounded-full border border-border/70 bg-muted/40 text-foreground hover:bg-muted/70 shadow-sm"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted"
       )}
       title={locale === "he" ? "Switch to English" : "החלף לעברית"}
     >

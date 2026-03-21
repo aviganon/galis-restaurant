@@ -56,7 +56,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${heebo.variable} font-sans antialiased`}>
+      <body className={`${heebo.variable} font-sans antialiased min-h-dvh max-lg:overscroll-y-none`}>
         <ThemeProvider>
           <LanguageProvider>
             {children}

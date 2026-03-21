@@ -133,15 +133,33 @@
   padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
 }
 
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
 /* Touch action optimizations for mobile */
 button, a, [role="button"] {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Prevent iOS zoom on inputs */
-input, select, textarea {
-  font-size: 16px !important;
+/*
+ * מניעת זום אוטומטי ב-iOS בשדות קלט — רק במסכים קטנים (מתחת ל־lg).
+ * במחשב נשמר גודל ברירת המחדל של הקומפוננטות.
+ */
+@media (max-width: 1023px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Toasts: מתחת לסרגל עליון בטלפון / מעל ניווט תחתון כשיש */
+@media (max-width: 1023px) {
+  [data-sonner-toaster][data-y-position="top"] {
+    top: max(0.75rem, calc(env(safe-area-inset-top, 0px) + 0.5rem));
+  }
 }
 
 /* RTL optimizations */

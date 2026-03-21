@@ -28,13 +28,14 @@ import {
 import { cn } from "@/lib/utils"
 import { useTranslations } from "@/lib/use-translations"
 
-const CATEGORY_KEYS = ["all", "starters", "mainDishes", "desserts", "drinks", "sides", "salads", "other"] as const
+const CATEGORY_KEYS = ["all", "starters", "mainDishes", "desserts", "drinks", "alcoholicDrinks", "sides", "salads", "other"] as const
 const CATEGORY_TO_HE: Record<string, string> = {
   all: "הכל",
   starters: "ראשונות",
   mainDishes: "עיקריות",
   desserts: "קינוחים",
   drinks: "משקאות",
+  alcoholicDrinks: "משקאות אלכוהוליים",
   sides: "תוספות",
   salads: "סלטים",
   other: "אחר",

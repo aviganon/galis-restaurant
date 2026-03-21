@@ -8,9 +8,10 @@ import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplie
 import { auth, storage, db } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
 import { FilePreviewModal } from "@/components/file-preview-modal"
-import type { ExtractedSupplierItem, ExtractedDishItem } from "@/lib/ai-extract"
+import type { ExtractedSupplierItem, ExtractedDishItem, SalesReportPeriod } from "@/lib/ai-extract"
 import { detectDocumentType, type DetectedDocType } from "@/lib/ai-extract"
 import { getClaudeApiKey } from "@/lib/claude"
+import { safeFirestoreRecipeId } from "@/lib/recipe-id"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -389,30 +390,63 @@ export function Upload() {
   )
 
   const handleConfirmSales = useCallback(
-    async (items: Array<{ name: string; qty: number; price: number }>) => {
+    async (
+      items: Array<{ name: string; qty: number; price: number }>,
+      meta?: {
+        salesReportPeriod?: SalesReportPeriod
+        salesReportDateFrom?: string
+        salesReportDateTo?: string
+      }
+    ) => {
       if (!currentRestaurantId) {
         toast.error("יש לבחור מסעדה לפני שמירת דוח מכירות")
         return
       }
-      const dailySales: Record<string, { avg: number; trend: number }> = {}
-      const priceUpdates: { name: string; price: number }[] = []
-      items.forEach((it) => {
-        const name = it.name?.trim()
-        if (!name) return
-        dailySales[name] = { avg: it.qty || 0, trend: 0 }
-        if (typeof it.price === "number" && it.price > 0) priceUpdates.push({ name, price: it.price })
-      })
+      const salesReportPeriod = meta?.salesReportPeriod
+      const salesReportDateFrom = meta?.salesReportDateFrom ?? null
+      const salesReportDateTo = meta?.salesReportDateTo ?? null
       try {
+        const salesRef = doc(db, "restaurants", currentRestaurantId, "appState", `salesReport_${currentRestaurantId}`)
+        const prevSnap = await getDoc(salesRef)
+        const prevDaily =
+          (prevSnap.data()?.dailySales as Record<string, { avg: number; trend?: number; total?: number }>) || {}
+        const dailySales: Record<string, { avg: number; trend: number }> = {}
+        Object.entries(prevDaily).forEach(([k, v]) => {
+          dailySales[k] = {
+            avg: typeof v?.avg === "number" ? v.avg : 0,
+            trend: typeof v?.trend === "number" ? v.trend : 0,
+          }
+        })
+        const priceUpdates: { recipeId: string; price: number }[] = []
+        const importedRecipeIds = new Set<string>()
+        items.forEach((it) => {
+          const name = it.name?.trim()
+          if (!name) return
+          const recipeId = safeFirestoreRecipeId(name)
+          importedRecipeIds.add(recipeId)
+          const prev = dailySales[recipeId]
+          const trend = typeof prev?.trend === "number" ? prev.trend : 0
+          dailySales[recipeId] = { avg: it.qty || 0, trend }
+          if (typeof it.price === "number" && it.price > 0) priceUpdates.push({ recipeId, price: it.price })
+        })
+        const nowIso = new Date().toISOString()
         await setDoc(
-          doc(db, "restaurants", currentRestaurantId, "appState", `salesReport_${currentRestaurantId}`),
-          { dailySales, lastUpdated: new Date().toISOString() },
+          salesRef,
+          {
+            dailySales,
+            lastUpdated: nowIso,
+            updatedAt: nowIso,
+            ...(salesReportPeriod ? { salesReportPeriod } : {}),
+            salesReportDateFrom,
+            salesReportDateTo,
+          },
           { merge: true }
         )
         if (priceUpdates.length > 0) {
           const batch = writeBatch(db)
-          priceUpdates.forEach(({ name, price }) => {
+          priceUpdates.forEach(({ recipeId, price }) => {
             batch.set(
-              doc(db, "restaurants", currentRestaurantId, "recipes", name),
+              doc(db, "restaurants", currentRestaurantId, "recipes", recipeId),
               { sellingPrice: price * VAT_RATE, lastUpdated: new Date().toISOString() },
               { merge: true }
             )
@@ -470,9 +504,10 @@ export function Upload() {
             }
           })
         }
-        Object.entries(dailySales).forEach(([dishName, { avg }]) => {
-          const sold = Math.round(avg) || 0
-          if (sold > 0) addUsage(dishName, sold)
+        /** ניכוי מלאי רק לפי שורות **מהדוח הזה** — לא לכל המנות השמורות במפה */
+        importedRecipeIds.forEach((dishId) => {
+          const sold = Math.round(dailySales[dishId]?.avg ?? 0) || 0
+          if (sold > 0) addUsage(dishId, sold)
         })
 
         if (Object.keys(toDeduct).length > 0) {
@@ -492,7 +527,9 @@ export function Upload() {
         }
 
         const stockUpdated = Object.keys(toDeduct).length
-        toast.success(`דוח מכירות נשמר — ${Object.keys(dailySales).length} מנות${priceUpdates.length > 0 ? `, ${priceUpdates.length} מחירים עודכנו` : ""}${stockUpdated > 0 ? ` — מלאי עודכן (${stockUpdated} רכיבים)` : ""}`)
+        toast.success(
+          `דוח מכירות נשמר — ${importedRecipeIds.size} שורות מהדוח${priceUpdates.length > 0 ? `, ${priceUpdates.length} מחירים עודכנו` : ""}${stockUpdated > 0 ? ` — מלאי עודכן (${stockUpdated} רכיבים)` : ""}`
+        )
         refreshIngredients?.()
       } catch (e) {
         toast.error("שגיאה בשמירה: " + (e as Error).message)

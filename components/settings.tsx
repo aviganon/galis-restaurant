@@ -349,7 +349,7 @@ export function Settings() {
   return (
     <div className="container mx-auto px-4 py-6 max-w-4xl">
       <div className="mb-6">
-        <button onClick={()=>setCurrentPage?.(isSystemOwner&&!isImpersonating?"admin-panel":"dashboard")}
+        <button onClick={()=>setCurrentPage?.(isSystemOwner&&!isImpersonating?"admin-panel":"calc")}
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors">
           <ChevronLeft className="w-4 h-4"/>
           {isSystemOwner&&!isImpersonating?"חזור לפאנל בעלים":"חזור לדף הראשי"}

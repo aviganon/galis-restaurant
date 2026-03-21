@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { collection, getDocs, query, where, addDoc, updateDoc, deleteDoc, doc, getDoc } from "firebase/firestore"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import { collection, getDocs, query, where, addDoc, updateDoc, deleteDoc, doc, getDoc, writeBatch } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
 import { Card, CardContent } from "@/components/ui/card"
@@ -11,10 +11,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
-import { FileText, Clock, CheckCircle2, DollarSign, Loader2, Search, ShoppingCart, Package } from "lucide-react"
+import { FileText, Clock, CheckCircle2, Loader2, Search, ShoppingCart, Package, ClipboardList } from "lucide-react"
+import { toast } from "sonner"
+import { FilePreviewModal } from "@/components/file-preview-modal"
+import { Button } from "@/components/ui/button"
 import { useTranslations } from "@/lib/use-translations"
 import { supplierFirestoreDocId } from "@/lib/supplier-firestore-id"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 
 interface OrderSuggestion {
   name: string
@@ -51,9 +55,11 @@ interface UploadRecord {
   supplier: string
 }
 
+const STOCK_COUNT_ACCEPT = ".xlsx,.xls,.csv,.pdf,.rtf,image/*"
+
 export function PurchaseOrders() {
   const t = useTranslations()
-  const { currentRestaurantId } = useApp()
+  const { currentRestaurantId, refreshIngredients } = useApp()
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
   const [suggestions, setSuggestions] = useState<OrderSuggestion[]>([])
   const [loading, setLoading] = useState(true)
@@ -65,6 +71,9 @@ export function PurchaseOrders() {
   const [orderNotes, setOrderNotes] = useState("")
   const [saving, setSaving] = useState(false)
   const [uploads, setUploads] = useState<UploadRecord[]>([])
+  const [stockCountFile, setStockCountFile] = useState<File | null>(null)
+  const [stockCountModalOpen, setStockCountModalOpen] = useState(false)
+  const stockFileInputRef = useRef<HTMLInputElement>(null)
 
   const loadData = useCallback(async () => {
     if (!currentRestaurantId) { setLoading(false); return }
@@ -113,6 +122,44 @@ export function PurchaseOrders() {
 
   useEffect(() => { void loadData() }, [loadData])
 
+  const handleStockCountFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    e.target.value = ""
+    if (!f) return
+    setStockCountFile(f)
+    setStockCountModalOpen(true)
+  }
+
+  const confirmStockCount = useCallback(
+    async (items: Array<{ name: string; qty: number; unit?: string }>) => {
+      if (!currentRestaurantId) return
+      try {
+        const BATCH = 400
+        for (let i = 0; i < items.length; i += BATCH) {
+          const slice = items.slice(i, i + BATCH)
+          const batch = writeBatch(db)
+          for (const row of slice) {
+            const payload: Record<string, unknown> = {
+              stock: row.qty,
+              lastUpdated: new Date().toISOString(),
+            }
+            if (row.unit?.trim()) payload.unit = row.unit.trim()
+            batch.set(doc(db, "restaurants", currentRestaurantId, "ingredients", row.name), payload, { merge: true })
+          }
+          await batch.commit()
+        }
+        refreshIngredients?.()
+        await loadData()
+        toast.success(`${t("pages.purchaseOrders.stockCountSuccess")} (${items.length})`)
+        setStockCountFile(null)
+      } catch (err) {
+        console.error(err)
+        toast.error((err as Error)?.message || "שגיאה בעדכון מלאי")
+      }
+    },
+    [currentRestaurantId, refreshIngredients, loadData, t]
+  )
+
   const addItem = (name: string, unit: string, price: number, qty: number) => {
     setOrderItems(prev => { const ex = prev.find(i => i.name === name); if (ex) return prev.map(i => i.name === name ? {...i, quantity: i.quantity + qty} : i); return [...prev, {name, quantity: qty, unit, price}] })
     setActiveTab("new-order")
@@ -153,13 +200,44 @@ export function PurchaseOrders() {
   const filteredOrders = orders.filter(o => o.orderNumber.includes(searchTerm) || o.supplier.includes(searchTerm))
   const stats = { total: orders.length, pending: orders.filter(o => o.status === "sent" || o.status === "confirmed").length, delivered: orders.filter(o => o.status === "delivered").length, totalValue: orders.filter(o => o.status !== "cancelled").reduce((s, o) => s + o.total, 0) }
 
+  const suggestionsBySupplier = useMemo(() => {
+    const map = new Map<string, OrderSuggestion[]>()
+    for (const s of suggestions) {
+      const key = (s.supplier || "").trim() || "—"
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(s)
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => a[0].localeCompare(b[0], "he"))
+      .map(([supplier, items]) => ({ supplier, items }))
+  }, [suggestions])
+
   if (loading) return <div className="p-4 md:p-6 flex items-center justify-center min-h-[40vh]"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>
   if (!currentRestaurantId) return <div className="p-4 md:p-6"><p className="text-muted-foreground">בחר מסעדה</p></div>
 
   return (
     <div className="p-4 md:p-6 space-y-4" dir="rtl">
+      <input
+        ref={stockFileInputRef}
+        type="file"
+        className="hidden"
+        accept={STOCK_COUNT_ACCEPT}
+        onChange={handleStockCountFileChange}
+      />
+      <FilePreviewModal
+        open={stockCountModalOpen}
+        onOpenChange={(open) => {
+          setStockCountModalOpen(open)
+          if (!open) setStockCountFile(null)
+        }}
+        file={stockCountFile}
+        type="p"
+        stockCountMode
+        currentRestaurantId={currentRestaurantId}
+        onConfirmStockCount={confirmStockCount}
+      />
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-4 w-full mb-4">
+        <TabsList className="grid grid-cols-2 sm:grid-cols-5 w-full mb-4 gap-1">
           <TabsTrigger value="suggestions" className="text-xs">
             המלצות {suggestions.length > 0 && <span className="bg-amber-500 text-white text-xs rounded-full px-1 mr-1">{suggestions.length}</span>}
           </TabsTrigger>
@@ -167,51 +245,95 @@ export function PurchaseOrders() {
             הזמנה חדשה {orderItems.length > 0 && <span className="bg-blue-500 text-white text-xs rounded-full px-1 mr-1">{orderItems.length}</span>}
           </TabsTrigger>
           <TabsTrigger value="orders" className="text-xs">הזמנות ({orders.length})</TabsTrigger>
+          <TabsTrigger value="stock-count" className="text-xs">
+            <span className="inline-flex items-center gap-1">
+              <ClipboardList className="w-3.5 h-3.5 shrink-0" />
+              {t("pages.purchaseOrders.stockCountTab")}
+            </span>
+          </TabsTrigger>
           <TabsTrigger value="uploads" className="text-xs">העלאות ({uploads.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="suggestions">
           {suggestions.length === 0 ? (
-            <Card><CardContent className="p-6 flex items-center gap-3 text-muted-foreground"><Package className="w-8 h-8 opacity-50" /><p>אין המלצות הזמנה</p></CardContent></Card>
+            <Card><CardContent className="p-6 flex items-center gap-3 text-muted-foreground"><Package className="w-8 h-8 opacity-50" /><p>{t("pages.purchaseOrders.noSuggestions")}</p></CardContent></Card>
           ) : (
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-4">
                   <div className="p-2 rounded-xl bg-amber-500/10"><ShoppingCart className="w-5 h-5 text-amber-500" /></div>
-                  <div><h2 className="font-bold text-lg">המלצות הזמנה</h2><p className="text-sm text-muted-foreground">רכיבים שמלאי מתחת למינימום</p></div>
+                  <div>
+                    <h2 className="font-bold text-lg">{t("pages.purchaseOrders.orderSuggestionsTitle")}</h2>
+                    <p className="text-sm text-muted-foreground">{t("pages.purchaseOrders.orderSuggestionsGroupedDesc")}</p>
+                  </div>
                 </div>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-right">ספק</TableHead>
-                        <TableHead className="text-right">רכיב</TableHead>
-                        <TableHead className="text-center">מלאי</TableHead>
-                        <TableHead className="text-center">מינימום</TableHead>
-                        <TableHead className="text-center">מוצע</TableHead>
-                        <TableHead className="text-center">יחידה</TableHead>
-                        <TableHead className="text-center">מחיר</TableHead>
-                        <TableHead />
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {suggestions.map(s => (
-                        <TableRow key={s.name} className="hover:bg-muted/50">
-                          <TableCell className="text-right">{s.supplier}</TableCell>
-                          <TableCell className="text-right font-medium">{s.name}</TableCell>
-                          <TableCell className="text-center text-red-500 font-bold">{s.currentStock}</TableCell>
-                          <TableCell className="text-center">{s.minStock}</TableCell>
-                          <TableCell className="text-center font-semibold text-blue-600">{s.suggestedQty}</TableCell>
-                          <TableCell className="text-center">{s.unit}</TableCell>
-                          <TableCell className="text-center">&#8362;{(s.suggestedQty * s.price).toFixed(2)}</TableCell>
-                          <TableCell className="text-center">
-                            <button onClick={() => addItem(s.name, s.unit, s.price, s.suggestedQty)} className="text-xs px-2 py-1 border rounded hover:bg-muted">+ הוסף</button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                <Accordion
+                  type="multiple"
+                  className="space-y-2"
+                  defaultValue={suggestionsBySupplier.map(({ supplier }) => supplier)}
+                >
+                  {suggestionsBySupplier.map(({ supplier, items }) => {
+                    const subtotal = items.reduce((sum, s) => sum + s.suggestedQty * s.price, 0)
+                    const supplierLabel = supplier === "—" ? t("pages.purchaseOrders.suggestionsNoSupplier") : supplier
+                    return (
+                      <AccordionItem
+                        key={supplier}
+                        value={supplier}
+                        className="rounded-xl border bg-card/40 border-b-0 last:border-b-0 overflow-hidden"
+                      >
+                        <AccordionTrigger className="px-3 py-3 hover:no-underline bg-muted/50 text-right [&[data-state=open]]:bg-muted/70 flex-row-reverse gap-3">
+                          <div className="flex flex-1 flex-wrap items-center justify-between gap-2 min-w-0">
+                            <h3 className="font-semibold text-sm truncate">{supplierLabel}</h3>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground shrink-0">
+                              <span>
+                                {items.length} {t("pages.purchaseOrders.suggestionsItemsCount")}
+                              </span>
+                              <span className="font-medium text-foreground tabular-nums">
+                                &#8362;{subtotal.toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pb-0">
+                          <div className="overflow-x-auto border-t border-border/60">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="text-right">{t("pages.ingredients.ingredient")}</TableHead>
+                                  <TableHead className="text-center">{t("pages.purchaseOrders.currentStock")}</TableHead>
+                                  <TableHead className="text-center">{t("pages.ingredients.minStock")}</TableHead>
+                                  <TableHead className="text-center">{t("pages.purchaseOrders.suggestedQty")}</TableHead>
+                                  <TableHead className="text-center">{t("pages.ingredients.unit")}</TableHead>
+                                  <TableHead className="text-center">{t("pages.purchaseOrders.amount")}</TableHead>
+                                  <TableHead />
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {items.map((s) => (
+                                  <TableRow key={s.name} className="hover:bg-muted/50">
+                                    <TableCell className="text-right font-medium">{s.name}</TableCell>
+                                    <TableCell className="text-center text-red-500 font-bold">{s.currentStock}</TableCell>
+                                    <TableCell className="text-center">{s.minStock}</TableCell>
+                                    <TableCell className="text-center font-semibold text-blue-600">{s.suggestedQty}</TableCell>
+                                    <TableCell className="text-center">{s.unit}</TableCell>
+                                    <TableCell className="text-center">&#8362;{(s.suggestedQty * s.price).toFixed(2)}</TableCell>
+                                    <TableCell className="text-center">
+                                      <button type="button" onClick={() => addItem(s.name, s.unit, s.price, s.suggestedQty)} className="text-xs px-2 py-1 border rounded hover:bg-muted">+ הוסף</button>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                          <div className="px-3 py-2 text-sm border-t bg-muted/20 flex justify-between items-center">
+                            <span className="text-muted-foreground">{t("pages.purchaseOrders.suggestionsSupplierSubtotal")}</span>
+                            <span className="font-semibold tabular-nums">&#8362;{subtotal.toFixed(2)}</span>
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    )
+                  })}
+                </Accordion>
               </CardContent>
             </Card>
           )}
@@ -231,7 +353,20 @@ export function PurchaseOrders() {
               <label className="text-sm font-medium mb-1 block">הוסף רכיב מהמלצות</label>
 <Select onValueChange={v => { const ing = suggestions.find(i => i.name === v); if (ing) addItem(ing.name, ing.unit, ing.price, ing.suggestedQty); }}>
                 <SelectTrigger className="w-full"><SelectValue placeholder="בחר רכיב..." /></SelectTrigger>
-                                <SelectContent position="popper" className="z-[9999] w-full">{suggestions.map(i => <SelectItem key={i.name} value={i.name}>{i.name} ({i.suggestedQty} {i.unit} מוצע)</SelectItem>)}</SelectContent>
+                <SelectContent position="popper" className="z-[9999] w-full max-h-[min(70vh,24rem)]">
+                  {suggestionsBySupplier.map(({ supplier, items }) => (
+                    <SelectGroup key={supplier}>
+                      <SelectLabel className="text-xs font-semibold px-2 py-1.5">
+                        {supplier === "—" ? t("pages.purchaseOrders.suggestionsNoSupplier") : supplier}
+                      </SelectLabel>
+                      {items.map((i) => (
+                        <SelectItem key={i.name} value={i.name}>
+                          {i.name} ({i.suggestedQty} {i.unit})
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))}
+                </SelectContent>
                                               </Select>
             </div>
             {orderItems.length > 0 && (
@@ -307,6 +442,25 @@ export function PurchaseOrders() {
               })}
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="stock-count">
+          <Card>
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-emerald-500/10">
+                  <ClipboardList className="w-6 h-6 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg">{t("pages.purchaseOrders.stockCountTitle")}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">{t("pages.purchaseOrders.stockCountDesc")}</p>
+                </div>
+              </div>
+              <Button type="button" onClick={() => stockFileInputRef.current?.click()} className="w-full sm:w-auto">
+                {t("pages.purchaseOrders.stockCountChooseFile")}
+              </Button>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="uploads">

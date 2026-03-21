@@ -30,6 +30,10 @@ export interface ExtractedDishItem {
   price: number
   category?: string
   ingredients?: Array<{ name: string; qty: number; unit: string }>
+  /** תיאור קצר (טעם, הגשה) */
+  description?: string
+  /** שלבי הכנה / הרכבה — טקסט עם מספור */
+  preparation?: string
 }
 
 export interface ExtractedSalesItem {
@@ -40,11 +44,20 @@ export interface ExtractedSalesItem {
 
 export type ExtractedItem = ExtractedSupplierItem | ExtractedDishItem | ExtractedSalesItem
 
+/** זיהוי AI לתקופת דוח המכירות (משמש להצגה ולשקיפות — המספרים תמיד "לתקופת הדוח") */
+export type SalesReportPeriod = "daily" | "monthly" | "weekly" | "unknown"
+
 export interface ExtractResult {
   items: ExtractedItem[]
   supplier_name?: string
   invoice_date?: string | null
   no_prices?: boolean
+  /** מזוהה מכותרת/תאריכים בדוח — יומי / חודשי / שבועי */
+  sales_report_period?: SalesReportPeriod
+  /** תחילת תקופת הדוח — YYYY-MM-DD אחרי נרמול */
+  sales_report_date_from?: string | null
+  /** סוף תקופת הדוח — YYYY-MM-DD אחרי נרמול */
+  sales_report_date_to?: string | null
 }
 
 const SUPPLIER_KNOWLEDGE = `
@@ -90,8 +103,41 @@ ${MENU_KNOWLEDGE}
 רכיבים: עד 8 למנה. יחידות: גרם/קג/יחידה/מ"ל.
 החזר JSON בלבד: {"items":[{"name":"שם מנה","price":0,"category":"קטגוריה","ingredients":[{"name":"שם רכיב","qty":100,"unit":"גרם"}]}]}`
 
-const SALES_SYSTEM = `אתה מנתח דוחות מכירות. חלץ: name, qty, price.
-דלג: כותרות, מע"מ, הנחות. החזר JSON: {"items":[{"name":"...","qty":0,"price":0.00}]}`
+const SALES_SYSTEM = `אתה מנתח דוחות מכירות למסעדות (POS, Excel, יומן מכירות).
+חלץ לכל שורת מנה: name (שם המנה כפי שבדוח), qty (כמות יחידות שנמכרו בתקופת הדוח), price (מחיר ליחידה **לפני מע"מ** אם מופיע — אחרת 0).
+דלג: סיכומי מע"מ, הנחות כלליות, כותרות בלבד.
+
+קבע sales_report_period לפי הכותרת/טווח תאריכים בדוח:
+- daily — דוח יומי, "היום", תאריך יום אחד, סגירת יום
+- weekly — שבוע, טווח 7 ימים
+- monthly — דוח חודשי, חודש/שנה, "בחודש"
+- unknown — לא ברור
+
+חלץ טווח תאריכים של הדוח אם מופיע במסמך (כותרת, עמודת תאריך, "מתאריך עד"):
+- sales_report_date_from, sales_report_date_to בפורמט YYYY-MM-DD בלבד (למשל 2025-03-01).
+- דוח ליום אחד: אותו תאריך בשתי השדות, או תאריך אחד ב-from ו-null ב-to.
+- חודש שלם בלי יום: השתמש ביום הראשון והאחרון של החודש (למשל 2025-03-01 ו-2025-03-31).
+- אם אין תאריך במסמך — null בשני השדות.
+
+החזר JSON בלבד:
+{"sales_report_period":"daily"|"monthly"|"weekly"|"unknown","sales_report_date_from":"YYYY-MM-DD"|null,"sales_report_date_to":"YYYY-MM-DD"|null,"items":[{"name":"...","qty":0,"price":0}]}`
+
+const DISH_FROM_SALES_LINES_SYSTEM = `אתה מומחה למטבח ולתפריטי מסעדות בישראל.
+${MENU_KNOWLEDGE}
+תקבל רשימת שורות מדוח מכירות: לכל שורה name (שם המנה כפי שמופיע בדוח), quantity (כמות נמכרה), revenue (סה"כ הכנסה בשקלים).
+לכל שורה החזר אובייקט ב-dishes עם: category (קטגוריה מתאימה), ingredients (עד 8 רכיבים) עם כמויות טיפוסיות למנה — יחידות: גרם, קג, יחידה, מ"ל.
+suggested_selling_price_ils = מחיר מכירה משוער למנה אחת **כולל מע"מ** בשקלים: אם אפשר לחשב מ-revenue/quantity (כש-quantity>0) — השתמש ב-max(חישוב, הערכה); אחרת הערכה סבירה או 0.
+חשוב: בכל אובייקט ב-dishes השדה name חייב להיות **זהה תו-בתו** לשדה name של אותה שורה בקלט — ללא שינוי, קיצור או תרגום.
+החזר JSON בלבד: {"dishes":[{"name":"...","category":"עיקריות","suggested_selling_price_ils":0,"ingredients":[{"name":"שם רכיב","qty":100,"unit":"גרם"}]}]}`
+
+const DISH_FROM_SALES_LINES_PANTRY_SYSTEM = `אתה מומחה למטבח ולתפריטי מסעדות בישראל.
+${MENU_KNOWLEDGE}
+תקבל שתי רשימות: (א) רכיבים זמינים במסעדה עם מחיר ויחידה — **חובה** להשתמש רק בשמות רכיבים מהרשימה הזו, **בדיוק** כפי שכתובים (תו-בתו, כולל רווחים). אסור להמציא רכיב שלא מופיע ברשימה.
+(ב) שורות מדוח מכירות: לכל שורה name, quantity, revenue.
+לכל שורה החזר ב-dishes: category מתאימה, ingredients (עד 8) — רק מהרשימה (א), כמויות סבירות למנה, יחידות תואמות לרשימה (גרם, קג, יחידה, מ"ל).
+suggested_selling_price_ils: מחיר מכירה למנה כולל מע"מ — העדף חישוב מ-revenue/quantity כשאפשר.
+השדה name בכל dish חייב להיות **זהה תו-בתו** לשדה name של אותה שורה בקלט.
+החזר JSON בלבד: {"dishes":[{"name":"...","category":"עיקריות","suggested_selling_price_ils":0,"ingredients":[{"name":"שם רכיב","qty":100,"unit":"גרם"}]}]}`
 
 /** פורמטים נתמכים — PDF, Excel, CSV, RTF, תמונות */
 export const SUPPORTED_EXTENSIONS = ["pdf", "xlsx", "xls", "csv", "rtf", "png", "jpg", "jpeg", "gif", "webp"] as const
@@ -102,6 +148,50 @@ export function getFileExtension(file: File): string {
 
 export function isSupportedFormat(file: File): boolean {
   return SUPPORTED_EXTENSIONS.includes(getFileExtension(file) as (typeof SUPPORTED_EXTENSIONS)[number])
+}
+
+const SALES_PERIOD_SET = new Set<SalesReportPeriod>(["daily", "monthly", "weekly", "unknown"])
+
+const SALES_ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/** נרמול מחרוזת תאריך מדוח מכירות ל-YYYY-MM-DD */
+export function normalizeSalesReportDateField(v: unknown): string | undefined {
+  if (v === null || v === undefined) return undefined
+  if (typeof v !== "string") return undefined
+  const s = v.trim()
+  if (!s || s.toLowerCase() === "null") return undefined
+  if (SALES_ISO_DATE_RE.test(s)) return s
+  const m = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/)
+  if (m) {
+    const d = m[1].padStart(2, "0")
+    const mo = m[2].padStart(2, "0")
+    const y = m[3]
+    return `${y}-${mo}-${d}`
+  }
+  return undefined
+}
+
+/** נרמול תשובת AI לדוח מכירות — תומך גם בפורמט ישן בלי sales_report_period */
+export function normalizeSalesExtractResult(parsed: unknown): ExtractResult {
+  const o = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {}
+  const rawItems = o.items
+  const items = Array.isArray(rawItems) ? (rawItems as ExtractedItem[]) : []
+  const raw = (o.sales_report_period ?? o.report_period) as string | undefined
+  let sales_report_period: SalesReportPeriod | undefined
+  if (typeof raw === "string") {
+    const k = raw.toLowerCase().trim() as SalesReportPeriod
+    if (SALES_PERIOD_SET.has(k)) sales_report_period = k
+  }
+  const fromRaw = o.sales_report_date_from ?? o.report_date_from ?? o.date_from
+  const toRaw = o.sales_report_date_to ?? o.report_date_to ?? o.date_to
+  const sales_report_date_from = normalizeSalesReportDateField(fromRaw)
+  const sales_report_date_to = normalizeSalesReportDateField(toRaw)
+  return { items, sales_report_period, sales_report_date_from, sales_report_date_to }
+}
+
+function finishExtractResult(type: ExtractType, parsed: unknown): ExtractResult {
+  if (type === "s") return normalizeSalesExtractResult(parsed)
+  return parsed as ExtractResult
 }
 
 async function rtfToPlainText(file: File): Promise<string> {
@@ -252,7 +342,7 @@ export async function extractWithAI(
         ? "נתח את המסמך (חשבונית/מחירון/תעודת משלוח). אם כותרת 'מחירון' — כל שורה=פריט, qty=1, price=המחיר, sku=קוד. אם חשבונית — price=נטו, qty=כמות. אם ללא מחירים — no_prices:true. name=שם המוצר בלבד. JSON בלבד."
         : type === "d"
           ? "חלץ מנות ומחירים מהתפריט. לכל מנה ישייך רכיבים לפי הבנתך (בשר, ירקות, קמח וכו') — גם אם לא מופיעים בתפריט. JSON בלבד."
-          : "חלץ מנות, כמויות ומחירים. JSON בלבד."
+          : "חלץ דוח מכירות לפי SALES_SYSTEM — כולל sales_report_period, sales_report_date_from, sales_report_date_to. JSON בלבד."
     const data = await callClaude({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 8000,
@@ -263,7 +353,7 @@ export async function extractWithAI(
     let clean = out.replace(/```json|```/g, "").trim()
     clean = clean.replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')
     try {
-      return JSON.parse(clean) as ExtractResult
+      return finishExtractResult(type, JSON.parse(clean))
     } catch (e) {
       // נסיון שני — חלץ JSON אגרסיבי
       const attempts = [
@@ -274,7 +364,7 @@ export async function extractWithAI(
       for (const attempt of attempts) {
         try {
           const c2 = attempt.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')
-          return JSON.parse(c2)
+          return finishExtractResult(type, JSON.parse(c2))
         } catch {}
       }
       if (clean.includes('"no_prices":true') && !clean.includes('"items":[{')) {
@@ -300,7 +390,7 @@ export async function extractWithAI(
         ? "נתח את המסמך (חשבונית/מחירון/תעודת משלוח). אם כותרת 'מחירון' — כל שורה=פריט, qty=1, price=המחיר, sku=קוד. אם חשבונית — price=נטו, qty=כמות. אם ללא מחירים — no_prices:true. name=שם המוצר בלבד. JSON בלבד."
         : type === "d"
           ? "חלץ מנות ומחירים מהתפריט. לכל מנה ישייך רכיבים לפי הבנתך (בשר, ירקות, קמח וכו') — גם אם לא מופיעים בתפריט. JSON בלבד."
-          : "חלץ מנות, כמויות ומחירים. JSON בלבד."
+          : "חלץ דוח מכירות לפי SALES_SYSTEM — כולל sales_report_period, sales_report_date_from, sales_report_date_to. JSON בלבד."
     const mediaBlock =
       isPdf
         ? { type: "document" as const, source: { type: "base64" as const, media_type: "application/pdf" as const, data: base64 } }
@@ -316,8 +406,7 @@ export async function extractWithAI(
     // תיקון: הסר תווים בעייתיים שגורמים לשגיאות JSON
     clean = clean.replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')
     try {
-      const parsed = JSON.parse(clean) as ExtractResult
-      return parsed
+      return finishExtractResult(type, JSON.parse(clean))
     } catch (e) {
       // נסיון שני — חלץ JSON אגרסיבי
       const attempts = [
@@ -328,7 +417,7 @@ export async function extractWithAI(
       for (const attempt of attempts) {
         try {
           const c2 = attempt.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')
-          return JSON.parse(c2)
+          return finishExtractResult(type, JSON.parse(c2))
         } catch {}
       }
       if (clean.includes('"no_prices":true') && !clean.includes('"items":[{')) {
@@ -354,7 +443,7 @@ export async function extractWithAI(
         ? `הנתונים:\n${preview}\n\nחלץ מנות ומחירים. לכל מנה ישייך רכיבים וכמויות לפי הבנתך. JSON בלבד.`
         : type === "p"
           ? `הנתונים:\n${preview}\n\nחלץ רכיבים (שם), מחיר, יחידה, כמות (qty). JSON בלבד.`
-          : `הנתונים:\n${preview}\n\nחלץ ל-JSON.`
+          : `הנתונים:\n${preview}\n\nחלץ דוח מכירות לפי SALES_SYSTEM — כולל sales_report_period, sales_report_date_from, sales_report_date_to. JSON בלבד.`
     const data = await callClaude({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 2000,
@@ -365,17 +454,92 @@ export async function extractWithAI(
     let clean = text.replace(/```json|```/g, "").trim()
     clean = clean.replace(/[\u0000-\u001F\u007F]/g, " ").replace(/,\s*}/g, "}").replace(/,\s*]/g, "]")
     try {
-      return JSON.parse(clean) as ExtractResult
+      return finishExtractResult(type, JSON.parse(clean))
     } catch {
       const jsonMatch = clean.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
-        try { return JSON.parse(jsonMatch[0]) as ExtractResult } catch {}
+        try {
+          return finishExtractResult(type, JSON.parse(jsonMatch[0]))
+        } catch {}
       }
       throw new Error(`שגיאה בפענוח תשובת AI — נסה שוב או השתמש בקובץ Excel`)
     }
   }
 
   throw new Error(`פורמט לא נתמך (${ext}). השתמש ב-PDF, Excel, CSV, RTF או תמונה.`)
+}
+
+/** הצעת רכיבים וקטגוריה למנה לפי שם + נתוני מכירה מהדוח */
+export interface SuggestedDishFromSalesLine {
+  name: string
+  category: string
+  suggested_selling_price_ils: number
+  ingredients: Array<{ name: string; qty: number; unit: string }>
+}
+
+/**
+ * קריאת AI אחת לכל השורות החסרות — מחזיר מפה לפי name מהדוח.
+ * אם מועבר `pantry` (רכיבי מסעדה), ה-AI מחויב לרשימה וגם מסננים שוב בקוד רק שמות שמופיעים ב־pantry.
+ */
+export async function suggestDishesFromSalesLines(
+  lines: { name: string; quantity: number; revenue: number }[],
+  pantry?: IngredientForSuggestion[]
+): Promise<Map<string, SuggestedDishFromSalesLine>> {
+  const map = new Map<string, SuggestedDishFromSalesLine>()
+  if (lines.length === 0) return map
+  const pantryList = Array.isArray(pantry) && pantry.length > 0 ? pantry : null
+  const hasPantry = pantryList != null
+  const allowedNames = hasPantry ? new Set(pantryList.map((p) => p.name)) : null
+  try {
+    const system = hasPantry ? DISH_FROM_SALES_LINES_PANTRY_SYSTEM : DISH_FROM_SALES_LINES_SYSTEM
+    const userText = hasPantry
+      ? `רכיבים זמינים במסעדה (השתמש רק בשמות האלה, תו-בתו):\n${pantryList
+          .slice(0, 120)
+          .map((i) => `${i.name} — ${i.price} ש"ח/${i.unit}${i.stock != null ? ` (מלאי: ${i.stock})` : ""}`)
+          .join("\n")}\n\nשורות מדוח המכירות:\n${JSON.stringify({ lines })}\n\nהחזר JSON בלבד.`
+      : `שורות מהדוח (JSON). הצע רכיבים וקטגוריה לכל מנה:\n${JSON.stringify({ lines })}\n\nהחזר JSON בלבד.`
+
+    const data = await callClaude({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 8000,
+      system,
+      messages: [{ role: "user", content: [{ type: "text", text: userText }] }],
+    })
+    const out = data.content?.map((b) => b.text ?? "").join("") ?? ""
+    let clean = out.replace(/```json|```/g, "").trim()
+    clean = clean.replace(/[\u0000-\u001F\u007F]/g, " ").replace(/,\s*}/g, "}").replace(/,\s*]/g, "]")
+    const parsed = JSON.parse(clean) as { dishes?: SuggestedDishFromSalesLine[] }
+    const dishes = Array.isArray(parsed.dishes) ? parsed.dishes : []
+    for (const d of dishes) {
+      if (!d?.name?.trim()) continue
+      const key = d.name.trim()
+      let ingredients = Array.isArray(d.ingredients)
+        ? d.ingredients
+            .filter((ing) => ing?.name?.trim())
+            .map((ing) => ({
+              name: String(ing.name).trim(),
+              qty: typeof ing.qty === "number" && !Number.isNaN(ing.qty) ? Math.max(0, ing.qty) : 0,
+              unit: typeof ing.unit === "string" && ing.unit.trim() ? ing.unit.trim() : "גרם",
+            }))
+            .slice(0, 8)
+        : []
+      if (allowedNames) {
+        ingredients = ingredients.filter((ing) => allowedNames.has(ing.name))
+      }
+      map.set(key, {
+        name: key,
+        category: typeof d.category === "string" && d.category.trim() ? d.category.trim() : "עיקריות",
+        suggested_selling_price_ils:
+          typeof d.suggested_selling_price_ils === "number" && !Number.isNaN(d.suggested_selling_price_ils)
+            ? Math.max(0, d.suggested_selling_price_ils)
+            : 0,
+        ingredients,
+      })
+    }
+  } catch (e) {
+    console.error("suggestDishesFromSalesLines:", e)
+  }
+  return map
 }
 
 export interface IngredientForSuggestion {
@@ -386,13 +550,75 @@ export interface IngredientForSuggestion {
   stock?: number
 }
 
-const SUGGEST_DISH_SYSTEM = `אתה שף ומנהל תפריט. בהתבסס על רשימת הרכיבים שיש למסעדה (עם מחירים ויחידות מהספקים), הצע מנה אחת מתאימה.
+const SUGGEST_DISH_SYSTEM = `אתה שף, ברמן ומנהל תפריט. בהתבסס על רשימת הרכיבים שיש למסעדה (מזון, משקאות, משקאות חריפים, מיקסרים וכו' — עם מחירים ויחידות מהספקים), הצע פריט אחד מתאים.
+
 חוקים:
-- השתמש רק ברכיבים מהרשימה — אל תוסיף רכיבים שלא קיימים.
-- ציין כמויות מדויקות (גרם, יחידה וכו') לפי היחידות ברשימה.
-- הצע מנה פופולרית שמתאימה למסעדה ישראלית (עיקריות, ראשונות, סלטים וכו').
-- קבע מחיר מכירה סביר (כולל מע"מ) לפי עלות הרכיבים + רווח סביר (30–40% עלות מזון).
-החזר JSON בלבד: {"name":"שם המנה","category":"קטגוריה","sellingPrice":0,"ingredients":[{"name":"שם רכיב","qty":0,"unit":"גרם"}]}`
+- השתמש **רק** ברכיבים מהרשימה — שם רכיב **זהה תו-בתו** לשם ברשימה (כולל רווחים).
+- ingredients: כמויות מדויקות לפי יחידות ברשימה (גרם, קג, יחידה, מ"ל, כף, כפית, בקבוק וכו').
+- אם ברשימה יש משקאות חריפים (ג'ין, וודקה, רום, ויסקי וכו'), מיקסרים, מיץ, סודה, סירופ, לימון — מותר ורצוי להציע **קוקטייל או משקה אלכוהולי** עם מתכון מלא (כמויות במ"ל לנוזלים).
+- אם הרכיבים מתאימים יותר למטבח — הצע **מנה** (עיקריות, ראשונות, סלטים, קינוחים וכו').
+- category: אחת מ: עיקריות, ראשונות, סלטים, קינוחים, משקאות, משקאות אלכוהוליים, תוספות, אחר
+- description: 1–2 משפטים — מה זה, טעם, איך מגישים (חובה משפט אחד לפחות).
+- **מתכון (חובה):** השתמש ב-preparationSteps — **מערך מחרוזות**, כל איבר = משפט אחד או שלב אחד (לפחות 4 איברים). דוגמה: ["1. לערבב...","2. לחמם..."]. אסור לשבור שורה בתוך מחרוזת JSON — רק מערך כזה או מחרוזת אחת עם \\n מוברחים.
+- sellingPrice: מספר — מחיר מכירה סביר **כולל מע"מ**.
+
+**חשוב:** החזר אובייקט JSON **תקין לחלוטין** בשורה אחת או מרובות — בלי טקסט לפני או אחרי, בלי markdown.
+
+המבנה המדויק:
+{"name":"שם","category":"...","description":"...","sellingPrice":0,"preparationSteps":["שלב 1","שלב 2","שלב 3","שלב 4"],"ingredients":[{"name":"שם רכיב","qty":0,"unit":"גרם"}]}`
+
+/** מוצא את אובייקט ה-JSON הראשון בתשובה (מתעלם מטקסט מסביב; מכבד מחרוזות עם סוגריים) */
+function extractFirstJsonObject(raw: string): string | null {
+  const s = raw.replace(/```(?:json)?/gi, "").replace(/```/g, "").trim()
+  const start = s.indexOf("{")
+  if (start < 0) return null
+  let depth = 0
+  let inString = false
+  let i = start
+  while (i < s.length) {
+    const c = s[i]
+    if (inString) {
+      if (c === "\\") {
+        i += 1
+        if (i < s.length) i += 1
+        continue
+      }
+      if (c === '"') inString = false
+      i += 1
+      continue
+    }
+    if (c === '"') {
+      inString = true
+      i += 1
+      continue
+    }
+    if (c === "{") depth += 1
+    else if (c === "}") {
+      depth -= 1
+      if (depth === 0) return s.slice(start, i + 1)
+    }
+    i += 1
+  }
+  return null
+}
+
+function parseSuggestDishSellingPrice(v: unknown): number {
+  if (typeof v === "number" && !Number.isNaN(v)) return Math.max(0, v)
+  if (typeof v === "string") {
+    const n = parseFloat(v.replace(/,/g, ".").replace(/[^\d.-]/g, ""))
+    return !Number.isNaN(n) && n >= 0 ? n : 0
+  }
+  return 0
+}
+
+function parseSuggestDishQty(v: unknown): number {
+  if (typeof v === "number" && !Number.isNaN(v)) return v
+  if (typeof v === "string") {
+    const n = parseFloat(v.replace(/,/g, "."))
+    return !Number.isNaN(n) ? n : 0
+  }
+  return 0
+}
 
 export async function suggestDishFromIngredients(
   ingredients: IngredientForSuggestion[]
@@ -404,23 +630,81 @@ export async function suggestDishFromIngredients(
     .join("\n")
   const data = await callClaude({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 1500,
+    max_tokens: 3500,
     system: SUGGEST_DISH_SYSTEM,
-    messages: [{ role: "user", content: [{ type: "text", text: `רשימת הרכיבים במסעדה:\n${list}\n\nהצע מנה אחת עם מתכון מלא. JSON בלבד.` }] }],
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `רשימת הרכיבים במסעדה:\n${list}\n\nהצע מנה או משקה עם description, preparationSteps (מערך של לפחות 4 שלבים), ו-ingredients. החזר **רק** JSON תקין — ללא הסבר לפני או אחרי.`,
+          },
+        ],
+      },
+    ],
   })
   const out = data.content?.map((b) => b.text ?? "").join("") ?? ""
-  const clean = out.replace(/```json|```/g, "").trim()
+  const jsonSlice = extractFirstJsonObject(out) ?? out.replace(/```json|```/g, "").trim()
+  let parsed: {
+    name?: string
+    category?: string
+    sellingPrice?: unknown
+    description?: string
+    preparation?: string
+    preparationSteps?: unknown
+    ingredients?: Array<{ name: string; qty?: unknown; unit?: string }>
+  }
   try {
-    const parsed = JSON.parse(clean) as { name?: string; category?: string; sellingPrice?: number; ingredients?: Array<{ name: string; qty: number; unit: string }> }
-    if (!parsed?.name || !Array.isArray(parsed.ingredients)) return null
-    return {
-      name: parsed.name,
-      price: typeof parsed.sellingPrice === "number" ? parsed.sellingPrice : 0,
-      category: parsed.category || "עיקריות",
-      ingredients: parsed.ingredients.filter((ing) => ingredients.some((i) => i.name === ing.name)),
-    }
-  } catch {
+    parsed = JSON.parse(jsonSlice) as typeof parsed
+  } catch (e) {
+    console.warn("suggestDishFromIngredients: JSON.parse failed", e)
     return null
+  }
+  if (!parsed?.name || typeof parsed.name !== "string" || !parsed.name.trim()) return null
+  if (!Array.isArray(parsed.ingredients)) return null
+
+  const normalize = (n: string) => n.trim().replace(/\s+/g, " ")
+  const allowed = new Set(ingredients.map((i) => i.name))
+  const byNormalized = new Map<string, string>()
+  for (const i of ingredients) {
+    byNormalized.set(normalize(i.name), i.name)
+  }
+  const resolveCanonicalName = (raw: string): string | null => {
+    if (allowed.has(raw)) return raw
+    return byNormalized.get(normalize(raw)) ?? null
+  }
+  const mappedIngredients = parsed.ingredients
+    .map((ing) => {
+      if (!ing || typeof ing.name !== "string") return null
+      const canon = resolveCanonicalName(ing.name)
+      if (!canon) return null
+      return {
+        name: canon,
+        qty: parseSuggestDishQty(ing.qty),
+        unit: (ing.unit as string) || "גרם",
+      }
+    })
+    .filter((x): x is { name: string; qty: number; unit: string } => x !== null)
+
+  let preparation: string | undefined
+  if (Array.isArray(parsed.preparationSteps) && parsed.preparationSteps.length > 0) {
+    preparation = parsed.preparationSteps
+      .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+      .join("\n")
+      .trim()
+  }
+  if (!preparation && typeof parsed.preparation === "string" && parsed.preparation.trim()) {
+    preparation = parsed.preparation.trim()
+  }
+
+  return {
+    name: parsed.name.trim(),
+    price: parseSuggestDishSellingPrice(parsed.sellingPrice),
+    category: typeof parsed.category === "string" && parsed.category.trim() ? parsed.category.trim() : "עיקריות",
+    description: typeof parsed.description === "string" ? parsed.description.trim() : undefined,
+    preparation: preparation || undefined,
+    ingredients: mappedIngredients,
   }
 }
 

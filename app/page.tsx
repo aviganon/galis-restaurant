@@ -27,6 +27,8 @@ import { cn } from "@/lib/utils"
 import { useTranslations } from "@/lib/use-translations"
 import { useLanguage } from "@/contexts/language-context"
 import { getTranslation } from "@/lib/translations"
+import { RestaurantTopBar } from "@/components/restaurant-top-bar"
+import { X } from "lucide-react"
 
 const RESTRICTED_PAGES = [
   "admin-panel",
@@ -60,14 +62,13 @@ const pageVariants: Variants = {
 
 export default function Home() {
   const t = useTranslations()
-  const { locale } = useLanguage()
+  const { locale, dir } = useLanguage()
   const localeRef = useRef(locale)
-  localeRef.current = locale
   const [authLoading, setAuthLoading] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userRole, setUserRole] = useState<"admin" | "owner" | "manager" | "user">("owner")
-  const [currentPage, setCurrentPage] = useState("dashboard")
-  const [previousPage, setPreviousPage] = useState("dashboard")
+  const [currentPage, setCurrentPage] = useState("calc")
+  const [previousPage, setPreviousPage] = useState("calc")
   const [currentRestaurant, setCurrentRestaurant] = useState(() => t("common.loading"))
   const [currentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null)
   const navigateTo = useCallback((page: string) => {
@@ -109,6 +110,10 @@ export default function Home() {
   }, [isSystemOwner, currentRestaurantId])
 
   const refreshIngredients = useCallback(() => setRefreshIngredientsKey((k) => k + 1), [])
+
+  useEffect(() => {
+    localeRef.current = locale
+  }, [locale])
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -294,11 +299,19 @@ export default function Home() {
 
   useEffect(() => {
     if ((RESTRICTED_PAGES as readonly string[]).includes(currentPage) && !canAccessPage(currentPage)) {
-      const fallback = ["dashboard", "calc", "ingredients", "inventory", "suppliers", "purchase-orders", "upload", "reports", "menu", ]
+      const fallback = ["calc", "ingredients", "inventory", "suppliers", "purchase-orders", "upload", "reports", "menu"]
         .find((p) => canAccessPage(p))
-      setCurrentPage(fallback || "dashboard")
+      setCurrentPage(fallback || "calc")
     }
   }, [currentPage, canAccessPage])
+
+  /* דף לוח בקרה מלא רק לבעל מערכת; לאחרים — רק מודאל מעץ מוצר */
+  useEffect(() => {
+    if (currentPage !== "dashboard") return
+    if (!isSystemOwner || impersonatingRestaurant) {
+      setCurrentPage("calc")
+    }
+  }, [currentPage, isSystemOwner, impersonatingRestaurant])
 
   useEffect(() => {
     if (isSystemOwner && !impersonatingRestaurant) {
@@ -319,10 +332,18 @@ export default function Home() {
 
   const effectiveRestaurantId = impersonatingRestaurant?.id ?? currentRestaurantId
   const effectiveRestaurantName = impersonatingRestaurant?.name ?? currentRestaurant
+  /** מצב עבודה בתוך מסעדה — ללא תפריט עליון; סרגל מותאם + עץ מוצר כדף ראשי */
+  const inRestaurantWorkspace =
+    !!effectiveRestaurantId && (!isSystemOwner || !!impersonatingRestaurant)
+  /** בעלי מערכת בפאנל ניהול / דשבורד — בלי תפריט עליון; מצמצמים ריווח main */
+  const compactSystemOwnerShell =
+    isSystemOwner &&
+    !impersonatingRestaurant &&
+    (currentPage === "admin-panel" || currentPage === "dashboard")
   const handleImpersonate = (rest: { id: string; name: string; emoji?: string }) => {
     const display = rest.emoji ? `${rest.emoji} ${rest.name}` : rest.name
     setImpersonatingRestaurant({ id: rest.id, name: display })
-    setCurrentPage("dashboard")
+    setCurrentPage("calc")
   }
   const handleStopImpersonate = () => setImpersonatingRestaurant(null)
   const handleRestaurantDeleted = useCallback((deletedId: string) => {
@@ -377,7 +398,8 @@ export default function Home() {
     }
     switch (currentPage) {
       case "dashboard":
-        return <Dashboard />
+        if (isSystemOwner && !impersonatingRestaurant) return <Dashboard />
+        return <ProductTree />
       case "calc":
         return <ProductTree />
       case "ingredients":
@@ -387,11 +409,14 @@ export default function Home() {
       case "inventory":
         return <Inventory />
       case "purchase-orders":
+        if (inRestaurantWorkspace) {
+          return <ProductTree />
+        }
         return (
           <div>
             <div className="container mx-auto px-4 py-4">
               <button onClick={() => setCurrentPage(previousPage)} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors">
-                ← חזרה לספקים
+                {t("app.backToSuppliers")}
               </button>
             </div>
             <PurchaseOrders />
@@ -410,31 +435,50 @@ export default function Home() {
       case "admin-panel":
         return <AdminPanel />
       default:
-        return <Dashboard />
+        return <ProductTree />
     }
   }
 
   return (
     <div className="min-h-screen bg-background">
-      {(!isSystemOwner || !!impersonatingRestaurant) && <DesktopNav 
-        currentPage={currentPage} 
-        setCurrentPage={setCurrentPage}
-        currentRestaurant={effectiveRestaurantName}
-        restaurants={restaurants}
-        onSelectRestaurant={(rest) => {
-          setCurrentRestaurant(rest.emoji ? `${rest.emoji} ${rest.name}` : rest.name)
-          setCurrentRestaurantId(rest.id)
-        }}
-        userRole={userRole}
-        isSystemOwner={isSystemOwner}
-        userPermissions={userPermissions}
-        onLogout={handleLogout}
-        isImpersonating={!!impersonatingRestaurant}
-        onStopImpersonate={handleStopImpersonate}
-      />}
-      
-      
-      <AppProvider 
+      {inRestaurantWorkspace && (
+        <RestaurantTopBar
+          dir={dir}
+          restaurantDisplayName={effectiveRestaurantName}
+          restaurants={restaurants}
+          currentRestaurantId={effectiveRestaurantId}
+          onSelectRestaurant={(rest) => {
+            setCurrentRestaurant(rest.emoji ? `${rest.emoji} ${rest.name}` : rest.name)
+            setCurrentRestaurantId(rest.id)
+          }}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+          canAccessPage={canAccessPage}
+          onLogout={handleLogout}
+          isImpersonating={!!impersonatingRestaurant}
+          onStopImpersonate={handleStopImpersonate}
+        />
+      )}
+      {!inRestaurantWorkspace && (!isSystemOwner || !!impersonatingRestaurant) && (
+        <DesktopNav
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+          currentRestaurant={effectiveRestaurantName}
+          restaurants={restaurants}
+          onSelectRestaurant={(rest) => {
+            setCurrentRestaurant(rest.emoji ? `${rest.emoji} ${rest.name}` : rest.name)
+            setCurrentRestaurantId(rest.id)
+          }}
+          userRole={userRole}
+          isSystemOwner={isSystemOwner}
+          userPermissions={userPermissions}
+          onLogout={handleLogout}
+          isImpersonating={!!impersonatingRestaurant}
+          onStopImpersonate={handleStopImpersonate}
+        />
+      )}
+
+      <AppProvider
         currentRestaurantId={effectiveRestaurantId} 
         userRole={userRole} 
         isSystemOwner={isSystemOwner} 
@@ -449,10 +493,28 @@ export default function Home() {
         refreshIngredientsKey={refreshIngredientsKey}
         refreshIngredients={refreshIngredients}
       >
-        <main className={cn("pb-24 md:pb-8 pt-16 md:pt-16", impersonatingRestaurant && "pt-14 md:pt-28")}>
+        <main
+          className={cn(
+            compactSystemOwnerShell
+              ? "pb-3 pt-[env(safe-area-inset-top,0px)] max-lg:pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] lg:pb-5"
+              : inRestaurantWorkspace && currentPage === "calc"
+                ? "pb-6 max-lg:pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] pt-[calc(7.25rem+env(safe-area-inset-top,0px))] lg:pb-8 lg:pt-[7.25rem]"
+                : inRestaurantWorkspace
+                  ? "pb-6 max-lg:pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] pt-[calc(3.5rem+env(safe-area-inset-top,0px))] lg:pb-8 lg:pt-14"
+                  : "max-lg:pb-[calc(6rem+env(safe-area-inset-bottom,0px))] max-lg:pt-[calc(4rem+env(safe-area-inset-top,0px))] pb-24 pt-16 lg:pb-8 lg:pt-16",
+            !compactSystemOwnerShell &&
+              !inRestaurantWorkspace &&
+              impersonatingRestaurant &&
+              "max-lg:pt-[calc(7rem+env(safe-area-inset-top,0px))] lg:pt-28"
+          )}
+        >
           <AnimatePresence mode="wait">
             <motion.div
-              key={`${currentPage}-${effectiveRestaurantId || ""}`}
+              key={
+                inRestaurantWorkspace && (currentPage === "calc" || currentPage === "purchase-orders")
+                  ? `tree-${effectiveRestaurantId ?? ""}`
+                  : `${currentPage}-${effectiveRestaurantId ?? ""}`
+              }
               variants={pageVariants}
               initial="initial"
               animate="animate"
@@ -460,26 +522,30 @@ export default function Home() {
             >
               {renderPage()}
             </motion.div>
-            {currentPage === "purchase-orders" && (
-              <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.5)'}} onClick={()=>setCurrentPage("calc")}/>
-              <div style={{position:'relative',width:'92vw',height:'88vh',background:'var(--background)',borderRadius:'12px',overflow:'visible',display:'flex',flexDirection:'column',boxShadow:'0 25px 50px rgba(0,0,0,0.3)'}}>
-                  <button onClick={()=>setCurrentPage("calc")} style={{position:'absolute',top:'12px',left:'12px',zIndex:10,width:'32px',height:'32px',borderRadius:'50%',border:'none',background:'var(--muted)',cursor:'pointer',fontSize:'18px'}}>✕</button>
-                  <div style={{overflowY:'auto',flex:1}}>
-                    <Suppliers />
-                    <div style={{borderTop:'1px solid var(--border)',marginTop:'16px',paddingTop:'16px'}}>
-                      <PurchaseOrders />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            {currentPage === "purchase-orders" && previousPage === "calc" && (
-              <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.5)'}} onClick={()=>{setCurrentPage("calc")}}/>
-                <div style={{position:'relative',width:'92vw',height:'88vh',background:'var(--background)',borderRadius:'12px',overflow:'visible',display:'flex',flexDirection:'column',boxShadow:'0 25px 50px rgba(0,0,0,0.3)'}}>
-                  <button onClick={()=>setCurrentPage("calc")} style={{position:'absolute',top:'12px',left:'12px',zIndex:10,width:'32px',height:'32px',borderRadius:'50%',border:'none',background:'var(--muted)',cursor:'pointer',fontSize:'18px'}}>✕</button>
-                  <div style={{overflowY:'auto',flex:1}}>
+            {inRestaurantWorkspace && currentPage === "purchase-orders" && (
+              <div
+                className="fixed inset-0 z-[70] flex items-center justify-center p-3"
+                role="dialog"
+                aria-modal="true"
+              >
+                <button
+                  type="button"
+                  className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"
+                  aria-label={t("pages.close")}
+                  onClick={() => setCurrentPage("calc")}
+                />
+                <div className="relative flex h-[min(88vh,900px)] max-lg:h-[min(calc(100dvh-1.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom)),900px)] w-[min(92vw,1200px)] max-lg:w-full max-lg:max-w-full flex-col overflow-hidden rounded-xl max-lg:rounded-2xl border bg-background shadow-2xl">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="absolute end-3 top-[max(0.75rem,env(safe-area-inset-top))] z-10 h-10 w-10 lg:h-9 lg:w-9 rounded-full shadow-md"
+                    onClick={() => setCurrentPage("calc")}
+                    aria-label={t("pages.close")}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                  <div className="flex-1 overflow-y-auto overscroll-contain pt-2">
                     <PurchaseOrders />
                   </div>
                 </div>
@@ -489,15 +555,16 @@ export default function Home() {
         </main>
       </AppProvider>
 
-      {/* Mobile Navigation */}
-      {(!isSystemOwner || !!impersonatingRestaurant) && <MobileNav 
-        currentPage={currentPage} 
-        setCurrentPage={setCurrentPage}
-        userRole={userRole}
-        isSystemOwner={isSystemOwner}
-        userPermissions={userPermissions}
-        isImpersonating={!!impersonatingRestaurant}
-      />}
+      {!inRestaurantWorkspace && (!isSystemOwner || !!impersonatingRestaurant) && (
+        <MobileNav
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+          userRole={userRole}
+          isSystemOwner={isSystemOwner}
+          userPermissions={userPermissions}
+          isImpersonating={!!impersonatingRestaurant}
+        />
+      )}
     </div>
   )
 }

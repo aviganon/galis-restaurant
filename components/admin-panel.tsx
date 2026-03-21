@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
-import { Shield, Key, Loader2, Camera, LogOut, Settings2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown, GripVertical, Columns3, Upload as UploadIcon, FileText, TrendingUp, DollarSign, Utensils, AlertTriangle, ShoppingCart } from "lucide-react"
+import { Shield, Key, Loader2, Camera, LogOut, Settings2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown, GripVertical, Columns3, Upload as UploadIcon, FileText, TrendingUp, DollarSign, Utensils, AlertTriangle, ShoppingCart, LayoutDashboard } from "lucide-react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -38,6 +38,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
   DropdownMenu,
@@ -49,6 +50,7 @@ import { getClaudeApiKey, setClaudeApiKey, testClaudeConnection } from "@/lib/cl
 import { supplierFirestoreDocId } from "@/lib/supplier-firestore-id"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
+import { Dashboard } from "@/components/dashboard"
 import { getTranslation, type Locale } from "@/lib/translations"
 import { useLanguage } from "@/contexts/language-context"
 import { LanguageSwitcher } from "@/components/language-switcher"
@@ -323,6 +325,8 @@ function WebPriceCell({
   )
 }
 
+type SystemOwnerTab = "restaurants" | "suppliers" | "ingredients" | "dashboard"
+
 export function AdminPanel() {
   const t = useTranslations()
   const { dir, locale } = useLanguage()
@@ -373,7 +377,7 @@ export function AdminPanel() {
   const [apiTestResult, setApiTestResult] = useState<string | null>(null)
 
   // System owner tabs
-  const [systemOwnerTab, setSystemOwnerTab] = useState<"restaurants" | "suppliers" | "ingredients">("restaurants")
+  const [systemOwnerTab, setSystemOwnerTab] = useState<SystemOwnerTab>("restaurants")
   const [restsWithDetails, setRestsWithDetails] = useState<RestWithDetails[]>([])
   const [suppliersWithRests, setSuppliersWithRests] = useState<SupplierWithRests[]>([])
   const [supplierToIngredients, setSupplierToIngredients] = useState<Record<string, IngredientRow[]>>({})
@@ -1836,6 +1840,7 @@ export function AdminPanel() {
       setNewRestName("")
       setNewRestEmoji("")
       setNewRestInviteCode("")
+      setNewRestOpen(false)
       loadSystemOwnerData()
       refreshRestaurants?.()
     } catch (e) {
@@ -2071,17 +2076,30 @@ export function AdminPanel() {
     )
   }
 
+  const shellCompact = isSystemOwner && !isImpersonating
+
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-2 w-full">
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="w-6 h-6" />
+    <div
+      className={cn(
+        "container mx-auto px-3 sm:px-4 max-w-7xl",
+        shellCompact ? "py-2 sm:py-3 space-y-3 sm:space-y-4" : "py-8 space-y-6"
+      )}
+      dir={dir}
+    >
+      <Card className={cn(shellCompact && "gap-2 py-3 shadow-sm")}>
+        <CardHeader className={cn(shellCompact && "space-y-1 px-4 py-2.5 pb-2")}>
+          <div className="flex items-center gap-2 w-full flex-wrap">
+            <CardTitle
+              className={cn(
+                "flex items-center gap-2 min-w-0 flex-1",
+                shellCompact && "text-base font-semibold"
+              )}
+            >
+              <Shield className={shellCompact ? "w-5 h-5 shrink-0" : "w-6 h-6 shrink-0"} />
               {t("pages.adminPanel.adminPanelTitle")}
             </CardTitle>
             {isSystemOwner && !isImpersonating && (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 ms-auto shrink-0">
                 <LanguageSwitcher variant="light" />
                 <Button variant="ghost" size="sm" onClick={()=>setCurrentPage?.("settings")} className="gap-1.5 text-muted-foreground hover:text-foreground h-8">
                   <Settings2 className="w-4 h-4"/><span className="text-xs hidden sm:inline">הגדרות</span>
@@ -2093,8 +2111,8 @@ export function AdminPanel() {
             )}
           </div>
         </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">
+        <CardContent className={cn(shellCompact && "px-4 pb-3 pt-0")}>
+          <p className={cn("text-muted-foreground", shellCompact && "text-sm leading-snug")}>
             {isSystemOwner
               ? t("pages.adminPanel.systemOwnerDesc")
               : userRole === "owner" || userRole === "manager"
@@ -2105,25 +2123,42 @@ export function AdminPanel() {
       </Card>
 
       {isSystemOwner && adminStats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" style={{animation:"_fOwner .4s ease both"}}>
-          <style>{`@keyframes _fOwner{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}`}</style>
-          {([
-            {val:adminStats.rests,lbl:t("pages.adminPanel.restaurants"),grad:"from-emerald-500 to-teal-600",icon:"🏠"},
-            {val:adminStats.users,lbl:t("pages.adminPanel.users"),grad:"from-blue-500 to-indigo-600",icon:"👥"},
-            {val:adminStats.dishes,lbl:t("pages.adminPanel.dishes"),grad:"from-amber-500 to-orange-500",icon:"🍽️"},
-            {val:adminStats.ings,lbl:t("pages.adminPanel.ingredients"),grad:"from-violet-500 to-purple-600",icon:"🥬"},
-          ] as const).map((s,i)=>(
-            <Card key={i} className="border-0 shadow-sm overflow-hidden"
-              style={{transition:"transform .2s,box-shadow .2s"}}
-              onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.transform="translateY(-3px)";(e.currentTarget as HTMLElement).style.boxShadow="0 8px 20px rgba(0,0,0,.12)"}}
-              onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.transform="";(e.currentTarget as HTMLElement).style.boxShadow=""}}
+        <div
+          className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5"
+          style={{ animation: "_fOwner .4s ease both" }}
+        >
+          <style>{`@keyframes _fOwner{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style>
+          {(
+            [
+              { val: adminStats.rests, lbl: t("pages.adminPanel.restaurants"), grad: "from-emerald-500 to-teal-600", icon: "🏠" },
+              { val: adminStats.users, lbl: t("pages.adminPanel.users"), grad: "from-blue-500 to-indigo-600", icon: "👥" },
+              { val: adminStats.dishes, lbl: t("pages.adminPanel.dishes"), grad: "from-amber-500 to-orange-500", icon: "🍽️" },
+              { val: adminStats.ings, lbl: t("pages.adminPanel.ingredients"), grad: "from-violet-500 to-purple-600", icon: "🥬" },
+            ] as const
+          ).map((s, i) => (
+            <Card
+              key={i}
+              className="gap-0 border border-border/40 py-0 shadow-sm overflow-hidden rounded-xl ring-1 ring-black/5 dark:ring-white/10"
+              style={{ transition: "transform .2s ease, box-shadow .2s ease" }}
+              onMouseEnter={(e) => {
+                ;(e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"
+                ;(e.currentTarget as HTMLElement).style.boxShadow = "0 6px 16px rgba(0,0,0,.1)"
+              }}
+              onMouseLeave={(e) => {
+                ;(e.currentTarget as HTMLElement).style.transform = ""
+                ;(e.currentTarget as HTMLElement).style.boxShadow = ""
+              }}
             >
               <CardContent className="p-0">
-                <div className={cn("bg-gradient-to-br p-4 pb-2",s.grad)}>
-                  <span className="text-xl">{s.icon}</span>
-                  <p className="text-2xl font-bold text-white mt-1">{s.val}</p>
+                <div className={cn("bg-gradient-to-br px-3 pt-2.5 pb-2 sm:px-3.5 sm:pt-3", s.grad)}>
+                  <span className="text-base sm:text-[1.05rem] leading-none block drop-shadow-sm">{s.icon}</span>
+                  <p className="text-lg sm:text-xl font-bold text-white mt-1 tabular-nums tracking-tight drop-shadow-sm">
+                    {s.val}
+                  </p>
                 </div>
-                <div className="px-4 py-2"><p className="text-xs text-muted-foreground font-medium">{s.lbl}</p></div>
+                <div className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-muted/30 dark:bg-muted/20 border-t border-border/30">
+                  <p className="text-[11px] sm:text-xs text-muted-foreground font-semibold leading-snug">{s.lbl}</p>
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -2131,121 +2166,163 @@ export function AdminPanel() {
       )}
 
       {isSystemOwner && (
-        <Tabs value={systemOwnerTab} onValueChange={(v) => setSystemOwnerTab(v as "restaurants" | "suppliers" | "ingredients")}>
-          <TabsList className="w-full justify-start flex-wrap h-auto gap-1">
-            <TabsTrigger value="restaurants" className="gap-1.5">
-              <UtensilsCrossed className="w-4 h-4" />
+        <Tabs
+          value={systemOwnerTab}
+          onValueChange={(v) => setSystemOwnerTab(v as SystemOwnerTab)}
+          className={shellCompact ? "gap-1" : undefined}
+        >
+          <TabsList
+            dir={dir}
+            className={cn(
+              "w-full flex-wrap h-auto justify-start gap-1 p-1",
+              shellCompact ? "min-h-8 rounded-lg bg-muted/50 py-0.5" : "gap-1"
+            )}
+          >
+            <TabsTrigger
+              value="restaurants"
+              className={cn("gap-1.5", shellCompact && "h-8 px-2.5 text-xs py-1")}
+            >
+              <UtensilsCrossed className={shellCompact ? "w-3.5 h-3.5 shrink-0" : "w-4 h-4 shrink-0"} />
               {t("pages.adminPanel.restaurants")}
             </TabsTrigger>
-            <TabsTrigger value="suppliers" className="gap-1.5">
-              <Truck className="w-4 h-4" />
+            <TabsTrigger value="suppliers" className={cn("gap-1.5", shellCompact && "h-8 px-2.5 text-xs py-1")}>
+              <Truck className={shellCompact ? "w-3.5 h-3.5 shrink-0" : "w-4 h-4 shrink-0"} />
               {t("pages.adminPanel.suppliers")}
             </TabsTrigger>
-            <TabsTrigger value="ingredients" className="gap-1.5">
-              <Package className="w-4 h-4" />
+            <TabsTrigger value="ingredients" className={cn("gap-1.5", shellCompact && "h-8 px-2.5 text-xs py-1")}>
+              <Package className={shellCompact ? "w-3.5 h-3.5 shrink-0" : "w-4 h-4 shrink-0"} />
               {t("pages.adminPanel.globalIngredients")}
             </TabsTrigger>
-
+            <TabsTrigger value="dashboard" className={cn("gap-1.5", shellCompact && "h-8 px-2.5 text-xs py-1")}>
+              <LayoutDashboard className={shellCompact ? "w-3.5 h-3.5 shrink-0" : "w-4 h-4 shrink-0"} />
+              {t("pages.adminPanel.dashboardTab")}
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="restaurants" className="mt-4 space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="w-5 h-5" />
-                  {t("pages.adminPanel.addRestaurant")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {(!restaurants || restaurants.length === 0) && (
-                  <p className="text-sm text-amber-600 dark:text-amber-500 mb-3 flex items-center gap-2">
-                    {t("pages.adminPanel.noRestaurantsLoaded")}{" "}
-                    <Button variant="link" className="p-0 h-auto font-semibold" onClick={() => window.location.reload()}>
-                      {t("pages.adminPanel.clickToRefresh")}
+          <TabsContent value="restaurants" className={cn("space-y-4", shellCompact ? "mt-2" : "mt-4")}>
+            <Collapsible open={newRestOpen} onOpenChange={setNewRestOpen}>
+              <Card className="gap-0 overflow-hidden py-0 shadow-sm">
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex w-full items-center justify-between gap-3 text-start transition-colors hover:bg-muted/50",
+                      "px-4 py-3 sm:px-6 sm:py-3.5",
+                      shellCompact && "py-2.5 sm:py-3",
+                      newRestOpen && "border-b border-border/60"
+                    )}
+                  >
+                    <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                      <Building2 className={cn("shrink-0 text-primary", shellCompact ? "h-4 w-4" : "h-5 w-5")} />
+                      <div className="min-w-0">
+                        <span className="block font-semibold leading-tight">
+                          {t("pages.adminPanel.addRestaurant")}
+                        </span>
+                        {!newRestOpen ? (
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            {t("pages.adminPanel.addRestaurantCollapsedHint")}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <ChevronDown
+                      className={cn(
+                        "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
+                        newRestOpen && "rotate-180"
+                      )}
+                      aria-hidden
+                    />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className={cn("pt-4 pb-5", shellCompact ? "px-4" : "px-6")}>
+                    {(!restaurants || restaurants.length === 0) && (
+                      <p className="text-sm text-amber-600 dark:text-amber-500 mb-3 flex flex-wrap items-center gap-2">
+                        {t("pages.adminPanel.noRestaurantsLoaded")}{" "}
+                        <Button variant="link" className="p-0 h-auto font-semibold" onClick={() => window.location.reload()}>
+                          {t("pages.adminPanel.clickToRefresh")}
+                        </Button>
+                      </p>
+                    )}
+                    <p className="text-sm text-muted-foreground mb-4">{t("pages.adminPanel.createNewRestaurant")}</p>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      <div className="flex-1 min-w-[200px]">
+                        <Label htmlFor="new-rest-name">{t("pages.adminPanel.restaurantName")}</Label>
+                        <Input
+                          id="new-rest-name"
+                          value={newRestName}
+                          onChange={(e) => setNewRestName(e.target.value)}
+                          placeholder={t("pages.adminPanel.enterRestaurantName")}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="w-24">
+                        <Label htmlFor="new-rest-emoji">{t("pages.adminPanel.emoji")}</Label>
+                        <Input
+                          id="new-rest-emoji"
+                          value={newRestEmoji}
+                          onChange={(e) => setNewRestEmoji(e.target.value)}
+                          placeholder="☕"
+                          className="mt-1"
+                        />
+                      </div>
+                    </div>
+                    <div className="mb-3">
+                      <Label htmlFor="new-rest-invite-code">{t("pages.adminPanel.inviteCodeOptional")}</Label>
+                      <div className="flex flex-wrap gap-2 items-center mt-1">
+                        <Input
+                          id="new-rest-invite-code"
+                          value={newRestInviteCode}
+                          onChange={(e) => setNewRestInviteCode(e.target.value)}
+                          placeholder={t("pages.adminPanel.inviteCodePlaceholder")}
+                          className="max-w-xs font-mono"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            setGeneratingCode(true)
+                            setLastGeneratedCode(null)
+                            try {
+                              const { inviteCodesCollection, inviteCodeFields } = firestoreConfig
+                              let code = generateInviteCode()
+                              let exists = true
+                              while (exists) {
+                                const snap = await getDoc(doc(db, inviteCodesCollection, code))
+                                exists = snap.exists()
+                                if (exists) code = generateInviteCode()
+                              }
+                              await setDoc(doc(db, inviteCodesCollection, code), {
+                                [inviteCodeFields.type]: "manager",
+                                [inviteCodeFields.used]: false,
+                                [inviteCodeFields.createdAt]: new Date().toISOString(),
+                              })
+                              setNewRestInviteCode(code)
+                              setLastGeneratedCode(code)
+                              toast.success(t("pages.adminPanel.codeCreated"))
+                            } catch (e) {
+                              toast.error((e as Error).message)
+                            } finally {
+                              setGeneratingCode(false)
+                            }
+                          }}
+                          disabled={generatingCode}
+                        >
+                          {generatingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                          {t("pages.adminPanel.createCode")}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{t("pages.adminPanel.optionallyCreateCode")}</p>
+                    </div>
+                    <Button onClick={handleCreateRestaurant} disabled={creatingRest}>
+                      {creatingRest ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Building2 className="w-4 h-4 ml-2" />}
+                      {t("pages.adminPanel.createRestaurant")}
                     </Button>
-                  </p>
-                )}
-                <p className="text-sm text-muted-foreground mb-4">
-                  {t("pages.adminPanel.createNewRestaurant")}
-                </p>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  <div className="flex-1 min-w-[200px]">
-                    <Label htmlFor="new-rest-name">{t("pages.adminPanel.restaurantName")}</Label>
-                    <Input
-                      id="new-rest-name"
-                      value={newRestName}
-                      onChange={(e) => setNewRestName(e.target.value)}
-                      placeholder={t("pages.adminPanel.enterRestaurantName")}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div className="w-24">
-                    <Label htmlFor="new-rest-emoji">{t("pages.adminPanel.emoji")}</Label>
-                    <Input
-                      id="new-rest-emoji"
-                      value={newRestEmoji}
-                      onChange={(e) => setNewRestEmoji(e.target.value)}
-                      placeholder="☕"
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-                <div className="mb-3">
-                  <Label htmlFor="new-rest-invite-code">{t("pages.adminPanel.inviteCodeOptional")}</Label>
-                  <div className="flex gap-2 items-center mt-1">
-                    <Input
-                      id="new-rest-invite-code"
-                      value={newRestInviteCode}
-                      onChange={(e) => setNewRestInviteCode(e.target.value)}
-                      placeholder={t("pages.adminPanel.inviteCodePlaceholder")}
-                      className="max-w-xs font-mono"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={async () => {
-                        setGeneratingCode(true)
-                        setLastGeneratedCode(null)
-                        try {
-                          const { inviteCodesCollection, inviteCodeFields } = firestoreConfig
-                          let code = generateInviteCode()
-                          let exists = true
-                          while (exists) {
-                            const snap = await getDoc(doc(db, inviteCodesCollection, code))
-                            exists = snap.exists()
-                            if (exists) code = generateInviteCode()
-                          }
-                          await setDoc(doc(db, inviteCodesCollection, code), {
-                            [inviteCodeFields.type]: "manager",
-                            [inviteCodeFields.used]: false,
-                            [inviteCodeFields.createdAt]: new Date().toISOString(),
-                          })
-                          setNewRestInviteCode(code)
-                          setLastGeneratedCode(code)
-                          toast.success(t("pages.adminPanel.codeCreated"))
-                        } catch (e) {
-                          toast.error((e as Error).message)
-                        } finally {
-                          setGeneratingCode(false)
-                        }
-                      }}
-                      disabled={generatingCode}
-                    >
-                      {generatingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                      {t("pages.adminPanel.createCode")}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {t("pages.adminPanel.optionallyCreateCode")}
-                  </p>
-                </div>
-                <Button onClick={handleCreateRestaurant} disabled={creatingRest}>
-                  {creatingRest ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Building2 className="w-4 h-4 ml-2" />}
-                  {t("pages.adminPanel.createRestaurant")}
-                </Button>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
             {loadingSystemOwner ? (
               <div className="flex items-center gap-2 text-muted-foreground py-8">
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -2296,13 +2373,15 @@ export function AdminPanel() {
                   </div>
                 </div>
               )}
-              {/* Restaurant image cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+              {/* Restaurant image cards — flex + dir כדי שב־RTL הכרטיסים יתחילו מימין */}
+                <div className="mb-6 flex flex-wrap justify-start gap-4" dir={dir}>
                   {restsWithDetails.map((rest, _ri) => {
                     const colors = ["linear-gradient(135deg,#0F6E56,#1D9E75)","linear-gradient(135deg,#185FA5,#378ADD)","linear-gradient(135deg,#533AAB,#7F77DD)","linear-gradient(135deg,#854F0B,#BA7517)","linear-gradient(135deg,#993C1D,#D85A30)"]
                     return (
                       <div key={rest.id}
-                        className={cn("relative rounded-xl overflow-hidden cursor-pointer border-2 transition-all duration-200 shadow-sm hover:shadow-lg hover:-translate-y-0.5",
+                        className={cn(
+                          "relative rounded-xl overflow-hidden cursor-pointer border-2 transition-all duration-200 shadow-sm hover:shadow-lg hover:-translate-y-0.5",
+                          "w-[calc((100%-1rem)/2)] sm:w-[calc((100%-2rem)/3)] lg:w-[calc((100%-3rem)/4)] max-w-full min-w-0 shrink-0",
                           selectedRestDetail===rest.id?"border-primary shadow-lg -translate-y-0.5":"border-transparent")}
                         style={{height:140}}
                         onClick={()=>{
@@ -2316,10 +2395,10 @@ export function AdminPanel() {
                           className="absolute inset-0 w-full h-full object-cover"
                           onError={e=>{(e.target as HTMLImageElement).style.display="none";(e.target as HTMLImageElement).parentElement!.style.background=colors[_ri%5]}}/>
                         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-black/10"/>
-                        <div className="absolute top-2 right-2 z-10"><button onClick={e=>{e.stopPropagation();openRestEditDialog(rest)}} className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center transition-colors" title="ערוך פרטים"><Edit2 className="w-3.5 h-3.5 text-white"/></button></div>
+                        <div className="absolute top-2 start-2 z-10"><button onClick={e=>{e.stopPropagation();openRestEditDialog(rest)}} className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center transition-colors" title="ערוך פרטים"><Edit2 className="w-3.5 h-3.5 text-white"/></button></div>
                         <div className="absolute inset-0 flex flex-col justify-end p-3">
-                          <p className="font-bold text-white text-sm leading-tight drop-shadow truncate">
-                            {rest.emoji&&<span className="ml-1">{rest.emoji}</span>}{rest.name}
+                          <p className="font-bold text-white text-sm leading-tight drop-shadow truncate text-start">
+                            {rest.emoji&&<span className="me-1">{rest.emoji}</span>}{rest.name}
                           </p>
                           <div className="flex gap-1 mt-1.5 flex-wrap">
                             {([
@@ -2344,9 +2423,9 @@ export function AdminPanel() {
                   const selectedRest=restsWithDetails.find(r=>r.id===selectedRestDetail)
                   if(!selectedRest)return null
                   return (
-                    <motion.div initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} className="space-y-4 p-5 rounded-xl border bg-muted/30 mb-4">
-                      <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
+                    <motion.div initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} className="space-y-4 p-5 rounded-xl border bg-muted/30 mb-4" dir={dir}>
+                      <div className="flex flex-wrap items-center gap-4 w-full">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
                           {/* Restaurant image upload */}
                           <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-muted shrink-0 cursor-pointer border hover:opacity-80 transition-opacity"
                             onClick={()=>restImageInputRef.current?.click()}>
@@ -2383,14 +2462,14 @@ export function AdminPanel() {
                               }catch(e){toast.error("שגיאה בהעלאה")}finally{setUploadingRestImage(false);e.currentTarget.value="";}
                             }}/>
                         </div>
-                        <div className="flex gap-2 flex-wrap">
+                        <div className="flex gap-2 flex-wrap shrink-0 ms-auto">
                           {onImpersonate&&(
                             <Button size="sm" variant="outline" onClick={()=>{onImpersonate({id:selectedRest.id,name:selectedRest.name,emoji:selectedRest.emoji});toast.success(t("pages.adminPanel.impersonatingRest")+": "+selectedRest.name)}}>
-                              <UserCircle className="w-4 h-4 ml-1"/>{t("pages.adminPanel.impersonate")}
+                              <UserCircle className="w-4 h-4 me-1"/>{t("pages.adminPanel.impersonate")}
                             </Button>
                           )}
                           <Button size="sm" variant="destructive" onClick={()=>{setRestToDelete(selectedRest);setDeleteRestDialogOpen(true)}}>
-                            <Trash2 className="w-4 h-4 ml-1"/>מחק
+                            <Trash2 className="w-4 h-4 me-1"/>מחק
                           </Button>
                         </div>
                       </div>
@@ -2616,7 +2695,7 @@ export function AdminPanel() {
 
           </TabsContent>
 
-          <TabsContent value="suppliers" className="mt-4">
+          <TabsContent value="suppliers" className={shellCompact ? "mt-2" : "mt-4"}>
             {loadingSystemOwner ? (
               <div className="flex items-center gap-2 text-muted-foreground py-8">
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -3064,7 +3143,7 @@ export function AdminPanel() {
 
           </TabsContent>
 
-          <TabsContent value="ingredients" className="mt-4">
+          <TabsContent value="ingredients" className={shellCompact ? "mt-2" : "mt-4"}>
             {loadingSystemOwner ? (
               <div className="flex items-center gap-2 text-muted-foreground py-8">
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -3291,6 +3370,10 @@ export function AdminPanel() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          <TabsContent value="dashboard" className={shellCompact ? "mt-2" : "mt-4"}>
+            <Dashboard />
           </TabsContent>
         </Tabs>
       )}

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { collection, getDocs, getDoc, doc, setDoc } from "firebase/firestore"
+import { collection, getDocs, getDoc, doc, setDoc, writeBatch, type DocumentReference } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
 import { motion, AnimatePresence } from "framer-motion"
@@ -20,6 +20,18 @@ import { cn } from "@/lib/utils"
 import { downloadExcel } from "@/lib/export-excel"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
+import { useLanguage } from "@/contexts/language-context"
+import {
+  extractWithAI,
+  suggestDishesFromSalesLines,
+  type ExtractedSalesItem,
+  type SalesReportPeriod,
+  isSupportedFormat,
+} from "@/lib/ai-extract"
+import { safeFirestoreRecipeId } from "@/lib/recipe-id"
+import { loadRestaurantPantryForAi } from "@/lib/restaurant-pantry"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 
 const VAT_RATE = 1.17
 
@@ -34,10 +46,14 @@ interface MenuItem {
   profitMargin: number
   status: "excellent" | "good" | "warning" | "critical"
   salesCount: number
+  addedFromSalesReport?: boolean
 }
 
 interface SalesRow {
+  /** שם כפי שחולץ מהדוח (תצוגה) */
   name: string
+  /** מזהה מסמך מתכון ב-Firestore */
+  recipeId: string
   quantity: number
   revenue: number
 }
@@ -47,48 +63,70 @@ interface FilePreviewModal {
   fileName: string
   rows: SalesRow[]
   rawText: string
+  existingRecipeIds: Set<string>
+  /** תקופת הדוח כפי שזוהתה ב-AI (יומי / חודשי וכו') */
+  salesReportPeriod?: SalesReportPeriod
+  /** YYYY-MM-DD מתוך הדוח */
+  salesReportDateFrom?: string
+  salesReportDateTo?: string
 }
 
 const isOwnerRole = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner"
 
-async function parseSalesWithAI(text: string): Promise<SalesRow[]> {
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        system: `You are a sales report parser. Extract dish sales data from text.
-Return ONLY valid JSON array, no markdown, no explanation.
-Format: [{"name":"dish name","quantity":number,"revenue":number}]
-- name: the dish/product name in Hebrew as it appears
-- quantity: number of units sold (integer)
-- revenue: total revenue in NIS (number, without VAT if possible)
-If quantity or revenue is missing, use 0.`,
-        messages: [{ role: "user", content: `Parse this sales report:\n\n${text.substring(0, 4000)}` }],
-      }),
-    })
-    const data = await res.json()
-    const content = data.content?.[0]?.text || "[]"
-    const clean = content.replace(/```json|```/g, "").trim()
-    return JSON.parse(clean) as SalesRow[]
-  } catch {
-    return []
+function salesColumnTitleForPeriod(t: (key: string) => string, period: SalesReportPeriod | undefined) {
+  switch (period) {
+    case "daily":
+      return t("pages.menuCosts.salesColumnDaily")
+    case "monthly":
+      return t("pages.menuCosts.salesColumnMonthly")
+    case "weekly":
+      return t("pages.menuCosts.salesColumnWeekly")
+    default:
+      return t("pages.menuCosts.salesColumnGeneric")
   }
 }
 
-async function readFileAsText(file: File): Promise<string> {
-  return new Promise((resolve) => {
-    const reader = new FileReader()
-    reader.onload = (e) => resolve((e.target?.result as string) || "")
-    reader.readAsText(file, "utf-8")
-  })
+function salesPeriodShortLabel(t: (key: string) => string, period: SalesReportPeriod | undefined) {
+  switch (period) {
+    case "daily":
+      return t("pages.menuCosts.salesReportPeriodDaily")
+    case "monthly":
+      return t("pages.menuCosts.salesReportPeriodMonthly")
+    case "weekly":
+      return t("pages.menuCosts.salesReportPeriodWeekly")
+    case "unknown":
+      return t("pages.menuCosts.salesReportPeriodUnknown")
+    default:
+      return t("pages.menuCosts.salesReportPeriodUnknown")
+  }
+}
+
+function formatIsoDateDisplay(iso: string | undefined, locale: string) {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return ""
+  return new Date(`${iso}T12:00:00`).toLocaleDateString(locale === "he" ? "he-IL" : "en-GB")
+}
+
+function mapExtractedSalesToRows(items: ExtractedSalesItem[]): SalesRow[] {
+  return items
+    .filter((it) => it?.name?.trim())
+    .map((it) => {
+      const name = String(it.name).trim()
+      const qty = typeof it.qty === "number" && !Number.isNaN(it.qty) ? it.qty : 0
+      const price = typeof it.price === "number" && !Number.isNaN(it.price) ? it.price : 0
+      const revenue = qty > 0 && price > 0 ? qty * price : price
+      return {
+        name,
+        recipeId: safeFirestoreRecipeId(name),
+        quantity: Math.max(0, Math.round(qty)),
+        revenue: Math.max(0, revenue),
+      }
+    })
 }
 
 export function MenuCosts() {
   const t = useTranslations()
-  const { currentRestaurantId, userRole, isSystemOwner, refreshIngredientsKey } = useApp()
+  const { locale } = useLanguage()
+  const { currentRestaurantId, userRole, isSystemOwner, refreshIngredientsKey, refreshIngredients } = useApp()
   const isOwner = isOwnerRole(userRole, isSystemOwner)
 
   const [items, setItems] = useState<MenuItem[]>([])
@@ -101,15 +139,33 @@ export function MenuCosts() {
 
   const [isDragging, setIsDragging] = useState(false)
   const [isParsingFile, setIsParsingFile] = useState(false)
-  const [preview, setPreview] = useState<FilePreviewModal>({ open: false, fileName: "", rows: [], rawText: "" })
+  const [preview, setPreview] = useState<FilePreviewModal>({
+    open: false,
+    fileName: "",
+    rows: [],
+    rawText: "",
+    existingRecipeIds: new Set(),
+    salesReportPeriod: undefined,
+    salesReportDateFrom: undefined,
+    salesReportDateTo: undefined,
+  })
+  /** תקופת הדוח האחרונה שנשמרה (מוצג בעמודת מכירות) */
+  const [savedSalesReportPeriod, setSavedSalesReportPeriod] = useState<SalesReportPeriod | undefined>(undefined)
+  const [savedSalesDateFrom, setSavedSalesDateFrom] = useState<string | undefined>(undefined)
+  const [savedSalesDateTo, setSavedSalesDateTo] = useState<string | undefined>(undefined)
+  const [addMissingDishesFromSales, setAddMissingDishesFromSales] = useState(true)
+  const [savingSales, setSavingSales] = useState(false)
   const [showDropZone, setShowDropZone] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dropRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (!currentRestaurantId) { setLoading(false); return }
-    setLoading(true)
-    const load = async () => {
+  const loadMenuCosts = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!currentRestaurantId) {
+        if (!opts?.silent) setLoading(false)
+        return
+      }
+      if (!opts?.silent) setLoading(true)
       try {
         const [recSnap, restIngSnap, asDoc, salesDoc] = await Promise.all([
           getDocs(collection(db, "restaurants", currentRestaurantId, "recipes")),
@@ -158,7 +214,21 @@ export function MenuCosts() {
           return qty * p * mult * (1 + waste / 100)
         }
 
-        const dailySales = (salesDoc.data()?.dailySales as Record<string, { avg: number }>) || {}
+        const salesData = salesDoc.data() as {
+          dailySales?: Record<string, { avg: number }>
+          salesReportPeriod?: SalesReportPeriod
+          salesReportDateFrom?: string | null
+          salesReportDateTo?: string | null
+        } | undefined
+        const dailySales = salesData?.dailySales || {}
+        const period = salesData?.salesReportPeriod
+        setSavedSalesReportPeriod(
+          period === "daily" || period === "monthly" || period === "weekly" || period === "unknown" ? period : undefined
+        )
+        const df = typeof salesData?.salesReportDateFrom === "string" ? salesData.salesReportDateFrom : undefined
+        const dt = typeof salesData?.salesReportDateTo === "string" ? salesData.salesReportDateTo : undefined
+        setSavedSalesDateFrom(df && /^\d{4}-\d{2}-\d{2}$/.test(df) ? df : undefined)
+        setSavedSalesDateTo(dt && /^\d{4}-\d{2}-\d{2}$/.test(dt) ? dt : undefined)
         const catSet = new Set<string>()
         const list: MenuItem[] = []
 
@@ -187,30 +257,66 @@ export function MenuCosts() {
             salePrice: sellingPrice, foodCost: cost,
             foodCostPercent: foodCostPct, profit, profitMargin, status,
             salesCount: Math.round(sales),
+            addedFromSalesReport: data.addedFromSalesReport === true,
           })
         })
         setItems(list)
         setCategories(["הכל", ...Array.from(catSet).sort()])
       } catch (e) {
         console.error("load menu costs:", e)
-        toast.error("שגיאה בטעינת עלויות תפריט")
+        toast.error(t("pages.menuCosts.loadError"))
       } finally {
-        setLoading(false)
+        if (!opts?.silent) setLoading(false)
       }
-    }
-    load()
-  }, [currentRestaurantId, isOwner, refreshIngredientsKey])
+    },
+    [currentRestaurantId, isOwner, t]
+  )
 
-  const processFile = useCallback(async (file: File) => {
-    setIsParsingFile(true)
-    try {
-      const text = await readFileAsText(file)
-      const rows = await parseSalesWithAI(text)
-      if (!rows.length) { toast.error("לא נמצאו נתוני מכירות בקובץ"); return }
-      setPreview({ open: true, fileName: file.name, rows, rawText: text })
-    } catch { toast.error("שגיאה בקריאת הקובץ") }
-    finally { setIsParsingFile(false) }
-  }, [])
+  useEffect(() => {
+    void loadMenuCosts()
+  }, [loadMenuCosts, refreshIngredientsKey])
+
+  const processFile = useCallback(
+    async (file: File) => {
+      if (!isSupportedFormat(file)) {
+        toast.error(t("pages.menuCosts.salesImportUnsupported"))
+        return
+      }
+      setIsParsingFile(true)
+      try {
+        const result = await extractWithAI(file, "s")
+        const rows = mapExtractedSalesToRows(result.items as ExtractedSalesItem[])
+        if (!rows.length) {
+          toast.error(t("pages.menuCosts.salesImportNoData"))
+          return
+        }
+        let existingRecipeIds = new Set<string>()
+        if (currentRestaurantId) {
+          const recSnap = await getDocs(collection(db, "restaurants", currentRestaurantId, "recipes"))
+          existingRecipeIds = new Set(recSnap.docs.map((d) => d.id))
+        }
+        const salesReportPeriod = result.sales_report_period
+        const salesReportDateFrom = result.sales_report_date_from ?? undefined
+        const salesReportDateTo = result.sales_report_date_to ?? undefined
+        setPreview({
+          open: true,
+          fileName: file.name,
+          rows,
+          rawText: "",
+          existingRecipeIds,
+          salesReportPeriod,
+          salesReportDateFrom,
+          salesReportDateTo,
+        })
+      } catch (e) {
+        console.error("menu costs sales import:", e)
+        toast.error(t("pages.menuCosts.salesImportReadError"))
+      } finally {
+        setIsParsingFile(false)
+      }
+    },
+    [t, currentRestaurantId]
+  )
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setIsDragging(false)
@@ -221,18 +327,115 @@ export function MenuCosts() {
   const onDragLeave = () => setIsDragging(false)
 
   const handleConfirmSales = async () => {
-    if (!currentRestaurantId || !preview.rows.length) return
+    if (!currentRestaurantId || !preview.rows.length || savingSales) return
+    setSavingSales(true)
     try {
-      const dailySales: Record<string, { avg: number; total: number }> = {}
-      preview.rows.forEach((row) => { dailySales[row.name] = { avg: row.quantity, total: row.revenue } })
+      const salesRef = doc(db, "restaurants", currentRestaurantId, "appState", `salesReport_${currentRestaurantId}`)
+      const prevSnap = await getDoc(salesRef)
+      const prevDaily = (prevSnap.data()?.dailySales as Record<string, { avg: number; total: number }>) || {}
+      const dailySales: Record<string, { avg: number; total: number }> = { ...prevDaily }
+      preview.rows.forEach((row) => {
+        dailySales[row.recipeId] = { avg: row.quantity, total: row.revenue }
+      })
+
+      const rowsToCreate = addMissingDishesFromSales
+        ? preview.rows.filter((row) => !preview.existingRecipeIds.has(row.recipeId))
+        : []
+      let suggestedMissing = 0
+      const pantry = await loadRestaurantPantryForAi(currentRestaurantId, isOwner)
+      const suggestions =
+        rowsToCreate.length > 0
+          ? await suggestDishesFromSalesLines(
+              rowsToCreate.map((r) => ({ name: r.name, quantity: r.quantity, revenue: r.revenue })),
+              pantry.length > 0 ? pantry : undefined
+            )
+          : new Map()
+      if (rowsToCreate.length > 0) {
+        suggestedMissing = rowsToCreate.filter((r) => !suggestions.has(r.name)).length
+      }
+
+      const BATCH_MAX = 450
+      const recipeWrites: Array<{ ref: DocumentReference; data: Record<string, unknown> }> = []
+      const nowIso = new Date().toISOString()
+
+      for (const row of rowsToCreate) {
+        const sug = suggestions.get(row.name)
+        const impliedUnit =
+          row.quantity > 0 ? Math.round((row.revenue / row.quantity) * 100) / 100 : 0
+        const sellingPrice = Math.max(
+          sug?.suggested_selling_price_ils ?? 0,
+          impliedUnit > 0 ? impliedUnit : 0
+        )
+        const ingredients = (sug?.ingredients ?? []).map((ing: { name: string; qty: number; unit: string }) => ({
+          name: ing.name,
+          qty: ing.qty,
+          unit: ing.unit || "גרם",
+          waste: 0,
+        }))
+        recipeWrites.push({
+          ref: doc(db, "restaurants", currentRestaurantId, "recipes", row.recipeId),
+          data: {
+            name: row.name,
+            category: sug?.category || "עיקריות",
+            sellingPrice,
+            ingredients,
+            isCompound: false,
+            addedFromSalesReport: true,
+            addedFromSalesReportAt: nowIso,
+          },
+        })
+      }
+
+      for (let i = 0; i < recipeWrites.length; i += BATCH_MAX) {
+        const batch = writeBatch(db)
+        const chunk = recipeWrites.slice(i, i + BATCH_MAX)
+        chunk.forEach(({ ref, data }) => batch.set(ref, data, { merge: true }))
+        await batch.commit()
+      }
+
+      const salesReportPeriod = preview.salesReportPeriod
+      const salesReportDateFrom = preview.salesReportDateFrom ?? null
+      const salesReportDateTo = preview.salesReportDateTo ?? null
       await setDoc(
-        doc(db, "restaurants", currentRestaurantId, "appState", `salesReport_${currentRestaurantId}`),
-        { dailySales, updatedAt: new Date().toISOString() }, { merge: true }
+        salesRef,
+        {
+          dailySales,
+          updatedAt: nowIso,
+          lastUpdated: nowIso,
+          ...(salesReportPeriod ? { salesReportPeriod } : {}),
+          salesReportDateFrom,
+          salesReportDateTo,
+        },
+        { merge: true }
       )
-      toast.success(`עודכנו מכירות עבור ${preview.rows.length} פריטים ✅`)
-      setPreview({ open: false, fileName: "", rows: [], rawText: "" })
-      setLoading(true); setTimeout(() => setLoading(false), 500)
-    } catch { toast.error("שגיאה בשמירת המכירות") }
+      if (salesReportPeriod) setSavedSalesReportPeriod(salesReportPeriod)
+      setSavedSalesDateFrom(salesReportDateFrom ?? undefined)
+      setSavedSalesDateTo(salesReportDateTo ?? undefined)
+
+      if (recipeWrites.length > 0) {
+        toast.success(t("pages.menuCosts.salesSaveSuccessWithNew"))
+        if (suggestedMissing > 0) toast.info(t("pages.menuCosts.salesSaveSuggestError"))
+        refreshIngredients?.()
+      } else {
+        toast.success(t("pages.menuCosts.salesSaveSuccess"))
+      }
+
+      setPreview({
+        open: false,
+        fileName: "",
+        rows: [],
+        rawText: "",
+        existingRecipeIds: new Set(),
+        salesReportPeriod: undefined,
+        salesReportDateFrom: undefined,
+        salesReportDateTo: undefined,
+      })
+      await loadMenuCosts({ silent: true })
+    } catch {
+      toast.error(t("pages.menuCosts.salesSaveError"))
+    } finally {
+      setSavingSales(false)
+    }
   }
 
   const getStatusConfig = (status: string) => {
@@ -280,7 +483,7 @@ export function MenuCosts() {
       <Card className="border-dashed">
         <CardContent className="p-0">
           <button onClick={() => setShowDropZone((v) => !v)} className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-            <span className="flex items-center gap-2"><Upload className="w-4 h-4" />ייבוא דוח מכירות</span>
+            <span className="flex items-center gap-2"><Upload className="w-4 h-4" />{t("pages.menuCosts.salesImportTitle")}</span>
             {showDropZone ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
           <AnimatePresence>
@@ -291,28 +494,55 @@ export function MenuCosts() {
                     isDragging ? "border-primary bg-primary/5 scale-[1.01]" : "border-muted-foreground/20 hover:border-primary/50 hover:bg-muted/30")}
                   onClick={() => fileInputRef.current?.click()}>
                   {isParsingFile ? (
-                    <><Loader2 className="w-8 h-8 animate-spin text-primary" /><p className="text-sm text-muted-foreground">מנתח קובץ עם AI...</p></>
+                    <><Loader2 className="w-8 h-8 animate-spin text-primary" /><p className="text-sm text-muted-foreground">{t("pages.menuCosts.salesImportParsing")}</p></>
                   ) : (
                     <>
                       <div className={cn("p-3 rounded-full transition-colors", isDragging ? "bg-primary/20" : "bg-muted")}>
                         <Upload className={cn("w-6 h-6", isDragging ? "text-primary" : "text-muted-foreground")} />
                       </div>
                       <div className="text-center">
-                        <p className="font-medium text-sm">{isDragging ? "שחרר כאן" : "גרור דוח מכירות לכאן"}</p>
-                        <p className="text-xs text-muted-foreground mt-1">CSV, TXT, Excel — זיהוי אוטומטי עם AI</p>
+                        <p className="font-medium text-sm">{isDragging ? t("pages.menuCosts.salesImportRelease") : t("pages.menuCosts.salesImportDrop")}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{t("pages.menuCosts.salesImportHint")}</p>
                       </div>
                       <Button size="sm" variant="outline" type="button" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}>
-                        <FileText className="w-3.5 h-3.5 ml-1.5" />בחר קובץ
+                        <FileText className="w-3.5 h-3.5 ml-1.5" />{t("pages.menuCosts.salesImportChoose")}
                       </Button>
                     </>
                   )}
-                  <input ref={fileInputRef} type="file" accept=".csv,.txt,.xlsx,.xls" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) processFile(f) }} />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.xlsx,.xls,.csv,.rtf,.png,.jpg,.jpeg,.gif,.webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0]
+                      if (f) processFile(f)
+                      e.target.value = ""
+                    }}
+                  />
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </CardContent>
       </Card>
+
+      {(savedSalesDateFrom || savedSalesDateTo) && (
+        <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-2 px-0.5">
+          <Badge variant="outline" className="font-normal shrink-0">
+            {t("pages.menuCosts.salesReportSavedDatesBadge")}
+          </Badge>
+          <span>
+            {(() => {
+              const a = formatIsoDateDisplay(savedSalesDateFrom, locale)
+              const b = formatIsoDateDisplay(savedSalesDateTo, locale)
+              if (a && b && savedSalesDateFrom === savedSalesDateTo) return a
+              if (a && b) return `${a} – ${b}`
+              return a || b || ""
+            })()}
+          </span>
+        </p>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 auto-rows-fr">
         {[
@@ -353,7 +583,7 @@ export function MenuCosts() {
       </CardContent></Card>
 
       <Card><CardContent className="p-0"><div className="overflow-x-auto"><Table>
-        <TableHeader><TableRow><TableHead className="text-right">מנה</TableHead><TableHead className="text-center">קטגוריה</TableHead><TableHead className="text-center">מחיר מכירה</TableHead><TableHead className="text-center">עלות מזון</TableHead><TableHead className="text-center">% עלות</TableHead><TableHead className="text-center">רווח</TableHead><TableHead className="text-center">מכירות</TableHead><TableHead className="text-center">סטטוס</TableHead></TableRow></TableHeader>
+        <TableHeader><TableRow><TableHead className="text-right">מנה</TableHead><TableHead className="text-center">קטגוריה</TableHead><TableHead className="text-center">מחיר מכירה</TableHead><TableHead className="text-center">עלות מזון</TableHead><TableHead className="text-center">% עלות</TableHead><TableHead className="text-center">רווח</TableHead><TableHead className="text-center">{salesColumnTitleForPeriod(t, savedSalesReportPeriod)}</TableHead><TableHead className="text-center">סטטוס</TableHead></TableRow></TableHeader>
         <TableBody>
           {filteredItems.length === 0 ? (<TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">{t("pages.menuCosts.noItems")}. {t("pages.recipes.addInProductTree")}</TableCell></TableRow>) : (
             filteredItems.map((item, index) => {
@@ -361,7 +591,16 @@ export function MenuCosts() {
               const costBarColor = item.foodCostPercent > 35 ? "bg-red-500" : item.foodCostPercent > 30 ? "bg-amber-500" : "bg-emerald-500"
               return (
                 <motion.tr key={item.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.02 }} className="hover:bg-muted/50">
-                  <TableCell className="font-medium">{item.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <span className="inline-flex items-center gap-2 flex-wrap">
+                      {item.name}
+                      {item.addedFromSalesReport ? (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500/50 text-amber-800 dark:text-amber-200">
+                          {t("pages.menuCosts.badgeFromSalesReport")}
+                        </Badge>
+                      ) : null}
+                    </span>
+                  </TableCell>
                   <TableCell className="text-center"><Badge variant="outline">{item.category}</Badge></TableCell>
                   <TableCell className="text-center font-semibold">{item.salePrice.toFixed(0)} ש"ח</TableCell>
                   <TableCell className="text-center">{item.foodCost.toFixed(2)} ש"ח</TableCell>
@@ -376,18 +615,122 @@ export function MenuCosts() {
         </TableBody>
       </Table></div></CardContent></Card>
 
-      <Dialog open={preview.open} onOpenChange={(o) => !o && setPreview((p) => ({ ...p, open: false }))}>
+      <Dialog
+        open={preview.open}
+        onOpenChange={(o) => {
+          if (!o)
+            setPreview({
+              open: false,
+              fileName: "",
+              rows: [],
+              rawText: "",
+              existingRecipeIds: new Set(),
+              salesReportPeriod: undefined,
+              salesReportDateFrom: undefined,
+              salesReportDateTo: undefined,
+            })
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="flex items-center gap-2"><FileText className="w-5 h-5 text-primary" />תצוגה מקדימה — {preview.fileName}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><FileText className="w-5 h-5 text-primary" />{t("pages.menuCosts.salesPreviewTitle")} — {preview.fileName}</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">AI זיהה <span className="font-bold text-foreground">{preview.rows.length}</span> פריטי מכירה. אשר כדי לעדכן את נתוני המכירות.</p>
+            <p className="text-sm text-muted-foreground">
+              <span className="font-bold text-foreground">{t("pages.menuCosts.salesPreviewDetectedPrefix")}</span>{" "}
+              <span className="font-bold text-foreground">{preview.rows.length}</span>{" "}
+              {t("pages.menuCosts.salesPreviewDetectedSuffix")} {t("pages.menuCosts.salesPreviewIntro")}
+            </p>
+            {preview.salesReportPeriod !== undefined ? (
+              <div className="flex flex-col gap-1 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-muted-foreground">{t("pages.menuCosts.salesReportPeriodLabel")}:</span>
+                  <Badge variant="secondary">{salesPeriodShortLabel(t, preview.salesReportPeriod)}</Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">{t("pages.menuCosts.salesReportPeriodHint")}</p>
+              </div>
+            ) : null}
+            {(preview.salesReportDateFrom || preview.salesReportDateTo) && (
+              <div className="flex flex-col gap-1 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+                <span className="text-muted-foreground font-medium">{t("pages.menuCosts.salesReportDateRangeLabel")}</span>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                  <span>
+                    <span className="text-muted-foreground">{t("pages.menuCosts.salesReportDateFromLabel")}: </span>
+                    <span className="font-medium tabular-nums">
+                      {formatIsoDateDisplay(preview.salesReportDateFrom, locale) || "—"}
+                    </span>
+                  </span>
+                  <span>
+                    <span className="text-muted-foreground">{t("pages.menuCosts.salesReportDateToLabel")}: </span>
+                    <span className="font-medium tabular-nums">
+                      {formatIsoDateDisplay(preview.salesReportDateTo, locale) || "—"}
+                    </span>
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">{t("pages.menuCosts.salesReportDateHint")}</p>
+              </div>
+            )}
+            <div className="flex items-start gap-3 rounded-lg border border-dashed p-3 bg-muted/30">
+              <Checkbox
+                id="add-missing-dishes"
+                checked={addMissingDishesFromSales}
+                onCheckedChange={(v) => setAddMissingDishesFromSales(v === true)}
+              />
+              <div className="grid gap-1">
+                <Label htmlFor="add-missing-dishes" className="text-sm font-medium cursor-pointer">
+                  {t("pages.menuCosts.salesAddMissingLabel")}
+                </Label>
+                <p className="text-xs text-muted-foreground">{t("pages.menuCosts.salesAddMissingHint")}</p>
+              </div>
+            </div>
             <div className="rounded-lg border overflow-hidden"><Table>
-              <TableHeader><TableRow><TableHead className="text-right">מנה</TableHead><TableHead className="text-center">כמות</TableHead><TableHead className="text-center">הכנסה (₪)</TableHead></TableRow></TableHeader>
-              <TableBody>{preview.rows.map((row, i) => (<TableRow key={i}><TableCell className="font-medium">{row.name}</TableCell><TableCell className="text-center">{row.quantity}</TableCell><TableCell className="text-center">{row.revenue.toLocaleString()}</TableCell></TableRow>))}</TableBody>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-right">מנה</TableHead>
+                  <TableHead className="text-center">{t("pages.menuCosts.salesPreviewColStatus")}</TableHead>
+                  <TableHead className="text-center">כמות</TableHead>
+                  <TableHead className="text-center">הכנסה (₪)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {preview.rows.map((row, i) => {
+                  const exists = preview.existingRecipeIds.has(row.recipeId)
+                  return (
+                    <TableRow key={`${row.recipeId}-${i}`}>
+                      <TableCell className="font-medium">{row.name}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant={exists ? "secondary" : "default"} className={exists ? "" : "bg-amber-600 hover:bg-amber-600"}>
+                          {exists ? t("pages.menuCosts.salesRowExisting") : t("pages.menuCosts.salesRowNew")}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">{row.quantity}</TableCell>
+                      <TableCell className="text-center">{row.revenue.toLocaleString()}</TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
             </Table></div>
             <div className="flex gap-3 justify-end pt-2">
-              <Button variant="outline" onClick={() => setPreview((p) => ({ ...p, open: false }))}><X className="w-4 h-4 ml-1.5" />ביטול</Button>
-              <Button onClick={handleConfirmSales}><CheckCircle2 className="w-4 h-4 ml-1.5" />אשר ועדכן מכירות</Button>
+              <Button
+                variant="outline"
+                disabled={savingSales}
+                onClick={() =>
+                  setPreview({
+                    open: false,
+                    fileName: "",
+                    rows: [],
+                    rawText: "",
+                    existingRecipeIds: new Set(),
+                    salesReportPeriod: undefined,
+                    salesReportDateFrom: undefined,
+                    salesReportDateTo: undefined,
+                  })
+                }
+              >
+                <X className="w-4 h-4 ml-1.5" />{t("pages.menuCosts.salesCancelButton")}
+              </Button>
+              <Button disabled={savingSales} onClick={() => void handleConfirmSales()}>
+                {savingSales ? <Loader2 className="w-4 h-4 ml-1.5 animate-spin" /> : <CheckCircle2 className="w-4 h-4 ml-1.5" />}
+                {savingSales ? t("pages.menuCosts.salesConfirmSaving") : t("pages.menuCosts.salesConfirmButton")}
+              </Button>
             </div>
           </div>
         </DialogContent>

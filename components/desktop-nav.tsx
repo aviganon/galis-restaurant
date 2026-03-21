@@ -1,6 +1,21 @@
 "use client"
-import { useState } from "react"
-import { LayoutDashboard, BarChart3, Settings, LogOut, ChevronDown, UtensilsCrossed, Calculator, Package, Upload, ClipboardList, Menu, Shield } from "lucide-react"
+import {
+  LayoutDashboard,
+  Settings,
+  LogOut,
+  ChevronDown,
+  UtensilsCrossed,
+  Calculator,
+  Package,
+  Upload,
+  Menu,
+  Shield,
+  Truck,
+  Boxes,
+  ShoppingCart,
+  BookOpen,
+  PieChart,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { UserPermissions } from "@/contexts/app-context"
 import { Button } from "@/components/ui/button"
@@ -27,7 +42,6 @@ interface DesktopNavProps {
 const hasFullMenu = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner" || role === "admin" || role === "manager"
 const userCanSee = (perms: UserPermissions | undefined, key: keyof UserPermissions) => perms?.[key] !== false
 const userCanSeeOptIn = (perms: UserPermissions | undefined, key: keyof UserPermissions) => !!perms?.[key]
-
 const mainNavItems = (
   t: (k: string) => string,
   userRole: string,
@@ -36,13 +50,14 @@ const mainNavItems = (
   isImpersonating?: boolean
 ) => {
   const full = hasFullMenu(userRole, isSystemOwner)
-  const items: { id: string; label: string; icon: typeof LayoutDashboard }[] = []
+  const items: { id: string; label: string; icon: typeof Calculator | typeof LayoutDashboard | typeof Shield }[] = []
   if (isSystemOwner && !isImpersonating) {
+    /* סקירת כל המסעדות — אין מודאל כזה מעץ מוצר */
     items.push({ id: "dashboard", label: t("nav.dashboard"), icon: LayoutDashboard })
     items.push({ id: "admin-panel", label: t("nav.adminPanel"), icon: Shield })
     return items
   }
-  if (full || userCanSee(perms, "canSeeDashboard")) items.push({ id: "dashboard", label: t("nav.dashboard"), icon: LayoutDashboard })
+  /* לשאר המשתמשים: לוח בקרה רק מעץ המוצר (מודאל), לא בתפריט */
   if (full || userCanSee(perms, "canSeeProductTree")) items.push({ id: "calc", label: t("nav.productTree"), icon: Calculator })
   if (full && !isImpersonating) items.push({ id: "admin-panel", label: t("nav.adminPanel"), icon: Shield })
   return items
@@ -59,8 +74,14 @@ const moreNavItems = (
   const items: { id: string; label: string; icon: typeof Package }[] = []
   if (isSystemOwner && !isImpersonating) return items
   if (isSystemOwner && isImpersonating) items.push({ id: "admin-panel", label: t("nav.adminPanel"), icon: Shield })
+  if (full && !isImpersonating) items.push({ id: "admin-panel", label: t("nav.adminPanel"), icon: Shield })
+  if (full || userCanSee(perms, "canSeeIngredients")) items.push({ id: "ingredients", label: t("nav.ingredients"), icon: Boxes })
+  if (full || userCanSee(perms, "canSeeSuppliers")) items.push({ id: "suppliers", label: t("nav.suppliers"), icon: Truck })
   if (full || userCanSee(perms, "canSeeUpload")) items.push({ id: "upload", label: t("nav.upload"), icon: Upload })
-  if (full || userCanSeeOptIn(perms, "canSeeReports")) items.push({ id: "reports", label: t("nav.reports"), icon: BarChart3 })
+  if (full || userCanSee(perms, "canSeeInventory")) items.push({ id: "inventory", label: t("nav.inventory"), icon: Package })
+  if (full || userCanSee(perms, "canSeePurchaseOrders")) items.push({ id: "purchase-orders", label: t("nav.purchaseOrders"), icon: ShoppingCart })
+  items.push({ id: "recipes", label: t("nav.recipes"), icon: BookOpen })
+  if (full || userCanSeeOptIn(perms, "canSeeCosts")) items.push({ id: "menu", label: t("nav.menuCosts"), icon: PieChart })
   if (full || userCanSeeOptIn(perms, "canSeeSettings")) items.push({ id: "settings", label: t("nav.settings"), icon: Settings })
   return items
 }
@@ -68,7 +89,7 @@ const moreNavItems = (
 export function DesktopNav({ currentPage, setCurrentPage, currentRestaurant, restaurants, onSelectRestaurant, userRole, isSystemOwner, userPermissions, onLogout, isImpersonating, onStopImpersonate }: DesktopNavProps) {
   const t = useTranslations()
   return (
-    <nav className="hidden md:flex fixed top-0 inset-x-0 z-50 h-16 bg-primary text-primary-foreground border-b border-primary-foreground/10">
+    <nav className="hidden lg:flex fixed top-0 inset-x-0 z-50 h-16 bg-primary text-primary-foreground border-b border-primary-foreground/10">
       <div className="container mx-auto px-4 flex items-center justify-between">
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-3">

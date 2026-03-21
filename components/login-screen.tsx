@@ -297,9 +297,9 @@ export function LoginScreen(_props: LoginScreenProps) {
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.6, ease: "easeOut" }}
-        className="fixed top-0 inset-x-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border"
+        className="fixed top-0 inset-x-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border max-lg:pt-[env(safe-area-inset-top,0px)]"
       >
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="container mx-auto px-4 min-h-16 h-16 flex items-center justify-between">
           <motion.div 
             className="flex items-center gap-3"
             whileHover={{ scale: 1.02 }}
@@ -310,7 +310,7 @@ export function LoginScreen(_props: LoginScreenProps) {
             </div>
             <span className="font-bold text-lg">Restaurant Pro</span>
           </motion.div>
-          <nav className="hidden md:flex items-center gap-6 text-sm">
+          <nav className="hidden lg:flex items-center gap-6 text-sm">
             {[
               { key: "login.features", id: "features" },
               { key: "login.restaurants", id: "restaurants" },
@@ -333,7 +333,7 @@ export function LoginScreen(_props: LoginScreenProps) {
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button 
                 variant="outline" 
-                className="hidden md:flex rounded-full"
+                className="hidden lg:flex rounded-full"
                 onClick={() => document.getElementById('auth-section')?.scrollIntoView({ behavior: 'smooth' })}
               >
                 {t("login.signIn")}
@@ -344,7 +344,10 @@ export function LoginScreen(_props: LoginScreenProps) {
       </motion.header>
 
       {/* Hero Section with Video */}
-      <section ref={heroRef} className="relative min-h-[90vh] pt-24 pb-16 md:pt-32 md:pb-24 overflow-hidden flex items-center">
+      <section
+        ref={heroRef}
+        className="relative min-h-[90vh] overflow-hidden flex items-center pt-[calc(6rem+env(safe-area-inset-top,0px))] pb-16 lg:pt-32 lg:pb-24"
+      >
         {/* Video Background */}
         <motion.div 
           className="absolute inset-0 z-0"
