@@ -126,25 +126,25 @@ function LoginBrandLogo({ variant }: { variant: LoginBrandLogoVariant }) {
       : variant === "card"
         ? "flex justify-center w-full"
         : variant === "header"
-          ? "flex items-center min-w-0 max-w-[min(70vw,300px)] sm:max-w-[320px]"
+          ? "flex items-center min-w-0 max-w-[min(78vw,380px)] sm:max-w-[400px]"
           : "flex items-center"
 
   const imgClass =
     variant === "hero"
-      ? "h-36 w-auto max-h-[15rem] sm:h-44 sm:max-h-[17rem] md:h-52 md:max-h-[19rem] lg:h-60 lg:max-h-[22rem] max-w-[min(94vw,36rem)] object-contain object-center mx-auto drop-shadow-[0_20px_50px_rgba(0,0,0,0.55)] dark:drop-shadow-[0_24px_56px_rgba(0,0,0,0.8)]"
+      ? "h-44 w-auto max-h-[18rem] sm:h-52 sm:max-h-[22rem] md:h-64 md:max-h-[26rem] lg:h-72 lg:max-h-[28rem] max-w-[min(96vw,44rem)] object-contain object-center mx-auto drop-shadow-[0_24px_60px_rgba(0,0,0,0.5)] dark:drop-shadow-[0_28px_64px_rgba(0,0,0,0.75)]"
       : variant === "card"
-        ? "h-28 sm:h-32 md:h-36 w-auto max-w-[min(88vw,22rem)] object-contain object-center mx-auto drop-shadow-md"
+        ? "h-36 sm:h-40 md:h-44 lg:h-48 w-auto max-w-[min(92vw,26rem)] object-contain object-center mx-auto drop-shadow-lg"
         : variant === "header"
-          ? "h-11 sm:h-12 w-auto max-w-full object-contain"
-          : "h-9 sm:h-10 w-auto max-w-[220px] object-contain"
+          ? "h-12 sm:h-14 w-auto max-w-full object-contain"
+          : "h-10 sm:h-12 w-auto max-w-[280px] object-contain"
 
   return (
     <div className={wrapClass}>
       <Image
         src={BRAND_LOGO_PATH}
         alt={t("login.brandLogoAlt")}
-        width={640}
-        height={240}
+        width={800}
+        height={280}
         className={imgClass}
         priority={variant === "hero" || variant === "header"}
         onError={() => setBroke(true)}
@@ -476,7 +476,7 @@ export function LoginScreen(_props: LoginScreenProps) {
             <motion.div variants={fadeInUp} className="mb-6 md:mb-8">
               <div className="relative flex flex-col items-center justify-center px-2">
                 <div
-                  className="pointer-events-none absolute left-1/2 top-1/2 h-52 w-[min(100%,32rem)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-400/20 blur-[56px] dark:bg-amber-500/15"
+                  className="pointer-events-none absolute left-1/2 top-1/2 h-56 w-[min(100%,36rem)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-400/12 blur-[64px] dark:bg-amber-500/10"
                   aria-hidden
                 />
                 <LoginBrandLogo variant="hero" />
@@ -715,7 +715,8 @@ export function LoginScreen(_props: LoginScreenProps) {
             <Card className="border-0 shadow-xl">
               <CardContent className="p-6 md:p-8">
                 <div className="text-center mb-6 space-y-4">
-                  <div className="mx-auto rounded-2xl border border-amber-500/25 bg-gradient-to-b from-background/95 via-background/80 to-muted/40 p-5 sm:p-6 shadow-xl ring-1 ring-black/[0.06] dark:ring-white/10">
+                  {/* ללא קופסת רקע — הלוגו PNG עם שקיפות אמיתית */}
+                  <div className="mx-auto flex justify-center px-1 py-2">
                     <LoginBrandLogo variant="card" />
                   </div>
                   <p className="text-sm font-medium text-muted-foreground">{t("login.systemDesc")}</p>
