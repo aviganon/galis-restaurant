@@ -68,6 +68,91 @@ const scaleIn: Variants = {
   visible: { opacity: 1, scale: 1, transition: { duration: 0.5, ease: [0.4, 0, 0.2, 1] } },
 }
 
+/** שים את קובץ הלוגו (PNG/WebP שקוף) ב־public/kamershalor-logo.png */
+const BRAND_LOGO_PATH = "/kamershalor-logo.png"
+
+type LoginBrandLogoVariant = "header" | "hero" | "card" | "footer"
+
+function LoginBrandLogo({ variant }: { variant: LoginBrandLogoVariant }) {
+  const t = useTranslations()
+  const [broke, setBroke] = useState(false)
+
+  if (broke) {
+    const box =
+      variant === "hero"
+        ? "w-20 h-20 rounded-2xl"
+        : variant === "card"
+          ? "w-16 h-16 rounded-2xl"
+          : variant === "header"
+            ? "w-10 h-10 rounded-xl"
+            : "w-8 h-8 rounded-lg"
+    const icon =
+      variant === "hero"
+        ? "w-10 h-10"
+        : variant === "card"
+          ? "w-8 h-8"
+          : variant === "header"
+            ? "w-5 h-5"
+            : "w-4 h-4"
+    const title =
+      variant === "hero"
+        ? "text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-center"
+        : variant === "card"
+          ? "text-xl font-bold"
+          : variant === "header"
+            ? "font-bold text-lg truncate"
+            : "font-semibold text-sm"
+    return (
+      <div
+        className={
+          variant === "hero"
+            ? "flex flex-col items-center gap-4"
+            : variant === "card"
+              ? "flex flex-col items-center gap-2"
+              : "flex items-center gap-3 min-w-0"
+        }
+      >
+        <div className={`${box} bg-primary flex items-center justify-center shrink-0`}>
+          <UtensilsCrossed className={`${icon} text-primary-foreground`} />
+        </div>
+        <span className={title}>Restaurant Pro</span>
+      </div>
+    )
+  }
+
+  const wrapClass =
+    variant === "hero"
+      ? "flex justify-center w-full"
+      : variant === "card"
+        ? "flex justify-center w-full"
+        : variant === "header"
+          ? "flex items-center min-w-0 max-w-[min(70vw,300px)] sm:max-w-[320px]"
+          : "flex items-center"
+
+  const imgClass =
+    variant === "hero"
+      ? "h-36 w-auto max-h-[15rem] sm:h-44 sm:max-h-[17rem] md:h-52 md:max-h-[19rem] lg:h-60 lg:max-h-[22rem] max-w-[min(94vw,36rem)] object-contain object-center mx-auto drop-shadow-[0_20px_50px_rgba(0,0,0,0.55)] dark:drop-shadow-[0_24px_56px_rgba(0,0,0,0.8)]"
+      : variant === "card"
+        ? "h-28 sm:h-32 md:h-36 w-auto max-w-[min(88vw,22rem)] object-contain object-center mx-auto drop-shadow-md"
+        : variant === "header"
+          ? "h-11 sm:h-12 w-auto max-w-full object-contain"
+          : "h-9 sm:h-10 w-auto max-w-[220px] object-contain"
+
+  return (
+    <div className={wrapClass}>
+      <Image
+        src={BRAND_LOGO_PATH}
+        alt={t("login.brandLogoAlt")}
+        width={640}
+        height={240}
+        className={imgClass}
+        priority={variant === "hero" || variant === "header"}
+        onError={() => setBroke(true)}
+      />
+    </div>
+  )
+}
+
 export function LoginScreen(_props: LoginScreenProps) {
   const t = useTranslations()
   const [email, setEmail] = useState("")
@@ -302,18 +387,15 @@ export function LoginScreen(_props: LoginScreenProps) {
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.6, ease: "easeOut" }}
-        className="fixed top-0 inset-x-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border max-lg:pt-[env(safe-area-inset-top,0px)]"
+        className="fixed top-0 inset-x-0 z-50 bg-background/85 backdrop-blur-xl border-b border-border max-lg:pt-[env(safe-area-inset-top,0px)]"
       >
-        <div className="container mx-auto px-4 min-h-16 h-16 flex items-center justify-between">
+        <div className="container mx-auto px-4 min-h-[4.25rem] h-[4.25rem] sm:min-h-[4.5rem] sm:h-[4.5rem] flex items-center justify-between gap-3">
           <motion.div 
-            className="flex items-center gap-3"
+            className="flex items-center gap-2 min-w-0 shrink"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-              <UtensilsCrossed className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="font-bold text-lg">Restaurant Pro</span>
+            <LoginBrandLogo variant="header" />
           </motion.div>
           <nav className="hidden lg:flex items-center gap-6 text-sm">
             {[
@@ -391,6 +473,16 @@ export function LoginScreen(_props: LoginScreenProps) {
             initial="hidden"
             animate="visible"
           >
+            <motion.div variants={fadeInUp} className="mb-6 md:mb-8">
+              <div className="relative flex flex-col items-center justify-center px-2">
+                <div
+                  className="pointer-events-none absolute left-1/2 top-1/2 h-52 w-[min(100%,32rem)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-400/20 blur-[56px] dark:bg-amber-500/15"
+                  aria-hidden
+                />
+                <LoginBrandLogo variant="hero" />
+              </div>
+            </motion.div>
+
             <motion.div variants={fadeInUp}>
               <Badge className="mb-6 rounded-full px-4 py-1.5 text-sm font-medium bg-secondary/80 backdrop-blur-sm text-secondary-foreground">
                 <Sparkles className="w-4 h-4 ml-2 animate-pulse" />
@@ -622,12 +714,11 @@ export function LoginScreen(_props: LoginScreenProps) {
           <div className="max-w-md mx-auto">
             <Card className="border-0 shadow-xl">
               <CardContent className="p-6 md:p-8">
-                <div className="text-center mb-6">
-                  <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-4">
-                    <UtensilsCrossed className="w-8 h-8 text-primary-foreground" />
+                <div className="text-center mb-6 space-y-4">
+                  <div className="mx-auto rounded-2xl border border-amber-500/25 bg-gradient-to-b from-background/95 via-background/80 to-muted/40 p-5 sm:p-6 shadow-xl ring-1 ring-black/[0.06] dark:ring-white/10">
+                    <LoginBrandLogo variant="card" />
                   </div>
-                  <h2 className="text-2xl font-bold">Restaurant Pro</h2>
-                  <p className="text-sm text-muted-foreground mt-1">{t("login.systemDesc")}</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t("login.systemDesc")}</p>
                 </div>
 
                 <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setError("") }} className="w-full">
@@ -845,11 +936,8 @@ export function LoginScreen(_props: LoginScreenProps) {
       <footer className="py-8 border-t border-border">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                <UtensilsCrossed className="w-4 h-4 text-primary-foreground" />
-              </div>
-              <span className="font-semibold">Restaurant Pro</span>
+            <div className="flex items-center gap-3 min-w-0">
+              <LoginBrandLogo variant="footer" />
             </div>
             <p className="text-sm text-muted-foreground">
               {t("login.footerRights")}

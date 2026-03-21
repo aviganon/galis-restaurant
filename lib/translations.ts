@@ -118,6 +118,7 @@ export const translations = {
       enterEmailForReset: "הזן את האימייל שלך כדי לאפס סיסמה",
       resetEmailSent: "נשלח אימייל לאיפוס סיסמה — בדוק את תיבת הדואר",
       userNotFound: "לא נמצא משתמש עם אימייל זה",
+      brandLogoAlt: "קמשרלור — קולינריה ברמה אחרת",
       footerRights: "© 2026 Restaurant Pro. כל הזכויות שמורות.",
     },
     authErrors: {
@@ -1022,6 +1023,7 @@ export const translations = {
       enterEmailForReset: "Enter your email to reset password",
       resetEmailSent: "Password reset email sent — check your inbox",
       userNotFound: "No user found with this email",
+      brandLogoAlt: "KAMERSHALOR — culinary at another level",
       footerRights: "© 2026 Restaurant Pro. All rights reserved.",
     },
     authErrors: {
