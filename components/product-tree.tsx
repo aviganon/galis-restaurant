@@ -33,6 +33,7 @@ import { FilePreviewModal } from "@/components/file-preview-modal"
 import { Dashboard } from "@/components/dashboard"
 import { Reports } from "@/components/reports"
 import { suggestDishFromIngredients, type ExtractedDishItem } from "@/lib/ai-extract"
+import { loadGlobalPriceSubdocsMap, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
 import { normalizeDishCategoryToHebrew } from "@/lib/dish-category-hebrew"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
@@ -208,6 +209,8 @@ export default function ProductTree() {
           getDocs(collection(db, "ingredients")),
         ])
         const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
+        const subPricesByIngredient =
+          assignedList.length > 0 ? await loadGlobalPriceSubdocsMap(db) : new Map()
 
         const newDishes: Record<string, Dish> = {}
         recSnap.forEach((d) => {
@@ -249,13 +252,12 @@ export default function ProductTree() {
         }
 
         type IngData = { price?: number; unit?: string; supplier?: string; stock?: number }
-        // בעלים ומנהלים: מכבדים assignedSuppliers — מסעדה חדשה בלי שיוך רואה רק רכיבים שלה
+        // בעלים ומנהלים: מכבדים assignedSuppliers — מחיר מספק ששויך **אחרון** לרשימה (כשיש כמה ספקים לאותו רכיב)
         if (assignedList.length > 0) {
           globalIngSnap.forEach((d) => {
             const data = d.data() as IngData
-            const sup = (data.supplier || "") as string
-            // רכיבים ללא ספק מהקטלוג הגלובלי — לא מוצגים במסעדות
-            if (sup && assignedList.includes(sup)) mergePrice(d.id, data)
+            const picked = pickGlobalIngredientRowFromAssigned(assignedList, data, subPricesByIngredient.get(d.id))
+            if (picked) mergePrice(d.id, { ...picked, stock: typeof data.stock === "number" ? data.stock : undefined })
           })
         }
         restIngSnap.forEach((d) => mergePrice(d.id, d.data() as IngData))

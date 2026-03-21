@@ -31,6 +31,7 @@ import {
 import { safeFirestoreRecipeId } from "@/lib/recipe-id"
 import { normalizeDishCategoryToHebrew } from "@/lib/dish-category-hebrew"
 import { loadRestaurantPantryForAi } from "@/lib/restaurant-pantry"
+import { loadGlobalPriceSubdocsMap, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 
@@ -177,6 +178,8 @@ export function MenuCosts() {
 
         const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
         const globalIngSnap = isOwner ? await getDocs(collection(db, "ingredients")) : null
+        const subPricesByIngredient =
+          isOwner && assignedList.length > 0 ? await loadGlobalPriceSubdocsMap(db) : new Map()
 
         const prices: Record<string, number> = {}
         restIngSnap.forEach((d) => {
@@ -185,10 +188,8 @@ export function MenuCosts() {
         })
         globalIngSnap?.forEach((d) => {
           if (d.id in prices) return
-          const data = d.data()
-          const sup = (data.supplier as string) || ""
-          if (!sup || !assignedList.includes(sup)) return
-          prices[d.id] = typeof data.price === "number" ? data.price : 0
+          const picked = pickGlobalIngredientRowFromAssigned(assignedList, d.data(), subPricesByIngredient.get(d.id))
+          if (picked) prices[d.id] = picked.price
         })
 
         const recipesMap: Record<string, { ingredients: { name: string; qty: number; unit: string; waste: number; isSubRecipe?: boolean }[]; yieldQty?: number }> = {}

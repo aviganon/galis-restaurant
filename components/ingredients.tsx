@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react"
 import { collection, collectionGroup, getDocs, doc, getDoc, setDoc, deleteDoc, writeBatch } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { groupPriceSubdocsByIngredient, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
 import { useApp } from "@/contexts/app-context"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -364,6 +365,8 @@ export function Ingredients() {
       }
 
       const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
+      const subPricesByIngredient =
+        pricesSnap && assignedList.length > 0 ? groupPriceSubdocsByIngredient(pricesSnap.docs) : new Map()
       const byId = new Map<string, Ingredient>()
       const supSet = new Set<string>()
       const restSupSet = new Set<string>()
@@ -425,20 +428,18 @@ export function Ingredients() {
       globalSnap.forEach((d) => {
         if (byId.has(d.id)) return
         const data = d.data()
-        const sup = (data.supplier as string) || ""
-        // רכיבים ללא ספק מהקטלוג הגלובלי — לא מוצגים במסעדות
-        if (!sup) return
-        // מכבדים assignedSuppliers — מסעדה חדשה בלי שיוך רואה רק רכיבים שלה
-        if (!assignedList.includes(sup)) return
+        if (!assignedList.length) return
+        const picked = pickGlobalIngredientRowFromAssigned(assignedList, data, subPricesByIngredient.get(d.id))
+        if (!picked) return
         const ing: Ingredient = {
           id: d.id,
           name: d.id,
-          price: typeof data.price === "number" ? data.price : 0,
-          unit: (data.unit as string) || "ק\"ג",
+          price: picked.price,
+          unit: picked.unit || (data.unit as string) || "ק\"ג",
           waste: typeof data.waste === "number" ? data.waste : 0,
           stock: typeof data.stock === "number" ? data.stock : 0,
           minStock: typeof data.minStock === "number" ? data.minStock : 0,
-          supplier: sup,
+          supplier: picked.supplier,
           sku: (data.sku as string) || "",
           category: (data.category as string) || "אחר",
           priceSource: isOwner ? "market" : undefined,
@@ -446,7 +447,7 @@ export function Ingredients() {
           inRestaurant: false,
         }
         byId.set(d.id, ing)
-        if (data.supplier) supSet.add(data.supplier)
+        supSet.add(picked.supplier)
       })
       const ings = Array.from(byId.values())
       setIngredients(ings)

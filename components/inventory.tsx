@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { toast } from "sonner"
 import { collection, getDocs, doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { loadGlobalPriceSubdocsMap, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
 import { useApp } from "@/contexts/app-context"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -69,6 +70,8 @@ export function Inventory() {
         const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
         // טוענים קטלוג גלובלי רק אם יש ספקים משויכים — מסעדה חדשה לא תראה רכיבים גלובליים
         const globalSnap = isOwner && assignedList.length > 0 ? await getDocs(collection(db, "ingredients")) : null
+        const subPricesByIngredient =
+          isOwner && assignedList.length > 0 ? await loadGlobalPriceSubdocsMap(db) : new Map()
         const byId = new Map<string, InventoryItem>()
         restSnap.forEach((d) => {
           const data = d.data()
@@ -86,17 +89,16 @@ export function Inventory() {
         globalSnap?.forEach((d) => {
           if (!byId.has(d.id) && assignedList.length > 0) {
             const data = d.data()
-            const sup = (data.supplier as string) || ""
-            // רכיבים ללא ספק — לא מוצגים במסעדות
-            if (!sup || !assignedList.includes(sup)) return
+            const picked = pickGlobalIngredientRowFromAssigned(assignedList, data, subPricesByIngredient.get(d.id))
+            if (!picked) return
             byId.set(d.id, {
               id: d.id,
               name: d.id,
               currentStock: typeof data.stock === "number" ? data.stock : 0,
-              unit: (data.unit as string) || "ק\"ג",
+              unit: picked.unit || (data.unit as string) || "ק\"ג",
               minStock: typeof data.minStock === "number" ? data.minStock : 0,
               maxStock: typeof data.maxStock === "number" ? data.maxStock : 100,
-              supplier: sup,
+              supplier: picked.supplier,
             })
           }
         })

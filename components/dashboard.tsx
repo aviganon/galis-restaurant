@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, type ReactNode } from "react"
 import { toast } from "sonner"
 import { collection, getDocs, getDoc, doc, query, where, orderBy, limit, setDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { loadGlobalPriceSubdocsMap, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
 import { useApp } from "@/contexts/app-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -119,6 +120,7 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
           let totalDishesSold = 0
           let overTargetAll = 0
           const globalIngSnap = await getDocs(collection(db, "ingredients"))
+          const subPricesByIngredient = await loadGlobalPriceSubdocsMap(db)
 
           for (const rest of restaurants) {
             const [recSnap, restIngSnap, salesDoc, asDoc] = await Promise.all([
@@ -131,10 +133,8 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
             const recipes = recSnap.docs.filter((d) => !d.data().isCompound)
             const prices: Record<string, number> = {}
             globalIngSnap.forEach((d) => {
-              const data = d.data()
-              const sup = (data.supplier as string) || ""
-              if (!sup || !assignedList.includes(sup)) return
-              prices[d.id] = typeof data.price === "number" ? data.price : 0
+              const picked = pickGlobalIngredientRowFromAssigned(assignedList, d.data(), subPricesByIngredient.get(d.id))
+              if (picked) prices[d.id] = picked.price
             })
             restIngSnap.forEach((d) => {
               const data = d.data()
@@ -256,6 +256,8 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
         ])
         const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
         const globalIngSnap = isOwner ? await getDocs(collection(db, "ingredients")) : null
+        const subPricesByIngredient =
+          isOwner && assignedList.length > 0 ? await loadGlobalPriceSubdocsMap(db) : new Map()
 
         type PoRow = { id: string; status?: string; supplier?: string }
         const pos: PoRow[] = poSnap.docs.map((d) => {
@@ -297,10 +299,16 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
         globalIngSnap?.forEach((d) => {
           if (ingIds.has(d.id)) return
           const data = d.data()
-          const sup = (data.supplier as string) || ""
-          if (!sup) return
-          if (!assignedList.includes(sup)) return
-          mergeIng(d)
+          const picked = pickGlobalIngredientRowFromAssigned(assignedList, data, subPricesByIngredient.get(d.id))
+          if (!picked) return
+          mergeIng({
+            id: d.id,
+            data: () => ({
+              ...data,
+              price: picked.price,
+              supplier: picked.supplier,
+            }),
+          })
         })
 
         setIngredientsCount(ingIds.size)

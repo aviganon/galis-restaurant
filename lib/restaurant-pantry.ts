@@ -1,6 +1,7 @@
 import { collection, getDocs, getDoc, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { IngredientForSuggestion } from "@/lib/ai-extract"
+import { loadGlobalPriceSubdocsMap, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
 
 /**
  * רכיבים זמינים להצעות AI — כמו לוגיקת מחירים בעלויות תפריט:
@@ -15,6 +16,8 @@ export async function loadRestaurantPantryForAi(
     getDoc(doc(db, "restaurants", restaurantId, "appState", "assignedSuppliers")),
   ])
   const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
+  const subPricesByIngredient =
+    isOwner && assignedList.length > 0 ? await loadGlobalPriceSubdocsMap(db) : new Map()
   const byId = new Map<string, IngredientForSuggestion>()
 
   restIngSnap.forEach((d) => {
@@ -31,12 +34,17 @@ export async function loadRestaurantPantryForAi(
     globalSnap.forEach((d) => {
       if (byId.has(d.id)) return
       const data = d.data()
-      const sup = (data.supplier as string) || ""
-      if (!sup || !assignedList.includes(sup)) return
-      const unit = (data.unit as string) || "גרם"
-      const price = typeof data.price === "number" ? data.price : 0
+      if (!assignedList.length) return
+      const picked = pickGlobalIngredientRowFromAssigned(assignedList, data, subPricesByIngredient.get(d.id))
+      if (!picked) return
       const stock = typeof data.stock === "number" ? data.stock : undefined
-      byId.set(d.id, { name: d.id, price, unit, supplier: sup, stock })
+      byId.set(d.id, {
+        name: d.id,
+        price: picked.price,
+        unit: picked.unit || (data.unit as string) || "גרם",
+        supplier: picked.supplier,
+        stock,
+      })
     })
   }
 

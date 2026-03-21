@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { collection, getDocs, getDoc, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { loadGlobalPriceSubdocsMap, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
 import { useApp } from "@/contexts/app-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -53,6 +54,8 @@ export function Reports() {
         ])
         const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
         const globalIngSnap = isOwner ? await getDocs(collection(db, "ingredients")) : null
+        const subPricesByIngredient =
+          isOwner && assignedList.length > 0 ? await loadGlobalPriceSubdocsMap(db) : new Map()
 
         const prices: Record<string, number> = {}
         restIngSnap.forEach((d) => {
@@ -60,13 +63,9 @@ export function Reports() {
           prices[d.id] = typeof data.price === "number" ? data.price : 0
         })
         globalIngSnap?.forEach((d) => {
-          if (!(d.id in prices)) {
-            const data = d.data()
-            const sup = (data.supplier as string) || ""
-            if (!sup) return
-            if (!assignedList.includes(sup)) return
-            prices[d.id] = typeof data.price === "number" ? data.price : 0
-          }
+          if (d.id in prices) return
+          const picked = pickGlobalIngredientRowFromAssigned(assignedList, d.data(), subPricesByIngredient.get(d.id))
+          if (picked) prices[d.id] = picked.price
         })
 
         const dailySales = (salesDoc.data()?.dailySales as Record<string, { avg: number; trend: number }>) || {}

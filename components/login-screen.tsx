@@ -138,13 +138,24 @@ function LoginBrandLogo({ variant }: { variant: LoginBrandLogoVariant }) {
           ? "h-12 sm:h-14 w-auto max-w-full object-contain"
           : "h-10 sm:h-12 w-auto max-w-[280px] object-contain"
 
+  const logoSizes =
+    variant === "hero"
+      ? "(max-width: 640px) 96vw, (max-width: 1024px) 90vw, 704px"
+      : variant === "card"
+        ? "(max-width: 640px) 92vw, 416px"
+        : variant === "header"
+          ? "(max-width: 480px) 78vw, 400px"
+          : "280px"
+
   return (
     <div className={wrapClass}>
       <Image
         src={BRAND_LOGO_PATH}
         alt={t("login.brandLogoAlt")}
-        width={800}
-        height={280}
+        width={1024}
+        height={558}
+        sizes={logoSizes}
+        quality={95}
         className={imgClass}
         priority={variant === "hero" || variant === "header"}
         onError={() => setBroke(true)}
