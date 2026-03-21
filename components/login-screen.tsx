@@ -12,11 +12,8 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { 
-  ChefHat, 
-  UtensilsCrossed, 
-  TrendingUp, 
-  Users, 
+import {
+  UtensilsCrossed,
   BarChart3,
   Lock,
   Mail,
@@ -30,7 +27,12 @@ import {
   Play,
   Volume2,
   VolumeX,
-  Star
+  Star,
+  FileSpreadsheet,
+  ScanLine,
+  Lightbulb,
+  Package,
+  Globe,
 } from "lucide-react"
 import { LanguageSwitcher } from "@/components/language-switcher"
 import { useTranslations } from "@/lib/use-translations"
@@ -83,13 +85,16 @@ export function LoginScreen(_props: LoginScreenProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const heroRef = useRef<HTMLDivElement>(null)
 
+  /** כרטיסים במקטע #features — יכולות AI אמיתיות במערכת (מחובר ל־translations) */
   const features = [
-    { icon: BarChart3, titleKey: "login.feature1Title", descKey: "login.feature1Desc" },
-    { icon: ChefHat, titleKey: "login.feature2Title", descKey: "login.feature2Desc" },
-    { icon: Users, titleKey: "login.feature3Title", descKey: "login.feature3Desc" },
-    { icon: TrendingUp, titleKey: "login.feature4Title", descKey: "login.feature4Desc" },
+    { icon: FileSpreadsheet, titleKey: "login.feature1Title", descKey: "login.feature1Desc" },
+    { icon: ScanLine, titleKey: "login.feature2Title", descKey: "login.feature2Desc" },
+    { icon: BarChart3, titleKey: "login.feature3Title", descKey: "login.feature3Desc" },
+    { icon: Lightbulb, titleKey: "login.feature4Title", descKey: "login.feature4Desc" },
+    { icon: Package, titleKey: "login.feature5Title", descKey: "login.feature5Desc" },
+    { icon: Globe, titleKey: "login.feature6Title", descKey: "login.feature6Desc" },
   ]
-  
+
   const { scrollYProgress } = useScroll({
     target: heroRef,
     offset: ["start start", "end start"]
@@ -291,7 +296,7 @@ export function LoginScreen(_props: LoginScreenProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden">
+    <div className="min-h-dvh bg-background overflow-x-hidden">
       {/* Header */}
       <motion.header 
         initial={{ y: -100 }}
@@ -346,12 +351,13 @@ export function LoginScreen(_props: LoginScreenProps) {
       {/* Hero Section with Video */}
       <section
         ref={heroRef}
-        className="relative min-h-[90vh] overflow-hidden flex items-center pt-[calc(6rem+env(safe-area-inset-top,0px))] pb-16 lg:pt-32 lg:pb-24"
+        id="login-hero"
+        className="relative overflow-x-hidden pt-[calc(6rem+env(safe-area-inset-top,0px))] pb-12 lg:pt-28 lg:pb-16"
       >
-        {/* Video Background */}
         <motion.div 
-          className="absolute inset-0 z-0"
+          className="absolute inset-0 z-0 min-h-full select-none"
           style={{ opacity: heroOpacity, scale: heroScale, y: heroY }}
+          aria-hidden
         >
           <video
             ref={videoRef}
@@ -360,7 +366,7 @@ export function LoginScreen(_props: LoginScreenProps) {
             muted
             playsInline
             poster="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1920&q=80"
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover"
           >
             <source src="https://assets.mixkit.co/videos/13258/13258-720.mp4" type="video/mp4" />
           </video>
@@ -378,7 +384,7 @@ export function LoginScreen(_props: LoginScreenProps) {
           {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
         </motion.button>
         
-        <div className="container mx-auto px-4 relative z-20">
+        <div className="container mx-auto px-4 relative z-20 pb-8">
           <motion.div 
             className="max-w-3xl mx-auto text-center"
             variants={staggerContainer}
@@ -403,7 +409,7 @@ export function LoginScreen(_props: LoginScreenProps) {
             
             <motion.p 
               variants={fadeInUp}
-              className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto text-pretty"
+              className="text-lg md:text-xl text-muted-foreground mb-6 max-w-2xl mx-auto text-pretty"
             >
               {t("login.heroDesc")}
               <br />
@@ -434,22 +440,6 @@ export function LoginScreen(_props: LoginScreenProps) {
                   <Play className="w-4 h-4 ml-2" />
                   {t("login.watchDemo")}
                 </Button>
-              </motion.div>
-            </motion.div>
-            
-            {/* Animated scroll indicator */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.5, duration: 0.5 }}
-              className="absolute bottom-8 left-1/2 -translate-x-1/2"
-            >
-              <motion.div
-                animate={{ y: [0, 10, 0] }}
-                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                className="w-6 h-10 rounded-full border-2 border-foreground/30 flex items-start justify-center p-2"
-              >
-                <motion.div className="w-1.5 h-1.5 rounded-full bg-foreground/50" />
               </motion.div>
             </motion.div>
           </motion.div>
@@ -492,7 +482,7 @@ export function LoginScreen(_props: LoginScreenProps) {
       </AnimatePresence>
 
       {/* Features Section */}
-      <section id="features" className="py-16 md:py-24 bg-muted/30">
+      <section id="features" className="scroll-mt-24 py-16 md:py-24 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-2xl md:text-3xl font-bold mb-4">{t("login.toolsTitle")}</h2>
@@ -501,7 +491,7 @@ export function LoginScreen(_props: LoginScreenProps) {
             </p>
           </div>
           
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {features.map((feature, i) => (
               <Card key={i} className="border-0 shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-6 text-center">

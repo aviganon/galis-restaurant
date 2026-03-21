@@ -54,10 +54,11 @@ const RESTAURANT_ONLY_PAGES = [
   "menu",
 ] as const
 
+/** מעברים קצרים יותר — פחות המתנה כשיוצאים מהתחזה / מחליפים מסעדה (התוכן עדיין נטען מחדש) */
 const pageVariants: Variants = {
-  initial: { opacity: 0, x: 20 },
-  animate: { opacity: 1, x: 0, transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] } },
-  exit: { opacity: 0, x: -20, transition: { duration: 0.2, ease: [0.4, 0, 1, 1] } },
+  initial: { opacity: 0, x: 12 },
+  animate: { opacity: 1, x: 0, transition: { duration: 0.2, ease: [0.4, 0, 0.2, 1] } },
+  exit: { opacity: 0, x: -12, transition: { duration: 0.12, ease: [0.4, 0, 1, 1] } },
 }
 
 export default function Home() {
@@ -87,7 +88,8 @@ export default function Home() {
     if (!isSystemOwner) return
     try {
       const { restaurantsCollection, restaurantFields } = firestoreConfig
-      const restsSnap = await getDocsFromServer(collection(db, restaurantsCollection)).catch(() => getDocs(collection(db, restaurantsCollection)))
+      // getDocs — נהנה ממטמון Firestore המקומי (IndexedDB) אחרי ביקור קודם; מהיר יותר אחרי יציאה מהתחזה
+      const restsSnap = await getDocs(collection(db, restaurantsCollection))
       const list: { id: string; name: string; branch?: string; emoji?: string }[] = []
       restsSnap.forEach((d) => {
         const ddata = d.data()
@@ -508,7 +510,7 @@ export default function Home() {
               "max-lg:pt-[calc(7rem+env(safe-area-inset-top,0px))] lg:pt-28"
           )}
         >
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="sync">
             <motion.div
               key={
                 inRestaurantWorkspace && (currentPage === "calc" || currentPage === "purchase-orders")

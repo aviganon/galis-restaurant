@@ -1,6 +1,11 @@
 import { initializeApp } from "firebase/app"
 import { getAuth } from "firebase/auth"
-import { getFirestore } from "firebase/firestore"
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from "firebase/firestore"
 import { getStorage } from "firebase/storage"
 
 const firebaseConfig = {
@@ -20,5 +25,27 @@ if (!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID && typeof window !== "undefined
 
 const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
-export const db = getFirestore(app)
+
+/**
+ * מטמון Firestore מקומי (IndexedDB) בדפדפן — מזרז חזרה לנתונים אחרי מעבר דף / יציאה מהתחזה,
+ * ומפחית רשת כשהקולקציות כבר נטענו פעם באותו טאב/מסעדה.
+ * ב-SSR נשאר getFirestore רגיל (ללא persistence).
+ */
+function createFirestore() {
+  if (typeof window === "undefined") {
+    return getFirestore(app)
+  }
+  try {
+    return initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
+    })
+  } catch {
+    // כבר אותחל (HMR / קריאה כפולה) — מחזירים את אותו מופע
+    return getFirestore(app)
+  }
+}
+
+export const db = createFirestore()
 export const storage = getStorage(app)
