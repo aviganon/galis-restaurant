@@ -47,6 +47,7 @@ import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Users, UserPlus, Ticket, Copy } from "lucide-react"
+import { InboundEmailSettings } from "@/components/inbound-email-settings"
 
 export function Settings() {
   const t = useTranslations()
@@ -762,6 +763,7 @@ export function Settings() {
         </DialogContent>
       </Dialog>
 
-    </div>
+        <InboundEmailSettings />
+  </div>
   )
 }
