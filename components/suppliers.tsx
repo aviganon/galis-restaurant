@@ -159,6 +159,12 @@ export default function Suppliers() {
         getDocs(collection(db, "ingredients")),
       ])
       const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
+      /** התאמה לפי שם (לא ID) — נירמול רווחים כדי שיתאים ל-admin ול-ingredients */
+      const isAssignedSupplierName = (supplierField: string) => {
+        const s = (supplierField || "").trim()
+        if (!s || s === "ללא ספק") return false
+        return assignedList.some((a) => (a || "").trim() === s)
+      }
       const bySupplier = new Map<string, { products: number; totalValue: number; source: "assigned" | "restaurant" }>()
       const chipsBySupplier = new Map<string, { name: string; stock: number; minStock: number; unit: string; price: number }[]>()
       const seenIds = new Set<string>()
@@ -169,7 +175,7 @@ export default function Suppliers() {
         const price = typeof data.price === "number" ? data.price : 0
         const stock = typeof data.stock === "number" ? data.stock : 0
         const existing = bySupplier.get(sup) || { products: 0, totalValue: 0, source: "restaurant" as const }
-        const src: "assigned" | "restaurant" = assignedList.includes(sup) ? "assigned" : "restaurant"
+        const src: "assigned" | "restaurant" = isAssignedSupplierName(sup) ? "assigned" : "restaurant"
         bySupplier.set(sup, {
           products: existing.products + 1,
           totalValue: existing.totalValue + price * stock,
@@ -184,7 +190,7 @@ export default function Suppliers() {
         const data = d.data()
         const sup = (data.supplier as string) || ""
         if (!sup) return // רכיבים גלובליים ללא ספק — לא מוצגים (רק רכיבי מסעדה עם supplier ריק)
-        if (!assignedList.includes(sup)) return
+        if (!isAssignedSupplierName(sup)) return
         const supKey = sup
         const price = typeof data.price === "number" ? data.price : 0
         const stock = typeof data.stock === "number" ? data.stock : 0
@@ -192,7 +198,7 @@ export default function Suppliers() {
         bySupplier.set(supKey, {
           products: existing.products + 1,
           totalValue: existing.totalValue + price * stock,
-          source: assignedList.includes(sup) ? "assigned" : existing.source,
+          source: isAssignedSupplierName(sup) ? "assigned" : existing.source,
         })
         const chips1 = chipsBySupplier.get(supKey) || []; chips1.push({ name: d.id, stock, minStock: typeof data.minStock === "number" ? data.minStock : 0, unit: (data.unit as string)||"יחידה", price: typeof data.price === "number" ? data.price : 0 }); chipsBySupplier.set(supKey, chips1)
       })

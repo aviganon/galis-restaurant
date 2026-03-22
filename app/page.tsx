@@ -17,7 +17,6 @@ import ProductTree from "@/components/product-tree"
 import { Ingredients } from "@/components/ingredients"
 import { MenuCosts } from "@/components/menu-costs"
 import { PurchaseOrders } from "@/components/purchase-orders"
-import { Upload } from "@/components/upload"
 import { MobileNav } from "@/components/mobile-nav"
 import { DesktopNav } from "@/components/desktop-nav"
 import { AdminPanel } from "@/components/admin-panel"
@@ -289,7 +288,8 @@ export default function Home() {
         case "inventory": return p?.canSeeInventory !== false
         case "suppliers": return p?.canSeeSuppliers !== false
         case "purchase-orders": return p?.canSeePurchaseOrders !== false
-        case "upload": return p?.canSeeUpload !== false
+        case "upload":
+          return p?.canSeeUpload !== false || p?.canSeeProductTree !== false
         case "reports": return !!p?.canSeeReports
         case "menu": return !!p?.canSeeCosts
         case "settings": return !!p?.canSeeSettings
@@ -301,7 +301,7 @@ export default function Home() {
 
   useEffect(() => {
     if ((RESTRICTED_PAGES as readonly string[]).includes(currentPage) && !canAccessPage(currentPage)) {
-      const fallback = ["calc", "ingredients", "inventory", "suppliers", "purchase-orders", "upload", "reports", "menu"]
+      const fallback = ["calc", "ingredients", "inventory", "suppliers", "purchase-orders", "reports", "menu"]
         .find((p) => canAccessPage(p))
       setCurrentPage(fallback || "calc")
     }
@@ -425,7 +425,7 @@ export default function Home() {
           </div>
         )
       case "upload":
-        return <Upload />
+        return <ProductTree />
       case "recipes":
         return <Recipes />
       case "suppliers":

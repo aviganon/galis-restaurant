@@ -7,7 +7,6 @@ import {
   Calculator,
   X,
   Package,
-  Upload,
   Shield,
   Truck,
   Boxes,
@@ -68,7 +67,6 @@ const moreItems = (
   if (full && !isImpersonating) items.push({ id: "admin-panel", label: t("nav.adminPanel"), icon: Shield })
   if (full || userCanSee(perms, "canSeeIngredients")) items.push({ id: "ingredients", label: t("nav.ingredients"), icon: Boxes })
   if (full || userCanSee(perms, "canSeeSuppliers")) items.push({ id: "suppliers", label: t("nav.suppliers"), icon: Truck })
-  if (full || userCanSee(perms, "canSeeUpload")) items.push({ id: "upload", label: t("nav.upload"), icon: Upload })
   if (full || userCanSee(perms, "canSeeInventory")) items.push({ id: "inventory", label: t("nav.inventory"), icon: Package })
   if (full || userCanSee(perms, "canSeePurchaseOrders")) items.push({ id: "purchase-orders", label: t("nav.purchaseOrders"), icon: ShoppingCart })
   items.push({ id: "recipes", label: t("nav.recipes"), icon: BookOpen })

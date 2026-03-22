@@ -743,7 +743,7 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
             <span className={em("hidden sm:inline", "")}>{t("pages.refresh")}</span>
           </Button>
           {setCurrentPage && !embedded && (
-            <Button variant="outline" size="sm" className={em("h-8 px-2 text-xs", "")} onClick={() => navigateToPage("upload")}>
+            <Button variant="outline" size="sm" className={em("h-8 px-2 text-xs", "")} onClick={() => navigateToPage("calc")}>
               <Upload className={em("w-3.5 h-3.5 ml-1", "w-4 h-4 ml-1.5")} />
               <span className={em("hidden sm:inline", "")}>{t("pages.dashboard.uploadReport")}</span>
             </Button>

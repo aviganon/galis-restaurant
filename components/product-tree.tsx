@@ -8,7 +8,7 @@ import {
   ChevronUp, X, Edit2, MoreVertical, Filter, SortAsc, SortDesc,
   Package, Utensils, DollarSign, TrendingUp, TrendingDown, ImageIcon, AlertTriangle,
   CheckCircle2, Info, ChefHat, Scale, Percent, Sparkles, BarChart2, BarChart3, Loader2, LayoutDashboard,
-  Truck, Leaf,
+  Truck, Leaf, FileText, RefreshCw,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,7 +32,17 @@ import { useApp } from "@/contexts/app-context"
 import { FilePreviewModal } from "@/components/file-preview-modal"
 import { Dashboard } from "@/components/dashboard"
 import { Reports } from "@/components/reports"
-import { suggestDishFromIngredients, type ExtractedDishItem } from "@/lib/ai-extract"
+import {
+  suggestDishFromIngredients,
+  detectDocumentType,
+  type ExtractedDishItem,
+  type ExtractedSupplierItem,
+  type ExtractType,
+  type DetectedDocType,
+  type SalesReportPeriod,
+} from "@/lib/ai-extract"
+import { getClaudeApiKey } from "@/lib/claude"
+import { confirmSupplierInvoiceImport, confirmSalesReportImport } from "@/lib/restaurant-import-handlers"
 import { loadGlobalPriceSubdocsMap, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
 import { normalizeDishCategoryToHebrew } from "@/lib/dish-category-hebrew"
 import { toast } from "sonner"
@@ -118,7 +128,7 @@ export default function ProductTree() {
   const t = useTranslations()
   const { dir } = useLanguage()
   const isRtl = dir === "rtl"
-  const { currentRestaurantId, userRole, userPermissions, isSystemOwner, refreshIngredientsKey, refreshIngredients } = useApp()
+  const { currentRestaurantId, userRole, userPermissions, isSystemOwner, refreshIngredientsKey, refreshIngredients, restaurants } = useApp()
   const canSeeCosts = userRole === "owner" || userRole === "admin" || userRole === "manager" || !!userPermissions?.canSeeCosts
   const hasFullMenu = isSystemOwner || userRole === "owner" || userRole === "admin" || userRole === "manager"
   const canSeeDashboardContent = hasFullMenu || userPermissions?.canSeeDashboard !== false
@@ -144,6 +154,10 @@ export default function ProductTree() {
   const [ingredientStock, setIngredientStock] = useState<Record<string, number>>({})
   const [importFile, setImportFile] = useState<File | null>(null)
   const [fpmOpen, setFpmOpen] = useState(false)
+  /** סוג חילוץ ב-FilePreviewModal: p חשבונית, d מנות, s מכירות */
+  const [fpmExtractType, setFpmExtractType] = useState<ExtractType>("d")
+  const [importSourceKind, setImportSourceKind] = useState<"auto" | "invoice" | "sales" | "recipes" | "dishImage">("auto")
+  const [detectingImport, setDetectingImport] = useState(false)
   const importFileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const [isCostPanelExpanded, setIsCostPanelExpanded] = useState(true)
@@ -512,20 +526,111 @@ export default function ProductTree() {
     setNewDishCategory("עיקריות")
   }
 
-  const openImportFpm = useCallback((file: File) => {
-    setImportFile(file)
-    setIsImportModalOpen(false)
-    setFpmOpen(true)
+  const mapDetectedToFpm = useCallback((detected: DetectedDocType): ExtractType => {
+    if (detected === "menu") return "d"
+    if (detected === "sales") return "s"
+    if (detected === "invoice") return "p"
+    return "p"
   }, [])
+
+  const restaurantName = restaurants?.find((r) => r.id === currentRestaurantId)?.name ?? null
+
+  const processImportFile = useCallback(
+    async (file: File) => {
+      const ext = file.name.split(".").pop()?.toLowerCase()
+      const isImg = ["jpg", "jpeg", "png", "webp", "gif"].includes(ext ?? "")
+      const isAiCapable =
+        ["xlsx", "xls", "csv", "pdf", "png", "jpg", "jpeg", "gif", "webp", "rtf", "doc", "docx"].includes(ext ?? "") ||
+        file.type.startsWith("image/")
+
+      const needsRestaurant = (ex: ExtractType) =>
+        ex === "d" || ex === "s" || (ex === "p" && !isOwner)
+
+      const openFpm = (f: File, extractType: ExtractType) => {
+        if (needsRestaurant(extractType) && !currentRestaurantId) {
+          toast.error(t("pages.upload.selectRestaurant"))
+          return
+        }
+        setImportFile(f)
+        setFpmExtractType(extractType)
+        setIsImportModalOpen(false)
+        setFpmOpen(true)
+      }
+
+      if (importSourceKind === "dishImage") {
+        if (!isImg) {
+          toast.error("בחר קובץ תמונה (PNG, JPG, WebP)")
+          return
+        }
+        if (!currentRestaurantId) {
+          toast.error(t("pages.upload.selectRestaurant"))
+          return
+        }
+        openFpm(file, "d")
+        return
+      }
+
+      if (!isAiCapable) {
+        toast.error("פורמט לא נתמך לחילוץ AI — השתמש ב-Excel, PDF, CSV, RTF או תמונה")
+        return
+      }
+
+      if (importSourceKind === "invoice") {
+        openFpm(file, "p")
+        return
+      }
+      if (importSourceKind === "sales") {
+        openFpm(file, "s")
+        return
+      }
+      if (importSourceKind === "recipes") {
+        openFpm(file, "d")
+        return
+      }
+
+      // auto
+      const hasKey = await getClaudeApiKey()
+      if (!hasKey) {
+        toast.warning("מפתח API לא הוגדר — ממשיך כחשבונית. הגדר מפתח בהגדרות לזיהוי אוטומטי.")
+        openFpm(file, "p")
+        return
+      }
+      setDetectingImport(true)
+      try {
+        const DETECT_TIMEOUT = 45_000
+        const detected = await Promise.race([
+          detectDocumentType(file),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("זיהוי ארך יותר מדי")), DETECT_TIMEOUT)
+          ),
+        ])
+        const fpmType = mapDetectedToFpm(detected)
+        if (detected !== "unknown") {
+          toast.info(
+            `זוהה: ${detected === "menu" ? "תפריט מסעדה" : detected === "sales" ? "דוח מכירות" : "חשבונית ספק"}`
+          )
+        } else {
+          toast.info("לא זוהה — מטפל כחשבונית ספק")
+        }
+        openFpm(file, fpmType)
+      } catch {
+        toast.warning("לא זוהה — מטפל כחשבונית ספק")
+        openFpm(file, "p")
+      } finally {
+        setDetectingImport(false)
+      }
+    },
+    [currentRestaurantId, importSourceKind, isOwner, mapDetectedToFpm, t]
+  )
 
   const handleImportFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files
       if (!files?.length) return
-      openImportFpm(files[0])
+      void processImportFile(files[0])
       e.target.value = ""
     },
-    [openImportFpm]
+    [processImportFile]
   )
 
   const handleImportDrop = useCallback(
@@ -533,9 +638,48 @@ export default function ProductTree() {
       e.preventDefault()
       e.stopPropagation()
       const files = e.dataTransfer.files
-      if (files?.length) openImportFpm(files[0])
+      if (files?.length) void processImportFile(files[0])
     },
-    [openImportFpm]
+    [processImportFile]
+  )
+
+  const handleConfirmSupplierImport = useCallback(
+    async (items: ExtractedSupplierItem[], supName: string, saveToGlobal?: boolean) => {
+      await confirmSupplierInvoiceImport({
+        db,
+        items,
+        supName,
+        saveToGlobal,
+        isOwner,
+        currentRestaurantId,
+        refreshIngredients,
+      })
+      setImportFile(null)
+      setFpmOpen(false)
+    },
+    [currentRestaurantId, isOwner, refreshIngredients]
+  )
+
+  const handleConfirmSalesImport = useCallback(
+    async (
+      items: Array<{ name: string; qty: number; price: number }>,
+      meta?: {
+        salesReportPeriod?: SalesReportPeriod
+        salesReportDateFrom?: string
+        salesReportDateTo?: string
+      }
+    ) => {
+      await confirmSalesReportImport({
+        db,
+        currentRestaurantId,
+        items,
+        meta,
+        refreshIngredients,
+      })
+      setImportFile(null)
+      setFpmOpen(false)
+    },
+    [currentRestaurantId, refreshIngredients]
   )
 
   const handleAiSuggest = useCallback(async () => {
@@ -957,8 +1101,13 @@ export default function ProductTree() {
           if (!o) setImportFile(null)
         }}
         file={importFile}
-        type="d"
+        type={fpmExtractType}
+        restaurantName={restaurantName}
+        currentRestaurantId={currentRestaurantId}
+        canSaveToGlobal={isOwner && fpmExtractType === "p"}
+        onConfirmSupplier={handleConfirmSupplierImport}
         onConfirmDishes={handleConfirmDishes}
+        onConfirmSales={handleConfirmSalesImport}
       />
 
       {/* Camera input for dish recognition — must be at root level */}
@@ -972,7 +1121,13 @@ export default function ProductTree() {
         onChange={e=>{
           const f=e.currentTarget.files?.[0];
           if(!f)return
+          if (!currentRestaurantId) {
+            toast.error(t("pages.upload.selectRestaurant"))
+            e.currentTarget.value=""
+            return
+          }
           setImportFile(f);
+          setFpmExtractType("d");
           setFpmOpen(true);
           e.currentTarget.value="";
         }}
@@ -1122,52 +1277,100 @@ export default function ProductTree() {
                     <span className="hidden sm:inline">{t("pages.productTree.import")}</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                       <FileSpreadsheet className="w-5 h-5" />
-                      {t("pages.productTree.importDishes")}
+                      {t("nav.upload")}
                     </DialogTitle>
+                    <DialogDescription className="text-start text-sm">
+                      {t("pages.upload.dragDrop")} — {t("pages.productTree.aiExtractDesc")}
+                    </DialogDescription>
                   </DialogHeader>
-                  
-                  <div className="py-6">
+
+                  <div className="space-y-4 py-2">
+                    <p className="text-xs font-medium text-muted-foreground">בחר סוג קובץ</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {(
+                        [
+                          { id: "auto" as const, label: "זיהוי אוטומטי", icon: Sparkles },
+                          { id: "invoice" as const, label: t("pages.upload.invoiceLabel"), icon: FileText },
+                          { id: "sales" as const, label: t("pages.upload.salesLabel"), icon: BarChart2 },
+                          { id: "recipes" as const, label: t("pages.productTree.importDishes"), icon: Utensils },
+                          { id: "dishImage" as const, label: t("pages.upload.recipeLabel"), icon: Camera },
+                        ] as const
+                      ).map(({ id, label, icon: Icon }) => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => setImportSourceKind(id)}
+                          className={cn(
+                            "rounded-lg border p-2.5 text-start text-xs transition-colors hover:bg-muted/80",
+                            importSourceKind === id ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "border-border"
+                          )}
+                        >
+                          <Icon className="mb-1 h-4 w-4 text-primary" />
+                          <span className="font-medium leading-tight block">{label}</span>
+                        </button>
+                      ))}
+                    </div>
+
                     <input
                       ref={importFileInputRef}
                       type="file"
                       id="import-menu-file"
                       name="importMenuFile"
-                      accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,image/*"
+                      accept={
+                        importSourceKind === "dishImage"
+                          ? "image/*"
+                          : ".xlsx,.xls,.csv,.pdf,.rtf,.doc,.docx,image/*"
+                      }
                       className="hidden"
                       onChange={handleImportFileSelect}
                     />
 
                     <div
-                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
-                      onDragLeave={(e) => { e.preventDefault(); e.stopPropagation() }}
+                      onDragOver={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
+                      onDragLeave={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
                       onDrop={handleImportDrop}
-                      className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
-                      onClick={() => importFileInputRef.current?.click()}
+                      className={cn(
+                        "relative border-2 border-dashed border-border rounded-xl p-6 text-center hover:border-primary/50 transition-colors cursor-pointer",
+                        detectingImport && "pointer-events-none opacity-70"
+                      )}
+                      onClick={() => !detectingImport && importFileInputRef.current?.click()}
                     >
-                      <Package className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-                      <p className="font-medium mb-2">{t("pages.productTree.dragFile")}</p>
-                      <div className="flex justify-center gap-2 flex-wrap mb-4">
+                      {detectingImport && (
+                        <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-background/80 z-10">
+                          <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                      )}
+                      <Package className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
+                      <p className="font-medium mb-1 text-sm">{t("pages.productTree.dragFile")}</p>
+                      <div className="flex justify-center gap-1.5 flex-wrap mb-3">
                         <Badge variant="secondary">Excel</Badge>
-                        <Badge variant="secondary">Word</Badge>
-                        <Badge variant="secondary">{t("pages.productTree.image")}</Badge>
                         <Badge variant="secondary">PDF</Badge>
+                        <Badge variant="secondary">RTF</Badge>
+                        <Badge variant="secondary">{t("pages.productTree.image")}</Badge>
                       </div>
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={(e) => { e.stopPropagation(); importFileInputRef.current?.click() }}
+                        disabled={detectingImport}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          importFileInputRef.current?.click()
+                        }}
                       >
                         בחר קובץ
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground text-center mt-3">
-                      {t("pages.productTree.aiExtractDesc")}
-                    </p>
                   </div>
                 </DialogContent>
               </Dialog>
