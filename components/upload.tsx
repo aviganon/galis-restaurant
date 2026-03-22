@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react"
 import { motion } from "framer-motion"
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage"
-import { writeBatch, doc, getDocs, collection } from "firebase/firestore"
+import { writeBatch, doc, getDocs, collection, query, where, orderBy, limit, onSnapshot } from "firebase/firestore"
 import { confirmSupplierInvoiceImport, confirmSalesReportImport } from "@/lib/restaurant-import-handlers"
 import { auth, storage, db } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
@@ -32,7 +32,8 @@ import {
   Eye,
   Clock,
   File,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Mail,
 } from "lucide-react"
 
 const ACCEPT = ".xlsx,.xls,.csv,.pdf,.doc,.docx,image/*"
@@ -49,6 +50,8 @@ interface UploadedFile {
   recordsImported?: number
   errors?: string[]
   downloadUrl?: string
+  source?: "email" | "manual"
+  fromEmail?: string
 }
 
 function getFileType(file: File): UploadedFile["type"] {
@@ -350,6 +353,56 @@ export function Upload() {
     }
   }, [])
 
+  // האזנה לקבצים שהגיעו ממייל
+  useEffect(() => {
+    if (!currentRestaurantId) return
+    const q = query(
+      collection(db, "inboundJobs"),
+      where("restaurantId", "==", currentRestaurantId),
+      where("status", "==", "pending"),
+      orderBy("receivedAt", "desc"),
+      limit(10)
+    )
+    const unsub = onSnapshot(q, (snap) => {
+      snap.docChanges().forEach((change) => {
+        if (change.type === "added") {
+          const job = change.doc.data() as {
+            attachmentPaths?: string[]
+            receivedAt?: { toDate?: () => Date } | string | number
+            fromEmail?: string
+          }
+          const path0 = job.attachmentPaths?.[0]
+          const nameFromPath = typeof path0 === "string" ? path0.split("/").pop() : undefined
+          const receivedRaw = job.receivedAt
+          let uploadedAtStr: string
+          if (receivedRaw && typeof (receivedRaw as { toDate?: () => Date }).toDate === "function") {
+            uploadedAtStr = (receivedRaw as { toDate: () => Date }).toDate().toLocaleString("he-IL")
+          } else if (receivedRaw !== undefined && receivedRaw !== null) {
+            uploadedAtStr = new Date(receivedRaw as string | number).toLocaleString("he-IL")
+          } else {
+            uploadedAtStr = new Date().toLocaleString("he-IL")
+          }
+          const emailFile: UploadedFile = {
+            id: change.doc.id,
+            name: nameFromPath ?? "קובץ ממייל",
+            type: "invoice",
+            size: "",
+            status: "completed",
+            progress: 100,
+            uploadedAt: uploadedAtStr,
+            source: "email",
+            fromEmail: job.fromEmail,
+          }
+          setUploads((prev) => {
+            if (prev.find((u) => u.id === change.doc.id)) return prev
+            return [emailFile, ...prev]
+          })
+        }
+      })
+    })
+    return () => unsub()
+  }, [currentRestaurantId])
+
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -618,7 +671,14 @@ export function Upload() {
                           {statusConfig.label}
                         </Badge>
                       </div>
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+                      <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1 flex-wrap">
+                        {file.source === "email" && (
+                          <Badge variant="secondary" className="text-xs gap-1 me-1">
+                            <Mail className="w-3 h-3" />
+                            ממייל
+                            {file.fromEmail && <span className="opacity-70">{file.fromEmail}</span>}
+                          </Badge>
+                        )}
                         <span>{file.size}</span>
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />

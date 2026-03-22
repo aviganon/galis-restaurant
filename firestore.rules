@@ -104,11 +104,20 @@ service cloud.firestore {
         || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && request.resource.data.restaurantId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId)
       );
     }
-  
-  // inbound email lookup — owner only
-  match /inboundEmailLookup/{token} {
-    allow read, write: if request.auth != null
-      && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "owner";
+
+    // inboundJobs — תור קבצים שהגיעו ממייל (כתיבה בדרך כלל מ-Cloud Function)
+    match /inboundJobs/{jobId} {
+      allow read: if request.auth != null && (
+        isConfigAdmin()
+        || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && resource.data.restaurantId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId)
+      );
+      allow write: if false;
+    }
+
+    // inbound email lookup — owner only
+    match /inboundEmailLookup/{token} {
+      allow read, write: if request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "owner";
+    }
   }
-}
 }

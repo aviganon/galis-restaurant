@@ -1,6 +1,15 @@
 {
   "indexes": [
     {
+      "collectionGroup": "inboundJobs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "restaurantId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "receivedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "ownerNotifications",
       "queryScope": "COLLECTION",
       "fields": [

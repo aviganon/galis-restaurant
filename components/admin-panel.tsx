@@ -78,6 +78,7 @@ import { firestoreConfig } from "@/lib/firestore-config"
 import { db, auth, storage } from "@/lib/firebase"
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage"
 import type { UserPermissions } from "@/contexts/app-context"
+import { InboundEmailSettings } from "@/components/inbound-email-settings"
 
 const VAT_RATE = 1.17
 
@@ -2165,6 +2166,13 @@ export function AdminPanel() {
         </div>
       )}
 
+      {/* תיבת ייבוא גלובלית לבעלים — נטען לפי מסעדה נבחרת בהקשר; אם אין — מוסתר */}
+      {isSystemOwner && (
+        <div className="mb-4">
+          <InboundEmailSettings />
+        </div>
+      )}
+
       {isSystemOwner && (
         <Tabs
           value={systemOwnerTab}
@@ -2378,40 +2386,85 @@ export function AdminPanel() {
                   {restsWithDetails.map((rest, _ri) => {
                     const colors = ["linear-gradient(135deg,#0F6E56,#1D9E75)","linear-gradient(135deg,#185FA5,#378ADD)","linear-gradient(135deg,#533AAB,#7F77DD)","linear-gradient(135deg,#854F0B,#BA7517)","linear-gradient(135deg,#993C1D,#D85A30)"]
                     return (
-                      <div key={rest.id}
+                      <div
+                        key={rest.id}
                         className={cn(
-                          "relative rounded-xl overflow-hidden cursor-pointer border-2 transition-all duration-200 shadow-sm hover:shadow-lg hover:-translate-y-0.5",
-                          "w-[calc((100%-1rem)/2)] sm:w-[calc((100%-2rem)/3)] lg:w-[calc((100%-3rem)/4)] max-w-full min-w-0 shrink-0",
-                          selectedRestDetail===rest.id?"border-primary shadow-lg -translate-y-0.5":"border-transparent")}
-                        style={{height:140}}
-                        onClick={()=>{
-    const newId=selectedRestDetail===rest.id?null:rest.id;
-    setSelectedRestDetail(newId);
-    setActiveRestChip(null);
-    setEditRestImageFile(null);
-    setEditRestImageUrl(newId?rest.imageUrl||null:null);
-  }}>
-                        <img src={(rest as any).imageUrl||getRestaurantImageUrl(rest.name)} alt={rest.name}
-                          className="absolute inset-0 w-full h-full object-cover"
-                          onError={e=>{(e.target as HTMLImageElement).style.display="none";(e.target as HTMLImageElement).parentElement!.style.background=colors[_ri%5]}}/>
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-black/10"/>
-                        <div className="absolute top-2 start-2 z-10"><button onClick={e=>{e.stopPropagation();openRestEditDialog(rest)}} className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center transition-colors" title="ערוך פרטים"><Edit2 className="w-3.5 h-3.5 text-white"/></button></div>
-                        <div className="absolute inset-0 flex flex-col justify-end p-3">
-                          <p className="font-bold text-white text-sm leading-tight drop-shadow truncate text-start">
-                            {rest.emoji&&<span className="me-1">{rest.emoji}</span>}{rest.name}
-                          </p>
-                          <div className="flex gap-1 mt-1.5 flex-wrap">
-                            {([
-                              {icon:Utensils,val:rest.dishesCount,grad:"from-amber-400 to-orange-500"},
-                              {icon:TrendingUp,val:rest.fcAvg>0?`${rest.fcAvg}%`:"—",grad:rest.fcAvg<=0?"from-slate-400 to-slate-500":rest.fcAvg<=28?"from-emerald-400 to-teal-500":rest.fcAvg<=33?"from-blue-400 to-indigo-500":"from-rose-400 to-red-500"},
-                              {icon:Truck,val:(rest.assignedSuppliers||[]).length,grad:"from-violet-400 to-purple-500"},
-                              {icon:ShoppingCart,val:rest.poCount??0,grad:"from-slate-400 to-slate-500"},
-                            ] as const).map((chip,ci)=>(
-                              <div key={ci} className={`inline-flex items-center gap-0.5 bg-gradient-to-br ${chip.grad} px-1.5 py-0.5 rounded text-white text-[11px] font-bold`}>
-                                <chip.icon className="w-2.5 h-2.5 opacity-80"/>{chip.val}
-                              </div>
-                            ))}
+                          "flex flex-col rounded-xl border-2 transition-all duration-200 shadow-sm hover:shadow-lg hover:-translate-y-0.5 bg-background",
+                          "w-[calc((100%-1rem)/2)] sm:w-[calc((100%-2rem)/3)] lg:w-[calc((100%-3rem)/4)] max-w-full min-w-0 shrink-0 overflow-hidden",
+                          selectedRestDetail === rest.id ? "border-primary shadow-lg -translate-y-0.5" : "border-transparent"
+                        )}
+                      >
+                        <div
+                          className="relative h-[140px] cursor-pointer overflow-hidden shrink-0"
+                          onClick={() => {
+                            const newId = selectedRestDetail === rest.id ? null : rest.id
+                            setSelectedRestDetail(newId)
+                            setActiveRestChip(null)
+                            setEditRestImageFile(null)
+                            setEditRestImageUrl(newId ? rest.imageUrl || null : null)
+                          }}
+                        >
+                          <img
+                            src={(rest as any).imageUrl || getRestaurantImageUrl(rest.name)}
+                            alt={rest.name}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            onError={(e) => {
+                              ;(e.target as HTMLImageElement).style.display = "none"
+                              ;(e.target as HTMLImageElement).parentElement!.style.background = colors[_ri % 5]
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-black/10" />
+                          <div className="absolute top-2 start-2 z-10">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openRestEditDialog(rest)
+                              }}
+                              className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center transition-colors"
+                              title="ערוך פרטים"
+                            >
+                              <Edit2 className="w-3.5 h-3.5 text-white" />
+                            </button>
                           </div>
+                          <div className="absolute inset-0 flex flex-col justify-end p-3">
+                            <p className="font-bold text-white text-sm leading-tight drop-shadow truncate text-start">
+                              {rest.emoji && <span className="me-1">{rest.emoji}</span>}
+                              {rest.name}
+                            </p>
+                            <div className="flex gap-1 mt-1.5 flex-wrap">
+                              {(
+                                [
+                                  { icon: Utensils, val: rest.dishesCount, grad: "from-amber-400 to-orange-500" },
+                                  {
+                                    icon: TrendingUp,
+                                    val: rest.fcAvg > 0 ? `${rest.fcAvg}%` : "—",
+                                    grad:
+                                      rest.fcAvg <= 0
+                                        ? "from-slate-400 to-slate-500"
+                                        : rest.fcAvg <= 28
+                                          ? "from-emerald-400 to-teal-500"
+                                          : rest.fcAvg <= 33
+                                            ? "from-blue-400 to-indigo-500"
+                                            : "from-rose-400 to-red-500",
+                                  },
+                                  { icon: Truck, val: (rest.assignedSuppliers || []).length, grad: "from-violet-400 to-purple-500" },
+                                  { icon: ShoppingCart, val: rest.poCount ?? 0, grad: "from-slate-400 to-slate-500" },
+                                ] as const
+                              ).map((chip, ci) => (
+                                <div
+                                  key={ci}
+                                  className={`inline-flex items-center gap-0.5 bg-gradient-to-br ${chip.grad} px-1.5 py-0.5 rounded text-white text-[11px] font-bold`}
+                                >
+                                  <chip.icon className="w-2.5 h-2.5 opacity-80" />
+                                  {chip.val}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        {/* ייבוא ממייל למסעדה */}
+                        <div className="mt-3 px-2 pb-2" onClick={(e) => e.stopPropagation()}>
+                          <InboundEmailSettings externalRestaurantId={rest.id} compact />
                         </div>
                       </div>
                     )
