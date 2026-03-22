@@ -1,14 +1,17 @@
 /**
  * functions/src/inbound-webhook.ts
  * Cloud Function (HTTPS) – receives inbound email webhook from Mailgun/SendGrid.
- *
- * Mailgun POST fields: recipient, sender, subject, attachment-1, attachment-2...
- * SendGrid POST fields: to, from, subject, attachment1, attachment2...
  */
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const Busboy = require("busboy") as (config: { headers: Record<string, string> }) => {
+  on(event: "field", handler: (name: string, val: string) => void): void
+  on(event: "file",  handler: (name: string, stream: NodeJS.ReadableStream, info: { filename: string; mimeType: string }) => void): void
+  on(event: "finish" | "error", handler: (...args: unknown[]) => void): void
+}
 
 import * as functions from "firebase-functions"
 import * as admin from "firebase-admin"
-import * as Busboy from "busboy"
 import { IncomingMessage } from "http"
 
 if (!admin.apps.length) admin.initializeApp()
@@ -30,9 +33,7 @@ async function lookupRestaurantId(token: string): Promise<string | null> {
 }
 
 async function isSenderAllowed(restaurantId: string, fromEmail: string): Promise<boolean> {
-  const snap = await db
-    .doc(`restaurants/${restaurantId}/appState/inboundSettings`)
-    .get()
+  const snap = await db.doc(`restaurants/${restaurantId}/appState/inboundSettings`).get()
   if (!snap.exists) return true
   const data = snap.data() as { inboundAllowedSenderEmails?: string[] }
   const list = data.inboundAllowedSenderEmails ?? []
@@ -45,19 +46,17 @@ export const inboundWebhook = functions
   .https.onRequest(async (req, res) => {
     const secret = req.query.secret ?? req.headers["x-webhook-secret"]
     if (WEBHOOK_SECRET && secret !== WEBHOOK_SECRET) {
-      functions.logger.warn("inboundWebhook: unauthorized")
       res.status(401).send("Unauthorized")
       return
     }
-
     if (req.method !== "POST") { res.status(405).send("Method Not Allowed"); return }
 
     try {
       const { fields, files } = await parseMultipart(req as unknown as IncomingMessage)
 
-      const recipient = (fields.recipient ?? fields.To ?? fields.to ?? "").toLowerCase()
-      const fromEmail = (fields.sender ?? fields.from ?? "").toLowerCase()
-      const subject = fields.subject ?? fields.Subject ?? "(no subject)"
+      const recipient = (fields["recipient"] ?? fields["To"] ?? fields["to"] ?? "").toLowerCase()
+      const fromEmail = (fields["sender"] ?? fields["from"] ?? "").toLowerCase()
+      const subject   = fields["subject"] ?? fields["Subject"] ?? "(no subject)"
 
       const token = extractToken(recipient)
       if (!token) { res.status(200).send("ok"); return }
@@ -65,8 +64,7 @@ export const inboundWebhook = functions
       const restaurantId = await lookupRestaurantId(token)
       if (!restaurantId) { res.status(200).send("ok"); return }
 
-      const allowed = await isSenderAllowed(restaurantId, fromEmail)
-      if (!allowed) { res.status(200).send("ok"); return }
+      if (!(await isSenderAllowed(restaurantId, fromEmail))) { res.status(200).send("ok"); return }
 
       const timestamp = Date.now()
       const attachmentPaths: string[] = []
@@ -101,20 +99,20 @@ interface ParsedForm {
 
 function parseMultipart(req: IncomingMessage): Promise<ParsedForm> {
   return new Promise((resolve, reject) => {
-    const busboy = Busboy({ headers: req.headers as Record<string, string> })
+    const bb = Busboy({ headers: req.headers as Record<string, string> })
     const fields: Record<string, string> = {}
     const files: Record<string, { filename: string; mimetype: string; buffer: Buffer }> = {}
 
-    busboy.on("field", (name, val) => { fields[name] = val })
-    busboy.on("file", (name, stream, info) => {
+    bb.on("field", (name: string, val: string) => { fields[name] = val })
+    bb.on("file",  (name: string, stream: NodeJS.ReadableStream, info: { filename: string; mimeType: string }) => {
       const chunks: Buffer[] = []
       stream.on("data", (chunk: Buffer) => chunks.push(chunk))
-      stream.on("end", () => {
+      stream.on("end",  () => {
         files[name] = { filename: info.filename, mimetype: info.mimeType, buffer: Buffer.concat(chunks) }
       })
     })
-    busboy.on("finish", () => resolve({ fields, files }))
-    busboy.on("error", reject)
-    ;(req as NodeJS.ReadableStream).pipe(busboy)
+    bb.on("finish", () => resolve({ fields, files }))
+    bb.on("error",  reject)
+    ;(req as NodeJS.ReadableStream).pipe(bb as unknown as NodeJS.WritableStream)
   })
 }
