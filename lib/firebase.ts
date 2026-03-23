@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app"
+import { getApps, initializeApp } from "firebase/app"
 import { getAuth } from "firebase/auth"
 import {
   getFirestore,
@@ -8,7 +8,8 @@ import {
 } from "firebase/firestore"
 import { getStorage } from "firebase/storage"
 
-const firebaseConfig = {
+/** ייצוא לשימוש ב־App משני (יצירת משתמש בלי להחליף את ההתחברות הנוכחית) */
+export const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "placeholder",
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "placeholder.firebaseapp.com",
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "placeholder",
@@ -25,6 +26,16 @@ if (!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID && typeof window !== "undefined
 
 const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
+
+const SECONDARY_AUTH_APP_NAME = "user-creation-secondary"
+
+/** Auth נפרד ליצירת משתמשים — לא מחליף את המשתמש המחובר באפליקציה הראשית */
+export function getAuthForUserCreation() {
+  const secondaryApp =
+    getApps().find((a) => a.name === SECONDARY_AUTH_APP_NAME) ??
+    initializeApp(firebaseConfig, SECONDARY_AUTH_APP_NAME)
+  return getAuth(secondaryApp)
+}
 
 /**
  * מטמון Firestore מקומי (IndexedDB) בדפדפן — מזרז חזרה לנתונים אחרי מעבר דף / יציאה מהתחזה,

@@ -13,6 +13,9 @@ dist
 # Firebase local cache (לא לדחוף שינויים מטמון)
 .firebase/
 
+# Firebase Functions — פלט קומפילציה (נבנה ב־deploy)
+functions/lib/
+
 # Environment
 .env
 .env.local

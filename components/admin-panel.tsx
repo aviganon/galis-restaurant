@@ -68,6 +68,7 @@ import {
   getDocsFromServer,
   deleteDoc,
   writeBatch,
+  limit,
   type DocumentData,
   type QueryDocumentSnapshot,
 } from "firebase/firestore"
@@ -78,7 +79,6 @@ import { firestoreConfig } from "@/lib/firestore-config"
 import { db, auth, storage } from "@/lib/firebase"
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage"
 import type { UserPermissions } from "@/contexts/app-context"
-import { InboundEmailSettings } from "@/components/inbound-email-settings"
 
 const VAT_RATE = 1.17
 
@@ -95,6 +95,8 @@ type RestWithDetails = {
   phone?: string | null
   email?: string | null
   address?: string | null
+  /** קוד הזמנה שמור להרשמה עצמית (מסעדה זו) */
+  linkedInviteCode?: string | null
 }
 
 type SupplierWithRests = {
@@ -464,6 +466,10 @@ export function AdminPanel() {
   const [restPanelSupplier, setRestPanelSupplier] = useState<string|null>(null)
   const [restPanelIngFilter, setRestPanelIngFilter] = useState("")
   const [activeRestChip, setActiveRestChip] = useState<"dishes"|"fc"|"suppliers"|"orders"|null>(null)
+  /** קוד הזמנה לפאנל מסעדה נבחרת (מ־linkedInviteCode או משאילתה) */
+  const [panelInviteCode, setPanelInviteCode] = useState<string | null>(null)
+  const [loadingPanelInviteCode, setLoadingPanelInviteCode] = useState(false)
+  const [creatingInviteCodeForRest, setCreatingInviteCodeForRest] = useState(false)
   const [restChipLoading, setRestChipLoading] = useState(false)
   const [restChipDishes, setRestChipDishes] = useState<{name:string;price:number;fc:number}[]>([])
   const [restChipOrders, setRestChipOrders] = useState<{id:string;supplier:string;date:string;total:number;status:string}[]>([])
@@ -808,6 +814,7 @@ export function AdminPanel() {
             assignedSuppliers: assignedList, poCount: poCountByRest.get(r.id) ?? 0,
             imageUrl: (data.imageUrl as string) || null,
             phone: (data.phone as string) || null, email: (data.email as string) || null, address: (data.address as string) || null,
+            linkedInviteCode: (data.linkedInviteCode as string) || null,
           }
         })
       )
@@ -1794,7 +1801,10 @@ export function AdminPanel() {
       toast.error(t("pages.adminPanel.enterRestaurantName"))
       return
     }
-    const codeRaw = newRestInviteCode.trim().toUpperCase().replace(/\s/g, "")
+    const fromField = newRestInviteCode.trim().toUpperCase().replace(/\s/g, "")
+    const fromSession = (lastGeneratedCode || "").trim().toUpperCase().replace(/\s/g, "")
+    /** קוד מהשדה או מהפעלה אחרונה של «צור קוד» — כדי שלא יאבד קישור אם השדה נמחק בטעות */
+    const codeRaw = fromField || fromSession
     if (codeRaw) {
       const { inviteCodesCollection, inviteCodeFields } = firestoreConfig
       const codeSnap = await getDoc(doc(db, inviteCodesCollection, codeRaw))
@@ -1820,6 +1830,7 @@ export function AdminPanel() {
         emoji: newRestEmoji.trim() || null,
         branch: "סניף ראשי",
         target: 30,
+        ...(codeRaw ? { linkedInviteCode: codeRaw } : {}),
       })
       if (codeRaw) {
         const { inviteCodesCollection, inviteCodeFields } = firestoreConfig
@@ -1841,6 +1852,7 @@ export function AdminPanel() {
       setNewRestName("")
       setNewRestEmoji("")
       setNewRestInviteCode("")
+      setLastGeneratedCode(null)
       setNewRestOpen(false)
       loadSystemOwnerData()
       refreshRestaurants?.()
@@ -1858,6 +1870,83 @@ export function AdminPanel() {
     s += "-"
     for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)]
     return s
+  }
+
+  useEffect(() => {
+    if (!selectedRestDetail) {
+      setPanelInviteCode(null)
+      setLoadingPanelInviteCode(false)
+      return
+    }
+    const rest = restsWithDetails.find((r) => r.id === selectedRestDetail)
+    if (!rest) {
+      setPanelInviteCode(null)
+      return
+    }
+    if (rest.linkedInviteCode) {
+      setPanelInviteCode(rest.linkedInviteCode)
+      setLoadingPanelInviteCode(false)
+      return
+    }
+    setLoadingPanelInviteCode(true)
+    setPanelInviteCode(null)
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { inviteCodesCollection, inviteCodeFields } = firestoreConfig
+        const q = query(
+          collection(db, inviteCodesCollection),
+          where(inviteCodeFields.restaurantId, "==", rest.id),
+          limit(25)
+        )
+        const snap = await getDocs(q)
+        if (cancelled) return
+        const unused = snap.docs.find((d) => !d.data()[inviteCodeFields.used])
+        setPanelInviteCode(unused?.id ?? null)
+      } catch {
+        if (!cancelled) setPanelInviteCode(null)
+      } finally {
+        if (!cancelled) setLoadingPanelInviteCode(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedRestDetail, restsWithDetails])
+
+  const handleCreateInviteCodeForSelectedRest = async () => {
+    if (!selectedRestDetail) return
+    setCreatingInviteCodeForRest(true)
+    try {
+      const { inviteCodesCollection, inviteCodeFields } = firestoreConfig
+      let code = generateInviteCode()
+      let exists = true
+      while (exists) {
+        const snap = await getDoc(doc(db, inviteCodesCollection, code))
+        exists = snap.exists()
+        if (exists) code = generateInviteCode()
+      }
+      await setDoc(doc(db, inviteCodesCollection, code), {
+        [inviteCodeFields.type]: "manager",
+        [inviteCodeFields.used]: false,
+        [inviteCodeFields.createdAt]: new Date().toISOString(),
+        [inviteCodeFields.restaurantId]: selectedRestDetail,
+      })
+      await setDoc(
+        doc(db, "restaurants", selectedRestDetail),
+        { linkedInviteCode: code },
+        { merge: true }
+      )
+      setPanelInviteCode(code)
+      setRestsWithDetails((prev) =>
+        prev.map((r) => (r.id === selectedRestDetail ? { ...r, linkedInviteCode: code } : r))
+      )
+      toast.success(t("pages.adminPanel.inviteCodeCreatedForRest"))
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setCreatingInviteCodeForRest(false)
+    }
   }
 
   const handleCreateManagerCode = async () => {
@@ -2166,13 +2255,6 @@ export function AdminPanel() {
         </div>
       )}
 
-      {/* תיבת ייבוא גלובלית לבעלים — נטען לפי מסעדה נבחרת בהקשר; אם אין — מוסתר */}
-      {isSystemOwner && (
-        <div className="mb-4">
-          <InboundEmailSettings />
-        </div>
-      )}
-
       {isSystemOwner && (
         <Tabs
           value={systemOwnerTab}
@@ -2389,82 +2471,75 @@ export function AdminPanel() {
                       <div
                         key={rest.id}
                         className={cn(
-                          "flex flex-col rounded-xl border-2 transition-all duration-200 shadow-sm hover:shadow-lg hover:-translate-y-0.5 bg-background",
-                          "w-[calc((100%-1rem)/2)] sm:w-[calc((100%-2rem)/3)] lg:w-[calc((100%-3rem)/4)] max-w-full min-w-0 shrink-0 overflow-hidden",
+                          "relative rounded-xl overflow-hidden cursor-pointer border-2 transition-all duration-200 shadow-sm hover:shadow-lg hover:-translate-y-0.5",
+                          "w-[calc((100%-1rem)/2)] sm:w-[calc((100%-2rem)/3)] lg:w-[calc((100%-3rem)/4)] max-w-full min-w-0 shrink-0",
                           selectedRestDetail === rest.id ? "border-primary shadow-lg -translate-y-0.5" : "border-transparent"
                         )}
+                        style={{ height: 140 }}
+                        onClick={() => {
+                          const newId = selectedRestDetail === rest.id ? null : rest.id
+                          setSelectedRestDetail(newId)
+                          setActiveRestChip(null)
+                          setEditRestImageFile(null)
+                          setEditRestImageUrl(newId ? rest.imageUrl || null : null)
+                        }}
                       >
-                        <div
-                          className="relative h-[140px] cursor-pointer overflow-hidden shrink-0"
-                          onClick={() => {
-                            const newId = selectedRestDetail === rest.id ? null : rest.id
-                            setSelectedRestDetail(newId)
-                            setActiveRestChip(null)
-                            setEditRestImageFile(null)
-                            setEditRestImageUrl(newId ? rest.imageUrl || null : null)
+                        <img
+                          src={(rest as any).imageUrl || getRestaurantImageUrl(rest.name)}
+                          alt={rest.name}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          onError={(e) => {
+                            ;(e.target as HTMLImageElement).style.display = "none"
+                            ;(e.target as HTMLImageElement).parentElement!.style.background = colors[_ri % 5]
                           }}
-                        >
-                          <img
-                            src={(rest as any).imageUrl || getRestaurantImageUrl(rest.name)}
-                            alt={rest.name}
-                            className="absolute inset-0 w-full h-full object-cover"
-                            onError={(e) => {
-                              ;(e.target as HTMLImageElement).style.display = "none"
-                              ;(e.target as HTMLImageElement).parentElement!.style.background = colors[_ri % 5]
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-black/10" />
+                        <div className="absolute top-2 start-2 z-10">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openRestEditDialog(rest)
                             }}
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-black/10" />
-                          <div className="absolute top-2 start-2 z-10">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                openRestEditDialog(rest)
-                              }}
-                              className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center transition-colors"
-                              title="ערוך פרטים"
-                            >
-                              <Edit2 className="w-3.5 h-3.5 text-white" />
-                            </button>
-                          </div>
-                          <div className="absolute inset-0 flex flex-col justify-end p-3">
-                            <p className="font-bold text-white text-sm leading-tight drop-shadow truncate text-start">
-                              {rest.emoji && <span className="me-1">{rest.emoji}</span>}
-                              {rest.name}
-                            </p>
-                            <div className="flex gap-1 mt-1.5 flex-wrap">
-                              {(
-                                [
-                                  { icon: Utensils, val: rest.dishesCount, grad: "from-amber-400 to-orange-500" },
-                                  {
-                                    icon: TrendingUp,
-                                    val: rest.fcAvg > 0 ? `${rest.fcAvg}%` : "—",
-                                    grad:
-                                      rest.fcAvg <= 0
-                                        ? "from-slate-400 to-slate-500"
-                                        : rest.fcAvg <= 28
-                                          ? "from-emerald-400 to-teal-500"
-                                          : rest.fcAvg <= 33
-                                            ? "from-blue-400 to-indigo-500"
-                                            : "from-rose-400 to-red-500",
-                                  },
-                                  { icon: Truck, val: (rest.assignedSuppliers || []).length, grad: "from-violet-400 to-purple-500" },
-                                  { icon: ShoppingCart, val: rest.poCount ?? 0, grad: "from-slate-400 to-slate-500" },
-                                ] as const
-                              ).map((chip, ci) => (
-                                <div
-                                  key={ci}
-                                  className={`inline-flex items-center gap-0.5 bg-gradient-to-br ${chip.grad} px-1.5 py-0.5 rounded text-white text-[11px] font-bold`}
-                                >
-                                  <chip.icon className="w-2.5 h-2.5 opacity-80" />
-                                  {chip.val}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
+                            className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center transition-colors"
+                            title="ערוך פרטים"
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-white" />
+                          </button>
                         </div>
-                        {/* ייבוא ממייל למסעדה */}
-                        <div className="mt-3 px-2 pb-2" onClick={(e) => e.stopPropagation()}>
-                          <InboundEmailSettings externalRestaurantId={rest.id} compact />
+                        <div className="absolute inset-0 flex flex-col justify-end p-3">
+                          <p className="font-bold text-white text-sm leading-tight drop-shadow truncate text-start">
+                            {rest.emoji && <span className="me-1">{rest.emoji}</span>}
+                            {rest.name}
+                          </p>
+                          <div className="flex gap-1 mt-1.5 flex-wrap">
+                            {(
+                              [
+                                { icon: Utensils, val: rest.dishesCount, grad: "from-amber-400 to-orange-500" },
+                                {
+                                  icon: TrendingUp,
+                                  val: rest.fcAvg > 0 ? `${rest.fcAvg}%` : "—",
+                                  grad:
+                                    rest.fcAvg <= 0
+                                      ? "from-slate-400 to-slate-500"
+                                      : rest.fcAvg <= 28
+                                        ? "from-emerald-400 to-teal-500"
+                                        : rest.fcAvg <= 33
+                                          ? "from-blue-400 to-indigo-500"
+                                          : "from-rose-400 to-red-500",
+                                },
+                                { icon: Truck, val: (rest.assignedSuppliers || []).length, grad: "from-violet-400 to-purple-500" },
+                                { icon: ShoppingCart, val: rest.poCount ?? 0, grad: "from-slate-400 to-slate-500" },
+                              ] as const
+                            ).map((chip, ci) => (
+                              <div
+                                key={ci}
+                                className={`inline-flex items-center gap-0.5 bg-gradient-to-br ${chip.grad} px-1.5 py-0.5 rounded text-white text-[11px] font-bold`}
+                              >
+                                <chip.icon className="w-2.5 h-2.5 opacity-80" />
+                                {chip.val}
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     )
@@ -2515,10 +2590,49 @@ export function AdminPanel() {
                               }catch(e){toast.error("שגיאה בהעלאה")}finally{setUploadingRestImage(false);e.currentTarget.value="";}
                             }}/>
                         </div>
-                        <div className="flex gap-2 flex-wrap shrink-0 ms-auto">
+                        <div className="flex gap-2 flex-wrap shrink-0 ms-auto items-center">
                           {onImpersonate&&(
                             <Button size="sm" variant="outline" onClick={()=>{onImpersonate({id:selectedRest.id,name:selectedRest.name,emoji:selectedRest.emoji});toast.success(t("pages.adminPanel.impersonatingRest")+": "+selectedRest.name)}}>
                               <UserCircle className="w-4 h-4 me-1"/>{t("pages.adminPanel.impersonate")}
+                            </Button>
+                          )}
+                          {loadingPanelInviteCode ? (
+                            <Button size="sm" variant="secondary" disabled className="font-mono text-xs">
+                              <Loader2 className="w-4 h-4 me-1 animate-spin" />
+                              {t("pages.adminPanel.inviteCodeLoading")}
+                            </Button>
+                          ) : panelInviteCode ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="font-mono text-xs max-w-[min(100%,14rem)] truncate"
+                              title={panelInviteCode}
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(panelInviteCode)
+                                  toast.success(t("pages.adminPanel.inviteCodeCopied"))
+                                } catch {
+                                  toast.error("Clipboard")
+                                }
+                              }}
+                            >
+                              <Copy className="w-4 h-4 me-1 shrink-0" />
+                              <span className="truncate">{panelInviteCode}</span>
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void handleCreateInviteCodeForSelectedRest()}
+                              disabled={creatingInviteCodeForRest}
+                              title={t("pages.adminPanel.noInviteCodeHint")}
+                            >
+                              {creatingInviteCodeForRest ? (
+                                <Loader2 className="w-4 h-4 me-1 animate-spin" />
+                              ) : (
+                                <Ticket className="w-4 h-4 me-1" />
+                              )}
+                              {t("pages.adminPanel.createInviteCodeForRest")}
                             </Button>
                           )}
                           <Button size="sm" variant="destructive" onClick={()=>{setRestToDelete(selectedRest);setDeleteRestDialogOpen(true)}}>

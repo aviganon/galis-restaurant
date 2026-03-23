@@ -21,6 +21,7 @@ const storage = admin.storage()
 
 const WEBHOOK_SECRET = process.env.INBOUND_WEBHOOK_SECRET ?? ""
 
+/** מזהה אחרי inbound+ — טוקן אקראי או slug לפי שם מסעדה (אותו lookup ב־inboundEmailLookup) */
 function extractToken(recipient: string): string | null {
   const match = recipient.match(/inbound\+([^@]+)@/)
   return match ? match[1] : null
