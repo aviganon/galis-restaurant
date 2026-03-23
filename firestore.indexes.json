@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "inboundChangeRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "inboundJobs",
       "queryScope": "COLLECTION",
       "fields": [
