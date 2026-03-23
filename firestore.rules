@@ -32,16 +32,18 @@ service cloud.firestore {
     }
 
     // users — משתמשים לפי uid
-    // list: בעלים או מנהל רואה משתמשים באותה מסעדה
+    // list: בעל מערכת / אדמין — כל המשתמשים; אחרת — רק באותה מסעדה (restaurantId)
     // update: מנהל יכול לעדכן הרשאות של משתמשים באותה מסעדה
     match /users/{userId} {
       allow get: if request.auth != null && (
         request.auth.uid == userId
         || isConfigAdmin()
+        || isSystemOwnerUser()
         || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && resource.data.restaurantId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId)
       );
       allow list: if request.auth != null && (
         isConfigAdmin()
+        || isSystemOwnerUser()
         || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && resource.data.restaurantId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId)
       );
       // create: רישום עצמי (uid = מזהה המסמך), או בעל מערכת — יצירת משתמש משני (Auth) + setDoc עם הטוקן של המחובר הראשי
