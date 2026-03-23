@@ -59,10 +59,34 @@
 
 ---
 
-## 5. מה לא השתנה
+## 5. מה לא השתנה (קוד האפליקציה)
 
 - **`contexts/app-context.tsx`** — רק הגדרת טיפוסים ו־Provider; אין טעינת נתונים שם.
-- **`firestore.rules`** — לא שונו בהקשר התיקונים האלה; `list` על `restaurants` מותר למשתמש מחובר.
+
+### 5.1 תיקון נפרד: `firestore.rules` — רק **מסמכי `users`**, לא `restaurants`
+
+**מה השתנה בכללים (קומיט `6e86aaf`):**
+
+- ב־`match /users/{userId}` נוסף ל־**`allow list`** ול־**`allow get`** התנאי **`isSystemOwnerUser()`**.
+- **מטרה:** משתמש עם `users/{uid}.isSystemOwner == true` **בלי** `restaurantId` (או עם `restaurantId` שלא תואם לאף משתמש אחר) — קודם לכן **`getDocs(collection(db, "users"))`** נכשל בשקט / החזיר ריק, כי החוק היה: רק `isConfigAdmin()` או משתמשים עם **אותו** `restaurantId` כמו המשתמש המחובר.
+- **לא שינינו** את החוקים של **`restaurants`** — שם כבר היה (ועדיין):  
+  `allow list, create, update, delete: if request.auth != null;`  
+  כלומר **רשימת מסעדות מ־Firestore לא תלויה בשיוך למסעדה**.
+
+---
+
+## 5.2 למה בפאנל ניהול רואים מסעדות ובהגדרות לפעמים לא?
+
+**זה לא אותו מקור נתונים באותה צורה:**
+
+| מקום | מאיפה הרשימה |
+|------|----------------|
+| **הגדרות** (`SystemOwnerDirectory`) | רק מ־**`restaurants` ב־React context** — נטען ב־**`app/page.tsx`** (מאזין `onSnapshot` על `restaurants` כש־`effectiveSystemOwner`). |
+| **פאנל ניהול** (`admin-panel.tsx`) | בנוסף ל־context, יש **`loadSystemOwnerData`** וכו' שקוראים ישירות **`getDocs(collection(db, "restaurants"))`** ל־state **מקומי** של הפאנל. |
+
+לכן אפשר לראות מסעדות בפאנל (שאילתה ישירה + חוק `restaurants` מאפשר `list` לכל מחובר), בעוד שבהגדרות עדיין **ריק** אם משהו ב־**context** ב־`page.tsx` לא התמלא (מאזין, תזמון, שגיאה בקונסול) — **זה לא בגלל חוק `users` על רשימת המסעדות**.
+
+**שיוך למסעדה למשתמש:** התיקון ב־rules ל־**`users`** עוזר ל־**טעינת רשימת המשתמשים** (`loadU` בהגדרות) ול־פעולות שמבוססות על `getDocs(users)`, **לא** אמור להיות התנאי שמציג או מסתיר את **רשימת המסעדות** מ־Firestore (אלא אם יש באג נוסף בקוד שמקשר בין השניים).
 
 ---
 
@@ -83,3 +107,4 @@
 | `22111b2` | מאזין Firestore למסעדות (בעל מערכת) |
 | `d50f5c9` | לוג דיבוג ב־settings (הוסר אחר כך) |
 | `3b0a389` | חיפוש: autofill + פילטר בטוח + לוג ב־SystemOwnerDirectory |
+| `6e86aaf` | Firestore: `users` list/get — `isSystemOwnerUser()` |
