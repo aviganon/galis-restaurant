@@ -112,6 +112,19 @@ export default function Home() {
 
   const refreshIngredients = useCallback(() => setRefreshIngredientsKey((k) => k + 1), [])
 
+  /** ניסיון נוסף לטעון מסעדות ל-context כשבעל מערכת נכנס להגדרות והרשימה עדיין ריקה (race/cache בפרודקשן) */
+  const settingsRestaurantsRefreshAttempted = useRef(false)
+  useEffect(() => {
+    if (currentPage !== "settings" || !isSystemOwner || impersonatingRestaurant) return
+    if (restaurants.length > 0) {
+      settingsRestaurantsRefreshAttempted.current = false
+      return
+    }
+    if (settingsRestaurantsRefreshAttempted.current) return
+    settingsRestaurantsRefreshAttempted.current = true
+    void refreshRestaurants()
+  }, [currentPage, isSystemOwner, impersonatingRestaurant, restaurants.length, refreshRestaurants])
+
   useEffect(() => {
     localeRef.current = locale
   }, [locale])

@@ -2088,7 +2088,9 @@ export function AdminPanel() {
       }
       await setDoc(ref, { list: [...current, email] }, { merge: true })
 
-      const restaurantName = restaurants?.find((r) => r.id === currentRestaurantId)?.name
+      const restaurantName =
+        restsWithDetails.find((r) => r.id === currentRestaurantId)?.name
+        ?? restaurants?.find((r) => r.id === currentRestaurantId)?.name
       const res = await fetch("/api/invite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2329,7 +2331,8 @@ export function AdminPanel() {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <CardContent className={cn("pt-4 pb-5", shellCompact ? "px-4" : "px-6")}>
-                    {(!restaurants || restaurants.length === 0) && (
+                    {/* restsWithDetails נטען ב-loadSystemOwnerData — לא restaurants מה-context (שעלול להיות ריק בפרודקשן) */}
+                    {restsWithDetails.length === 0 && !loadingSystemOwner && (
                       <p className="text-sm text-amber-600 dark:text-amber-500 mb-3 flex flex-wrap items-center gap-2">
                         {t("pages.adminPanel.noRestaurantsLoaded")}{" "}
                         <Button variant="link" className="p-0 h-auto font-semibold" onClick={() => window.location.reload()}>
