@@ -188,7 +188,7 @@ export function SystemOwnerDirectory({
   const loadInboundForAll = useCallback(async () => {
     const list = restaurants || []
     if (list.length === 0) {
-      setInboundMap({})
+      // לא מאפסים כשהרשימה ריקה זמנית - מחכים לנתונים אמיתיים
       return
     }
     setLoadingInbound(true)
