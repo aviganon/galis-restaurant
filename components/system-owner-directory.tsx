@@ -64,6 +64,7 @@ import { useLanguage } from "@/contexts/language-context"
 import { postInviteEmail } from "@/lib/invite-email"
 import { setUserPasswordAsAdmin } from "@/lib/set-user-password-client"
 import { createUniqueInviteCode } from "@/lib/invite-code-document"
+import { directoryUserRoleLabel, directoryUserRoleSearchText } from "@/lib/directory-user-role-label"
 
 export type DirectoryUserRow = {
   uid: string
@@ -71,6 +72,8 @@ export type DirectoryUserRow = {
   role: string
   restaurantId: string | null
   restaurantName?: string
+  /** כשמוגדר — התפקיד המוצג הוא «בעל מערכת» (לא רק users.role) */
+  isSystemOwner?: boolean
 }
 
 type Props = {
@@ -235,7 +238,7 @@ export function SystemOwnerDirectory({
       (u) =>
         (u.email || "").toLowerCase().includes(q) ||
         (u.restaurantName || "").toLowerCase().includes(q) ||
-        (u.role || "").toLowerCase().includes(q)
+        directoryUserRoleSearchText(u).includes(q)
     )
   }, [usersData, search])
 
@@ -629,7 +632,7 @@ export function SystemOwnerDirectory({
                             <div className="min-w-0 flex-1">
                               <div className="text-xs font-mono dir-ltr text-start">{u.email}</div>
                               <div className="text-xs text-muted-foreground mt-1">
-                                {u.restaurantName || "ללא מסעדה"} · {u.role}
+                                {u.restaurantName || "ללא מסעדה"} · {directoryUserRoleLabel(u)}
                               </div>
                             </div>
                             <UserCircle2 className="w-4 h-4 shrink-0 text-muted-foreground mt-0.5" />
@@ -648,7 +651,8 @@ export function SystemOwnerDirectory({
                               </div>
                               <div className="text-xs text-muted-foreground space-y-1">
                                 <p>
-                                  תפקיד: <strong className="text-foreground">{u.role}</strong>
+                                  תפקיד:{" "}
+                                  <strong className="text-foreground">{directoryUserRoleLabel(u)}</strong>
                                 </p>
                                 <p>
                                   מסעדה:{" "}
@@ -1389,7 +1393,7 @@ function DirectoryRestaurantDialogs({
                             <td className="p-2 font-mono text-xs" dir="ltr">
                               {u.email}
                             </td>
-                            <td className="p-2 text-center text-xs">{u.role}</td>
+                            <td className="p-2 text-center text-xs">{directoryUserRoleLabel(u)}</td>
                             <td className="p-2">
                               <div className="flex flex-wrap gap-1 justify-start">
                                 <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onEditUser(u)}>

@@ -364,7 +364,18 @@ export function AdminPanel() {
   const [assignManagerEmail, setAssignManagerEmail] = useState("")
   const [assigningManager, setAssigningManager] = useState(false)
   const [assignManagerResult, setAssignManagerResult] = useState<{ok:boolean;msg:string}|null>(null)
-  const [allSystemUsers, setAllSystemUsers] = useState<{uid:string;email:string;role:string;restaurantId:string|null;restaurantName?:string;name?:string;phone?:string}[]>([])
+  const [allSystemUsers, setAllSystemUsers] = useState<
+    {
+      uid: string
+      email: string
+      role: string
+      restaurantId: string | null
+      restaurantName?: string
+      name?: string
+      phone?: string
+      isSystemOwner?: boolean
+    }[]
+  >([])
   const [loadingAllUsers, setLoadingAllUsers] = useState(false)
   const [allUsersLoaded, setAllUsersLoaded] = useState(false)
   const [assignTarget, setAssignTarget] = useState<{uid:string;email:string}|null>(null)
@@ -1991,7 +2002,16 @@ export function AdminPanel() {
         const data = d.data()
         const restId = data.restaurantId || null
         const restName = restsWithDetails.find(r => r.id === restId)?.name
-        return { uid: d.id, email: data.email || d.id, role: data.role || "user", restaurantId: restId, restaurantName: restName, name: (data.name as string) || "", phone: (data.phone as string) || "" }
+        return {
+          uid: d.id,
+          email: data.email || d.id,
+          role: data.role || "user",
+          restaurantId: restId,
+          restaurantName: restName,
+          name: (data.name as string) || "",
+          phone: (data.phone as string) || "",
+          isSystemOwner: data.isSystemOwner === true,
+        }
       })
       users.sort((a, b) => a.email.localeCompare(b.email))
       setAllSystemUsers(users)
@@ -2004,11 +2024,15 @@ export function AdminPanel() {
     if (!assignTarget) return
     setSavingAssign(true)
     try {
-      const currentData = allSystemUsers.find(u => u.uid === assignTarget.uid)
-      await setDoc(doc(db, "users", assignTarget.uid), {
-        restaurantId: assignTargetRestId || null,
-        role: currentData?.role === "owner" ? "owner" : "manager",
-      }, { merge: true })
+      const currentData = allSystemUsers.find((u) => u.uid === assignTarget.uid)
+      const rid = assignTargetRestId?.trim() || null
+      const patch: Record<string, unknown> = { restaurantId: rid }
+      if (rid) {
+        patch.role = currentData?.role === "owner" ? "owner" : "manager"
+      } else if (currentData?.isSystemOwner) {
+        patch.role = "user"
+      }
+      await setDoc(doc(db, "users", assignTarget.uid), patch, { merge: true })
       toast.success("✅ " + assignTarget.email + " שויך בהצלחה")
       setAssignTarget(null)
       setAssignTargetRestId("")

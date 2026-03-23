@@ -15,6 +15,7 @@ export type UsersManagementRow = {
   role: string
   restaurantId: string | null
   restaurantName?: string
+  isSystemOwner?: boolean
 }
 
 export type SystemOwnerUsersManagementProps = {
@@ -134,11 +135,18 @@ export function SystemOwnerUserTabToolbar({
   return (
     <div className="space-y-3 text-start" dir={dir}>
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 flex-1 min-w-0">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 flex-1 min-w-0">
           {[
             { label: `סה"כ`, val: usersData.length },
-            { label: "מנהלים", val: usersData.filter((u) => u.role === "manager").length },
-            { label: "משתמשים", val: usersData.filter((u) => u.role === "user").length },
+            { label: "בעלי מערכת", val: usersData.filter((u) => u.isSystemOwner).length },
+            {
+              label: "מנהלים",
+              val: usersData.filter((u) => !u.isSystemOwner && u.role === "manager").length,
+            },
+            {
+              label: "משתמשים",
+              val: usersData.filter((u) => !u.isSystemOwner && u.role === "user").length,
+            },
           ].map((s, i) => (
             <div key={i} className="bg-muted/50 rounded-lg p-2.5 sm:p-3">
               <p className="text-[10px] sm:text-xs text-muted-foreground mb-0.5">{s.label}</p>

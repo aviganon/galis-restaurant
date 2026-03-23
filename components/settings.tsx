@@ -71,7 +71,13 @@ export function Settings() {
   const [profileAddress, setProfileAddress] = useState("")
   const [savingProfile, setSavingProfile] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [editingUser, setEditingUser] = useState<{uid:string;email:string;role:string;restaurantId:string|null}|null>(null)
+  const [editingUser, setEditingUser] = useState<{
+    uid: string
+    email: string
+    role: string
+    restaurantId: string | null
+    isSystemOwner?: boolean
+  } | null>(null)
   const [editUserName, setEditUserName] = useState("")
   const [editUserPhone, setEditUserPhone] = useState("")
   const [editUserAddress, setEditUserAddress] = useState("")
@@ -83,7 +89,16 @@ export function Settings() {
   const [apiKeyInput, setApiKeyInput] = useState("")
   const [savingApiKey, setSavingApiKey] = useState(false)
   const [apiKeySaved, setApiKeySaved] = useState(false)
-  const [usersData, setUsersData] = useState<{uid:string;email:string;role:string;restaurantId:string|null;restaurantName?:string}[]>([])
+  const [usersData, setUsersData] = useState<
+    {
+      uid: string
+      email: string
+      role: string
+      restaurantId: string | null
+      restaurantName?: string
+      isSystemOwner?: boolean
+    }[]
+  >([])
   const [usersLoaded, setUsersLoaded] = useState(false)
   const [loadingUsers2, setLoadingUsers2] = useState(false)
   const [assignTgt, setAssignTgt] = useState<{uid:string;email:string}|null>(null)
@@ -323,7 +338,13 @@ export function Settings() {
     }
   }
 
-  const openEditUser = async (u:{uid:string;email:string;role:string;restaurantId:string|null}) => {
+  const openEditUser = async (u: {
+    uid: string
+    email: string
+    role: string
+    restaurantId: string | null
+    isSystemOwner?: boolean
+  }) => {
     setEditingUser(u); setEditUserRole(u.role as "manager"|"user"); setEditUserRestId(u.restaurantId||"")
     setEditUserName(""); setEditUserPhone(""); setEditUserAddress(""); setEditUserNotes("")
     setLoadingEditProfile(true)
@@ -397,6 +418,7 @@ export function Settings() {
               role: dt.role || "user",
               restaurantId: dt.restaurantId || null,
               restaurantName: r?.name,
+              isSystemOwner: dt.isSystemOwner === true,
             }
           })
           .filter((u) => u.role !== "owner"),
@@ -545,7 +567,36 @@ export function Settings() {
     }
   }
 
-  const doAssign=async()=>{if(!assignTgt)return;setSavingAssign2(true);try{await setDoc(doc(db,"users",assignTgt.uid),{restaurantId:assignTgtRestId||null},{merge:true});setUsersData(p=>p.map(u=>u.uid===assignTgt.uid?{...u,restaurantId:assignTgtRestId||null,restaurantName:(restaurants||[]).find(r=>r.id===assignTgtRestId)?.name}:u));toast.success("שויך");setAssignTgt(null)}catch{toast.error("שגיאה")}finally{setSavingAssign2(false)}}
+  const doAssign = async () => {
+    if (!assignTgt) return
+    setSavingAssign2(true)
+    try {
+      const rid = assignTgtRestId?.trim() || null
+      const row = usersData.find((u) => u.uid === assignTgt.uid)
+      const updates: Record<string, unknown> = { restaurantId: rid }
+      /** הסרת שיוך: נשאר role=manager מבלבל — לבעל מערכת מאפסים ל-user (ההרשאה האמיתית מ-isSystemOwner) */
+      if (!rid && row?.isSystemOwner) updates.role = "user"
+      await setDoc(doc(db, "users", assignTgt.uid), updates, { merge: true })
+      setUsersData((p) =>
+        p.map((u) => {
+          if (u.uid !== assignTgt.uid) return u
+          const nextRole = !rid && u.isSystemOwner ? "user" : u.role
+          return {
+            ...u,
+            restaurantId: rid,
+            restaurantName: rid ? (restaurants || []).find((r) => r.id === rid)?.name : undefined,
+            role: nextRole,
+          }
+        }),
+      )
+      toast.success("שויך")
+      setAssignTgt(null)
+    } catch {
+      toast.error("שגיאה")
+    } finally {
+      setSavingAssign2(false)
+    }
+  }
 
   const goBackFromSettings = () => {
     setCurrentPage?.(isSystemOwner && !isImpersonating ? "admin-panel" : "calc")
@@ -1018,6 +1069,11 @@ export function Settings() {
                   <label className="text-sm font-medium flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5"/>כתובת</label>
                   <Input value={editUserAddress} onChange={e=>setEditUserAddress(e.target.value)} placeholder="רחוב, עיר" className="h-10"/>
                 </div>
+                {editingUser.isSystemOwner ? (
+                  <p className="text-xs text-muted-foreground rounded-md border border-primary/20 bg-primary/5 px-3 py-2">
+                    משתמש זה מוגדר כ<strong className="text-foreground"> בעל מערכת</strong>. שדה «תפקיד» משמש לשיוך למסעדה בלבד; ההרשאות המלאות נשארות לפי בעל המערכת.
+                  </p>
+                ) : null}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium">תפקיד</label>
