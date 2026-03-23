@@ -362,7 +362,7 @@ export function SystemOwnerDirectory({
           </div>
         </div>
 
-        <Tabs value={panelTab} onValueChange={(v) => setPanelTab(v as "restaurant" | "user"); setSearch("")} dir={layoutDir}>
+        <Tabs value={panelTab} onValueChange={(v) => { setPanelTab(v as "restaurant" | "user"); setSearch("") }} dir={layoutDir}>
           <TabsList className="grid w-full max-w-md grid-cols-2 h-10" dir={layoutDir}>
             <TabsTrigger value="restaurant" className="gap-1.5 text-xs sm:text-sm">
               <Building2 className="w-3.5 h-3.5" />
