@@ -114,6 +114,11 @@ export function SystemOwnerDirectory({
   onRestaurantDeleted,
   hideCardHeader = false,
 }: Props) {
+  /** זמני — דיבוג: אם length כאן תואם ל-settings אבל UI מציג 0, הבעיה ב-filter/חיפוש */
+  useEffect(() => {
+    console.log("SystemOwnerDirectory props restaurants:", restaurants?.length)
+  }, [restaurants])
+
   const t = useTranslations()
   const { dir, locale } = useLanguage()
   /** הרכיב בעברית בלבד: כשממשק האפליקציה באנגלית `dir` הוא ltr ואז שורות המסעדה נראות הפוך. כופים RTL לפריסה עד שכל הרכיב יתורגם ואז אפשר להשתמש ב-`dir` בלבד. */
@@ -210,14 +215,14 @@ export function SystemOwnerDirectory({
 
   const filteredRestaurants = useMemo(() => {
     const q = search.trim().toLowerCase()
-    const base = restaurants || []
+    const base = Array.isArray(restaurants) ? restaurants : []
     if (!q) return base
-    return base.filter(
-      (r) =>
-        r.name.toLowerCase().includes(q) ||
-        (r.branch && r.branch.toLowerCase().includes(q)) ||
-        r.id.toLowerCase().includes(q)
-    )
+    return base.filter((r) => {
+      const name = String(r.name ?? "").toLowerCase()
+      const branch = r.branch != null ? String(r.branch).toLowerCase() : ""
+      const id = String(r.id ?? "").toLowerCase()
+      return name.includes(q) || branch.includes(q) || id.includes(q)
+    })
   }, [restaurants, search])
 
   const filteredUsers = useMemo(() => {
@@ -305,6 +310,10 @@ export function SystemOwnerDirectory({
           <div className="relative flex-1">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <Input
+              id="system-owner-directory-search"
+              name="system-owner-directory-search"
+              autoComplete="off"
+              autoCorrect="off"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="חיפוש לפי שם מסעדה, סניף, אימייל משתמש..."

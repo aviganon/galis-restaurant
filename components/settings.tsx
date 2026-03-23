@@ -63,11 +63,6 @@ export function Settings() {
   const systemOwnerPanelDir: "rtl" | "ltr" = locale === "en" ? "rtl" : dir
   const { userRole, currentRestaurantId, refreshIngredients, refreshRestaurants, isImpersonating, isSystemOwner, restaurants, setCurrentPage } = useApp()
 
-  /** זמני — דיבוג production (מסעדות 0); להסיר אחרי אימות */
-  useEffect(() => {
-    console.log("settings restaurants:", restaurants, "isSystemOwner:", isSystemOwner)
-  }, [restaurants, isSystemOwner])
-
   const [email, setEmail] = useState("")
   const [displayName, setDisplayName] = useState("")
   const [userId, setUserId] = useState<string | null>(null)
