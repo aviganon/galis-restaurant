@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { onAuthStateChanged, sendPasswordResetEmail } from "firebase/auth"
+import { onAuthStateChanged } from "firebase/auth"
 import { collection, getDocs, getDoc, writeBatch, doc, deleteDoc, setDoc } from "firebase/firestore"
 import { auth, db, getAuthForUserCreation } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
@@ -37,6 +37,7 @@ import {
   Upload,
   Trash2,
   ChevronLeft,
+  ChevronRight,
   Phone,
   MapPin,
   Save,
@@ -47,16 +48,19 @@ import {
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
 import { cn } from "@/lib/utils"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { InboundEmailSettings } from "@/components/inbound-email-settings"
-import { InboundChangeRequestsPanel } from "@/components/inbound-change-requests-panel"
 import { SystemOwnerDirectory } from "@/components/system-owner-directory"
 import { SystemOwnerUserTabBulkSection, SystemOwnerUserTabToolbar } from "@/components/system-owner-users-management"
 import { postInviteEmail } from "@/lib/invite-email"
 import { createUniqueInviteCode } from "@/lib/invite-code-document"
+import { useLanguage } from "@/contexts/language-context"
+import { sendPasswordResetReliable } from "@/lib/password-reset-client"
 
 export function Settings() {
   const t = useTranslations()
+  const { dir, locale } = useLanguage()
+  /** טאבים של בעל מערכת בעברית — כשממשק האפליקציה באנגלית עדיין RTL */
+  const systemOwnerPanelDir: "rtl" | "ltr" = locale === "en" ? "rtl" : dir
   const { userRole, currentRestaurantId, refreshIngredients, refreshRestaurants, isImpersonating, isSystemOwner, restaurants, setCurrentPage } = useApp()
   const [email, setEmail] = useState("")
   const [displayName, setDisplayName] = useState("")
@@ -193,9 +197,17 @@ export function Settings() {
     }
   }
 
-  // בהתחזות — הצג "מנהל" ולא "בעלים"
-  const effectiveRole = (userRole === "owner" && isImpersonating) ? "manager" : userRole
-  const roleLabel = effectiveRole === "owner" ? t("pages.settings.owner") : effectiveRole === "manager" ? t("pages.settings.manager") : effectiveRole === "user" ? t("pages.settings.user") : t("pages.settings.manager")
+  /** בהתחזות של בעל מערכת — אותה תצוגת הגדרות כמו למנהל מסעדה (כרטיסים, תפקיד מוצג, בלי מפתח מערכת) */
+  const settingsViewRole =
+    isImpersonating && isSystemOwner ? "manager" : userRole
+  const roleLabel =
+    settingsViewRole === "owner"
+      ? t("pages.settings.owner")
+      : settingsViewRole === "manager"
+        ? t("pages.settings.manager")
+        : settingsViewRole === "user"
+          ? t("pages.settings.user")
+          : t("pages.settings.manager")
 
   const handleChangePassword = async () => {
     const targetEmail = email || auth.currentUser?.email
@@ -203,17 +215,13 @@ export function Settings() {
       toast.error(t("pages.settings.noEmailForReset"))
       return
     }
-    try {
-      auth.languageCode = "he"
-      const actionCodeSettings = {
-        url: window.location.origin + "/",
-        handleCodeInApp: false,
-      }
-      await sendPasswordResetEmail(auth, targetEmail, actionCodeSettings)
-      toast.success(`מייל לאיפוס סיסמא נשלח ל-${targetEmail} — בדוק גם תיקיית ספאם`)
-    } catch (e: unknown) {
-      const err = e instanceof Error ? e : new Error(String(e))
-      toast.error(err.message || t("authErrors.resetError"))
+    const r = await sendPasswordResetReliable(targetEmail)
+    if (r.ok) {
+      toast.success(
+        r.via === "resend" ? t("pages.settings.passwordResetSentResend") : t("pages.settings.passwordResetSentFirebase"),
+      )
+    } else {
+      toast.error(r.error)
     }
   }
 
@@ -494,17 +502,24 @@ export function Settings() {
     setCurrentPage?.(isSystemOwner && !isImpersonating ? "admin-panel" : "calc")
   }
 
+  const BackChevron = dir === "rtl" ? ChevronRight : ChevronLeft
+
   return (
     <div
+      dir={dir}
       className={cn(
-        "container mx-auto px-4 pb-6",
+        "container mx-auto px-4 pb-6 text-start",
         isSystemOwner && !isImpersonating ? "max-w-6xl pt-2" : "max-w-4xl pt-3",
       )}
     >
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3 gap-y-2">
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl md:text-3xl font-bold leading-tight">{t("pages.settings.title")}</h1>
-          <p className="text-muted-foreground text-sm mt-1">{t("pages.settings.subtitle")}</p>
+          <h1 className="text-2xl md:text-3xl font-bold leading-tight">
+            {isSystemOwner && !isImpersonating ? t("pages.settings.systemOwnerPageTitle") : t("pages.settings.title")}
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            {isSystemOwner && !isImpersonating ? t("pages.settings.systemOwnerPageSubtitle") : t("pages.settings.subtitle")}
+          </p>
         </div>
         <Button
           type="button"
@@ -513,30 +528,123 @@ export function Settings() {
           className="shrink-0 gap-1.5"
           onClick={goBackFromSettings}
         >
-          <ChevronLeft className="w-4 h-4" />
+          <BackChevron className="w-4 h-4" />
           חזור
         </Button>
       </div>
-      <Tabs defaultValue={isSystemOwner && !isImpersonating ? "users" : "settings"}>
-        {isSystemOwner && !isImpersonating && (
-          <TabsList className="mb-4 grid h-10 w-full max-w-2xl grid-cols-3 gap-1">
-            <TabsTrigger value="users" className="text-xs sm:text-sm px-1">
-              משתמשים ומסעדות
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="text-xs sm:text-sm px-1">
-              הגדרות
-            </TabsTrigger>
-            <TabsTrigger value="restaurant-requests" className="text-xs sm:text-sm px-1">
-              מסעדה
-            </TabsTrigger>
-          </TabsList>
-        )}
-        {(!isSystemOwner || isImpersonating) && (
-        <TabsList className="mb-6">
-          <TabsTrigger value="settings">הגדרות</TabsTrigger>
-        </TabsList>
-        )}
-        <TabsContent value="settings">
+      {isSystemOwner && !isImpersonating ? (
+        <div className="mx-auto w-full max-w-4xl space-y-4" dir={systemOwnerPanelDir}>
+          <SystemOwnerDirectory
+            hideCardHeader
+            restaurants={restaurants || []}
+            usersData={usersData}
+            usersLoaded={usersLoaded}
+            loadingUsers={loadingUsers2}
+            onRefreshUsers={loadU}
+            onRestaurantSaved={() => refreshRestaurants?.()}
+            onRestaurantDeleted={(id) => {
+              refreshRestaurants?.()
+              setInboundEmailRestId((prev) => (prev === id ? null : prev))
+            }}
+            selectedRestId={inboundEmailRestId}
+            onSelectRestaurant={setInboundEmailRestId}
+            onEditUser={openEditUser}
+            onAssignClick={(u) => {
+              setAssignTgt({ uid: u.uid, email: u.email })
+              setAssignTgtRestId(u.restaurantId || "")
+            }}
+            onSendInvite={async (u) => {
+              if (!u.email) return
+              try {
+                await postInviteEmail({
+                  email: u.email,
+                  role: u.role,
+                  restaurantName: u.restaurantName,
+                  accountCreated: false,
+                })
+                toast.success("נשלח מייל הזמנה")
+              } catch (e) {
+                toast.error((e as Error).message || "שגיאה")
+              }
+            }}
+            userTabToolbar={
+              <SystemOwnerUserTabToolbar
+                usersData={usersData}
+                usersLoaded={usersLoaded}
+                loadingUsers={loadingUsers2}
+                loadU={loadU}
+                restaurants={restaurants || []}
+                showCreate2={showCreate2}
+                setShowCreate2={setShowCreate2}
+                cEmail={cEmail}
+                setCEmail={setCEmail}
+                cPass={cPass}
+                setCPass={setCPass}
+                cRole={cRole}
+                setCRole={setCRole}
+                cRest={cRest}
+                setCRest={setCRest}
+                cName={cName}
+                setCName={setCName}
+                cPhone={cPhone}
+                setCPhone={setCPhone}
+                cAddress={cAddress}
+                setCAddress={setCAddress}
+                cNotes={cNotes}
+                setCNotes={setCNotes}
+                cErr={cErr}
+                creating2={creating2}
+                doCreate={doCreate}
+                showRestaurantInvitePanel={showRestaurantInvitePanel}
+                setShowRestaurantInvitePanel={setShowRestaurantInvitePanel}
+                restaurantInviteCode={restaurantInviteCode}
+                generatingRestaurantInviteCode={generatingRestaurantInviteCode}
+                onGenerateRestaurantInviteCode={handleGenerateRestaurantInviteCode}
+              />
+            }
+            userTabBulk={
+              <SystemOwnerUserTabBulkSection
+                restaurants={restaurants || []}
+                assignTgt={assignTgt}
+                setAssignTgt={setAssignTgt}
+                assignTgtRestId={assignTgtRestId}
+                setAssignTgtRestId={setAssignTgtRestId}
+                doAssign={doAssign}
+                savingAssign2={savingAssign2}
+              />
+            }
+          />
+          <Card
+            className="mt-2 border border-primary/15 bg-gradient-to-br from-primary/[0.04] to-transparent shadow-sm"
+            dir={systemOwnerPanelDir}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                <Key className="w-5 h-5 text-muted-foreground shrink-0" />
+                {t("pages.settings.claudeApiKey")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-0">
+              <p className="text-sm text-muted-foreground leading-relaxed">{t("pages.settings.claudeApiKeyDesc")}</p>
+              <div className="flex flex-wrap gap-2">
+                <Input
+                  type="password"
+                  placeholder={t("pages.adminPanel.keyPlaceholderNew")}
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  className="flex-1 min-w-[12rem] font-mono text-sm"
+                  dir="ltr"
+                />
+                <Button size="sm" onClick={saveApiKey} disabled={savingApiKey} className="shrink-0 gap-1.5">
+                  {savingApiKey ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  {t("pages.adminPanel.save")}
+                </Button>
+              </div>
+              {apiKeySaved ? <p className="text-xs text-emerald-600">{t("pages.settings.claudeApiKeySaved")}</p> : null}
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
         <div className="space-y-6">
         {(!isSystemOwner || isImpersonating) && (
         <Card className="border-0 shadow-sm">
@@ -548,10 +656,10 @@ export function Settings() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-2xl">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-2xl shrink-0">
                 👨‍🍳
               </div>
-              <div>
+              <div className="min-w-0 flex-1 text-start">
                 <p className="font-semibold">{displayName || email || t("pages.settings.user")}</p>
                 <p className="text-sm text-muted-foreground">{roleLabel}</p>
               </div>
@@ -583,7 +691,7 @@ export function Settings() {
                 </div>
               </div>
               <Button onClick={saveProfile} disabled={savingProfile} size="sm" className="w-full sm:w-auto">
-                {savingProfile ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Save className="w-4 h-4 ml-2" />}
+                {savingProfile ? <Loader2 className="w-4 h-4 animate-spin ms-2" /> : <Save className="w-4 h-4 ms-2" />}
                 שמור פרטים
               </Button>
             </div>
@@ -606,10 +714,10 @@ export function Settings() {
         )}
 
         {currentRestaurantId &&
-          (userRole === "owner" ||
-            userRole === "admin" ||
-            userRole === "manager" ||
-            userRole === "user") &&
+          (settingsViewRole === "owner" ||
+            settingsViewRole === "admin" ||
+            settingsViewRole === "manager" ||
+            settingsViewRole === "user") &&
           (!isSystemOwner || isImpersonating) && (
             <Card className="border-0 shadow-sm border-primary/15 bg-primary/[0.03]">
               <CardHeader className="pb-2">
@@ -709,8 +817,8 @@ export function Settings() {
         </Card>
         )}
 
-        {/* אבטחה — לא בטאב הגדרות של בעל מערכת (איפוס סיסמה בניהול משתמשים) */}
-        {(!isSystemOwner || isImpersonating) && (
+        {/* אבטחה — לא לבעל מערכת (איפוס סיסמה מ«לפי משתמש» או ממסך הכניסה) */}
+        {!isSystemOwner && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -719,40 +827,26 @@ export function Settings() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button variant="outline" className="w-full justify-between h-12 rounded-xl" onClick={handleChangePassword}>
-              <span>{t("pages.settings.changePassword")}</span>
-              <ChevronLeft className="w-4 h-4" />
+            <Button variant="outline" className="w-full justify-between h-12 rounded-xl gap-2" onClick={handleChangePassword}>
+              <span className="text-start flex-1">{t("pages.settings.changePassword")}</span>
+              <BackChevron className="w-4 h-4 shrink-0 opacity-60" />
             </Button>
             <Button
               variant="outline"
-              className="w-full justify-between h-12 rounded-xl"
+              className="w-full justify-between h-12 rounded-xl gap-2"
               onClick={() => toast.info("אימות דו-שלבי יהיה זמין בגרסה הבאה")}
             >
-              <span>{t("pages.settings.twoFactor")}</span>
-              <Badge variant="secondary">{t("pages.settings.twoFactorInactive")}</Badge>
+              <span className="text-start flex-1">{t("pages.settings.twoFactor")}</span>
+              <Badge variant="secondary" className="shrink-0">{t("pages.settings.twoFactorInactive")}</Badge>
             </Button>
             <Button
               variant="outline"
-              className="w-full justify-between h-12 rounded-xl"
+              className="w-full justify-between h-12 rounded-xl gap-2"
               onClick={() => toast.info("היסטוריית התחברויות תהיה זמינה בגרסה הבאה")}
             >
-              <span>{t("pages.settings.loginHistory")}</span>
-              <ChevronLeft className="w-4 h-4" />
+              <span className="text-start flex-1">{t("pages.settings.loginHistory")}</span>
+              <BackChevron className="w-4 h-4 shrink-0 opacity-60" />
             </Button>
-          </CardContent>
-        </Card>
-        )}
-
-        {isSystemOwner && (
-        <Card className="border-0 shadow-sm">
-          <CardHeader><CardTitle className="text-lg font-semibold flex items-center gap-2"><Key className="w-5 h-5 text-muted-foreground"/>מפתח Claude API</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">המפתח משמש לניתוח חשבוניות ובדיקת מחירים באינטרנט.</p>
-            <div className="flex gap-2">
-              <Input type="password" placeholder="sk-ant-..." value={apiKeyInput} onChange={e=>setApiKeyInput(e.target.value)} className="flex-1 font-mono text-sm" dir="ltr"/>
-              <Button size="sm" onClick={saveApiKey} disabled={savingApiKey}>{savingApiKey?<Loader2 className="w-4 h-4 animate-spin"/>:<Save className="w-4 h-4"/>}</Button>
-            </div>
-            {apiKeySaved&&<p className="text-xs text-emerald-600">✓ מפתח נשמר</p>}
           </CardContent>
         </Card>
         )}
@@ -760,7 +854,9 @@ export function Settings() {
         {/* ניהול נתונים — לא בטאב הגדרות של בעל מערכת (ייבוא/ייצוא במקומות אחרים לפי הצורך) */}
         {(!isSystemOwner || isImpersonating) &&
           currentRestaurantId &&
-          (userRole === "owner" || userRole === "admin" || userRole === "manager") && (
+          (settingsViewRole === "owner" ||
+            settingsViewRole === "admin" ||
+            settingsViewRole === "manager") && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -840,100 +936,7 @@ export function Settings() {
           </CardContent>
         </Card>
         </div>
-        </TabsContent>
-        {isSystemOwner && !isImpersonating && (
-        <TabsContent value="users" className="space-y-4">
-          <div className="mx-auto w-full max-w-4xl">
-          <SystemOwnerDirectory
-            restaurants={restaurants || []}
-            usersData={usersData}
-            usersLoaded={usersLoaded}
-            loadingUsers={loadingUsers2}
-            onRefreshUsers={loadU}
-            onRestaurantSaved={() => refreshRestaurants?.()}
-            onRestaurantDeleted={(id) => {
-              refreshRestaurants?.()
-              setInboundEmailRestId((prev) => (prev === id ? null : prev))
-            }}
-            selectedRestId={inboundEmailRestId}
-            onSelectRestaurant={setInboundEmailRestId}
-            onEditUser={openEditUser}
-            onAssignClick={(u) => {
-              setAssignTgt({ uid: u.uid, email: u.email })
-              setAssignTgtRestId(u.restaurantId || "")
-            }}
-            onSendInvite={async (u) => {
-              if (!u.email) return
-              try {
-                await postInviteEmail({
-                  email: u.email,
-                  role: u.role,
-                  restaurantName: u.restaurantName,
-                  accountCreated: false,
-                })
-                toast.success("נשלח מייל הזמנה")
-              } catch (e) {
-                toast.error((e as Error).message || "שגיאה")
-              }
-            }}
-            userTabToolbar={
-              <SystemOwnerUserTabToolbar
-                usersData={usersData}
-                usersLoaded={usersLoaded}
-                loadingUsers={loadingUsers2}
-                loadU={loadU}
-                restaurants={restaurants || []}
-                showCreate2={showCreate2}
-                setShowCreate2={setShowCreate2}
-                cEmail={cEmail}
-                setCEmail={setCEmail}
-                cPass={cPass}
-                setCPass={setCPass}
-                cRole={cRole}
-                setCRole={setCRole}
-                cRest={cRest}
-                setCRest={setCRest}
-                cName={cName}
-                setCName={setCName}
-                cPhone={cPhone}
-                setCPhone={setCPhone}
-                cAddress={cAddress}
-                setCAddress={setCAddress}
-                cNotes={cNotes}
-                setCNotes={setCNotes}
-                cErr={cErr}
-                creating2={creating2}
-                doCreate={doCreate}
-                showRestaurantInvitePanel={showRestaurantInvitePanel}
-                setShowRestaurantInvitePanel={setShowRestaurantInvitePanel}
-                restaurantInviteCode={restaurantInviteCode}
-                generatingRestaurantInviteCode={generatingRestaurantInviteCode}
-                onGenerateRestaurantInviteCode={handleGenerateRestaurantInviteCode}
-              />
-            }
-            userTabBulk={
-              <SystemOwnerUserTabBulkSection
-                restaurants={restaurants || []}
-                assignTgt={assignTgt}
-                setAssignTgt={setAssignTgt}
-                assignTgtRestId={assignTgtRestId}
-                setAssignTgtRestId={setAssignTgtRestId}
-                doAssign={doAssign}
-                savingAssign2={savingAssign2}
-              />
-            }
-          />
-          </div>
-        </TabsContent>
         )}
-        {isSystemOwner && !isImpersonating && (
-        <TabsContent value="restaurant-requests" className="space-y-4">
-          <div className="mx-auto w-full max-w-4xl">
-            <InboundChangeRequestsPanel />
-          </div>
-        </TabsContent>
-        )}
-      </Tabs>
 
       <Dialog
         open={!!editingUser}
@@ -1004,7 +1007,7 @@ export function Settings() {
                 ביטול
               </Button>
               <Button onClick={saveEditUser} disabled={savingEditUser || loadingEditProfile}>
-                {savingEditUser ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Save className="w-4 h-4 ml-1" />}
+                {savingEditUser ? <Loader2 className="w-4 h-4 animate-spin ms-1" /> : <Save className="w-4 h-4 ms-1" />}
                 שמור
               </Button>
             </div>

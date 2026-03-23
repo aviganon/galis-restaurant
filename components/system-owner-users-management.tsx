@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { UserPlus, Loader2, Ticket, Copy } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
+import { useLanguage } from "@/contexts/language-context"
 
 export type UsersManagementRow = {
   uid: string
@@ -127,10 +128,11 @@ export function SystemOwnerUserTabToolbar({
   | "onGenerateRestaurantInviteCode"
 >) {
   const t = useTranslations()
+  const { dir } = useLanguage()
   const rs = restaurants || []
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 text-start" dir={dir}>
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div className="grid grid-cols-3 gap-2 sm:gap-3 flex-1 min-w-0">
           {[
@@ -334,10 +336,11 @@ export function SystemOwnerUserTabBulkSection({
   | "doAssign"
   | "savingAssign2"
 >) {
+  const { dir } = useLanguage()
   const rs = restaurants || []
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 text-start" dir={dir}>
       {assignTgt ? (
         <div className="bg-card border rounded-xl p-4 space-y-2">
           <p className="text-sm font-medium">

@@ -1,23 +1,25 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import { sendPasswordResetEmail } from "firebase/auth"
 import {
   collection,
   deleteDoc,
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
+  orderBy,
   query,
   setDoc,
   where,
   writeBatch,
 } from "firebase/firestore"
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage"
-import { auth, db, getAuthForUserCreation, storage } from "@/lib/firebase"
+import { db, getAuthForUserCreation, storage } from "@/lib/firebase"
 import type { Restaurant } from "@/contexts/app-context"
 import { buildInboundAddress, type InboundSettings } from "@/lib/inbound-email"
 import { InboundEmailSettings } from "@/components/inbound-email-settings"
+import { InboundChangeRequestsPanel } from "@/components/inbound-change-requests-panel"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   AlertDialog,
@@ -31,6 +33,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -52,12 +55,15 @@ import {
   Users,
   Link2,
   KeyRound,
+  MessageSquare,
   Pencil,
   Trash2,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
+import { useLanguage } from "@/contexts/language-context"
 import { postInviteEmail } from "@/lib/invite-email"
+import { setUserPasswordAsAdmin } from "@/lib/set-user-password-client"
 import { createUniqueInviteCode } from "@/lib/invite-code-document"
 
 export type DirectoryUserRow = {
@@ -87,6 +93,8 @@ type Props = {
   onRestaurantSaved?: () => void
   /** אחרי מחיקת מסעדה (למשל עדכון בחירה בהגדרות) */
   onRestaurantDeleted?: (deletedId: string) => void
+  /** כשהכותרת מוצגת בעמוד החיצוני (הגדרות בעלים) — מסתירים כותרת+תיאור בכרטיס */
+  hideCardHeader?: boolean
 }
 
 export function SystemOwnerDirectory({
@@ -104,33 +112,71 @@ export function SystemOwnerDirectory({
   userTabBulk,
   onRestaurantSaved,
   onRestaurantDeleted,
+  hideCardHeader = false,
 }: Props) {
   const t = useTranslations()
+  const { dir, locale } = useLanguage()
+  /** הרכיב בעברית בלבד: כשממשק האפליקציה באנגלית `dir` הוא ltr ואז שורות המסעדה נראות הפוך. כופים RTL לפריסה עד שכל הרכיב יתורגם ואז אפשר להשתמש ב-`dir` בלבד. */
+  const layoutDir: "rtl" | "ltr" = locale === "en" ? "rtl" : dir
   const [search, setSearch] = useState("")
   const [inboundMap, setInboundMap] = useState<Record<string, InboundSettings | null>>({})
   const [loadingInbound, setLoadingInbound] = useState(false)
   const [panelTab, setPanelTab] = useState<"restaurant" | "user">("restaurant")
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
-  const [sendingPasswordResetUid, setSendingPasswordResetUid] = useState<string | null>(null)
+  const [passwordDialogUser, setPasswordDialogUser] = useState<DirectoryUserRow | null>(null)
+  const [newPasswordInput, setNewPasswordInput] = useState("")
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState("")
+  const [savingPasswordUid, setSavingPasswordUid] = useState<string | null>(null)
+  const [changeRequestsRestId, setChangeRequestsRestId] = useState<string | null>(null)
+  /** מספר בקשות שינוי כתובת פתוחות לפי מזהה מסעדה (להבהוב בכפתור) */
+  const [pendingInboundRequestsByRest, setPendingInboundRequestsByRest] = useState<Record<string, number>>({})
 
-  const handlePasswordResetUser = async (u: DirectoryUserRow) => {
-    const email = u.email?.trim()
-    if (!email) {
-      toast.error(t("pages.settings.noEmailForReset"))
+  useEffect(() => {
+    const q = query(collection(db, "inboundChangeRequests"), orderBy("createdAt", "desc"))
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const counts: Record<string, number> = {}
+        snap.forEach((d) => {
+          const rid = (d.data() as { restaurantId?: string }).restaurantId
+          if (rid) counts[rid] = (counts[rid] || 0) + 1
+        })
+        setPendingInboundRequestsByRest(counts)
+      },
+      (err) => console.error("[inboundChangeRequests]", err),
+    )
+    return () => unsub()
+  }, [])
+
+  const openSetPasswordDialog = (u: DirectoryUserRow) => {
+    setPasswordDialogUser(u)
+    setNewPasswordInput("")
+    setConfirmPasswordInput("")
+  }
+
+  const submitSetPasswordDialog = async () => {
+    if (!passwordDialogUser) return
+    if (newPasswordInput.length < 6) {
+      toast.error(t("login.passwordMinLength"))
       return
     }
-    setSendingPasswordResetUid(u.uid)
+    if (newPasswordInput !== confirmPasswordInput) {
+      toast.error(t("pages.settings.passwordMismatch"))
+      return
+    }
+    setSavingPasswordUid(passwordDialogUser.uid)
     try {
-      auth.languageCode = "he"
-      await sendPasswordResetEmail(auth, email, {
-        url: `${typeof window !== "undefined" ? window.location.origin : ""}/`,
-        handleCodeInApp: false,
-      })
-      toast.success(t("pages.settings.resetEmailSent"))
-    } catch (e) {
-      toast.error((e as Error).message)
+      const r = await setUserPasswordAsAdmin(passwordDialogUser.uid, newPasswordInput)
+      if (r.ok) {
+        toast.success(t("pages.settings.passwordSetSuccess"))
+        setPasswordDialogUser(null)
+        setNewPasswordInput("")
+        setConfirmPasswordInput("")
+      } else {
+        toast.error(r.error)
+      }
     } finally {
-      setSendingPasswordResetUid(null)
+      setSavingPasswordUid(null)
     }
   }
 
@@ -238,19 +284,24 @@ export function SystemOwnerDirectory({
   }
 
   return (
-    <Card className="border-primary/20 bg-gradient-to-br from-primary/[0.04] to-transparent shadow-sm overflow-hidden">
-      <CardHeader className="pb-2 space-y-1">
-        <CardTitle className="text-lg flex flex-wrap items-center gap-2">
-          <Building2 className="w-5 h-5 text-primary shrink-0" />
-          ניהול מסעדות ומשתמשים
-        </CardTitle>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          בשורת המסעדה: <strong>עריכה</strong> לפרטי המסעדה, <strong>ניהול צוות</strong>, ולחיצה על <strong>כתובת המייל</strong> לייבוא. לחיצה על רקע השורה פותחת פרטים <strong>מתחת</strong> לאותה שורה.{" "}
-          <span className="text-muted-foreground/90">הפרטים נפתחים מתחת לשורה; לחיצה שוב על הרקע סוגרת.</span>
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-col sm:flex-row gap-2">
+    <Card
+      dir={layoutDir}
+      className="border-primary/20 bg-gradient-to-br from-primary/[0.04] to-transparent shadow-sm overflow-hidden text-start"
+    >
+      {!hideCardHeader && (
+        <CardHeader className="pb-2 space-y-1">
+          <CardTitle className="text-lg flex flex-wrap items-center gap-2">
+            <Building2 className="w-5 h-5 text-primary shrink-0" />
+            ניהול מסעדות ומשתמשים
+          </CardTitle>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            בשורת המסעדה: <strong>עריכה</strong>, <strong>ניהול צוות</strong>, <strong>בקשה</strong> (שינוי כתובת ייבוא), ולחיצה על <strong>כתובת המייל</strong> לייבוא. לחיצה על רקע השורה פותחת פרטים <strong>מתחת</strong> לאותה שורה.{" "}
+            <span className="text-muted-foreground/90">הפרטים נפתחים מתחת לשורה; לחיצה שוב על הרקע סוגרת.</span>
+          </p>
+        </CardHeader>
+      )}
+      <CardContent className={cn("space-y-4", hideCardHeader && "pt-4 sm:pt-5")}>
+        <div className="flex flex-col sm:flex-row gap-2" dir={layoutDir}>
           <div className="relative flex-1">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <Input
@@ -294,8 +345,8 @@ export function SystemOwnerDirectory({
           </div>
         </div>
 
-        <Tabs value={panelTab} onValueChange={(v) => setPanelTab(v as "restaurant" | "user")}>
-          <TabsList className="grid w-full max-w-md grid-cols-2 h-10">
+        <Tabs value={panelTab} onValueChange={(v) => setPanelTab(v as "restaurant" | "user")} dir={layoutDir}>
+          <TabsList className="grid w-full max-w-md grid-cols-2 h-10" dir={layoutDir}>
             <TabsTrigger value="restaurant" className="gap-1.5 text-xs sm:text-sm">
               <Building2 className="w-3.5 h-3.5" />
               לפי מסעדה
@@ -306,17 +357,18 @@ export function SystemOwnerDirectory({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="restaurant" className="mt-4 space-y-0">
+          <TabsContent value="restaurant" className="mt-4 space-y-0" dir={layoutDir}>
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground px-1">
                 מסעדות ({filteredRestaurants.length})
               </p>
-              <div className="border rounded-xl max-h-[min(70vh,560px)] overflow-y-auto bg-card">
+              <div className="border rounded-xl max-h-[min(70vh,560px)] overflow-y-auto bg-card" dir={layoutDir}>
                 {!restaurants?.length ? (
                   <div className="p-6 text-sm text-muted-foreground text-center">אין מסעדות</div>
                 ) : (
                   filteredRestaurants.map((r) => {
                     const n = usersByRestaurant(r.id).length
+                    const pendingInboundReq = pendingInboundRequestsByRest[r.id] ?? 0
                     const inbound = inboundMap[r.id]
                     const addr =
                       inbound?.inboundEmailToken != null
@@ -337,18 +389,21 @@ export function SystemOwnerDirectory({
                             }
                           }}
                           className={cn(
-                            "w-full text-right p-3 transition-colors hover:bg-muted/60 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-none",
+                            "w-full text-start p-3 transition-colors hover:bg-muted/60 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-none",
                             active && "bg-primary/10 ring-1 ring-inset ring-primary/25"
                           )}
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0 flex-1 space-y-1">
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="font-medium text-sm min-w-0 leading-snug">
+                          <div className="min-w-0 w-full space-y-1">
+                              {/* flex + layoutDir: ב-RTL שם ב-start (ימין), כפתורים ב-end (שמאל) */}
+                              <div
+                                className="flex w-full items-start justify-between gap-2"
+                                dir={layoutDir}
+                              >
+                                <div className="font-medium text-sm min-w-0 flex-1 leading-snug text-start">
                                   {r.emoji ? `${r.emoji} ` : ""}
                                   {r.name}
                                 </div>
-                                <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                                <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-start">
                                   <Button
                                     type="button"
                                     variant="outline"
@@ -378,6 +433,33 @@ export function SystemOwnerDirectory({
                                     <UserPlus className="h-3 w-3 shrink-0" />
                                     ניהול צוות
                                   </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className={cn(
+                                      "h-7 px-2 text-[11px] gap-0.5",
+                                      pendingInboundReq > 0 &&
+                                        "animate-pulse ring-2 ring-amber-500/70 ring-offset-1 ring-offset-background bg-amber-50/90 dark:bg-amber-950/50",
+                                    )}
+                                    title="בקשות שינוי כתובת ייבוא למסעדה זו"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      ensureRestaurantSelected(r.id)
+                                      setChangeRequestsRestId(r.id)
+                                    }}
+                                  >
+                                    <MessageSquare className="h-3 w-3 shrink-0" />
+                                    בקשה
+                                    {pendingInboundReq > 0 ? (
+                                      <Badge
+                                        variant="secondary"
+                                        className="h-5 min-w-[1.25rem] px-1 text-[10px] tabular-nums"
+                                      >
+                                        {pendingInboundReq}
+                                      </Badge>
+                                    ) : null}
+                                  </Button>
                                   <Badge variant="secondary" className="shrink-0 tabular-nums">
                                     {n}
                                   </Badge>
@@ -401,7 +483,6 @@ export function SystemOwnerDirectory({
                               >
                                 {addr || "— אין כתובת מייל —"}
                               </button>
-                            </div>
                           </div>
                         </div>
                         {active ? (
@@ -460,7 +541,7 @@ export function SystemOwnerDirectory({
             </div>
           </TabsContent>
 
-          <TabsContent value="user" className="mt-4 space-y-6">
+          <TabsContent value="user" className="mt-4 space-y-6" dir={layoutDir}>
             {userTabToolbar}
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground px-1">
@@ -494,13 +575,13 @@ export function SystemOwnerDirectory({
                             }
                           }}
                           className={cn(
-                            "w-full text-right p-3 transition-colors hover:bg-muted/60 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-none",
+                            "w-full text-start p-3 transition-colors hover:bg-muted/60 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-none",
                             active && "bg-primary/10 ring-1 ring-inset ring-primary/25",
                           )}
                         >
                           <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <div className="text-xs font-mono dir-ltr text-left">{u.email}</div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-mono dir-ltr text-start">{u.email}</div>
                               <div className="text-xs text-muted-foreground mt-1">
                                 {u.restaurantName || "ללא מסעדה"} · {u.role}
                               </div>
@@ -537,15 +618,11 @@ export function SystemOwnerDirectory({
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => void handlePasswordResetUser(u)}
-                                  disabled={!u.email?.trim() || sendingPasswordResetUid === u.uid}
-                                  title={
-                                    u.email?.trim()
-                                      ? t("pages.settings.resetPasswordForUser")
-                                      : t("pages.settings.noEmailForReset")
-                                  }
+                                  onClick={() => openSetPasswordDialog(u)}
+                                  disabled={savingPasswordUid === u.uid}
+                                  title={t("pages.settings.resetPasswordForUser")}
                                 >
-                                  {sendingPasswordResetUid === u.uid ? (
+                                  {savingPasswordUid === u.uid ? (
                                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                   ) : (
                                     <KeyRound className="w-3.5 h-3.5" />
@@ -636,14 +713,95 @@ export function SystemOwnerDirectory({
           </TabsContent>
         </Tabs>
 
+        <Dialog
+          open={!!passwordDialogUser}
+          onOpenChange={(open) => {
+            if (!open) {
+              setPasswordDialogUser(null)
+              setNewPasswordInput("")
+              setConfirmPasswordInput("")
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-md" dir="rtl">
+            <DialogHeader>
+              <DialogTitle>{t("pages.settings.setPasswordDialogTitle")}</DialogTitle>
+              <DialogDescription className="text-start space-y-1">
+                <span className="block">{t("pages.settings.setPasswordDialogHint")}</span>
+                {passwordDialogUser ? (
+                  <span className="block font-mono text-xs text-foreground dir-ltr" dir="ltr">
+                    {passwordDialogUser.email || passwordDialogUser.uid}
+                  </span>
+                ) : null}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="set-pw-new">{t("pages.settings.newPasswordLabel")}</Label>
+                <Input
+                  id="set-pw-new"
+                  type="password"
+                  autoComplete="new-password"
+                  value={newPasswordInput}
+                  onChange={(e) => setNewPasswordInput(e.target.value)}
+                  className="font-mono"
+                  dir="ltr"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="set-pw-confirm">{t("pages.settings.confirmPasswordLabel")}</Label>
+                <Input
+                  id="set-pw-confirm"
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPasswordInput}
+                  onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                  className="font-mono"
+                  dir="ltr"
+                />
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:justify-start">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setPasswordDialogUser(null)
+                  setNewPasswordInput("")
+                  setConfirmPasswordInput("")
+                }}
+              >
+                {t("pages.settings.cancel")}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void submitSetPasswordDialog()}
+                disabled={!passwordDialogUser || savingPasswordUid === passwordDialogUser?.uid}
+                className="gap-1.5"
+              >
+                {savingPasswordUid === passwordDialogUser?.uid ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <KeyRound className="h-4 w-4" />
+                )}
+                {t("pages.settings.saveNewPassword")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <DirectoryRestaurantDialogs
           inboundRestId={inboundDialogRestId}
           staffRestId={staffDialogRestId}
+          changeRequestsRestId={changeRequestsRestId}
           onInboundOpenChange={(open) => {
             if (!open) setInboundDialogRestId(null)
           }}
           onStaffOpenChange={(open) => {
             if (!open) setStaffDialogRestId(null)
+          }}
+          onChangeRequestsOpenChange={(open) => {
+            if (!open) setChangeRequestsRestId(null)
           }}
           restaurants={restaurants}
           usersData={usersData}
@@ -654,8 +812,8 @@ export function SystemOwnerDirectory({
           onEditUser={onEditUser}
           onAssignClick={onAssignClick}
           onSendInvite={onSendInvite}
-          onPasswordReset={handlePasswordResetUser}
-          sendingPasswordResetUid={sendingPasswordResetUid}
+          onPasswordReset={openSetPasswordDialog}
+          savingPasswordUid={savingPasswordUid}
         />
 
         <RestaurantEditDialog
@@ -669,6 +827,7 @@ export function SystemOwnerDirectory({
             if (selectedRestId === deletedId) onSelectRestaurant(null)
             setInboundDialogRestId((p) => (p === deletedId ? null : p))
             setStaffDialogRestId((p) => (p === deletedId ? null : p))
+            setChangeRequestsRestId((p) => (p === deletedId ? null : p))
             setEditRestaurantId(null)
             void loadInboundForAll()
             onRestaurantDeleted?.(deletedId)
@@ -1038,8 +1197,10 @@ function RestaurantEditDialog({
 function DirectoryRestaurantDialogs({
   inboundRestId,
   staffRestId,
+  changeRequestsRestId,
   onInboundOpenChange,
   onStaffOpenChange,
+  onChangeRequestsOpenChange,
   restaurants,
   usersData,
   usersLoaded,
@@ -1050,12 +1211,14 @@ function DirectoryRestaurantDialogs({
   onAssignClick,
   onSendInvite,
   onPasswordReset,
-  sendingPasswordResetUid,
+  savingPasswordUid,
 }: {
   inboundRestId: string | null
   staffRestId: string | null
+  changeRequestsRestId: string | null
   onInboundOpenChange: (open: boolean) => void
   onStaffOpenChange: (open: boolean) => void
+  onChangeRequestsOpenChange: (open: boolean) => void
   restaurants: Restaurant[]
   usersData: DirectoryUserRow[]
   usersLoaded: boolean
@@ -1066,15 +1229,46 @@ function DirectoryRestaurantDialogs({
   onAssignClick: (u: DirectoryUserRow) => void
   onSendInvite?: (u: DirectoryUserRow) => void
   onPasswordReset?: (u: DirectoryUserRow) => void
-  sendingPasswordResetUid?: string | null
+  savingPasswordUid?: string | null
 }) {
   const t = useTranslations()
   const inboundRestaurant = inboundRestId ? restaurants.find((r) => r.id === inboundRestId) : undefined
   const staffRestaurant = staffRestId ? restaurants.find((r) => r.id === staffRestId) : undefined
+  const changeRequestsRestaurant = changeRequestsRestId
+    ? restaurants.find((r) => r.id === changeRequestsRestId)
+    : undefined
   const staffUsers = staffRestId ? usersByRestaurant(staffRestId) : []
 
   return (
     <>
+      <Dialog open={!!changeRequestsRestId} onOpenChange={onChangeRequestsOpenChange}>
+        {changeRequestsRestId ? (
+          <DialogContent
+            className="sm:max-w-lg max-h-[min(calc(100dvh-2rem),920px)] overflow-y-auto"
+            dir="rtl"
+          >
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 flex-wrap">
+                <MessageSquare className="h-5 w-5 text-primary shrink-0" />
+                בקשות שינוי כתובת ייבוא
+                {changeRequestsRestaurant?.name ? (
+                  <span className="text-sm font-normal text-muted-foreground">
+                    — {changeRequestsRestaurant.name}
+                  </span>
+                ) : null}
+              </DialogTitle>
+              <DialogDescription className="text-start">
+                צוותי מסעדות יכולים לבקש שינוי כתובת המייל; כאן מופיעות הבקשות למסעדה זו — לאחר טיפול אפשר למחוק את הרשומה.
+              </DialogDescription>
+            </DialogHeader>
+            <InboundChangeRequestsPanel
+              compact
+              restaurantIdFilter={changeRequestsRestId}
+            />
+          </DialogContent>
+        ) : null}
+      </Dialog>
+
       <Dialog open={!!inboundRestId} onOpenChange={onInboundOpenChange}>
         {inboundRestId ? (
           <DialogContent
@@ -1138,9 +1332,9 @@ function DirectoryRestaurantDialogs({
                     <table className="w-full">
                       <thead className="bg-muted/50 text-xs text-muted-foreground sticky top-0">
                         <tr>
-                          <th className="text-right p-2 font-medium">אימייל</th>
+                          <th className="text-start p-2 font-medium">אימייל</th>
                           <th className="text-center p-2 font-medium w-24">תפקיד</th>
-                          <th className="text-left p-2 font-medium min-w-[12rem]">פעולות</th>
+                          <th className="text-end p-2 font-medium min-w-[12rem]">פעולות</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1151,7 +1345,7 @@ function DirectoryRestaurantDialogs({
                             </td>
                             <td className="p-2 text-center text-xs">{u.role}</td>
                             <td className="p-2">
-                              <div className="flex flex-wrap gap-1 justify-end">
+                              <div className="flex flex-wrap gap-1 justify-start">
                                 <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onEditUser(u)}>
                                   ערוך
                                 </Button>
@@ -1160,11 +1354,11 @@ function DirectoryRestaurantDialogs({
                                     size="sm"
                                     variant="ghost"
                                     className="h-7 text-xs gap-0.5"
-                                    disabled={!u.email?.trim() || sendingPasswordResetUid === u.uid}
-                                    onClick={() => void onPasswordReset(u)}
+                                    disabled={savingPasswordUid === u.uid}
+                                    onClick={() => onPasswordReset(u)}
                                     title={t("pages.settings.resetPasswordForUser")}
                                   >
-                                    {sendingPasswordResetUid === u.uid ? (
+                                    {savingPasswordUid === u.uid ? (
                                       <Loader2 className="w-3 h-3 animate-spin shrink-0" />
                                     ) : (
                                       <KeyRound className="w-3 h-3 shrink-0" />
@@ -1228,12 +1422,12 @@ function RestaurantDetailPanel({
     <div className="w-full space-y-4">
       {showDetailActions ? (
         <div className="rounded-xl border bg-card p-4 space-y-3">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="text-base font-semibold flex items-center gap-2 flex-wrap min-w-0">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 items-start">
+            <h3 className="text-base font-semibold flex items-center gap-2 flex-wrap min-w-0 text-start">
               {restaurant?.emoji ? <span aria-hidden>{restaurant.emoji}</span> : null}
               <span>{restaurant?.name ?? "מסעדה"}</span>
             </h3>
-            <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+            <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-start">
               <Button
                 type="button"
                 variant="outline"
@@ -1267,9 +1461,9 @@ function RestaurantDetailPanel({
               type="button"
               onClick={onOpenInbound}
               className={cn(
-                "w-full text-right rounded-lg border px-3 py-2 text-sm transition-colors",
+                "w-full text-start rounded-lg border px-3 py-2 text-sm transition-colors",
                 "hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                inboundAddress ? "font-mono dir-ltr text-left" : "text-primary border-dashed",
+                inboundAddress ? "font-mono dir-ltr" : "text-primary border-dashed",
               )}
               dir={inboundAddress ? "ltr" : undefined}
             >

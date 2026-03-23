@@ -309,7 +309,7 @@ export function InboundEmailSettings({
                 <p className="text-xs font-medium text-muted-foreground">כתובת הייבוא</p>
                 <div className="flex items-center gap-2 flex-wrap">
                   <div
-                    className="flex-1 min-w-[200px] rounded-lg border bg-muted/30 px-3 py-2.5 text-sm font-mono select-all break-all text-right"
+                    className="flex-1 min-w-[200px] rounded-lg border bg-muted/30 px-3 py-2.5 text-sm font-mono select-all break-all text-start"
                     dir="ltr"
                   >
                     {buildInboundAddress(settings.inboundEmailToken)}
@@ -569,7 +569,7 @@ export function InboundEmailSettings({
               </div>
               <div className="flex items-center gap-2">
                 <div
-                  className="flex-1 rounded-lg border bg-muted/30 px-3 py-2.5 text-sm font-mono select-all break-all text-right"
+                  className="flex-1 rounded-lg border bg-muted/30 px-3 py-2.5 text-sm font-mono select-all break-all text-start"
                   dir="ltr"
                 >
                   {buildInboundAddress(settings.inboundEmailToken)}
@@ -651,7 +651,7 @@ export function InboundEmailSettings({
                 }
               >
                 {slugChecking ? <Loader2 className="w-3.5 h-3.5 animate-spin me-1" /> : null}
-                עדכן למזהה זה
+                עדכן כתובת למסעדה
               </Button>
             </div>
 

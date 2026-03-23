@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
-import { Shield, Key, Loader2, Camera, LogOut, Settings2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown, GripVertical, Columns3, Upload as UploadIcon, FileText, TrendingUp, DollarSign, Utensils, AlertTriangle, ShoppingCart, LayoutDashboard } from "lucide-react"
+import { Shield, Key, Loader2, Camera, LogOut, Settings2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown, GripVertical, Columns3, Upload as UploadIcon, FileText, TrendingUp, DollarSign, Utensils, AlertTriangle, ShoppingCart, LayoutDashboard, Mail } from "lucide-react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -51,6 +51,7 @@ import { supplierFirestoreDocId } from "@/lib/supplier-firestore-id"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
 import { Dashboard } from "@/components/dashboard"
+import { InboundEmailSettings } from "@/components/inbound-email-settings"
 import { getTranslation, type Locale } from "@/lib/translations"
 import { useLanguage } from "@/contexts/language-context"
 import { LanguageSwitcher } from "@/components/language-switcher"
@@ -375,6 +376,8 @@ export function AdminPanel() {
   const [generatingCode, setGeneratingCode] = useState(false)
   const [lastGeneratedCode, setLastGeneratedCode] = useState<string | null>(null)
   const [impersonateRestId, setImpersonateRestId] = useState<string>("")
+  /** דיאלוג ייבוא ממייל מכרטיס מסעדה בפאנל (ליד התחזה) */
+  const [adminInboundDialogRestId, setAdminInboundDialogRestId] = useState<string | null>(null)
   const [adminStats, setAdminStats] = useState<{ rests: number; users: number; dishes: number; ings: number } | null>(null)
   const [testingApi, setTestingApi] = useState(false)
   const [apiTestResult, setApiTestResult] = useState<string | null>(null)
@@ -2463,16 +2466,15 @@ export function AdminPanel() {
                   </div>
                 </div>
               )}
-              {/* Restaurant image cards — flex + dir כדי שב־RTL הכרטיסים יתחילו מימין */}
-                <div className="mb-6 flex flex-wrap justify-start gap-4" dir={dir}>
+              {/* Restaurant image cards — grid + dir: ב־RTL עמודה ראשונה מימין (המסעדה הראשונה בפינה הימנית-עליונה) */}
+                <div className="mb-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" dir={dir}>
                   {restsWithDetails.map((rest, _ri) => {
                     const colors = ["linear-gradient(135deg,#0F6E56,#1D9E75)","linear-gradient(135deg,#185FA5,#378ADD)","linear-gradient(135deg,#533AAB,#7F77DD)","linear-gradient(135deg,#854F0B,#BA7517)","linear-gradient(135deg,#993C1D,#D85A30)"]
                     return (
                       <div
                         key={rest.id}
                         className={cn(
-                          "relative rounded-xl overflow-hidden cursor-pointer border-2 transition-all duration-200 shadow-sm hover:shadow-lg hover:-translate-y-0.5",
-                          "w-[calc((100%-1rem)/2)] sm:w-[calc((100%-2rem)/3)] lg:w-[calc((100%-3rem)/4)] max-w-full min-w-0 shrink-0",
+                          "relative w-full min-w-0 rounded-xl overflow-hidden cursor-pointer border-2 transition-all duration-200 shadow-sm hover:shadow-lg hover:-translate-y-0.5",
                           selectedRestDetail === rest.id ? "border-primary shadow-lg -translate-y-0.5" : "border-transparent"
                         )}
                         style={{ height: 140 }}
@@ -2552,8 +2554,8 @@ export function AdminPanel() {
                   if(!selectedRest)return null
                   return (
                     <motion.div initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} className="space-y-4 p-5 rounded-xl border bg-muted/30 mb-4" dir={dir}>
-                      <div className="flex flex-wrap items-center gap-4 w-full">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 items-center w-full">
+                        <div className="flex items-center gap-3 min-w-0">
                           {/* Restaurant image upload */}
                           <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-muted shrink-0 cursor-pointer border hover:opacity-80 transition-opacity"
                             onClick={()=>restImageInputRef.current?.click()}>
@@ -2566,7 +2568,7 @@ export function AdminPanel() {
                             )}
                             {uploadingRestImage&&<div className="absolute inset-0 bg-black/50 flex items-center justify-center"><Loader2 className="w-4 h-4 animate-spin text-white"/></div>}
                           </div>
-                          <h3 className="text-lg font-semibold">{selectedRest.emoji&&<span className="ml-2">{selectedRest.emoji}</span>}{selectedRest.name}</h3>
+                          <h3 className="text-lg font-semibold text-start">{selectedRest.emoji&&<span className="me-2">{selectedRest.emoji}</span>}{selectedRest.name}</h3>
                           <input ref={restImageInputRef} type="file" accept="image/*" className="hidden"
                             onChange={async e=>{
                               const f=e.currentTarget.files?.[0];
@@ -2590,10 +2592,23 @@ export function AdminPanel() {
                               }catch(e){toast.error("שגיאה בהעלאה")}finally{setUploadingRestImage(false);e.currentTarget.value="";}
                             }}/>
                         </div>
-                        <div className="flex gap-2 flex-wrap shrink-0 ms-auto items-center">
+                        <div className="flex gap-2 flex-wrap shrink-0 items-center justify-start">
                           {onImpersonate&&(
                             <Button size="sm" variant="outline" onClick={()=>{onImpersonate({id:selectedRest.id,name:selectedRest.name,emoji:selectedRest.emoji});toast.success(t("pages.adminPanel.impersonatingRest")+": "+selectedRest.name)}}>
                               <UserCircle className="w-4 h-4 me-1"/>{t("pages.adminPanel.impersonate")}
+                            </Button>
+                          )}
+                          {isSystemOwner && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              className="gap-1"
+                              title="כתובת ייבוא ממייל — הצגה ועריכה"
+                              onClick={() => setAdminInboundDialogRestId(selectedRest.id)}
+                            >
+                              <Mail className="w-4 h-4 shrink-0" />
+                              כתובת ייבוא
                             </Button>
                           )}
                           {loadingPanelInviteCode ? (
@@ -4139,6 +4154,42 @@ export function AdminPanel() {
         </DialogContent>
       </Dialog>
 
+      <Dialog
+        open={!!adminInboundDialogRestId}
+        onOpenChange={(o) => {
+          if (!o) setAdminInboundDialogRestId(null)
+        }}
+      >
+        {adminInboundDialogRestId ? (
+          <DialogContent
+            className="sm:max-w-lg max-h-[min(calc(100dvh-2rem),920px)] overflow-y-auto"
+            dir="rtl"
+          >
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 flex-wrap">
+                <Mail className="h-5 w-5 text-primary shrink-0" />
+                ייבוא ממייל
+                {restsWithDetails.find((r) => r.id === adminInboundDialogRestId)?.name ? (
+                  <span className="text-sm font-normal text-muted-foreground">
+                    — {restsWithDetails.find((r) => r.id === adminInboundDialogRestId)?.name}
+                  </span>
+                ) : null}
+              </DialogTitle>
+              <DialogDescription className="text-start">
+                כתובת ייחודית לקבלת חשבוניות ודוחות. ניתן לערוך את המזהה והגדרות מתקדמות כאן.
+              </DialogDescription>
+            </DialogHeader>
+            <InboundEmailSettings
+              externalRestaurantId={adminInboundDialogRestId}
+              allowEdit
+              onInboundCreated={() => {
+                refreshRestaurants?.()
+                toast.success("נשמר")
+              }}
+            />
+          </DialogContent>
+        ) : null}
+      </Dialog>
 
     </div>
   )

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   collection,
   deleteDoc,
@@ -24,10 +24,25 @@ export type InboundChangeRequestDoc = {
   createdAt: string
 }
 
-export function InboundChangeRequestsPanel() {
+type InboundChangeRequestsPanelProps = {
+  /** רק בקשות למסעדה זו (לדיאלוג מהשורה) */
+  restaurantIdFilter?: string | null
+  /** בלי מסגרת Card — לשימוש בתוך Dialog */
+  compact?: boolean
+}
+
+export function InboundChangeRequestsPanel({
+  restaurantIdFilter = null,
+  compact = false,
+}: InboundChangeRequestsPanelProps) {
   const [items, setItems] = useState<{ id: string; data: InboundChangeRequestDoc }[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const filteredItems = useMemo(() => {
+    if (!restaurantIdFilter) return items
+    return items.filter((x) => x.data.restaurantId === restaurantIdFilter)
+  }, [items, restaurantIdFilter])
 
   useEffect(() => {
     const q = query(
@@ -65,28 +80,25 @@ export function InboundChangeRequestsPanel() {
     }
   }
 
-  return (
-    <Card className="border-0 shadow-sm border-primary/15 bg-primary/[0.03]">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg font-semibold flex items-center gap-2">
-          <Building2 className="w-5 h-5 text-primary" />
-          בקשות שינוי כתובת ייבוא
-        </CardTitle>
-        <p className="text-sm text-muted-foreground font-normal leading-relaxed">
-          צוותי מסעדות יכולים לבקש שינוי כתובת המייל; כאן מופיעות הבקשות — לאחר טיפול אפשר למחוק את הרשומה.
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {loading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground py-6">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            טוען…
-          </div>
-        ) : items.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4">אין בקשות פתוחות</p>
-        ) : (
-          <ul className="space-y-3">
-            {items.map(({ id, data }) => (
+  const hint = (
+    <p className="text-sm text-muted-foreground font-normal leading-relaxed">
+      צוותי מסעדות יכולים לבקש שינוי כתובת המייל; כאן מופיעות הבקשות — לאחר טיפול אפשר למחוק את הרשומה.
+    </p>
+  )
+
+  const listBody =
+    loading ? (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground py-6">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        טוען…
+      </div>
+    ) : filteredItems.length === 0 ? (
+      <p className="text-sm text-muted-foreground py-4">
+        {restaurantIdFilter ? "אין בקשות פתוחות למסעדה זו" : "אין בקשות פתוחות"}
+      </p>
+    ) : (
+      <ul className="space-y-3">
+            {filteredItems.map(({ id, data }) => (
               <li
                 key={id}
                 className="rounded-lg border bg-card p-3 space-y-2 text-sm"
@@ -130,9 +142,28 @@ export function InboundChangeRequestsPanel() {
                 </p>
               </li>
             ))}
-          </ul>
-        )}
-      </CardContent>
+      </ul>
+    )
+
+  if (compact) {
+    return (
+      <div className="space-y-3">
+        {!restaurantIdFilter ? hint : null}
+        {listBody}
+      </div>
+    )
+  }
+
+  return (
+    <Card className="border-0 shadow-sm border-primary/15 bg-primary/[0.03]">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg font-semibold flex items-center gap-2">
+          <Building2 className="w-5 h-5 text-primary" />
+          בקשות שינוי כתובת ייבוא
+        </CardTitle>
+        {hint}
+      </CardHeader>
+      <CardContent className="space-y-3">{listBody}</CardContent>
     </Card>
   )
 }

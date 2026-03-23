@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from "firebase/auth"
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth"
 import { auth, db } from "@/lib/firebase"
+import { sendPasswordResetReliable } from "@/lib/password-reset-client"
 import { doc, getDoc, setDoc } from "firebase/firestore"
 import { firestoreConfig } from "@/lib/firestore-config"
 import Image from "next/image"
@@ -227,14 +228,14 @@ export function LoginScreen(_props: LoginScreenProps) {
     setError("")
     setIsLoading(true)
     try {
-      auth.languageCode = "he"
-      const actionCodeSettings = { url: window.location.origin + "/", handleCodeInApp: false }
-      await sendPasswordResetEmail(auth, email.trim(), actionCodeSettings)
-      setError(t("login.resetEmailSent") + " — בדוק גם תיקיית ספאם")
-    } catch (err: unknown) {
-      const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
-      if (code === "auth/user-not-found") setError(t("login.userNotFound"))
-      else setError(getAuthError(code) || t("authErrors.resetError"))
+      const r = await sendPasswordResetReliable(email)
+      if (r.ok) {
+        setError(
+          r.via === "resend" ? t("login.resetEmailSentResend") : t("login.resetEmailSentFirebase"),
+        )
+      } else {
+        setError(r.error)
+      }
     } finally {
       setIsLoading(false)
     }
