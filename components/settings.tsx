@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { onAuthStateChanged } from "firebase/auth"
 import { collection, getDocs, getDoc, writeBatch, doc, deleteDoc, setDoc } from "firebase/firestore"
 import { auth, db, getAuthForUserCreation } from "@/lib/firebase"
@@ -377,10 +377,60 @@ export function Settings() {
     } catch { toast.error("שגיאה") } finally { setSavingApiKey(false) }
   }
 
+  /** תמיד עדכני — מונע loadU עם restaurants ריק אחרי רינדור ראשון (מרוצים / לחיצות בהגדרות) */
+  const restaurantsRef = useRef(restaurants)
+  restaurantsRef.current = restaurants
+
+  const loadU = useCallback(async () => {
+    setLoadingUsers2(true)
+    try {
+      const s = await getDocs(collection(db, "users"))
+      const rs = restaurantsRef.current || []
+      setUsersData(
+        s.docs
+          .map((d) => {
+            const dt = d.data()
+            const r = rs.find((x) => x.id === dt.restaurantId)
+            return {
+              uid: d.id,
+              email: dt.email || "",
+              role: dt.role || "user",
+              restaurantId: dt.restaurantId || null,
+              restaurantName: r?.name,
+            }
+          })
+          .filter((u) => u.role !== "owner"),
+      )
+      setUsersLoaded(true)
+    } catch {
+      toast.error("שגיאה")
+    } finally {
+      setLoadingUsers2(false)
+    }
+  }, [])
+
   useEffect(() => {
-    if (isSystemOwner && !isImpersonating) loadU()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSystemOwner, isImpersonating])
+    if (isSystemOwner && !isImpersonating) void loadU()
+  }, [isSystemOwner, isImpersonating, loadU])
+
+  /** כשמאזין המסעדות ב־page ממלא רשימה אחרי loadU ראשון — מעדכן שמות מסעדה בשורות משתמש בלי לרענן הכל */
+  useEffect(() => {
+    if (!isSystemOwner || isImpersonating) return
+    const list = restaurants || []
+    if (list.length === 0) return
+    setUsersData((prev) => {
+      if (prev.length === 0) return prev
+      let changed = false
+      const next = prev.map((u) => {
+        if (!u.restaurantId) return u
+        const name = list.find((r) => r.id === u.restaurantId)?.name
+        if (name === u.restaurantName) return u
+        changed = true
+        return { ...u, restaurantName: name }
+      })
+      return changed ? next : prev
+    })
+  }, [restaurants, isSystemOwner, isImpersonating])
 
   useEffect(() => {
     if (!isSystemOwner || isImpersonating) return
@@ -395,8 +445,6 @@ export function Settings() {
       return fromBar || list[0].id
     })
   }, [isSystemOwner, isImpersonating, restaurants, currentRestaurantId])
-
-  const loadU = async()=>{setLoadingUsers2(true);try{const s=await getDocs(collection(db,"users"));const rs=restaurants||[];setUsersData(s.docs.map(d=>{const dt=d.data();const r=rs.find(x=>x.id===dt.restaurantId);return{uid:d.id,email:dt.email||"",role:dt.role||"user",restaurantId:dt.restaurantId||null,restaurantName:r?.name}}).filter(u=>u.role!=="owner"));setUsersLoaded(true)}catch{toast.error("שגיאה")}finally{setLoadingUsers2(false)}}
   const doCreate = async () => {
     setCErr(null)
     if (!cEmail.trim() || !cPass.trim()) {

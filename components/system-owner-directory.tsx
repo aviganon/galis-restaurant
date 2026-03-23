@@ -114,11 +114,6 @@ export function SystemOwnerDirectory({
   onRestaurantDeleted,
   hideCardHeader = false,
 }: Props) {
-  /** זמני — דיבוג: אם length כאן תואם ל-settings אבל UI מציג 0, הבעיה ב-filter/חיפוש */
-  useEffect(() => {
-    console.log("SystemOwnerDirectory props restaurants:", restaurants?.length)
-  }, [restaurants])
-
   const t = useTranslations()
   const { dir, locale } = useLanguage()
   /** הרכיב בעברית בלבד: כשממשק האפליקציה באנגלית `dir` הוא ltr ואז שורות המסעדה נראות הפוך. כופים RTL לפריסה עד שכל הרכיב יתורגם ואז אפשר להשתמש ב-`dir` בלבד. */

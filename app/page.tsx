@@ -94,6 +94,8 @@ export default function Home() {
 
   /** מאזין מסעדות — רק לבעל מערכת; ניקוי בהתנתקות / מעבר למשתמש רגיל (מונע רשימה ריקה בפרודקשן מטעינה חד-פעמית) */
   const restaurantsUnsubRef = useRef<(() => void) | null>(null)
+  /** מונע שני מסלולי onAuthStateChanged שרצים במקביל — האחרון "מנצח"; הישן לא מאפס restaurants */
+  const authProfileGenRef = useRef(0)
 
   const refreshRestaurants = useCallback(async () => {
     if (!isSystemOwner) return
@@ -150,6 +152,7 @@ export default function Home() {
     const unsub = onAuthStateChanged(auth, async (user) => {
       setAuthLoading(false)
       if (!user) {
+        authProfileGenRef.current += 1
         stopRestaurantsListener()
         setIsLoggedIn(false)
         setRestaurants([])
@@ -157,10 +160,13 @@ export default function Home() {
         setIsSystemOwner(false)
         return
       }
+      const authGen = ++authProfileGenRef.current
+      const authStale = () => authGen !== authProfileGenRef.current
       try {
         const { usersCollection, roleField, restaurantIdField, restaurantsCollection, restaurantFields, permissionsField, defaultPermissions } = firestoreConfig
         // getDocFromServer: עוקף מטמון — חשוב אחרי עדכון isSystemOwner בסקריפט
         const userDoc = await getDocFromServer(doc(db, usersCollection, user.uid)).catch(() => getDoc(doc(db, usersCollection, user.uid)))
+        if (authStale()) return
         const data = userDoc.exists() ? userDoc.data() : null
         let roleRaw = data?.[roleField]
         let isInAdminsList = false
@@ -213,6 +219,8 @@ export default function Home() {
         } else {
           setUserPermissions(undefined)
         }
+
+        if (authStale()) return
 
         // בעל מערכת: מאזין Firestore לכל המסעדות (עוקף מרוצים/מטמון ריק בפרודקשן ב-getDocs חד-פעמי)
         if (effectiveSystemOwner) {
@@ -275,6 +283,7 @@ export default function Home() {
           stopRestaurantsListener()
           if (userRestaurantId) {
             const restDoc = await getDoc(doc(db, restaurantsCollection, userRestaurantId))
+            if (authStale()) return
             if (restDoc.exists()) {
               const ddata = restDoc.data()
               const rName = (ddata[restaurantFields.name] ?? restDoc.id) as string
@@ -290,6 +299,7 @@ export default function Home() {
             }
           } else if (user.email && !isInAdminsList) {
             const restsSnap = await getDocs(collection(db, restaurantsCollection))
+            if (authStale()) return
             let foundRestId: string | null = null
             for (const d of restsSnap.docs) {
               try {
@@ -311,8 +321,10 @@ export default function Home() {
                 // אין הרשאה לקרוא — המשתמש לא מוזמן למסעדה זו
               }
             }
+            if (authStale()) return
             if (foundRestId) {
               const restDoc = await getDoc(doc(db, restaurantsCollection, foundRestId))
+              if (authStale()) return
               if (restDoc.exists()) {
                 const ddata = restDoc.data()
                 const rName = (ddata[restaurantFields.name] ?? restDoc.id) as string
@@ -333,6 +345,7 @@ export default function Home() {
             setCurrentRestaurant(getTranslation(localeRef.current, "app.noRestaurantLabel"))
           }
         }
+        if (authStale()) return
         setIsLoggedIn(true)
       } catch (err) {
         console.error("[Restaurant Pro] שגיאה בטעינת נתוני משתמש:", err)
