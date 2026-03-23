@@ -137,20 +137,28 @@ export function SystemOwnerDirectory({
   const [pendingInboundRequestsByRest, setPendingInboundRequestsByRest] = useState<Record<string, number>>({})
 
   useEffect(() => {
-    const q = query(collection(db, "inboundChangeRequests"), orderBy("createdAt", "desc"))
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const counts: Record<string, number> = {}
-        snap.forEach((d) => {
-          const rid = (d.data() as { restaurantId?: string }).restaurantId
-          if (rid) counts[rid] = (counts[rid] || 0) + 1
-        })
-        setPendingInboundRequestsByRest(counts)
-      },
-      (err) => console.error("[inboundChangeRequests]", err),
-    )
-    return () => unsub()
+    let unsub: (() => void) | null = null
+    try {
+      const q = query(collection(db, "inboundChangeRequests"), orderBy("createdAt", "desc"))
+      unsub = onSnapshot(
+        q,
+        (snap) => {
+          const counts: Record<string, number> = {}
+          snap.forEach((d) => {
+            const rid = (d.data() as { restaurantId?: string }).restaurantId
+            if (rid) counts[rid] = (counts[rid] || 0) + 1
+          })
+          setPendingInboundRequestsByRest(counts)
+        },
+        (err) => {
+          // האינדקס עדיין נבנה — לא נפרסים, פשוט מדלגים
+          console.warn("[inboundChangeRequests] index not ready:", err.message)
+        },
+      )
+    } catch (err) {
+      console.warn("[inboundChangeRequests] failed to subscribe:", err)
+    }
+    return () => { if (unsub) unsub() }
   }, [])
 
   const openSetPasswordDialog = (u: DirectoryUserRow) => {
