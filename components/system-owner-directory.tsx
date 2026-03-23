@@ -357,7 +357,16 @@ export function SystemOwnerDirectory({
           </div>
         </div>
 
-        <Tabs value={panelTab} onValueChange={(v) => { setPanelTab(v as "restaurant" | "user"); setSearch("") }} dir={layoutDir}>
+        {/* key: כשהמאזין ב-page ממלא restaurants אחרי רינדור ראשון — רימאונט של Radix Tabs, אחרת לעיתים תוכן «לפי מסעדה» נשאר ריק עד מעבר טאב */}
+        <Tabs
+          key={(restaurants?.length ?? 0) > 0 ? "restaurants-ready" : "restaurants-pending"}
+          value={panelTab}
+          onValueChange={(v) => {
+            setPanelTab(v as "restaurant" | "user")
+            setSearch("")
+          }}
+          dir={layoutDir}
+        >
           <TabsList className="grid w-full max-w-md grid-cols-2 h-10" dir={layoutDir}>
             <TabsTrigger value="restaurant" className="gap-1.5 text-xs sm:text-sm">
               <Building2 className="w-3.5 h-3.5" />
