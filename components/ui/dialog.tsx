@@ -66,6 +66,10 @@ function DialogContent({
         )}
         {...props}
       >
+        {/* Radix: חובה Description או aria-describedby — ברירת מחדל מונעת אזהרה בקונסול */}
+        <DialogPrimitive.Description className="sr-only">
+          תיבת דו-שיח
+        </DialogPrimitive.Description>
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close
