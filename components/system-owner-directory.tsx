@@ -403,15 +403,7 @@ export function SystemOwnerDirectory({
         </div>
 
         {panelTab === "restaurant" ? (
-          <div
-            key={
-              (restaurants?.length ?? 0) === 0
-                ? "restaurants-pane-empty"
-                : `restaurants-pane-${(restaurants ?? []).map((r) => r.id).sort().join("|")}`
-            }
-            className="mt-4 space-y-0"
-            dir={layoutDir}
-          >
+          <div className="mt-4 space-y-0" dir={layoutDir}>
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground px-1">
                 מסעדות ({filteredRestaurants.length})
