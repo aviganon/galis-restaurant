@@ -49,6 +49,7 @@ import { useTranslations } from "@/lib/use-translations"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { InboundEmailSettings } from "@/components/inbound-email-settings"
+import { InboundChangeRequestsPanel } from "@/components/inbound-change-requests-panel"
 import { SystemOwnerDirectory } from "@/components/system-owner-directory"
 import { SystemOwnerUserTabBulkSection, SystemOwnerUserTabToolbar } from "@/components/system-owner-users-management"
 import { postInviteEmail } from "@/lib/invite-email"
@@ -489,18 +490,47 @@ export function Settings() {
 
   const doAssign=async()=>{if(!assignTgt)return;setSavingAssign2(true);try{await setDoc(doc(db,"users",assignTgt.uid),{restaurantId:assignTgtRestId||null},{merge:true});setUsersData(p=>p.map(u=>u.uid===assignTgt.uid?{...u,restaurantId:assignTgtRestId||null,restaurantName:(restaurants||[]).find(r=>r.id===assignTgtRestId)?.name}:u));toast.success("שויך");setAssignTgt(null)}catch{toast.error("שגיאה")}finally{setSavingAssign2(false)}}
 
+  const goBackFromSettings = () => {
+    setCurrentPage?.(isSystemOwner && !isImpersonating ? "admin-panel" : "calc")
+  }
+
   return (
-    <div className={cn("container mx-auto px-4 py-6", isSystemOwner && !isImpersonating ? "max-w-6xl" : "max-w-4xl")}>
-      <div className="mb-6">
-        <button onClick={()=>setCurrentPage?.(isSystemOwner&&!isImpersonating?"admin-panel":"calc")}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors">
-          <ChevronLeft className="w-4 h-4"/>
-          {isSystemOwner&&!isImpersonating?"חזור לפאנל בעלים":"חזור לדף הראשי"}
-        </button>
-        <h1 className="text-2xl md:text-3xl font-bold mb-1">{t("pages.settings.title")}</h1>
-        <p className="text-muted-foreground">{t("pages.settings.subtitle")}</p>
+    <div
+      className={cn(
+        "container mx-auto px-4 pb-6",
+        isSystemOwner && !isImpersonating ? "max-w-6xl pt-2" : "max-w-4xl pt-3",
+      )}
+    >
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3 gap-y-2">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl md:text-3xl font-bold leading-tight">{t("pages.settings.title")}</h1>
+          <p className="text-muted-foreground text-sm mt-1">{t("pages.settings.subtitle")}</p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="shrink-0 gap-1.5"
+          onClick={goBackFromSettings}
+        >
+          <ChevronLeft className="w-4 h-4" />
+          חזור
+        </Button>
       </div>
       <Tabs defaultValue={isSystemOwner && !isImpersonating ? "users" : "settings"}>
+        {isSystemOwner && !isImpersonating && (
+          <TabsList className="mb-4 grid h-10 w-full max-w-2xl grid-cols-3 gap-1">
+            <TabsTrigger value="users" className="text-xs sm:text-sm px-1">
+              משתמשים ומסעדות
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="text-xs sm:text-sm px-1">
+              הגדרות
+            </TabsTrigger>
+            <TabsTrigger value="restaurant-requests" className="text-xs sm:text-sm px-1">
+              מסעדה
+            </TabsTrigger>
+          </TabsList>
+        )}
         {(!isSystemOwner || isImpersonating) && (
         <TabsList className="mb-6">
           <TabsTrigger value="settings">הגדרות</TabsTrigger>
@@ -576,7 +606,10 @@ export function Settings() {
         )}
 
         {currentRestaurantId &&
-          (userRole === "owner" || userRole === "admin" || userRole === "manager") &&
+          (userRole === "owner" ||
+            userRole === "admin" ||
+            userRole === "manager" ||
+            userRole === "user") &&
           (!isSystemOwner || isImpersonating) && (
             <Card className="border-0 shadow-sm border-primary/15 bg-primary/[0.03]">
               <CardHeader className="pb-2">
@@ -585,12 +618,11 @@ export function Settings() {
                   ייבוא ממייל למסעדה
                 </CardTitle>
                 <p className="text-sm text-muted-foreground font-normal leading-relaxed">
-                  כתובת ייחודית ל<strong>מסעדה הנבחרת</strong> במערכת (למעלה). חשבוניות ודוחות שנשלחים לכתובת מתווספים לנתוני אותה מסעדה.
-                  משתמשים ששויכו לאותה מסעדה רואים את הנתונים כאן.
+                  כתובת הייבוא <strong>מוגדרת על ידי בעל המערכת</strong>. חשבוניות ודוחות שנשלחים לכתובת מתווספים לנתוני המסעדה — אפשר להעתיק את הכתובת ולהשתמש בה; שינוי כתובת רק דרך בעל המערכת או בקשה מהכפתור למטה.
                 </p>
               </CardHeader>
               <CardContent>
-                <InboundEmailSettings />
+                <InboundEmailSettings allowEdit={false} />
               </CardContent>
             </Card>
           )}
@@ -677,7 +709,8 @@ export function Settings() {
         </Card>
         )}
 
-        {/* Security */}
+        {/* אבטחה — לא בטאב הגדרות של בעל מערכת (איפוס סיסמה בניהול משתמשים) */}
+        {(!isSystemOwner || isImpersonating) && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -708,6 +741,7 @@ export function Settings() {
             </Button>
           </CardContent>
         </Card>
+        )}
 
         {isSystemOwner && (
         <Card className="border-0 shadow-sm">
@@ -723,8 +757,10 @@ export function Settings() {
         </Card>
         )}
 
-        {/* Data Management - only for owner/manager, when restaurant selected */}
-        {currentRestaurantId && (userRole === "owner" || userRole === "admin" || userRole === "manager") && (
+        {/* ניהול נתונים — לא בטאב הגדרות של בעל מערכת (ייבוא/ייצוא במקומות אחרים לפי הצורך) */}
+        {(!isSystemOwner || isImpersonating) &&
+          currentRestaurantId &&
+          (userRole === "owner" || userRole === "admin" || userRole === "manager") && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -805,8 +841,9 @@ export function Settings() {
         </Card>
         </div>
         </TabsContent>
-        {isSystemOwner && (
+        {isSystemOwner && !isImpersonating && (
         <TabsContent value="users" className="space-y-4">
+          <div className="mx-auto w-full max-w-4xl">
           <SystemOwnerDirectory
             restaurants={restaurants || []}
             usersData={usersData}
@@ -886,6 +923,14 @@ export function Settings() {
               />
             }
           />
+          </div>
+        </TabsContent>
+        )}
+        {isSystemOwner && !isImpersonating && (
+        <TabsContent value="restaurant-requests" className="space-y-4">
+          <div className="mx-auto w-full max-w-4xl">
+            <InboundChangeRequestsPanel />
+          </div>
         </TabsContent>
         )}
       </Tabs>

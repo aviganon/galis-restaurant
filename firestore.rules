@@ -66,13 +66,21 @@ service cloud.firestore {
       allow list, create, update, delete: if request.auth != null;
 
       // appState — invitedEmails וכו' (משתמש מוזמן יכול לקרוא אם האימייל שלו ברשימה)
+      // inboundSettings — רק בעל מערכת/אדמין (כתובת ייבוא); שאר appState — גם מנהל/משתמש במסעדה
       match /appState/{docId} {
         allow read: if request.auth != null && (
           canManageAllRestaurants()
           || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId == restaurantId)
           || (docId == 'invitedEmails' && request.auth.token.email in resource.data.get('list', []))
         );
-        allow write: if request.auth != null && (canManageAllRestaurants() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId == restaurantId));
+        allow write: if request.auth != null && (
+          canManageAllRestaurants()
+          || (
+            docId != 'inboundSettings'
+            && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId == restaurantId
+          )
+        );
       }
 
       // Subcollections: recipes, ingredients — רק לבעלים/מנהל/משתמש של המסעדה
@@ -144,16 +152,21 @@ service cloud.firestore {
         || (exists(/databases/$(database)/documents/users/$(request.auth.uid))
             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId != null)
       );
-      allow create, update: if request.auth != null && (
-        canManageAllRestaurants()
-        || (exists(/databases/$(database)/documents/users/$(request.auth.uid))
-            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId == request.resource.data.restaurantId)
-      );
-      allow delete: if request.auth != null && (
-        canManageAllRestaurants()
-        || (exists(/databases/$(database)/documents/users/$(request.auth.uid))
-            && resource.data.restaurantId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId)
-      );
+      allow create, update: if request.auth != null && canManageAllRestaurants();
+      allow delete: if request.auth != null && canManageAllRestaurants();
+    }
+
+    // בקשות מצוות מסעדה לשינוי כתובת ייבוא — יוצרים חברי צוות, רואים ומוחקים רק בעל מערכת/אדמין
+    match /inboundChangeRequests/{requestId} {
+      allow create: if request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId == request.resource.data.restaurantId
+        && request.resource.data.restaurantId is string
+        && request.resource.data.message is string
+        && request.resource.data.requestedByUid is string
+        && request.resource.data.createdAt is string;
+      allow read, delete: if canManageAllRestaurants();
+      allow update: if false;
     }
   }
 }

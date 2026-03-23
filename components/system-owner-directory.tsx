@@ -245,8 +245,8 @@ export function SystemOwnerDirectory({
           ניהול מסעדות ומשתמשים
         </CardTitle>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          בשורת המסעדה: <strong>עריכה</strong> לפרטי המסעדה, <strong>ניהול צוות</strong>, ולחיצה על <strong>כתובת המייל</strong> לייבוא. לחיצה על רקע השורה בוחרת מסעדה בפאנל.{" "}
-          <span className="text-muted-foreground/90">לחיצה שוב על רקע השורה סוגרת את הפאנל.</span>
+          בשורת המסעדה: <strong>עריכה</strong> לפרטי המסעדה, <strong>ניהול צוות</strong>, ולחיצה על <strong>כתובת המייל</strong> לייבוא. לחיצה על רקע השורה פותחת פרטים <strong>מתחת</strong> לאותה שורה.{" "}
+          <span className="text-muted-foreground/90">הפרטים נפתחים מתחת לשורה; לחיצה שוב על הרקע סוגרת.</span>
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -307,26 +307,25 @@ export function SystemOwnerDirectory({
           </TabsList>
 
           <TabsContent value="restaurant" className="mt-4 space-y-0">
-            <div className="grid lg:grid-cols-12 gap-4">
-              <div className="lg:col-span-5 space-y-2">
-                <p className="text-xs font-medium text-muted-foreground px-1">
-                  מסעדות ({filteredRestaurants.length})
-                </p>
-                <div className="border rounded-xl max-h-[min(52vh,420px)] overflow-y-auto divide-y bg-card">
-                  {!restaurants?.length ? (
-                    <div className="p-6 text-sm text-muted-foreground text-center">אין מסעדות</div>
-                  ) : (
-                    filteredRestaurants.map((r) => {
-                      const n = usersByRestaurant(r.id).length
-                      const inbound = inboundMap[r.id]
-                      const addr =
-                        inbound?.inboundEmailToken != null
-                          ? buildInboundAddress(inbound.inboundEmailToken)
-                          : null
-                      const active = selectedRestId === r.id && panelTab === "restaurant"
-                      return (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground px-1">
+                מסעדות ({filteredRestaurants.length})
+              </p>
+              <div className="border rounded-xl max-h-[min(70vh,560px)] overflow-y-auto bg-card">
+                {!restaurants?.length ? (
+                  <div className="p-6 text-sm text-muted-foreground text-center">אין מסעדות</div>
+                ) : (
+                  filteredRestaurants.map((r) => {
+                    const n = usersByRestaurant(r.id).length
+                    const inbound = inboundMap[r.id]
+                    const addr =
+                      inbound?.inboundEmailToken != null
+                        ? buildInboundAddress(inbound.inboundEmailToken)
+                        : null
+                    const active = selectedRestId === r.id && panelTab === "restaurant"
+                    return (
+                      <div key={r.id} className="border-b border-border last:border-b-0">
                         <div
-                          key={r.id}
                           role="button"
                           tabIndex={0}
                           title={active ? "לחיצה על הרקע סוגרת את פאנל הפרטים" : undefined}
@@ -405,14 +404,42 @@ export function SystemOwnerDirectory({
                             </div>
                           </div>
                         </div>
-                      )
-                    })
-                  )}
-                </div>
+                        {active ? (
+                          <div
+                            className="border-t border-dashed bg-muted/20 p-3 sm:p-4"
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                          >
+                            <RestaurantDetailPanel
+                              restaurant={effectiveRest}
+                              showDetailActions={false}
+                              inboundAddress={(() => {
+                                const s = inboundMap[selectedRestId]
+                                return s?.inboundEmailToken != null
+                                  ? buildInboundAddress(s.inboundEmailToken)
+                                  : null
+                              })()}
+                              usersLoaded={usersLoaded}
+                              userCount={usersByRestaurant(selectedRestId).length}
+                              onOpenInbound={() => setInboundDialogRestId(selectedRestId)}
+                              onOpenStaff={() => setStaffDialogRestId(selectedRestId)}
+                              onOpenEdit={() => setEditRestaurantId(selectedRestId)}
+                            />
+                          </div>
+                        ) : null}
+                      </div>
+                    )
+                  })
+                )}
               </div>
 
-              <div className="lg:col-span-7 space-y-4 min-h-[280px]">
-                {selectedRestId && panelTab === "restaurant" ? (
+              {selectedRestId &&
+              panelTab === "restaurant" &&
+              !filteredRestaurants.some((r) => r.id === selectedRestId) ? (
+                <div className="rounded-xl border border-dashed bg-muted/15 p-4">
+                  <p className="text-xs text-muted-foreground mb-3">
+                    המסעדה שנבחרה לא מופיעה בתוצאות החיפוש — פרטים:
+                  </p>
                   <RestaurantDetailPanel
                     restaurant={effectiveRest}
                     showDetailActions={false}
@@ -428,43 +455,47 @@ export function SystemOwnerDirectory({
                     onOpenStaff={() => setStaffDialogRestId(selectedRestId)}
                     onOpenEdit={() => setEditRestaurantId(selectedRestId)}
                   />
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-center text-muted-foreground text-sm border rounded-xl border-dashed p-6">
-                    <Building2 className="w-10 h-10 mb-2 opacity-40" />
-                    בחר מסעדה מהרשימה כדי לראות פרטי מסעדה ומשתמשים
-                  </div>
-                )}
-              </div>
+                </div>
+              ) : null}
             </div>
           </TabsContent>
 
           <TabsContent value="user" className="mt-4 space-y-6">
             {userTabToolbar}
-            <div className="grid lg:grid-cols-12 gap-4">
-              <div className="lg:col-span-5 space-y-2">
-                <p className="text-xs font-medium text-muted-foreground px-1">
-                  משתמשים ({filteredUsers.length})
-                </p>
-                <div className="border rounded-xl max-h-[min(52vh,420px)] overflow-y-auto divide-y bg-card">
-                  {!usersLoaded ? (
-                    <div className="p-6 text-sm text-muted-foreground text-center flex items-center justify-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      טוען משתמשים…
-                    </div>
-                  ) : filteredUsers.length === 0 ? (
-                    <div className="p-6 text-sm text-muted-foreground text-center">אין תוצאות</div>
-                  ) : (
-                    filteredUsers.map((u) => {
-                      const active = selectedUserId === u.uid
-                      return (
-                        <button
-                          key={u.uid}
-                          type="button"
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground px-1">
+                משתמשים ({filteredUsers.length})
+              </p>
+              <div className="border rounded-xl max-h-[min(70vh,560px)] overflow-y-auto bg-card">
+                {!usersLoaded ? (
+                  <div className="p-6 text-sm text-muted-foreground text-center flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    טוען משתמשים…
+                  </div>
+                ) : filteredUsers.length === 0 ? (
+                  <div className="p-6 text-sm text-muted-foreground text-center">אין תוצאות</div>
+                ) : (
+                  filteredUsers.map((u) => {
+                    const active = selectedUserId === u.uid && panelTab === "user"
+                    const restForUser = u.restaurantId
+                      ? restaurants.find((r) => r.id === u.restaurantId)
+                      : undefined
+                    return (
+                      <div key={u.uid} className="border-b border-border last:border-b-0">
+                        <div
+                          role="button"
+                          tabIndex={0}
                           title={active ? "לחיצה שוב סוגרת את פאנל הפרטים" : undefined}
                           onClick={() => selectUserRow(u)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault()
+                              selectUserRow(u)
+                            }
+                          }}
                           className={cn(
-                            "w-full text-right p-3 transition-colors hover:bg-muted/60",
-                            active && "bg-primary/10 ring-1 ring-primary/25"
+                            "w-full text-right p-3 transition-colors hover:bg-muted/60 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-none",
+                            active && "bg-primary/10 ring-1 ring-inset ring-primary/25",
                           )}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -476,90 +507,130 @@ export function SystemOwnerDirectory({
                             </div>
                             <UserCircle2 className="w-4 h-4 shrink-0 text-muted-foreground mt-0.5" />
                           </div>
-                        </button>
-                      )
-                    })
-                  )}
-                </div>
-              </div>
-
-              <div className="lg:col-span-7 space-y-4 min-h-[280px]">
-                {selectedUser ? (
-                  <div className="space-y-4">
-                    <div className="rounded-xl border bg-muted/30 p-4 space-y-2">
-                      <div className="text-sm font-semibold flex items-center gap-2">
-                        <UserCircle2 className="w-4 h-4" />
-                        {selectedUser.email}
-                      </div>
-                      <div className="text-xs text-muted-foreground space-y-1">
-                        <p>
-                          תפקיד: <strong className="text-foreground">{selectedUser.role}</strong>
-                        </p>
-                        <p>
-                          מסעדה:{" "}
-                          <strong className="text-foreground">
-                            {selectedUser.restaurantName || "— לא משויך —"}
-                          </strong>
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        <Button size="sm" variant="secondary" onClick={() => onEditUser(selectedUser)}>
-                          ערוך משתמש
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => void handlePasswordResetUser(selectedUser)}
-                          disabled={!selectedUser.email?.trim() || sendingPasswordResetUid === selectedUser.uid}
-                          title={selectedUser.email?.trim() ? t("pages.settings.resetPasswordForUser") : t("pages.settings.noEmailForReset")}
-                        >
-                          {sendingPasswordResetUid === selectedUser.uid ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <KeyRound className="w-3.5 h-3.5" />
-                          )}
-                          {t("pages.settings.resetPasswordForUser")}
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => onAssignClick(selectedUser)}>
-                          שייך מסעדה
-                        </Button>
-                        {onSendInvite ? (
-                          <Button size="sm" variant="outline" onClick={() => onSendInvite(selectedUser)}>
-                            הזמנה במייל
-                          </Button>
+                        </div>
+                        {active ? (
+                          <div
+                            className="space-y-3 border-t border-dashed bg-muted/20 p-3 sm:p-4"
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                          >
+                            <div className="rounded-xl border bg-muted/30 p-4 space-y-2">
+                              <div className="text-sm font-semibold flex items-center gap-2">
+                                <UserCircle2 className="w-4 h-4" />
+                                {u.email}
+                              </div>
+                              <div className="text-xs text-muted-foreground space-y-1">
+                                <p>
+                                  תפקיד: <strong className="text-foreground">{u.role}</strong>
+                                </p>
+                                <p>
+                                  מסעדה:{" "}
+                                  <strong className="text-foreground">
+                                    {u.restaurantName || "— לא משויך —"}
+                                  </strong>
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap gap-2 pt-1">
+                                <Button size="sm" variant="secondary" onClick={() => onEditUser(u)}>
+                                  ערוך משתמש
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => void handlePasswordResetUser(u)}
+                                  disabled={!u.email?.trim() || sendingPasswordResetUid === u.uid}
+                                  title={
+                                    u.email?.trim()
+                                      ? t("pages.settings.resetPasswordForUser")
+                                      : t("pages.settings.noEmailForReset")
+                                  }
+                                >
+                                  {sendingPasswordResetUid === u.uid ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <KeyRound className="w-3.5 h-3.5" />
+                                  )}
+                                  {t("pages.settings.resetPasswordForUser")}
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => onAssignClick(u)}>
+                                  שייך מסעדה
+                                </Button>
+                                {onSendInvite ? (
+                                  <Button size="sm" variant="outline" onClick={() => onSendInvite(u)}>
+                                    הזמנה במייל
+                                  </Button>
+                                ) : null}
+                              </div>
+                            </div>
+                            {u.restaurantId ? (
+                              <RestaurantDetailPanel
+                                restaurant={restForUser}
+                                showDetailActions
+                                inboundAddress={(() => {
+                                  const s = inboundMap[u.restaurantId!]
+                                  return s?.inboundEmailToken != null
+                                    ? buildInboundAddress(s.inboundEmailToken)
+                                    : null
+                                })()}
+                                usersLoaded={usersLoaded}
+                                userCount={usersByRestaurant(u.restaurantId).length}
+                                onOpenInbound={() => setInboundDialogRestId(u.restaurantId!)}
+                                onOpenStaff={() => setStaffDialogRestId(u.restaurantId!)}
+                                onOpenEdit={() => setEditRestaurantId(u.restaurantId!)}
+                              />
+                            ) : (
+                              <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground text-center">
+                                למשתמש זה אין מסעדה משויכת — לחץ &quot;שייך מסעדה&quot; כדי לקשר.
+                              </div>
+                            )}
+                          </div>
                         ) : null}
                       </div>
-                    </div>
-
-                    {selectedUser.restaurantId ? (
-                      <RestaurantDetailPanel
-                        restaurant={effectiveRest}
-                        showDetailActions
-                        inboundAddress={(() => {
-                          const s = inboundMap[selectedUser.restaurantId!]
-                          return s?.inboundEmailToken != null
-                            ? buildInboundAddress(s.inboundEmailToken)
-                            : null
-                        })()}
-                        usersLoaded={usersLoaded}
-                        userCount={usersByRestaurant(selectedUser.restaurantId).length}
-                        onOpenInbound={() => setInboundDialogRestId(selectedUser.restaurantId!)}
-                        onOpenStaff={() => setStaffDialogRestId(selectedUser.restaurantId!)}
-                        onOpenEdit={() => setEditRestaurantId(selectedUser.restaurantId!)}
-                      />
-                    ) : (
-                      <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground text-center">
-                        למשתמש זה אין מסעדה משויכת — לחץ &quot;שייך מסעדה&quot; כדי לקשר.
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-center text-muted-foreground text-sm border rounded-xl border-dashed p-6">
-                    <Users className="w-10 h-10 mb-2 opacity-40" />
-                    בחר משתמש מהרשימה
-                  </div>
+                    )
+                  })
                 )}
               </div>
+
+              {selectedUser &&
+              panelTab === "user" &&
+              !filteredUsers.some((x) => x.uid === selectedUser.uid) ? (
+                <div className="rounded-xl border border-dashed bg-muted/15 p-4 space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    המשתמש שנבחר לא מופיע בתוצאות החיפוש — פרטים:
+                  </p>
+                  <div className="rounded-xl border bg-muted/30 p-4 space-y-2">
+                    <div className="text-sm font-semibold flex items-center gap-2">
+                      <UserCircle2 className="w-4 h-4" />
+                      {selectedUser.email}
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <Button size="sm" variant="secondary" onClick={() => onEditUser(selectedUser)}>
+                        ערוך משתמש
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => onAssignClick(selectedUser)}>
+                        שייך מסעדה
+                      </Button>
+                    </div>
+                  </div>
+                  {selectedUser.restaurantId ? (
+                    <RestaurantDetailPanel
+                      restaurant={effectiveRest}
+                      showDetailActions
+                      inboundAddress={(() => {
+                        const s = inboundMap[selectedUser.restaurantId!]
+                        return s?.inboundEmailToken != null
+                          ? buildInboundAddress(s.inboundEmailToken)
+                          : null
+                      })()}
+                      usersLoaded={usersLoaded}
+                      userCount={usersByRestaurant(selectedUser.restaurantId).length}
+                      onOpenInbound={() => setInboundDialogRestId(selectedUser.restaurantId!)}
+                      onOpenStaff={() => setStaffDialogRestId(selectedUser.restaurantId!)}
+                      onOpenEdit={() => setEditRestaurantId(selectedUser.restaurantId!)}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
             </div>
             {userTabBulk}
           </TabsContent>
@@ -1021,6 +1092,7 @@ function DirectoryRestaurantDialogs({
             </DialogHeader>
             <InboundEmailSettings
               externalRestaurantId={inboundRestId}
+              allowEdit
               onInboundCreated={onInboundRefresh}
             />
           </DialogContent>
@@ -1212,7 +1284,7 @@ function RestaurantDetailPanel({
             <span className="mx-1">·</span>
             {branchLabel}
             <br />
-            <span className="text-xs">ייבוא ממייל, עריכה וניהול צוות — בשורה ברשימה משמאל.</span>
+            <span className="text-xs">ייבוא ממייל, עריכה וניהול צוות — בכפתורים בשורת המסעדה למעלה.</span>
           </div>
           <Button type="button" variant="secondary" size="sm" className="gap-1.5" onClick={onOpenEdit}>
             <Pencil className="h-3.5 w-3.5 shrink-0" />

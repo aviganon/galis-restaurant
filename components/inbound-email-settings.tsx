@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { doc, getDoc, setDoc, deleteDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { doc, getDoc, setDoc, deleteDoc, addDoc, collection } from "firebase/firestore"
+import { auth, db } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -29,19 +29,30 @@ import {
   type InboundSettings,
   type InboundSlugAvailability,
 } from "@/lib/inbound-email"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 interface Props {
   externalRestaurantId?: string
   compact?: boolean
   onInboundCreated?: () => void
+  /** false = צפייה והעתקה בלבד + בקשת שינוי לבעל המערכת (הגדרות מסעדה) */
+  allowEdit?: boolean
 }
 
 export function InboundEmailSettings({
   externalRestaurantId,
   compact = false,
   onInboundCreated,
+  allowEdit = true,
 }: Props) {
-  const { currentRestaurantId } = useApp()
+  const { currentRestaurantId, restaurants } = useApp()
   const restaurantId = externalRestaurantId ?? currentRestaurantId
 
   const [settings, setSettings] = useState<InboundSettings | null>(null)
@@ -55,6 +66,9 @@ export function InboundEmailSettings({
   const [slugChecking, setSlugChecking] = useState(false)
   /** קומפקטי + כבר יש כתובת — להציג טופס החלפת מזהה */
   const [compactEditSlug, setCompactEditSlug] = useState(false)
+  const [requestDialogOpen, setRequestDialogOpen] = useState(false)
+  const [requestMessage, setRequestMessage] = useState("")
+  const [requestSubmitting, setRequestSubmitting] = useState(false)
 
   useEffect(() => {
     if (!restaurantId) {
@@ -197,6 +211,29 @@ export function InboundEmailSettings({
     toast.success("הכתובת הועתקה")
   }
 
+  const submitChangeRequest = async () => {
+    if (!restaurantId || !requestMessage.trim()) return
+    setRequestSubmitting(true)
+    try {
+      const rest = restaurants?.find((r) => r.id === restaurantId)
+      await addDoc(collection(db, "inboundChangeRequests"), {
+        restaurantId,
+        restaurantName: rest?.name ?? null,
+        message: requestMessage.trim(),
+        requestedByUid: auth.currentUser?.uid ?? "",
+        requestedByEmail: auth.currentUser?.email ?? null,
+        createdAt: new Date().toISOString(),
+      })
+      toast.success("הבקשה נשלחה לבעל המערכת")
+      setRequestDialogOpen(false)
+      setRequestMessage("")
+    } catch (e) {
+      toast.error((e as Error).message || "שגיאה בשליחה")
+    } finally {
+      setRequestSubmitting(false)
+    }
+  }
+
   const handleAddEmail = async () => {
     if (!settings || !newEmail.trim()) return
     await save(
@@ -230,6 +267,90 @@ export function InboundEmailSettings({
           <span>טוען...</span>
         </CardContent>
       </Card>
+    )
+  }
+
+  if (!allowEdit) {
+    if (compact && !settings) {
+      return (
+        <div className="w-full rounded-lg border border-dashed bg-muted/20 p-2.5 text-center text-[11px] text-muted-foreground">
+          לא הוגדרה כתובת ייבוא על ידי בעל המערכת
+        </div>
+      )
+    }
+    if (compact && settings) {
+      return (
+        <div className="w-full space-y-2">
+          <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/40 border text-sm">
+            <Mail className="w-3.5 h-3.5 text-primary shrink-0" />
+            <span className="font-mono text-xs truncate flex-1">{buildInboundAddress(settings.inboundEmailToken)}</span>
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCopy}>
+              {copied ? <CheckCircle2 className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground text-center">שינוי כתובת — דרך בעל המערכת בלבד</p>
+        </div>
+      )
+    }
+    return (
+      <>
+        <div className="space-y-4">
+          <div className="flex gap-2 p-3 rounded-lg bg-muted/40 text-sm text-foreground">
+            <Info className="w-4 h-4 mt-0.5 shrink-0" />
+            <p>
+              כתובת הייבוא <strong>מוגדרת על ידי בעל המערכת</strong>. אפשר להעתיק ולשלוח אליה חשבוניות; לשינוי הכתובת ניתן לשלוח בקשה.
+            </p>
+          </div>
+          {!settings ? (
+            <p className="text-sm text-muted-foreground">עדיין לא הוגדרה כתובת מייל ייבוא למסעדה זו.</p>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">כתובת הייבוא</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div
+                    className="flex-1 min-w-[200px] rounded-lg border bg-muted/30 px-3 py-2.5 text-sm font-mono select-all break-all text-right"
+                    dir="ltr"
+                  >
+                    {buildInboundAddress(settings.inboundEmailToken)}
+                  </div>
+                  <Button size="icon" variant={copied ? "default" : "outline"} onClick={handleCopy} title="העתק">
+                    {copied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  </Button>
+                </div>
+              </div>
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setRequestDialogOpen(true)}>
+                בקשה לשינוי כתובת…
+              </Button>
+            </>
+          )}
+        </div>
+        <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
+          <DialogContent dir="rtl" className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>בקשה לשינוי כתובת ייבוא</DialogTitle>
+              <DialogDescription>
+                הבקשה תישלח לבעל המערכת. תאר במדויק מה תרצו לשנות (למשל מזהה חדש או סיבה).
+              </DialogDescription>
+            </DialogHeader>
+            <textarea
+              className="w-full min-h-[100px] rounded-md border bg-background px-3 py-2 text-sm"
+              placeholder="לדוגמה: נא לשנות את המזהה לשם הסניף באנגלית…"
+              value={requestMessage}
+              onChange={(e) => setRequestMessage(e.target.value)}
+            />
+            <DialogFooter className="gap-2 sm:justify-start">
+              <Button variant="outline" onClick={() => setRequestDialogOpen(false)}>
+                ביטול
+              </Button>
+              <Button onClick={() => void submitChangeRequest()} disabled={requestSubmitting || !requestMessage.trim()}>
+                {requestSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                שלח בקשה
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
     )
   }
 

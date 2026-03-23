@@ -341,7 +341,7 @@ export default function Home() {
   const compactSystemOwnerShell =
     isSystemOwner &&
     !impersonatingRestaurant &&
-    (currentPage === "admin-panel" || currentPage === "dashboard")
+    (currentPage === "admin-panel" || currentPage === "dashboard" || currentPage === "settings")
   const handleImpersonate = (rest: { id: string; name: string; emoji?: string }) => {
     const display = rest.emoji ? `${rest.emoji} ${rest.name}` : rest.name
     setImpersonatingRestaurant({ id: rest.id, name: display })
