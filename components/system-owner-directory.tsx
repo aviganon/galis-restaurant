@@ -42,7 +42,6 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import {
   Building2,
@@ -357,28 +356,54 @@ export function SystemOwnerDirectory({
           </div>
         </div>
 
-        {/* key: כשהמאזין ב-page ממלא restaurants אחרי רינדור ראשון — רימאונט של Radix Tabs, אחרת לעיתים תוכן «לפי מסעדה» נשאר ריק עד מעבר טאב */}
-        <Tabs
-          key={(restaurants?.length ?? 0) > 0 ? "restaurants-ready" : "restaurants-pending"}
-          value={panelTab}
-          onValueChange={(v) => {
-            setPanelTab(v as "restaurant" | "user")
-            setSearch("")
-          }}
+        {/* ללא Radix Tabs: Content מוסתר עם display:none לא תמיד מתעדכן כש־restaurants מגיעים מהמאזין — טאבים ידניים */}
+        <div
+          role="tablist"
+          className="bg-muted text-muted-foreground grid w-full max-w-md grid-cols-2 h-10 items-stretch gap-1 rounded-lg p-1"
           dir={layoutDir}
         >
-          <TabsList className="grid w-full max-w-md grid-cols-2 h-10" dir={layoutDir}>
-            <TabsTrigger value="restaurant" className="gap-1.5 text-xs sm:text-sm">
-              <Building2 className="w-3.5 h-3.5" />
-              לפי מסעדה
-            </TabsTrigger>
-            <TabsTrigger value="user" className="gap-1.5 text-xs sm:text-sm">
-              <Users className="w-3.5 h-3.5" />
-              לפי משתמש
-            </TabsTrigger>
-          </TabsList>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={panelTab === "restaurant"}
+            className={cn(
+              "inline-flex items-center justify-center gap-1.5 rounded-md border border-transparent px-2 text-xs font-medium transition-[color,box-shadow] sm:text-sm",
+              "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
+              panelTab === "restaurant"
+                ? "border-input bg-background text-foreground shadow-sm dark:bg-input/30"
+                : "text-foreground hover:text-foreground/90",
+            )}
+            onClick={() => {
+              setPanelTab("restaurant")
+              setSearch("")
+            }}
+          >
+            <Building2 className="w-3.5 h-3.5 shrink-0" />
+            לפי מסעדה
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={panelTab === "user"}
+            className={cn(
+              "inline-flex items-center justify-center gap-1.5 rounded-md border border-transparent px-2 text-xs font-medium transition-[color,box-shadow] sm:text-sm",
+              "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
+              panelTab === "user"
+                ? "border-input bg-background text-foreground shadow-sm dark:bg-input/30"
+                : "text-foreground hover:text-foreground/90",
+            )}
+            onClick={() => {
+              setPanelTab("user")
+              setSearch("")
+            }}
+          >
+            <Users className="w-3.5 h-3.5 shrink-0" />
+            לפי משתמש
+          </button>
+        </div>
 
-          <TabsContent value="restaurant" className="mt-4 space-y-0" dir={layoutDir}>
+        {panelTab === "restaurant" ? (
+          <div className="mt-4 space-y-0" dir={layoutDir}>
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground px-1">
                 מסעדות ({filteredRestaurants.length})
@@ -560,9 +585,9 @@ export function SystemOwnerDirectory({
                 </div>
               ) : null}
             </div>
-          </TabsContent>
-
-          <TabsContent value="user" className="mt-4 space-y-6" dir={layoutDir}>
+          </div>
+        ) : (
+          <div className="mt-4 space-y-6" dir={layoutDir}>
             {userTabToolbar}
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground px-1">
@@ -731,8 +756,8 @@ export function SystemOwnerDirectory({
               ) : null}
             </div>
             {userTabBulk}
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
 
         <Dialog
           open={!!passwordDialogUser}
