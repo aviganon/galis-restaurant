@@ -3,7 +3,16 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { AnimatePresence, motion, type Variants } from "framer-motion"
 import { onAuthStateChanged, signOut } from "firebase/auth"
-import { doc, getDoc, getDocFromServer, getDocsFromServer, setDoc, collection, getDocs } from "firebase/firestore"
+import {
+  doc,
+  getDoc,
+  getDocFromServer,
+  getDocsFromServer,
+  setDoc,
+  collection,
+  getDocs,
+  onSnapshot,
+} from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
 import { firestoreConfig } from "@/lib/firestore-config"
 import { LoginScreen } from "@/components/login-screen"
@@ -83,6 +92,9 @@ export default function Home() {
   const [impersonatingRestaurant, setImpersonatingRestaurant] = useState<{ id: string; name: string } | null>(null)
   const [refreshIngredientsKey, setRefreshIngredientsKey] = useState(0)
 
+  /** מאזין מסעדות — רק לבעל מערכת; ניקוי בהתנתקות / מעבר למשתמש רגיל (מונע רשימה ריקה בפרודקשן מטעינה חד-פעמית) */
+  const restaurantsUnsubRef = useRef<(() => void) | null>(null)
+
   const refreshRestaurants = useCallback(async () => {
     if (!isSystemOwner) return
     try {
@@ -130,10 +142,19 @@ export default function Home() {
   }, [locale])
 
   useEffect(() => {
+    const stopRestaurantsListener = () => {
+      restaurantsUnsubRef.current?.()
+      restaurantsUnsubRef.current = null
+    }
+
     const unsub = onAuthStateChanged(auth, async (user) => {
       setAuthLoading(false)
       if (!user) {
+        stopRestaurantsListener()
         setIsLoggedIn(false)
+        setRestaurants([])
+        setCurrentRestaurantId(null)
+        setIsSystemOwner(false)
         return
       }
       try {
@@ -193,70 +214,67 @@ export default function Home() {
           setUserPermissions(undefined)
         }
 
-        // בעלים מ-config/admins או users.isSystemOwner: רואה את כל המסעדות (getDocsFromServer עוקף מטמון)
+        // בעל מערכת: מאזין Firestore לכל המסעדות (עוקף מרוצים/מטמון ריק בפרודקשן ב-getDocs חד-פעמי)
         if (effectiveSystemOwner) {
-          const restsSnap = await getDocsFromServer(collection(db, restaurantsCollection)).catch((e) => {
-            console.error("[Restaurant Pro] שגיאה בטעינת מסעדות:", e)
-            return getDocs(collection(db, restaurantsCollection))
-          })
-          const list: { id: string; name: string; branch?: string; emoji?: string }[] = []
-          restsSnap.forEach((d) => {
-            const ddata = d.data()
-            list.push({
-              id: d.id,
-              name: (ddata[restaurantFields.name] ?? d.id) as string,
-              branch: ddata[restaurantFields.branch] as string | undefined,
-              emoji: ddata[restaurantFields.emoji] as string | undefined,
-            })
-          })
-          setRestaurants(list)
-          if (list.length > 0) {
-            const first = list[0]
-            setCurrentRestaurant(first.emoji ? `${first.emoji} ${first.name}` : first.name)
-            setCurrentRestaurantId(first.id)
-          } else {
-            setCurrentRestaurant(getTranslation(localeRef.current, "app.noRestaurants"))
-          }
-        } else if (userRestaurantId) {
-          const restDoc = await getDoc(doc(db, restaurantsCollection, userRestaurantId))
-          if (restDoc.exists()) {
-            const ddata = restDoc.data()
-            const rName = (ddata[restaurantFields.name] ?? restDoc.id) as string
-            const rEmoji = ddata[restaurantFields.emoji] as string | undefined
-            const name = rEmoji ? `${rEmoji} ${rName}` : rName
-            setRestaurants([{ id: restDoc.id, name: rName, branch: ddata[restaurantFields.branch] as string | undefined, emoji: rEmoji }])
-            setCurrentRestaurant(name)
-            setCurrentRestaurantId(restDoc.id)
-          } else {
-            setRestaurants([{ id: userRestaurantId, name: userRestaurantId }])
-            setCurrentRestaurant(userRestaurantId)
-            setCurrentRestaurantId(userRestaurantId)
-          }
-        } else if (user.email && !isInAdminsList) {
-          const restsSnap = await getDocs(collection(db, restaurantsCollection))
-          let foundRestId: string | null = null
-          for (const d of restsSnap.docs) {
-            try {
-              const invDoc = await getDoc(doc(db, "restaurants", d.id, "appState", "invitedEmails"))
-              const list: string[] = Array.isArray(invDoc.data()?.list) ? invDoc.data()!.list : []
-              if (list.includes(user.email!)) {
-                foundRestId = d.id
-                await setDoc(doc(db, usersCollection, user.uid), {
-                  restaurantId: d.id,
-                  role: "user",
-                  email: user.email,
-                  permissions: defaultPermissions,
-                }, { merge: true })
-                const newList = list.filter((e) => e !== user.email)
-                await setDoc(doc(db, "restaurants", d.id, "appState", "invitedEmails"), { list: newList }, { merge: true })
-                break
+          stopRestaurantsListener()
+          const unsubRests = onSnapshot(
+            collection(db, restaurantsCollection),
+            (snap) => {
+              const list: { id: string; name: string; branch?: string; emoji?: string }[] = []
+              snap.forEach((d) => {
+                const ddata = d.data()
+                list.push({
+                  id: d.id,
+                  name: (ddata[restaurantFields.name] ?? d.id) as string,
+                  branch: ddata[restaurantFields.branch] as string | undefined,
+                  emoji: ddata[restaurantFields.emoji] as string | undefined,
+                })
+              })
+              setRestaurants(list)
+              if (list.length > 0) {
+                setCurrentRestaurantId((prev) => {
+                  const id = prev && list.some((r) => r.id === prev) ? prev : list[0].id
+                  const pick = list.find((r) => r.id === id)!
+                  queueMicrotask(() =>
+                    setCurrentRestaurant(pick.emoji ? `${pick.emoji} ${pick.name}` : pick.name),
+                  )
+                  return id
+                })
+              } else {
+                setCurrentRestaurant(getTranslation(localeRef.current, "app.noRestaurants"))
+                setCurrentRestaurantId(null)
               }
-            } catch {
-              // אין הרשאה לקרוא — המשתמש לא מוזמן למסעדה זו
-            }
-          }
-          if (foundRestId) {
-            const restDoc = await getDoc(doc(db, restaurantsCollection, foundRestId))
+            },
+            (err) => {
+              console.error("[Restaurant Pro] מאזין מסעדות — שגיאה, ננסה טעינה חד-פעמית:", err)
+              void getDocsFromServer(collection(db, restaurantsCollection))
+                .catch(() => getDocs(collection(db, restaurantsCollection)))
+                .then((restsSnap) => {
+                  const list: { id: string; name: string; branch?: string; emoji?: string }[] = []
+                  restsSnap.forEach((d) => {
+                    const ddata = d.data()
+                    list.push({
+                      id: d.id,
+                      name: (ddata[restaurantFields.name] ?? d.id) as string,
+                      branch: ddata[restaurantFields.branch] as string | undefined,
+                      emoji: ddata[restaurantFields.emoji] as string | undefined,
+                    })
+                  })
+                  setRestaurants(list)
+                  if (list.length > 0) {
+                    const first = list[0]
+                    setCurrentRestaurant(first.emoji ? `${first.emoji} ${first.name}` : first.name)
+                    setCurrentRestaurantId(first.id)
+                  }
+                })
+                .catch((e) => console.error("[Restaurant Pro] גיבוי טעינת מסעדות נכשל:", e))
+            },
+          )
+          restaurantsUnsubRef.current = unsubRests
+        } else {
+          stopRestaurantsListener()
+          if (userRestaurantId) {
+            const restDoc = await getDoc(doc(db, restaurantsCollection, userRestaurantId))
             if (restDoc.exists()) {
               const ddata = restDoc.data()
               const rName = (ddata[restaurantFields.name] ?? restDoc.id) as string
@@ -265,16 +283,55 @@ export default function Home() {
               setRestaurants([{ id: restDoc.id, name: rName, branch: ddata[restaurantFields.branch] as string | undefined, emoji: rEmoji }])
               setCurrentRestaurant(name)
               setCurrentRestaurantId(restDoc.id)
+            } else {
+              setRestaurants([{ id: userRestaurantId, name: userRestaurantId }])
+              setCurrentRestaurant(userRestaurantId)
+              setCurrentRestaurantId(userRestaurantId)
             }
-            setUserRole("user")
-            setUserPermissions(defaultPermissions)
+          } else if (user.email && !isInAdminsList) {
+            const restsSnap = await getDocs(collection(db, restaurantsCollection))
+            let foundRestId: string | null = null
+            for (const d of restsSnap.docs) {
+              try {
+                const invDoc = await getDoc(doc(db, "restaurants", d.id, "appState", "invitedEmails"))
+                const list: string[] = Array.isArray(invDoc.data()?.list) ? invDoc.data()!.list : []
+                if (list.includes(user.email!)) {
+                  foundRestId = d.id
+                  await setDoc(doc(db, usersCollection, user.uid), {
+                    restaurantId: d.id,
+                    role: "user",
+                    email: user.email,
+                    permissions: defaultPermissions,
+                  }, { merge: true })
+                  const newList = list.filter((e) => e !== user.email)
+                  await setDoc(doc(db, "restaurants", d.id, "appState", "invitedEmails"), { list: newList }, { merge: true })
+                  break
+                }
+              } catch {
+                // אין הרשאה לקרוא — המשתמש לא מוזמן למסעדה זו
+              }
+            }
+            if (foundRestId) {
+              const restDoc = await getDoc(doc(db, restaurantsCollection, foundRestId))
+              if (restDoc.exists()) {
+                const ddata = restDoc.data()
+                const rName = (ddata[restaurantFields.name] ?? restDoc.id) as string
+                const rEmoji = ddata[restaurantFields.emoji] as string | undefined
+                const name = rEmoji ? `${rEmoji} ${rName}` : rName
+                setRestaurants([{ id: restDoc.id, name: rName, branch: ddata[restaurantFields.branch] as string | undefined, emoji: rEmoji }])
+                setCurrentRestaurant(name)
+                setCurrentRestaurantId(restDoc.id)
+              }
+              setUserRole("user")
+              setUserPermissions(defaultPermissions)
+            } else {
+              setRestaurants([])
+              setCurrentRestaurant(getTranslation(localeRef.current, "app.noRestaurantLabel"))
+            }
           } else {
             setRestaurants([])
             setCurrentRestaurant(getTranslation(localeRef.current, "app.noRestaurantLabel"))
           }
-        } else {
-          setRestaurants([])
-          setCurrentRestaurant(getTranslation(localeRef.current, "app.noRestaurantLabel"))
         }
         setIsLoggedIn(true)
       } catch (err) {
@@ -283,7 +340,10 @@ export default function Home() {
         setIsLoggedIn(true)
       }
     })
-    return () => unsub()
+    return () => {
+      stopRestaurantsListener()
+      unsub()
+    }
     // locale דרך localeRef — לא מפעילים מחדש onAuthStateChanged כשהשפה משתנה (מונע מרוצים / איפוס state)
   }, [])
 
