@@ -83,12 +83,6 @@ export default function Home() {
   const [impersonatingRestaurant, setImpersonatingRestaurant] = useState<{ id: string; name: string } | null>(null)
   const [refreshIngredientsKey, setRefreshIngredientsKey] = useState(0)
 
-  /** מונע איפוס רשימת מסעדות ברענון טוקן כש־onAuthStateChanged רץ שוב לפני שהמסמך users חוזר מהרשת */
-  const restaurantsLengthRef = useRef(0)
-  useEffect(() => {
-    restaurantsLengthRef.current = restaurants.length
-  }, [restaurants.length])
-
   const refreshRestaurants = useCallback(async () => {
     if (!isSystemOwner) return
     try {
@@ -118,10 +112,16 @@ export default function Home() {
 
   const refreshIngredients = useCallback(() => setRefreshIngredientsKey((k) => k + 1), [])
 
-  /** בעל מערכת בהגדרות: טעינת מסעדות ל-context אם ריק (בלי לגרום לריצה חוזרת כשהרשימה כבר מלאה) */
+  /** ניסיון נוסף לטעון מסעדות ל-context כשבעל מערכת נכנס להגדרות והרשימה עדיין ריקה (race/cache בפרודקשן) */
+  const settingsRestaurantsRefreshAttempted = useRef(false)
   useEffect(() => {
     if (currentPage !== "settings" || !isSystemOwner || impersonatingRestaurant) return
-    if (restaurants.length > 0) return
+    if (restaurants.length > 0) {
+      settingsRestaurantsRefreshAttempted.current = false
+      return
+    }
+    if (settingsRestaurantsRefreshAttempted.current) return
+    settingsRestaurantsRefreshAttempted.current = true
     void refreshRestaurants()
   }, [currentPage, isSystemOwner, impersonatingRestaurant, restaurants.length, refreshRestaurants])
 
@@ -133,7 +133,6 @@ export default function Home() {
     const unsub = onAuthStateChanged(auth, async (user) => {
       setAuthLoading(false)
       if (!user) {
-        restaurantsLengthRef.current = 0
         setIsLoggedIn(false)
         return
       }
@@ -142,11 +141,6 @@ export default function Home() {
         // getDocFromServer: עוקף מטמון — חשוב אחרי עדכון isSystemOwner בסקריפט
         const userDoc = await getDocFromServer(doc(db, usersCollection, user.uid)).catch(() => getDoc(doc(db, usersCollection, user.uid)))
         const data = userDoc.exists() ? userDoc.data() : null
-        // רענון טוקן: אם מסמך users חסר רגעית אבל כבר יש מסעדות ב־UI — לא מריצים לוגיקה שמאפסת רשימה
-        if (!userDoc.exists() && restaurantsLengthRef.current > 0) {
-          setIsLoggedIn(true)
-          return
-        }
         let roleRaw = data?.[roleField]
         let isInAdminsList = false
         if (user.email) {
@@ -275,17 +269,12 @@ export default function Home() {
             setUserRole("user")
             setUserPermissions(defaultPermissions)
           } else {
-            if (restaurantsLengthRef.current === 0) {
-              setRestaurants([])
-              setCurrentRestaurant(getTranslation(localeRef.current, "app.noRestaurantLabel"))
-            }
-          }
-        } else {
-          // לא מאפסים אם כבר נטענו מסעדות (מניעת הבהוב/נעלמות אחרי רענון טוקן)
-          if (restaurantsLengthRef.current === 0) {
             setRestaurants([])
             setCurrentRestaurant(getTranslation(localeRef.current, "app.noRestaurantLabel"))
           }
+        } else {
+          setRestaurants([])
+          setCurrentRestaurant(getTranslation(localeRef.current, "app.noRestaurantLabel"))
         }
         setIsLoggedIn(true)
       } catch (err) {
