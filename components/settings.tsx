@@ -126,6 +126,7 @@ export function Settings() {
   const [dailySummary, setDailySummary] = useState(true)
   const [supplierAlerts, setSupplierAlerts] = useState(false)
   const [weeklyReport, setWeeklyReport] = useState(true)
+  const [restaurantSettingsTab, setRestaurantSettingsTab] = useState<"profile" | "team" | "operations">("profile")
   const [loadingNotifications, setLoadingNotifications] = useState(true)
   const [savingNotification, setSavingNotification] = useState<string | null>(null)
 
@@ -771,6 +772,41 @@ export function Settings() {
         <div className="space-y-6">
         {(!isSystemOwner || isImpersonating) && (
         <Card className="border-0 shadow-sm">
+          <CardContent className="p-3">
+            <div className="grid grid-cols-3 gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={restaurantSettingsTab === "profile" ? "default" : "outline"}
+                className="h-9"
+                onClick={() => setRestaurantSettingsTab("profile")}
+              >
+                פרופיל
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={restaurantSettingsTab === "team" ? "default" : "outline"}
+                className="h-9"
+                onClick={() => setRestaurantSettingsTab("team")}
+              >
+                צוות
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={restaurantSettingsTab === "operations" ? "default" : "outline"}
+                className="h-9"
+                onClick={() => setRestaurantSettingsTab("operations")}
+              >
+                תפעול
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        )}
+        {(!isSystemOwner || isImpersonating) && restaurantSettingsTab === "profile" && (
+        <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
               <User className="w-5 h-5 text-muted-foreground" />
@@ -844,7 +880,7 @@ export function Settings() {
         </Card>
 
         )}
-        {currentRestaurantId && (!isSystemOwner || isImpersonating) && (
+        {currentRestaurantId && (!isSystemOwner || isImpersonating) && restaurantSettingsTab === "operations" && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -863,7 +899,7 @@ export function Settings() {
             settingsViewRole === "admin" ||
             settingsViewRole === "manager" ||
             settingsViewRole === "user") &&
-          (!isSystemOwner || isImpersonating) && (
+          (!isSystemOwner || isImpersonating) && restaurantSettingsTab === "team" && (
             <Card className="border-0 shadow-sm border-primary/15 bg-primary/[0.03]">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -880,7 +916,7 @@ export function Settings() {
             </Card>
           )}
 
-        {canManageTeamInOwnRestaurant && (
+        {canManageTeamInOwnRestaurant && restaurantSettingsTab === "team" && (
           <Card className="border-0 shadow-sm border-primary/20 bg-primary/[0.03]">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -995,7 +1031,7 @@ export function Settings() {
           </Card>
         )}
 
-        {(!isSystemOwner || isImpersonating) && (
+        {(!isSystemOwner || isImpersonating) && restaurantSettingsTab === "profile" && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -1078,7 +1114,7 @@ export function Settings() {
         )}
 
         {/* אבטחה — מנהל/משתמש מסעדה ובעל מערכת בהתחזות (איפוס סיסמה בתוך «פרטי משתמש» למעלה) */}
-        {(!isSystemOwner || isImpersonating) && (
+        {(!isSystemOwner || isImpersonating) && restaurantSettingsTab === "operations" && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -1109,6 +1145,7 @@ export function Settings() {
 
         {/* ניהול נתונים — לא בטאב הגדרות של בעל מערכת (ייבוא/ייצוא במקומות אחרים לפי הצורך) */}
         {(!isSystemOwner || isImpersonating) &&
+          restaurantSettingsTab === "operations" &&
           currentRestaurantId &&
           (settingsViewRole === "owner" ||
             settingsViewRole === "admin" ||
@@ -1182,6 +1219,7 @@ export function Settings() {
         )}
 
         {/* App Info */}
+        {(!isSystemOwner || isImpersonating) && restaurantSettingsTab === "profile" ? (
         <Card className="border-0 shadow-sm">
           <CardContent className="p-6">
             <div className="text-center text-sm text-muted-foreground">
@@ -1191,6 +1229,7 @@ export function Settings() {
             </div>
           </CardContent>
         </Card>
+        ) : null}
         </div>
         )}
 
