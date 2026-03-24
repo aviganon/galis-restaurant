@@ -218,6 +218,10 @@ export function Settings() {
   /** בהתחזות של בעל מערכת — אותה תצוגת הגדרות כמו למנהל מסעדה (כרטיסים, תפקיד מוצג, בלי מפתח מערכת) */
   const settingsViewRole =
     isImpersonating && isSystemOwner ? "manager" : userRole
+  const canManageTeamInOwnRestaurant =
+    !!currentRestaurantId &&
+    (settingsViewRole === "owner" || settingsViewRole === "admin" || settingsViewRole === "manager") &&
+    (!isSystemOwner || isImpersonating)
   const roleLabel =
     settingsViewRole === "owner"
       ? t("pages.settings.owner")
@@ -361,8 +365,9 @@ export function Settings() {
   const saveEditUser = async () => {
     if (!editingUser) return; setSavingEditUser(true)
     try {
-      await setDoc(doc(db,"users",editingUser.uid),{role:editUserRole,restaurantId:editUserRestId||null,name:editUserName.trim()||null,phone:editUserPhone.trim()||null,address:editUserAddress.trim()||null,notes:editUserNotes.trim()||null,updatedAt:new Date().toISOString()},{merge:true})
-      setUsersData(p=>p.map(u=>u.uid===editingUser.uid?{...u,role:editUserRole,restaurantId:editUserRestId||null,restaurantName:(restaurants||[]).find(r=>r.id===editUserRestId)?.name}:u))
+      const nextRestId = canManageTeamInOwnRestaurant ? (currentRestaurantId || null) : (editUserRestId || null)
+      await setDoc(doc(db,"users",editingUser.uid),{role:editUserRole,restaurantId:nextRestId,name:editUserName.trim()||null,phone:editUserPhone.trim()||null,address:editUserAddress.trim()||null,notes:editUserNotes.trim()||null,updatedAt:new Date().toISOString()},{merge:true})
+      setUsersData(p=>p.map(u=>u.uid===editingUser.uid?{...u,role:editUserRole,restaurantId:nextRestId,restaurantName:(restaurants||[]).find(r=>r.id===nextRestId)?.name}:u))
       toast.success("משתמש עודכן"); setEditingUser(null)
     }
     catch { toast.error("שגיאה") } finally { setSavingEditUser(false) }
@@ -414,33 +419,39 @@ export function Settings() {
     try {
       const s = await getDocs(collection(db, "users"))
       const rs = restaurantsRef.current || []
-      setUsersData(
-        s.docs
-          .map((d) => {
-            const dt = d.data()
-            const r = rs.find((x) => x.id === dt.restaurantId)
-            return {
-              uid: d.id,
-              email: dt.email || "",
-              role: dt.role || "user",
-              restaurantId: dt.restaurantId || null,
-              restaurantName: r?.name,
-              isSystemOwner: dt.isSystemOwner === true,
-            }
-          })
-          .filter((u) => u.role !== "owner"),
-      )
+      const mapped = s.docs.map((d) => {
+        const dt = d.data()
+        const r = rs.find((x) => x.id === dt.restaurantId)
+        return {
+          uid: d.id,
+          email: dt.email || "",
+          role: dt.role || "user",
+          restaurantId: dt.restaurantId || null,
+          restaurantName: r?.name,
+          isSystemOwner: dt.isSystemOwner === true,
+        }
+      })
+      const visible =
+        isSystemOwner && !isImpersonating
+          ? mapped.filter((u) => u.role !== "owner")
+          : mapped.filter(
+              (u) =>
+                u.restaurantId === currentRestaurantId &&
+                u.role !== "owner" &&
+                u.isSystemOwner !== true,
+            )
+      setUsersData(visible)
       setUsersLoaded(true)
     } catch {
       toast.error("שגיאה")
     } finally {
       setLoadingUsers2(false)
     }
-  }, [])
+  }, [isSystemOwner, isImpersonating, currentRestaurantId])
 
   useEffect(() => {
-    if (isSystemOwner && !isImpersonating) void loadU()
-  }, [isSystemOwner, isImpersonating, loadU])
+    if ((isSystemOwner && !isImpersonating) || canManageTeamInOwnRestaurant) void loadU()
+  }, [isSystemOwner, isImpersonating, canManageTeamInOwnRestaurant, loadU])
 
   /** כשמאזין המסעדות ב־page ממלא רשימה אחרי loadU ראשון — מעדכן שמות מסעדה בשורות משתמש בלי לרענן הכל */
   useEffect(() => {
@@ -480,6 +491,11 @@ export function Settings() {
       setCErr("נא למלא אימייל וסיסמה")
       return
     }
+    const effectiveRestId = canManageTeamInOwnRestaurant ? currentRestaurantId || "" : cRest
+    if (!effectiveRestId) {
+      setCErr("נא לבחור מסעדה")
+      return
+    }
     if (cPass.length < 6) {
       setCErr("סיסמה קצרה")
       return
@@ -492,7 +508,7 @@ export function Settings() {
       await setDoc(doc(db, "users", cr.user.uid), {
         email: cEmail.trim(),
         role: cRole,
-        restaurantId: cRest || null,
+        restaurantId: effectiveRestId,
         name: cName.trim() || null,
         phone: cPhone.trim() || null,
         address: cAddress.trim() || null,
@@ -510,15 +526,15 @@ export function Settings() {
           uid: cr.user.uid,
           email: cEmail.trim(),
           role: cRole,
-          restaurantId: cRest || null,
-          restaurantName: (restaurants || []).find((r) => r.id === cRest)?.name,
+          restaurantId: effectiveRestId,
+          restaurantName: (restaurants || []).find((r) => r.id === effectiveRestId)?.name,
         },
       ])
-      const restName = cRest ? (restaurants || []).find((r) => r.id === cRest)?.name : null
+      const restName = effectiveRestId ? (restaurants || []).find((r) => r.id === effectiveRestId)?.name : null
       let inviteCode: string | undefined
       try {
         inviteCode = await createUniqueInviteCode({
-          restaurantId: cRest || null,
+          restaurantId: effectiveRestId,
           role: cRole,
         })
       } catch {
@@ -545,7 +561,7 @@ export function Settings() {
       }
       setCEmail("")
       setCPass("")
-      setCRest("")
+      if (!canManageTeamInOwnRestaurant) setCRest("")
       setCName("")
       setCPhone("")
       setCAddress("")
@@ -864,6 +880,121 @@ export function Settings() {
             </Card>
           )}
 
+        {canManageTeamInOwnRestaurant && (
+          <Card className="border-0 shadow-sm border-primary/20 bg-primary/[0.03]">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                <User className="w-5 h-5 text-primary" />
+                ניהול צוות המסעדה
+              </CardTitle>
+              <p className="text-sm text-muted-foreground font-normal">
+                יצירה, עריכה ומחיקה של עובדים ומנהלים במסעדה שלך בלבד.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={showCreate2 ? "secondary" : "default"}
+                  className="gap-1.5"
+                  onClick={() => {
+                    setShowCreate2((v) => !v)
+                    setCRest(currentRestaurantId || "")
+                    setCErr(null)
+                  }}
+                >
+                  <User className="w-4 h-4" />
+                  {showCreate2 ? "סגור יצירה" : "צור עובד/מנהל"}
+                </Button>
+                <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={() => void loadU()} disabled={loadingUsers2}>
+                  {loadingUsers2 ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  רענן
+                </Button>
+              </div>
+
+              {showCreate2 ? (
+                <div className="rounded-xl border bg-card p-3 space-y-3">
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">אימייל</label>
+                      <Input value={cEmail} onChange={(e) => setCEmail(e.target.value)} dir="ltr" type="email" placeholder="user@example.com" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">סיסמה</label>
+                      <Input value={cPass} onChange={(e) => setCPass(e.target.value)} type="password" placeholder="******" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">שם</label>
+                      <Input value={cName} onChange={(e) => setCName(e.target.value)} placeholder="שם מלא" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">תפקיד</label>
+                      <select className="w-full h-10 rounded-md border px-3 text-sm bg-background" value={cRole} onChange={(e) => setCRole(e.target.value as "manager" | "user")}>
+                        <option value="user">משתמש</option>
+                        <option value="manager">מנהל</option>
+                      </select>
+                    </div>
+                  </div>
+                  {cErr ? <p className="text-sm text-destructive">{cErr}</p> : null}
+                  <Button type="button" onClick={() => void doCreate()} disabled={creating2} className="gap-2">
+                    {creating2 ? <Loader2 className="w-4 h-4 animate-spin" /> : <User className="w-4 h-4" />}
+                    צור משתמש למסעדה
+                  </Button>
+                </div>
+              ) : null}
+
+              <div className="rounded-xl border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-start p-2 font-medium">אימייל</th>
+                      <th className="text-start p-2 font-medium">תפקיד</th>
+                      <th className="text-end p-2 font-medium">פעולות</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {usersData.length === 0 ? (
+                      <tr>
+                        <td className="p-3 text-muted-foreground" colSpan={3}>אין עדיין משתמשים במסעדה</td>
+                      </tr>
+                    ) : (
+                      usersData.map((u) => (
+                        <tr key={u.uid} className="border-t">
+                          <td className="p-2 font-mono text-xs" dir="ltr">{u.email}</td>
+                          <td className="p-2">{u.role === "manager" ? "מנהל" : "משתמש"}</td>
+                          <td className="p-2">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openEditUser(u)}>ערוך</Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 text-xs"
+                                onClick={() => {
+                                  void postInviteEmail({
+                                    email: u.email,
+                                    role: u.role,
+                                    restaurantName: u.restaurantName || null,
+                                    accountCreated: false,
+                                  })
+                                    .then(() => toast.success("נשלח מייל הזמנה"))
+                                    .catch((e) => toast.error((e as Error).message || "שגיאה"))
+                                }}
+                              >
+                                הזמנה
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {(!isSystemOwner || isImpersonating) && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
@@ -1106,13 +1237,20 @@ export function Settings() {
                       <option value="manager">מנהל</option><option value="user">משתמש</option>
                     </select>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">מסעדה</label>
-                    <select className="w-full h-10 rounded-md border px-3 text-sm bg-background" value={editUserRestId} onChange={e=>setEditUserRestId(e.target.value)}>
-                      <option value="">— ללא —</option>
-                      {(restaurants||[]).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
-                    </select>
-                  </div>
+                  {canManageTeamInOwnRestaurant ? (
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">מסעדה</label>
+                      <Input readOnly value={(restaurants || []).find((r) => r.id === currentRestaurantId)?.name || "המסעדה הנוכחית"} className="h-10 bg-muted" />
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">מסעדה</label>
+                      <select className="w-full h-10 rounded-md border px-3 text-sm bg-background" value={editUserRestId} onChange={e=>setEditUserRestId(e.target.value)}>
+                        <option value="">— ללא —</option>
+                        {(restaurants||[]).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
+                      </select>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">הערות</label>

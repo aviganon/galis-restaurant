@@ -58,6 +58,14 @@ service cloud.firestore {
       allow create: if request.auth != null && (
         request.auth.uid == userId
         || isConfigAdmin()
+        || (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['manager', 'admin']
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId != null
+          && request.resource.data.restaurantId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId
+          && request.resource.data.role in ['manager', 'user']
+          && request.resource.data.isSystemOwner != true
+        )
       );
       allow update: if request.auth != null && (
         request.auth.uid == userId
@@ -67,6 +75,12 @@ service cloud.firestore {
       allow delete: if request.auth != null && (
         request.auth.uid == userId
         || canManageAllRestaurants()
+        || (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['manager', 'admin']
+          && resource.data.restaurantId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId
+          && resource.data.isSystemOwner != true
+        )
       );
     }
 
