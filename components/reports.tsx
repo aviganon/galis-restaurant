@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { collection, getDocs, getDoc, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { loadGlobalPriceSubdocsMap, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
+import { recipeCountsAsMenuDish } from "@/lib/recipe-menu-visibility"
 import { useApp } from "@/contexts/app-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -75,7 +76,7 @@ export function Reports() {
 
         recSnap.docs.forEach((r) => {
           const data = r.data()
-          if (data.isCompound) return
+          if (!recipeCountsAsMenuDish(data)) return
           const sellingPrice = (typeof data.sellingPrice === "number" ? data.sellingPrice : 0) / VAT_RATE
           const sales = dailySales[r.id]?.avg ?? 0
           const revenue = sellingPrice * sales

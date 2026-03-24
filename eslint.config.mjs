@@ -7,7 +7,7 @@ const nextConfig = require("eslint-config-next")
 const eslintConfig = [
   ...nextConfig,
   {
-    ignores: [".firebase/**", "*.tsbuildinfo", "dist/**", "coverage/**"],
+    ignores: [".firebase/**", "*.tsbuildinfo", "dist/**", "coverage/**", "functions/lib/**"],
   },
   {
     files: ["scripts/**/*.{js,mjs,ts}"],

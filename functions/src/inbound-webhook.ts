@@ -3,8 +3,8 @@
  * Cloud Function (HTTPS) – receives inbound email webhook from Mailgun/SendGrid.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const Busboy = require("busboy") as (config: { headers: Record<string, string> }) => {
+import Busboy from "busboy"
+const createBusboy = Busboy as unknown as (config: { headers: Record<string, string> }) => {
   on(event: "field", handler: (name: string, val: string) => void): void
   on(event: "file",  handler: (name: string, stream: NodeJS.ReadableStream, info: { filename: string; mimeType: string }) => void): void
   on(event: "finish" | "error", handler: (...args: unknown[]) => void): void
@@ -100,7 +100,7 @@ interface ParsedForm {
 
 function parseMultipart(req: IncomingMessage): Promise<ParsedForm> {
   return new Promise((resolve, reject) => {
-    const bb = Busboy({ headers: req.headers as Record<string, string> })
+    const bb = createBusboy({ headers: req.headers as Record<string, string> })
     const fields: Record<string, string> = {}
     const files: Record<string, { filename: string; mimetype: string; buffer: Buffer }> = {}
 
