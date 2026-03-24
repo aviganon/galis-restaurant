@@ -1,11 +1,14 @@
 "use client"
 
-import { UtensilsCrossed, Settings, LogOut } from "lucide-react"
+import { Settings, LogOut } from "lucide-react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { LanguageSwitcher } from "@/components/language-switcher"
 import { useTranslations } from "@/lib/use-translations"
 import { cn } from "@/lib/utils"
+
+const BRAND_LOGO_PATH = "/kamershalor-logo.png"
 
 export type RestaurantTopBarRestaurant = {
   id: string
@@ -66,15 +69,14 @@ export function RestaurantTopBar({
       <div className="mx-auto max-w-[1920px]">
         <div className="flex h-14 min-h-[3.5rem] items-center gap-2 px-3 sm:gap-3 sm:px-4">
           <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
-          <div
-            className={cn(
-              "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
-              "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-md ring-1 ring-primary/20"
-            )}
-            aria-hidden
-          >
-            <UtensilsCrossed className="h-4 w-4" />
-          </div>
+          <Image
+            src={BRAND_LOGO_PATH}
+            alt="Kamershalor"
+            width={160}
+            height={88}
+            className="h-9 w-auto shrink-0 object-contain"
+            priority
+          />
           <div className="min-w-0 flex-1">
             {restaurants.length > 1 ? (
               <Select

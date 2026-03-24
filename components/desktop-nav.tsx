@@ -4,7 +4,6 @@ import {
   Settings,
   LogOut,
   ChevronDown,
-  UtensilsCrossed,
   Calculator,
   Package,
   Menu,
@@ -15,12 +14,15 @@ import {
   BookOpen,
   PieChart,
 } from "lucide-react"
+import Image from "next/image"
 import { cn } from "@/lib/utils"
 import type { UserPermissions } from "@/contexts/app-context"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, } from "@/components/ui/dropdown-menu"
 import { LanguageSwitcher } from "@/components/language-switcher"
 import { useTranslations } from "@/lib/use-translations"
+
+const BRAND_LOGO_PATH = "/kamershalor-logo.png"
 
 type Restaurant = { id: string; name: string; branch?: string; emoji?: string }
 
@@ -91,10 +93,14 @@ export function DesktopNav({ currentPage, setCurrentPage, currentRestaurant, res
       <div className="container mx-auto px-4 flex items-center justify-between">
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary-foreground/10 flex items-center justify-center">
-              <UtensilsCrossed className="w-5 h-5" />
-            </div>
-            <span className="font-bold text-lg">Restaurant Pro</span>
+            <Image
+              src={BRAND_LOGO_PATH}
+              alt="Kamershalor"
+              width={180}
+              height={100}
+              className="h-10 w-auto object-contain"
+              priority
+            />
           </div>
           {(isImpersonating || !isSystemOwner) && restaurants.length > 0 && (
             isImpersonating ? (
