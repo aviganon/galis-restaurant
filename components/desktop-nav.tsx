@@ -22,7 +22,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { LanguageSwitcher } from "@/components/language-switcher"
 import { useTranslations } from "@/lib/use-translations"
 
-const BRAND_LOGO_PATH = "/kamershalor-logo.png"
+const BRAND_LOGO_PATH = "/kamershalor-logo-mark.png"
 
 type Restaurant = { id: string; name: string; branch?: string; emoji?: string }
 
@@ -96,9 +96,9 @@ export function DesktopNav({ currentPage, setCurrentPage, currentRestaurant, res
             <Image
               src={BRAND_LOGO_PATH}
               alt="Kamershalor"
-              width={180}
-              height={100}
-              className="h-10 w-auto object-contain"
+              width={210}
+              height={247}
+              className="h-11 w-auto object-contain"
               priority
             />
           </div>

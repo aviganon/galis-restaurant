@@ -8,7 +8,7 @@ import { LanguageSwitcher } from "@/components/language-switcher"
 import { useTranslations } from "@/lib/use-translations"
 import { cn } from "@/lib/utils"
 
-const BRAND_LOGO_PATH = "/kamershalor-logo.png"
+const BRAND_LOGO_PATH = "/kamershalor-logo-mark.png"
 
 export type RestaurantTopBarRestaurant = {
   id: string
@@ -72,9 +72,9 @@ export function RestaurantTopBar({
           <Image
             src={BRAND_LOGO_PATH}
             alt="Kamershalor"
-            width={160}
-            height={88}
-            className="h-9 w-auto shrink-0 object-contain"
+            width={210}
+            height={247}
+            className="h-10 w-auto shrink-0 object-contain"
             priority
           />
           <div className="min-w-0 flex-1">

@@ -153,8 +153,8 @@ function LoginBrandLogo({ variant }: { variant: LoginBrandLogoVariant }) {
       <Image
         src={BRAND_LOGO_PATH}
         alt={t("login.brandLogoAlt")}
-        width={999}
-        height={548}
+        width={507}
+        height={435}
         sizes={logoSizes}
         quality={95}
         className={imgClass}
