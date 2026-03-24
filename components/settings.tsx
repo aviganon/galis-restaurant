@@ -43,6 +43,7 @@ import {
   Save,
   Loader2,
   Key,
+  KeyRound,
   Mail,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -70,6 +71,7 @@ export function Settings() {
   const [profilePhone, setProfilePhone] = useState("")
   const [profileAddress, setProfileAddress] = useState("")
   const [savingProfile, setSavingProfile] = useState(false)
+  const [sendingPasswordReset, setSendingPasswordReset] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<{
     uid: string
@@ -231,13 +233,18 @@ export function Settings() {
       toast.error(t("pages.settings.noEmailForReset"))
       return
     }
-    const r = await sendPasswordResetReliable(targetEmail)
-    if (r.ok) {
-      toast.success(
-        r.via === "resend" ? t("pages.settings.passwordResetSentResend") : t("pages.settings.passwordResetSentFirebase"),
-      )
-    } else {
-      toast.error(r.error)
+    setSendingPasswordReset(true)
+    try {
+      const r = await sendPasswordResetReliable(targetEmail)
+      if (r.ok) {
+        toast.success(
+          r.via === "resend" ? t("pages.settings.passwordResetSentResend") : t("pages.settings.passwordResetSentFirebase"),
+        )
+      } else {
+        toast.error(r.error)
+      }
+    } finally {
+      setSendingPasswordReset(false)
     }
   }
 
@@ -795,6 +802,28 @@ export function Settings() {
                 שמור פרטים
               </Button>
             </div>
+            <div className="border-t pt-4 space-y-3">
+              <p className="text-sm font-medium flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-muted-foreground shrink-0" />
+                {t("pages.settings.changePassword")}
+              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">{t("pages.settings.passwordResetSelfHint")}</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full sm:w-auto gap-2 rounded-xl"
+                onClick={() => void handleChangePassword()}
+                disabled={sendingPasswordReset || !email}
+              >
+                {sendingPasswordReset ? (
+                  <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                ) : (
+                  <Mail className="w-4 h-4 shrink-0 opacity-70" />
+                )}
+                {t("pages.settings.sendPasswordResetLink")}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -917,8 +946,8 @@ export function Settings() {
         </Card>
         )}
 
-        {/* אבטחה — לא לבעל מערכת (איפוס סיסמה מ«לפי משתמש» או ממסך הכניסה) */}
-        {!isSystemOwner && (
+        {/* אבטחה — מנהל/משתמש מסעדה ובעל מערכת בהתחזות (איפוס סיסמה בתוך «פרטי משתמש» למעלה) */}
+        {(!isSystemOwner || isImpersonating) && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -927,10 +956,6 @@ export function Settings() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button variant="outline" className="w-full justify-between h-12 rounded-xl gap-2" onClick={handleChangePassword}>
-              <span className="text-start flex-1">{t("pages.settings.changePassword")}</span>
-              <BackChevron className="w-4 h-4 shrink-0 opacity-60" />
-            </Button>
             <Button
               variant="outline"
               className="w-full justify-between h-12 rounded-xl gap-2"
