@@ -96,8 +96,8 @@ export function DesktopNav({ currentPage, setCurrentPage, currentRestaurant, res
             <Image
               src={BRAND_LOGO_PATH}
               alt="Kamershalor"
-              width={210}
-              height={247}
+              width={194}
+              height={210}
               className="h-11 w-auto object-contain"
               priority
             />

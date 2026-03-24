@@ -72,8 +72,8 @@ export function RestaurantTopBar({
           <Image
             src={BRAND_LOGO_PATH}
             alt="Kamershalor"
-            width={210}
-            height={247}
+            width={194}
+            height={210}
             className="h-10 w-auto shrink-0 object-contain"
             priority
           />
