@@ -21,6 +21,7 @@ import {
   type MenuDishNameLanguage,
 } from "@/lib/ai-extract"
 import { toast } from "sonner"
+import { firebaseBearerHeaders } from "@/lib/api-auth-client"
 import { db } from "@/lib/firebase"
 import { collection, getDocs, getDoc, doc } from "firebase/firestore"
 import { Loader2, X, Plus, Globe } from "lucide-react"
@@ -248,7 +249,10 @@ export function FilePreviewModal({
           const timeout = setTimeout(() => controller.abort(), 8000)
           const res = await fetch("/api/ingredient-web-price", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              ...(await firebaseBearerHeaders()),
+            },
             body: JSON.stringify({ name }),
             signal: controller.signal,
           })

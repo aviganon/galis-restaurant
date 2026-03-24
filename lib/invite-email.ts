@@ -1,3 +1,5 @@
+import { firebaseBearerHeaders } from "@/lib/api-auth-client"
+
 /** קריאה ל־/api/invite — שימוש אחרי יצירת משתמש או הזמנה ידנית */
 export async function postInviteEmail(payload: {
   email: string
@@ -10,7 +12,10 @@ export async function postInviteEmail(payload: {
 }): Promise<void> {
   const res = await fetch("/api/invite", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(await firebaseBearerHeaders()),
+    },
     body: JSON.stringify(payload),
   })
   if (!res.ok) {

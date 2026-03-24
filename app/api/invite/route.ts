@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
+import { requireFirebaseUser } from "@/lib/api-verify-firebase"
+import { canSendInviteEmail, loadAdminEmailSet } from "@/lib/firebase-admin-permissions"
+import { getFirebaseAdminFirestore } from "@/lib/firebase-admin-server"
 
 const fromEmail = process.env.RESEND_FROM_EMAIL || "Restaurant Pro <onboarding@resend.dev>"
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://restaurant-pro.web.app"
@@ -12,6 +15,23 @@ function roleLabelHe(role: string | undefined): string {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireFirebaseUser(req)
+    if (!auth.ok) return auth.response
+
+    const db = getFirebaseAdminFirestore()
+    if (!db) {
+      return NextResponse.json(
+        { error: "השרת לא מוגדר לאדמין (הוסף FIREBASE_SERVICE_ACCOUNT_JSON)" },
+        { status: 503 },
+      )
+    }
+
+    const adminSet = await loadAdminEmailSet(db)
+    const allowed = await canSendInviteEmail(db, auth.decoded.uid, auth.decoded.email, adminSet)
+    if (!allowed) {
+      return NextResponse.json({ error: "אין הרשאה לשליחת הזמנה" }, { status: 403 })
+    }
+
     const body = await req.json()
     const email = body.email as string | undefined
     const restaurantName =

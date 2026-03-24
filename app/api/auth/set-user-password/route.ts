@@ -1,31 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import type { DocumentData, Firestore } from "firebase-admin/firestore"
+import type { Firestore } from "firebase-admin/firestore"
+import { loadAdminEmailSet } from "@/lib/firebase-admin-permissions"
 import { getFirebaseAdminAuth, getFirebaseAdminFirestore } from "@/lib/firebase-admin-server"
-
-function collectAdminEmails(data: DocumentData | undefined): string[] {
-  if (!data) return []
-  const a = data.emails
-  const b = data.adminEmails
-  const out: string[] = []
-  if (Array.isArray(a)) out.push(...a.map((e) => String(e).toLowerCase()))
-  if (Array.isArray(b)) out.push(...b.map((e) => String(e).toLowerCase()))
-  return out
-}
-
-async function loadAdminEmailSet(db: Firestore): Promise<Set<string>> {
-  const set = new Set<string>()
-  try {
-    const [adminsSnap, altSnap] = await Promise.all([
-      db.collection("config").doc("admins").get(),
-      db.collection("config").doc("adminEmails").get(),
-    ])
-    for (const e of collectAdminEmails(adminsSnap.exists ? adminsSnap.data() : undefined)) set.add(e)
-    for (const e of collectAdminEmails(altSnap.exists ? altSnap.data() : undefined)) set.add(e)
-  } catch {
-    /* ignore */
-  }
-  return set
-}
 
 /**
  * בודק אם המחובר רשאי להגדיר סיסמה למשתמש היעד (בעל מערכת / מנהל+באותה מסעדה).

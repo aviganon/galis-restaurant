@@ -25,10 +25,18 @@ service cloud.firestore {
       return isConfigAdmin() || isSystemOwnerUser();
     }
 
-    // config — admins (רשימת מנהלים), anthropic (מפתח API)
-    match /config/{docId} {
+    // config — admins / adminEmails: קריאה לכל מחובר (זיהוי בעלים באפליקציה); כתיבה רק לבעל מערכת או אדמין
+    match /config/admins {
       allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow write: if canManageAllRestaurants();
+    }
+    match /config/adminEmails {
+      allow read: if request.auth != null;
+      allow write: if canManageAllRestaurants();
+    }
+    // מפתח Claude גלובלי — רק בעל מערכת / אדמין (שאר המשתמשים: מפתח מקומי או /api/claude עם env)
+    match /config/anthropic {
+      allow read, write: if canManageAllRestaurants();
     }
 
     // users — משתמשים לפי uid

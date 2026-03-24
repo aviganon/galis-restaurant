@@ -1,6 +1,7 @@
 "use client"
 
 import { doc, getDoc, setDoc, deleteDoc } from "firebase/firestore"
+import { firebaseBearerHeaders } from "@/lib/api-auth-client"
 import { db } from "./firebase"
 
 const ANTHROPIC_CONFIG_PATH = { collection: "config", docId: "anthropic" }
@@ -118,7 +119,10 @@ export async function callClaude(payload: {
     const resp = await fetch("/api/claude", {
       signal: ctrl.signal,
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(await firebaseBearerHeaders()),
+      },
       body: JSON.stringify(payload),
     })
     clearTimeout(timeoutId)

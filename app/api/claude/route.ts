@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireFirebaseUser } from "@/lib/api-verify-firebase"
 
 export async function POST(req: NextRequest) {
   try {
+    const gate = await requireFirebaseUser(req)
+    if (!gate.ok) return gate.response
+
     const body = await req.json()
 
     const apiKey = process.env.ANTHROPIC_API_KEY

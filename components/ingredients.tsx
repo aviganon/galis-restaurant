@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react"
 import { collection, collectionGroup, getDocs, doc, getDoc, setDoc, deleteDoc, writeBatch } from "firebase/firestore"
+import { firebaseBearerHeaders } from "@/lib/api-auth-client"
 import { db } from "@/lib/firebase"
 import { groupPriceSubdocsByIngredient, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
 import { useApp } from "@/contexts/app-context"
@@ -490,7 +491,10 @@ export function Ingredients() {
       try {
         const res = await fetch("/api/ingredient-web-price", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(await firebaseBearerHeaders()),
+          },
           body: JSON.stringify({ name: ingredientName }),
         })
         if (res.ok) {

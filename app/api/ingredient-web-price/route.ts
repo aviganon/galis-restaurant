@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireFirebaseUser } from "@/lib/api-verify-firebase"
 
 export interface WebPriceResult {
   price: number
@@ -71,6 +72,9 @@ async function extractWithClaude(ingredientName: string, searchSnippets: string 
 
 export async function POST(req: NextRequest) {
   try {
+    const gate = await requireFirebaseUser(req)
+    if (!gate.ok) return gate.response
+
     const { name } = await req.json()
     const ingredientName = typeof name === "string" ? name.trim() : ""
     if (!ingredientName) {
