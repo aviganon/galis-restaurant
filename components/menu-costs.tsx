@@ -34,6 +34,7 @@ import { loadRestaurantPantryForAi } from "@/lib/restaurant-pantry"
 import { loadGlobalPriceSubdocsMap, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { recipeCountsAsMenuDish } from "@/lib/recipe-menu-visibility"
 
 const VAT_RATE = 1.17
 
@@ -236,7 +237,7 @@ export function MenuCosts() {
 
         recSnap.docs.forEach((r) => {
           const data = r.data()
-          if (data.isCompound) return
+          if (!recipeCountsAsMenuDish(data)) return
           const sellingPrice = (typeof data.sellingPrice === "number" ? data.sellingPrice : 0) / VAT_RATE
           const ing = Array.isArray(data.ingredients) ? data.ingredients : []
           let cost = 0

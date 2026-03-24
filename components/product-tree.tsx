@@ -8,7 +8,7 @@ import {
   ChevronUp, X, Edit2, MoreVertical, Filter, SortAsc, SortDesc,
   Package, Utensils, DollarSign, TrendingUp, TrendingDown, ImageIcon, AlertTriangle,
   CheckCircle2, Info, ChefHat, Scale, Percent, Sparkles, BarChart2, BarChart3, Loader2, LayoutDashboard,
-  Truck, Leaf, FileText, RefreshCw,
+  Truck, Leaf, FileText, RefreshCw, ListOrdered, Maximize2, Minimize2, Eye, EyeOff, GripVertical,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -72,13 +72,22 @@ interface Dish {
   recipeDescription?: string
   /** שלבי הכנה / מתכון מלא */
   preparationNotes?: string
+  /** false = במאגר בלבד; חסר/undefined = מוצגת בתפריט */
+  onMenu?: boolean
 }
 
 /** Firestore דוחה ערכי undefined — מסיר שדות ברמה העליונה לפני set/batch */
 function dishToFirestoreData(dish: Dish): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries({ ...dish, isCompound: dish.isCompound ?? false }).filter(([, v]) => v !== undefined)
-  )
+  const isCompound = dish.isCompound ?? false
+  const { onMenu: _clientOnMenu, ...rest } = dish
+  const onMenuPersist =
+    isCompound ? undefined : dish.onMenu === false ? false : true
+  const base = {
+    ...rest,
+    isCompound,
+    ...(onMenuPersist !== undefined ? { onMenu: onMenuPersist } : {}),
+  }
+  return Object.fromEntries(Object.entries(base).filter(([, v]) => v !== undefined))
 }
 
 interface SupplierPrice {
@@ -164,6 +173,13 @@ export default function ProductTree() {
   /** סרגל לוח בקרה / עלויות תפריט / AI — ניתן להסתיר; העדפה נשמרת במכשיר */
   const [menuToolsOpen, setMenuToolsOpen] = useState(true)
   const [editingDish, setEditingDish] = useState<string | null>(null)
+  const [menuVisibilityOpen, setMenuVisibilityOpen] = useState(false)
+  const [menuVisibilityExpanded, setMenuVisibilityExpanded] = useState(false)
+  const [menuSwapPick, setMenuSwapPick] = useState<{ id: string; zone: "menu" | "pool" } | null>(null)
+
+  useEffect(() => {
+    if (!menuVisibilityOpen) setMenuSwapPick(null)
+  }, [menuVisibilityOpen])
 
   useEffect(() => {
     try {
@@ -251,6 +267,7 @@ export default function ProductTree() {
             imageUrl: (data.imageUrl as string) || undefined,
             recipeDescription: typeof data.recipeDescription === "string" ? data.recipeDescription : undefined,
             preparationNotes: typeof data.preparationNotes === "string" ? data.preparationNotes : undefined,
+            onMenu: data.isCompound ? undefined : data.onMenu === false ? false : undefined,
           }
         })
 
@@ -285,7 +302,12 @@ export default function ProductTree() {
           img.src = url
         })
         setDishes(newDishes)
-        setSelectedDish(prev => (prev && newDishes[prev] ? prev : Object.keys(newDishes)[0] || null))
+        setSelectedDish((prev) => {
+          if (prev && newDishes[prev]) return prev
+          const simpleKeys = Object.keys(newDishes).filter((k) => !newDishes[k].isCompound)
+          const onMenuFirst = simpleKeys.find((k) => newDishes[k].onMenu !== false)
+          return onMenuFirst ?? simpleKeys[0] ?? null
+        })
         setSupplierPrices(newPrices)
         setIngredientStock(newStock)
       } catch (e) {
@@ -331,6 +353,87 @@ export default function ProductTree() {
       }, 400)
     },
     [saveDishToFirestore]
+  )
+
+  const applyDishOnMenu = useCallback(
+    (name: string, onMenu: boolean) => {
+      setDishes((prev) => {
+        const d = prev[name]
+        if (!d || d.isCompound) return prev
+        const nextDish: Dish = { ...d, onMenu: onMenu ? undefined : false }
+        void saveDishToFirestore(name, nextDish)
+        return { ...prev, [name]: nextDish }
+      })
+    },
+    [saveDishToFirestore],
+  )
+
+  const swapMenuWithPool = useCallback(
+    (menuId: string, poolId: string) => {
+      setDishes((prev) => {
+        const a = prev[menuId]
+        const b = prev[poolId]
+        if (!a || !b || a.isCompound || b.isCompound) return prev
+        if (a.onMenu === false || b.onMenu !== false) return prev
+        const nextA: Dish = { ...a, onMenu: false }
+        const nextB: Dish = { ...b, onMenu: undefined }
+        void saveDishToFirestore(menuId, nextA)
+        void saveDishToFirestore(poolId, nextB)
+        toast.success(t("pages.productTree.menuSwapToast"))
+        return { ...prev, [menuId]: nextA, [poolId]: nextB }
+      })
+    },
+    [saveDishToFirestore, t],
+  )
+
+  const MENU_DRAG_TYPE = "application/x-restaurantpro-menu-dish"
+
+  const parseDragPayload = (e: React.DragEvent): { id: string; zone: "menu" | "pool" } | null => {
+    try {
+      const raw = e.dataTransfer.getData(MENU_DRAG_TYPE)
+      if (!raw) return null
+      const o = JSON.parse(raw) as { id?: string; zone?: string }
+      if (o.id && (o.zone === "menu" || o.zone === "pool")) return { id: o.id, zone: o.zone }
+    } catch {
+      /* ignore */
+    }
+    return null
+  }
+
+  const handleMenuComposerRowClick = useCallback(
+    (id: string, zone: "menu" | "pool") => {
+      if (!menuSwapPick) {
+        setMenuSwapPick({ id, zone })
+        return
+      }
+      if (menuSwapPick.id === id) {
+        setMenuSwapPick(null)
+        return
+      }
+      if (menuSwapPick.zone === zone) {
+        setMenuSwapPick({ id, zone })
+        return
+      }
+      const menuId = menuSwapPick.zone === "menu" ? menuSwapPick.id : id
+      const poolId = menuSwapPick.zone === "pool" ? menuSwapPick.id : id
+      swapMenuWithPool(menuId, poolId)
+      setMenuSwapPick(null)
+    },
+    [menuSwapPick, swapMenuWithPool],
+  )
+
+  const handleDropSwap = useCallback(
+    (targetId: string, targetZone: "menu" | "pool", e: React.DragEvent) => {
+      e.preventDefault()
+      const src = parseDragPayload(e)
+      if (!src || src.id === targetId) return
+      if (src.zone === targetZone) return
+      const menuId = src.zone === "menu" ? src.id : targetId
+      const poolId = src.zone === "pool" ? src.id : targetId
+      swapMenuWithPool(menuId, poolId)
+      setMenuSwapPick(null)
+    },
+    [swapMenuWithPool],
   )
 
   // Cost per unit for an ingredient (recursive for compounds)
@@ -392,9 +495,9 @@ export default function ProductTree() {
     return { bg: "bg-red-500/10", text: "text-red-600", border: "border-red-500/30" }
   }
 
-  // Filtered and sorted dishes
+  // Filtered and sorted dishes (רק מנות שמוצגות בתפריט)
   const filteredDishes = useMemo(() => {
-    let names = Object.keys(dishes).filter(n => !dishes[n].isCompound)
+    let names = Object.keys(dishes).filter((n) => !dishes[n].isCompound && dishes[n].onMenu !== false)
     
     if (searchQuery) {
       names = names.filter(n => n.includes(searchQuery))
@@ -419,6 +522,23 @@ export default function ProductTree() {
     
     return names
   }, [dishes, searchQuery, categoryFilter, sortMode, calcFoodCostPct])
+
+  const offMenuDishCount = useMemo(
+    () => Object.keys(dishes).filter((n) => !dishes[n].isCompound && dishes[n].onMenu === false).length,
+    [dishes],
+  )
+
+  const menuNamesForComposer = useMemo(() => {
+    return Object.keys(dishes)
+      .filter((n) => !dishes[n].isCompound && dishes[n].onMenu !== false)
+      .sort((a, b) => a.localeCompare(b, "he"))
+  }, [dishes])
+
+  const poolNamesForComposer = useMemo(() => {
+    return Object.keys(dishes)
+      .filter((n) => !dishes[n].isCompound && dishes[n].onMenu === false)
+      .sort((a, b) => a.localeCompare(b, "he"))
+  }, [dishes])
 
   // Filtered ingredients for dropdown (simple + compound recipes)
   const filteredIngredients = useMemo(() => {
@@ -788,14 +908,16 @@ export default function ProductTree() {
   // Delete dish
   const deleteDish = (name: string) => {
     saveDishToFirestore(name, null)
-    setDishes(prev => {
+    setDishes((prev) => {
       const next = { ...prev }
       delete next[name]
+      if (selectedDish === name) {
+        const onMenuKeys = Object.keys(next).filter((n) => !next[n].isCompound && next[n].onMenu !== false)
+        const pick = onMenuKeys[0] ?? Object.keys(next).find((n) => !next[n].isCompound) ?? null
+        queueMicrotask(() => setSelectedDish(pick))
+      }
       return next
     })
-    if (selectedDish === name) {
-      setSelectedDish(Object.keys(dishes).find(n => n !== name) || null)
-    }
   }
 
   // Duplicate dish
@@ -1197,6 +1319,28 @@ export default function ProductTree() {
               <Badge variant="secondary" className="text-xs">
                 {filteredDishes.length}
               </Badge>
+              <button
+                type="button"
+                onClick={() => setMenuVisibilityOpen(true)}
+                title={t("pages.productTree.menuVisibilityTitle")}
+                aria-label={t("pages.productTree.menuVisibilityTitle")}
+                className={cn(
+                  "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold transition-colors",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                  "hover:bg-muted/80",
+                  offMenuDishCount > 0
+                    ? "border-amber-500/40 text-amber-900 hover:bg-amber-500/15 dark:text-amber-100"
+                    : "border-border text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {offMenuDishCount > 0 ? (
+                  <>
+                    +{offMenuDishCount} {t("pages.productTree.offMenuPoolBadge")}
+                  </>
+                ) : (
+                  t("pages.productTree.poolChipZero")
+                )}
+              </button>
             </div>
             
             <div className="flex flex-wrap gap-2">
@@ -1377,6 +1521,179 @@ export default function ProductTree() {
             </div>
           </div>
 
+          <Dialog
+            open={menuVisibilityOpen}
+            onOpenChange={(o) => {
+              setMenuVisibilityOpen(o)
+              if (!o) setMenuVisibilityExpanded(false)
+            }}
+          >
+            <DialogContent
+              showCloseButton
+              dir={isRtl ? "rtl" : "ltr"}
+              className={cn(
+                "flex flex-col gap-0 overflow-hidden p-0 shadow-2xl",
+                menuVisibilityExpanded
+                  ? "h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:max-w-[calc(100vw-1rem)]"
+                  : "max-h-[min(88dvh,720px)] w-[calc(100vw-1.5rem)] sm:max-w-3xl",
+              )}
+            >
+              <DialogHeader className="shrink-0 border-b px-4 py-3 pe-14 text-start sm:px-6 sm:py-4 sm:pe-16">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <DialogTitle className="flex items-center gap-2 text-start text-lg">
+                      <ListOrdered className="h-5 w-5 shrink-0 text-primary" />
+                      {t("pages.productTree.menuVisibilityTitle")}
+                    </DialogTitle>
+                    <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed sm:text-sm">
+                      {t("pages.productTree.menuVisibilityHint")}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="shrink-0 gap-1"
+                    onClick={() => setMenuVisibilityExpanded((v) => !v)}
+                  >
+                    {menuVisibilityExpanded ? (
+                      <Minimize2 className="h-4 w-4" />
+                    ) : (
+                      <Maximize2 className="h-4 w-4" />
+                    )}
+                    <span className="hidden sm:inline">
+                      {menuVisibilityExpanded
+                        ? t("pages.productTree.shrinkMenuDialog")
+                        : t("pages.productTree.expandMenuDialog")}
+                    </span>
+                  </Button>
+                </div>
+              </DialogHeader>
+              <div className="grid min-h-0 flex-1 gap-0 sm:grid-cols-2 sm:divide-x sm:divide-border">
+                <div className="flex min-h-0 min-w-0 flex-col border-b border-border sm:border-b-0">
+                  <div className="bg-muted/40 px-3 py-2 text-sm font-semibold">
+                    {t("pages.productTree.onMenuColumn")}{" "}
+                    <span className="text-muted-foreground font-normal">({menuNamesForComposer.length})</span>
+                  </div>
+                  <ScrollArea className="h-[min(40dvh,320px)] sm:h-[min(52dvh,420px)]">
+                    <div className="space-y-1 p-2">
+                      {menuNamesForComposer.length === 0 ? (
+                        <p className="text-muted-foreground px-2 py-4 text-center text-sm">—</p>
+                      ) : (
+                        menuNamesForComposer.map((id) => (
+                          <div
+                            key={id}
+                            role="button"
+                            tabIndex={0}
+                            draggable
+                            dir={isRtl ? "rtl" : "ltr"}
+                            onDragStart={(e) => {
+                              e.dataTransfer.effectAllowed = "move"
+                              e.dataTransfer.setData(MENU_DRAG_TYPE, JSON.stringify({ id, zone: "menu" }))
+                            }}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => handleDropSwap(id, "menu", e)}
+                            onClick={() => handleMenuComposerRowClick(id, "menu")}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault()
+                                handleMenuComposerRowClick(id, "menu")
+                              }
+                            }}
+                            className={cn(
+                              "flex cursor-pointer items-center gap-1.5 rounded-lg border px-2 py-1.5 text-sm transition-colors",
+                              isRtl ? "flex-row" : "flex-row-reverse",
+                              menuSwapPick?.id === id && menuSwapPick.zone === "menu"
+                                ? "border-primary bg-primary/10"
+                                : "border-transparent bg-card hover:bg-muted/80",
+                            )}
+                          >
+                            <span className="min-w-0 flex-1 truncate text-start font-medium">{id}</span>
+                            <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-70" aria-hidden />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              title={t("pages.productTree.removeFromMenuDisplay")}
+                              className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                applyDishOnMenu(id, false)
+                              }}
+                            >
+                              <EyeOff className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+                <div className="flex min-h-0 min-w-0 flex-col">
+                  <div className="bg-muted/40 px-3 py-2 text-sm font-semibold">
+                    {t("pages.productTree.offMenuColumn")}{" "}
+                    <span className="text-muted-foreground font-normal">({poolNamesForComposer.length})</span>
+                  </div>
+                  <ScrollArea className="h-[min(40dvh,320px)] sm:h-[min(52dvh,420px)]">
+                    <div className="space-y-1 p-2">
+                      {poolNamesForComposer.length === 0 ? (
+                        <p className="text-muted-foreground px-2 py-4 text-center text-sm leading-relaxed">
+                          {t("pages.productTree.menuVisibilityEmptyPool")}
+                        </p>
+                      ) : (
+                        poolNamesForComposer.map((id) => (
+                          <div
+                            key={id}
+                            role="button"
+                            tabIndex={0}
+                            draggable
+                            dir={isRtl ? "rtl" : "ltr"}
+                            onDragStart={(e) => {
+                              e.dataTransfer.effectAllowed = "move"
+                              e.dataTransfer.setData(MENU_DRAG_TYPE, JSON.stringify({ id, zone: "pool" }))
+                            }}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => handleDropSwap(id, "pool", e)}
+                            onClick={() => handleMenuComposerRowClick(id, "pool")}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault()
+                                handleMenuComposerRowClick(id, "pool")
+                              }
+                            }}
+                            className={cn(
+                              "flex cursor-pointer items-center gap-1.5 rounded-lg border px-2 py-1.5 text-sm transition-colors",
+                              isRtl ? "flex-row" : "flex-row-reverse",
+                              menuSwapPick?.id === id && menuSwapPick.zone === "pool"
+                                ? "border-primary bg-primary/10"
+                                : "border-transparent bg-card hover:bg-muted/80",
+                            )}
+                          >
+                            <span className="min-w-0 flex-1 truncate text-start font-medium">{id}</span>
+                            <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-70" aria-hidden />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              title={t("pages.productTree.addToMenuDisplay")}
+                              className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                applyDishOnMenu(id, true)
+                              }}
+                            >
+                              <Eye className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           {showMenuCosts && (
             <div style={{position:'fixed',inset:0,zIndex:70,display:'flex',alignItems:'center',justifyContent:'center'}}>
               <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.5)'}} onClick={() => setShowMenuCosts(false)} />
@@ -1540,112 +1857,170 @@ export default function ProductTree() {
             </Select>
           </div>
           
-          {/* Dishes Grid */}
-          <div className="flex flex-wrap gap-1.5 max-h-[180px] overflow-y-auto hide-scrollbar">
+          {/* Dishes grid — כרטיסים גדולים ובולטים (לחזור: git checkout HEAD~1 -- components/product-tree.tsx) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[min(42vh,360px)] overflow-y-auto overflow-x-hidden hide-scrollbar [-webkit-overflow-scrolling:touch]">
             {loading && (
-              <div className="flex flex-wrap gap-2">
-                {Array.from({length:6}).map((_,i)=>(
-                  <div key={i} className="relative rounded-lg min-w-[100px] max-w-[150px] h-[90px] flex-1 animate-pulse bg-muted border border-border"/>
+              <div className="col-span-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="relative min-h-[168px] rounded-xl animate-pulse bg-muted border border-border shadow-sm"
+                  />
                 ))}
               </div>
             )}
             <AnimatePresence mode="popLayout">
-              {!loading && filteredDishes.map(name => {
-                const dish = dishes[name]
-                const pct = calcFoodCostPct(name)
-                const status = getStatusColor(pct)
-                const isActive = name === selectedDish
-                
-                return (
-                  <motion.div
-                    key={name}
-                    role="button"
-                    tabIndex={0}
-                    layout
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    onClick={() => setSelectedDish(name)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault()
-                        setSelectedDish(name)
+              {!loading &&
+                filteredDishes.map((name) => {
+                  const dish = dishes[name]
+                  const pct = calcFoodCostPct(name)
+                  const status = getStatusColor(pct)
+                  const isActive = name === selectedDish
+                  const hasImg = !!(dishImages[name] && loadedDishImages.has(name))
+
+                  return (
+                    <motion.div
+                      key={name}
+                      role="button"
+                      tabIndex={0}
+                      layout
+                      initial={{ opacity: 0, scale: 0.96 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.96 }}
+                      onClick={() => setSelectedDish(name)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault()
+                          setSelectedDish(name)
+                        }
+                      }}
+                      className={cn(
+                        "relative flex min-h-[168px] flex-col overflow-hidden rounded-xl p-3 text-right shadow-md outline-none transition-all duration-200",
+                        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                        isActive
+                          ? "z-[1] scale-[1.02] shadow-xl ring-2 ring-primary/55 ring-offset-2 ring-offset-background"
+                          : "border border-border/80 bg-card hover:border-primary/40 hover:shadow-lg",
+                        !hasImg && !isActive && "bg-gradient-to-br from-primary/[0.12] via-violet-500/[0.08] to-amber-500/[0.14]",
+                        isActive && !hasImg && "bg-primary text-primary-foreground border-primary",
+                      )}
+                      style={
+                        hasImg
+                          ? {
+                              backgroundImage: `url(${dishImages[name]})`,
+                              backgroundSize: "cover",
+                              backgroundPosition: "center",
+                            }
+                          : undefined
                       }
-                    }}
-                    className={cn(
-                      "relative cursor-pointer rounded-lg p-2 text-right transition-all min-w-[100px] max-w-[150px] flex-1 outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      isActive 
-                        ? "shadow-lg ring-2 ring-primary/50" 
-                        : "bg-card border border-border hover:border-primary/50 hover:shadow-md"
-                    )}
-                    style={dishImages[name] && loadedDishImages.has(name)
-                      ? {backgroundImage:`url(${dishImages[name]})`,backgroundSize:'cover',backgroundPosition:'center'}
-                      : isActive ? {background:'var(--primary)'} : undefined
-                    }
-                  >
-                    {dishImages[name] && !loadedDishImages.has(name) && (
-                      <div className="absolute inset-0 rounded-lg overflow-hidden">
-                        <div className="w-full h-full animate-pulse bg-muted"/>
-                      </div>
-                    )}
-                    {dishImages[name] && loadedDishImages.has(name) && <div className="absolute inset-0 rounded-lg" style={{background:'linear-gradient(to top,rgba(0,0,0,0.65) 0%,rgba(0,0,0,0.1) 60%,transparent 100%)'}}/>}
-                    <button onClick={e=>{e.stopPropagation();openDishEditDialog(name)}}
-                      className={cn("absolute top-1.5 left-1.5 p-1 rounded-md z-10 transition-colors",
-                        dishImages[name]||isActive?"text-white/80 hover:bg-white/20":"text-muted-foreground hover:bg-muted")}>
-                      <MoreVertical className="w-3.5 h-3.5"/>
-                    </button>
-                    
-                    {/* Category */}
-                    {dish.category && (
-                      <p className={cn(
-                        "text-[10px] font-semibold uppercase tracking-wider mb-0.5 pr-1",
-                        isActive ? "text-primary-foreground/70" : "text-muted-foreground"
-                      )}>
-                        {CATEGORY_TO_KEY[dish.category]
-                          ? t(`pages.productTree.${CATEGORY_TO_KEY[dish.category]}`)
-                          : dish.category}
-                      </p>
-                    )}
-                    
-                    {/* Name */}
-                    <p className={cn(
-                      "font-bold text-sm leading-tight mb-2 pr-1",
-                      isActive ? "text-primary-foreground" : "text-foreground"
-                    )}>
-                      {name}
-                    </p>
-                    
-                    {/* Price & FC — לבעלים בלבד */}
-                    <div className="flex items-center justify-between">
-                      {canSeeCosts ? (
-                        <>
-                          <span className={cn(
-                            "text-xs",
-                            isActive ? "text-primary-foreground/80" : "text-muted-foreground"
-                          )}>
-                            {dish.sellingPrice > 0 ? `₪${(dish.sellingPrice/VAT_RATE).toFixed(0)} לפמ` : "—"}
-                          </span>
-                          <Badge 
-                            variant="secondary"
+                    >
+                      {dishImages[name] && !loadedDishImages.has(name) && (
+                        <div className="absolute inset-0 overflow-hidden rounded-xl">
+                          <div className="h-full w-full animate-pulse bg-muted" />
+                        </div>
+                      )}
+                      {hasImg && (
+                        <div
+                          className="pointer-events-none absolute inset-0 rounded-xl"
+                          style={{
+                            background:
+                              "linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.2) 45%, transparent 100%)",
+                          }}
+                        />
+                      )}
+                      {!hasImg && !isActive && (
+                        <Utensils
+                          className="pointer-events-none absolute left-1/2 top-1/3 h-14 w-14 -translate-x-1/2 -translate-y-1/2 text-muted-foreground/20"
+                          aria-hidden
+                        />
+                      )}
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openDishEditDialog(name)
+                        }}
+                        className={cn(
+                          "absolute left-2 top-2 z-20 rounded-lg p-1.5 transition-colors",
+                          hasImg || isActive
+                            ? "text-white/90 hover:bg-white/20"
+                            : "text-muted-foreground hover:bg-muted",
+                        )}
+                        type="button"
+                        aria-label={t("pages.productTree.editDetails")}
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </button>
+
+                      <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+                        {dish.category ? (
+                          <p
                             className={cn(
-                              "text-[10px] font-bold",
-                              isActive 
-                                ? "bg-white/20 text-primary-foreground" 
-                                : cn(status.bg, status.text)
+                              "mb-1 text-[11px] font-semibold uppercase tracking-wide",
+                              hasImg || isActive
+                                ? isActive
+                                  ? "text-primary-foreground/80"
+                                  : "text-white/85"
+                                : "text-muted-foreground",
                             )}
                           >
-                            {pct > 0 ? `${pct.toFixed(1)}%` : `${dish.ingredients.length} ${t("pages.productTree.ingredientsCountShort")}`}
-                          </Badge>
-                        </>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          {dish.ingredients.length} {t("pages.productTree.ingredientsCountShort")}
-                        </span>
-                      )}
-                    </div>
-                  </motion.div>
-                )
-              })}
+                            {CATEGORY_TO_KEY[dish.category]
+                              ? t(`pages.productTree.${CATEGORY_TO_KEY[dish.category]}`)
+                              : dish.category}
+                          </p>
+                        ) : null}
+
+                        <p
+                          className={cn(
+                            "line-clamp-2 text-base font-extrabold leading-snug tracking-tight",
+                            hasImg || isActive
+                              ? isActive
+                                ? "text-primary-foreground"
+                                : "text-white drop-shadow-md"
+                              : "text-foreground",
+                          )}
+                        >
+                          {name}
+                        </p>
+
+                        <div className="mt-auto pt-3">
+                          {canSeeCosts ? (
+                            <div className="flex items-end justify-between gap-2">
+                              <span
+                                className={cn(
+                                  "text-sm font-semibold tabular-nums",
+                                  hasImg || isActive
+                                    ? isActive
+                                      ? "text-primary-foreground/95"
+                                      : "text-white drop-shadow"
+                                    : "text-foreground",
+                                )}
+                              >
+                                {dish.sellingPrice > 0
+                                  ? `₪${(dish.sellingPrice / VAT_RATE).toFixed(0)} לפמ`
+                                  : "—"}
+                              </span>
+                              {pct > 0 ? (
+                                <Badge
+                                  variant="secondary"
+                                  className={cn(
+                                    "shrink-0 text-[11px] font-bold shadow-sm",
+                                    isActive
+                                      ? "border-white/30 bg-white/25 text-primary-foreground"
+                                      : hasImg
+                                        ? "border-white/20 bg-black/45 text-white backdrop-blur-[2px]"
+                                        : cn(status.bg, status.text, "border border-border/50"),
+                                  )}
+                                >
+                                  {pct.toFixed(1)}%
+                                </Badge>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )
+                })}
             </AnimatePresence>
           </div>
         </CardContent>

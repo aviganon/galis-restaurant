@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { collection, getDocs, getDoc, doc, query, where, orderBy, limit, setDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { loadGlobalPriceSubdocsMap, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
+import { recipeCountsAsMenuDish } from "@/lib/recipe-menu-visibility"
 import { useApp } from "@/contexts/app-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -130,7 +131,7 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
               getDoc(doc(db, "restaurants", rest.id, "appState", "assignedSuppliers")),
             ])
             const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
-            const recipes = recSnap.docs.filter((d) => !d.data().isCompound)
+            const recipes = recSnap.docs.filter((d) => recipeCountsAsMenuDish(d.data()))
             const prices: Record<string, number> = {}
             globalIngSnap.forEach((d) => {
               const picked = pickGlobalIngredientRowFromAssigned(assignedList, d.data(), subPricesByIngredient.get(d.id))
@@ -272,7 +273,7 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
         const delivered = pos.filter((p) => p.status === "delivered").slice(0, 5)
         setRecentDelivered(delivered.map((p) => ({ supplier: p.supplier || "—" })))
 
-        const recipes = recSnap.docs.filter((d) => !d.data().isCompound)
+        const recipes = recSnap.docs.filter((d) => recipeCountsAsMenuDish(d.data()))
         setRecipesCount(recipes.length)
 
         const prices: Record<string, number> = {}
