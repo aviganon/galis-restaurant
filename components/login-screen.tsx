@@ -132,12 +132,12 @@ function LoginBrandLogo({ variant }: { variant: LoginBrandLogoVariant }) {
 
   const imgClass =
     variant === "hero"
-      ? "h-44 w-auto max-h-[18rem] sm:h-52 sm:max-h-[22rem] md:h-64 md:max-h-[26rem] lg:h-72 lg:max-h-[28rem] max-w-[min(96vw,44rem)] object-contain object-center mx-auto drop-shadow-[0_24px_60px_rgba(0,0,0,0.5)] dark:drop-shadow-[0_28px_64px_rgba(0,0,0,0.75)]"
+      ? "h-52 w-auto max-h-[22rem] sm:h-60 sm:max-h-[24rem] md:h-72 md:max-h-[28rem] lg:h-80 lg:max-h-[30rem] max-w-[min(96vw,44rem)] object-contain object-center mx-auto contrast-110 saturate-110 drop-shadow-[0_12px_30px_rgba(0,0,0,0.28)]"
       : variant === "card"
-        ? "h-36 sm:h-40 md:h-44 lg:h-48 w-auto max-w-[min(92vw,26rem)] object-contain object-center mx-auto drop-shadow-lg"
+        ? "h-40 sm:h-44 md:h-48 lg:h-52 w-auto max-w-[min(92vw,28rem)] object-contain object-center mx-auto contrast-110 saturate-110 drop-shadow-[0_8px_20px_rgba(0,0,0,0.22)]"
         : variant === "header"
-          ? "h-12 sm:h-14 w-auto max-w-full object-contain"
-          : "h-10 sm:h-12 w-auto max-w-[280px] object-contain"
+          ? "h-14 sm:h-16 w-auto max-w-full object-contain contrast-110"
+          : "h-12 sm:h-14 w-auto max-w-[320px] object-contain contrast-110"
 
   const logoSizes =
     variant === "hero"
@@ -153,8 +153,8 @@ function LoginBrandLogo({ variant }: { variant: LoginBrandLogoVariant }) {
       <Image
         src={BRAND_LOGO_PATH}
         alt={t("login.brandLogoAlt")}
-        width={1024}
-        height={565}
+        width={999}
+        height={548}
         sizes={logoSizes}
         quality={95}
         className={imgClass}
