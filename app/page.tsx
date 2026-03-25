@@ -151,8 +151,25 @@ export default function Home() {
       const authStale = () => authGen !== authProfileGenRef.current
       try {
         const { usersCollection, roleField, restaurantIdField, restaurantsCollection, restaurantFields, permissionsField, defaultPermissions } = firestoreConfig
+        const userRef = doc(db, usersCollection, user.uid)
         // getDocFromServer: עוקף מטמון — חשוב אחרי עדכון isSystemOwner בסקריפט
-        const userDoc = await getDocFromServer(doc(db, usersCollection, user.uid)).catch(() => getDoc(doc(db, usersCollection, user.uid)))
+        let userDoc = await getDocFromServer(userRef).catch(() => getDoc(userRef))
+        if (authStale()) return
+        /**
+         * הרשמה עם קוד הזמנה: createUserWithEmailAndPassword מפעיל את onAuthStateChanged
+         * לפני ש-handleRegister מסיים setDoc על users/{uid} — בקריאה הראשונה המסמך עדיין לא קיים
+         * והאפליקציה מציגה "אין מסעדה" עד התחברות מחדש. נמתין קצרות ומנסים שוב.
+         */
+        if (!userDoc.exists()) {
+          const maxAttempts = 20
+          const delayMs = 150
+          for (let a = 1; a < maxAttempts; a++) {
+            await new Promise((r) => setTimeout(r, delayMs))
+            if (authStale()) return
+            userDoc = await getDocFromServer(userRef).catch(() => getDoc(userRef))
+            if (userDoc.exists()) break
+          }
+        }
         if (authStale()) return
         const data = userDoc.exists() ? userDoc.data() : null
         let roleRaw = data?.[roleField]
