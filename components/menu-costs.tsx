@@ -13,11 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
-  Search, Download, TrendingUp, TrendingDown, DollarSign, UtensilsCrossed,
+  Search, TrendingUp, TrendingDown, DollarSign, UtensilsCrossed,
   Percent, AlertTriangle, CheckCircle2, Loader2, Upload, FileText, X, ChevronDown, ChevronUp,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { downloadExcel } from "@/lib/export-excel"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
 import { useLanguage } from "@/contexts/language-context"
@@ -594,10 +593,10 @@ export function MenuCosts({ embeddedInProductTree = false }: MenuCostsProps) {
           { icon: AlertTriangle,   color: "bg-red-500/10 text-red-500",         label: t("pages.menuCosts.dishesToReview"), value: stats.criticalItems },
         ].map(({ icon: Icon, color, label, value }, i) => (
           <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }} className="h-full">
-            <Card className="h-full"><CardContent className="p-4">
+            <Card className="h-full"><CardContent className="p-5">
               <div className="flex items-center gap-3">
-                <div className={cn("p-2 rounded-xl", color.split(" ")[0])}><Icon className={cn("w-5 h-5", color.split(" ")[1])} /></div>
-                <div><p className="text-sm text-muted-foreground">{label}</p><p className="text-2xl font-bold">{value}</p></div>
+                <div className={cn("rounded-xl p-2.5", color.split(" ")[0])}><Icon className={cn("h-6 w-6", color.split(" ")[1])} /></div>
+                <div><p className="text-sm font-medium text-muted-foreground">{label}</p><p className="text-3xl font-bold tracking-tight">{value}</p></div>
               </div>
             </CardContent></Card>
           </motion.div>
@@ -606,73 +605,50 @@ export function MenuCosts({ embeddedInProductTree = false }: MenuCostsProps) {
   )
 
   const compactStatsRow = (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-border/60 bg-muted/30 px-2 py-1.5 text-[11px] sm:text-xs shrink-0">
-      <span className="inline-flex items-center gap-1 text-muted-foreground">
-        <UtensilsCrossed className="w-3.5 h-3.5 shrink-0 text-primary" />
-        <span className="font-semibold text-foreground tabular-nums">{stats.totalItems}</span>
-        {t("pages.menuCosts.menuItems")}
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5 text-sm sm:text-[15px] shrink-0">
+      <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+        <UtensilsCrossed className="h-5 w-5 shrink-0 text-primary" />
+        <span className="text-base font-bold tabular-nums text-foreground sm:text-lg">{stats.totalItems}</span>
+        <span className="font-medium">{t("pages.menuCosts.menuItems")}</span>
       </span>
-      <span className="text-border" aria-hidden>
+      <span className="text-muted-foreground/50" aria-hidden>
         |
       </span>
       <span className="text-muted-foreground">
-        {t("pages.menuCosts.avgFoodCost")}: <span className="font-semibold text-amber-700 dark:text-amber-400 tabular-nums">{stats.avgFoodCost.toFixed(1)}%</span>
+        <span className="font-medium">{t("pages.menuCosts.avgFoodCost")}:</span>{" "}
+        <span className="text-base font-bold tabular-nums text-amber-700 dark:text-amber-400 sm:text-lg">
+          {stats.avgFoodCost.toFixed(1)}%
+        </span>
       </span>
-      <span className="text-border" aria-hidden>
+      <span className="text-muted-foreground/50" aria-hidden>
         |
       </span>
       <span className="text-muted-foreground">
-        {t("pages.menuCosts.grossProfit")}: <span className="font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">{stats.totalProfit.toLocaleString()} ₪</span>
+        <span className="font-medium">{t("pages.menuCosts.grossProfit")}:</span>{" "}
+        <span className="text-base font-bold tabular-nums text-emerald-700 dark:text-emerald-400 sm:text-lg">
+          {stats.totalProfit.toLocaleString()} ₪
+        </span>
       </span>
-      <span className="text-border" aria-hidden>
+      <span className="text-muted-foreground/50" aria-hidden>
         |
       </span>
       <span className="text-muted-foreground">
-        {t("pages.menuCosts.dishesToReview")}: <span className="font-semibold text-red-700 dark:text-red-400 tabular-nums">{stats.criticalItems}</span>
+        <span className="font-medium">{t("pages.menuCosts.dishesToReview")}:</span>{" "}
+        <span className="text-base font-bold tabular-nums text-red-700 dark:text-red-400 sm:text-lg">
+          {stats.criticalItems}
+        </span>
       </span>
     </div>
   )
 
-  const exportExcel = () => {
-    const rows = filteredItems.map((i) => ({
-      מנה: i.name,
-      קטגוריה: i.category,
-      "מחיר מכירה": i.salePrice,
-      "עלות מזון": i.foodCost.toFixed(2),
-      "עלות %": i.foodCostPercent.toFixed(1),
-      רווח: i.profit.toFixed(2),
-      "מרווח %": i.profitMargin.toFixed(1),
-      סטטוס:
-        i.status === "excellent"
-          ? "מצוין"
-          : i.status === "good"
-            ? "טוב"
-            : i.status === "warning"
-              ? "אזהרה"
-              : "קריטי",
-    }))
-    downloadExcel(rows, `עלויות_תפריט_${new Date().toISOString().slice(0, 10)}`, "עלויות")
-    toast.success(t("pages.ingredients.fileDownloaded"))
-  }
-
   const toolbarCard = (
       <Card>
         <CardContent className={cn("p-4", embeddedInProductTree && "p-2.5")}>
-        <div className={cn("flex flex-col gap-3", !embeddedInProductTree && "md:flex-row md:gap-4")}>
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className={cn("font-bold", embeddedInProductTree ? "text-sm" : "text-lg")}>{t("nav.menuCosts")}</span>
-            <Badge variant="secondary" className={embeddedInProductTree ? "text-[10px] px-1.5 py-0" : ""}>
-              {filteredItems.length} {t("pages.menuCosts.dish")}
-            </Badge>
-          </div>
-          <Button
-            variant="outline"
-            className={cn("rounded-full shrink-0", embeddedInProductTree && "h-8 text-xs px-3")}
-            onClick={exportExcel}
-          >
-            <Download className="w-4 h-4 ml-2" />
-            {t("pages.menuCosts.exportReport")}
-          </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={cn("font-bold", embeddedInProductTree ? "text-sm" : "text-lg")}>{t("nav.menuCosts")}</span>
+          <Badge variant="secondary" className={embeddedInProductTree ? "text-xs px-2 py-0.5" : ""}>
+            {filteredItems.length} {t("pages.menuCosts.dish")}
+          </Badge>
         </div>
         <div
           className={cn(
