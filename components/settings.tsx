@@ -85,7 +85,7 @@ export function Settings() {
   const [editUserAddress, setEditUserAddress] = useState("")
   const [editUserNotes, setEditUserNotes] = useState("")
   const [loadingEditProfile, setLoadingEditProfile] = useState(false)
-  const [editUserRole, setEditUserRole] = useState<"manager"|"user">("user")
+  const [editUserRole, setEditUserRole] = useState<"manager"|"user"|"system_owner">("user")
   const [editUserRestId, setEditUserRestId] = useState("")
   const [savingEditUser, setSavingEditUser] = useState(false)
   const [apiKeyInput, setApiKeyInput] = useState("")
@@ -357,18 +357,59 @@ export function Settings() {
     restaurantId: string | null
     isSystemOwner?: boolean
   }) => {
-    setEditingUser(u); setEditUserRole(u.role as "manager"|"user"); setEditUserRestId(u.restaurantId||"")
+    setEditingUser(u); setEditUserRole(u.isSystemOwner ? "system_owner" : (u.role as "manager"|"user")); setEditUserRestId(u.restaurantId||"")
     setEditUserName(""); setEditUserPhone(""); setEditUserAddress(""); setEditUserNotes("")
     setLoadingEditProfile(true)
     try { const snap=await getDoc(doc(db,"users",u.uid)); if(snap.exists()){const d=snap.data();setEditUserName(d.name||"");setEditUserPhone(d.phone||"");setEditUserAddress(d.address||"");setEditUserNotes(d.notes||"")} }
     catch{} finally{setLoadingEditProfile(false)}
   }
+  const setSystemOwnerEmailInConfig = useCallback(async (emailRaw: string, enable: boolean) => {
+    const email = emailRaw.trim().toLowerCase()
+    if (!email) return
+    const targets: Array<{ col: string; id: string }> = [
+      { col: "config", id: "admins" },
+      { col: "config", id: "adminEmails" },
+    ]
+    for (const tDoc of targets) {
+      try {
+        const ref = doc(db, tDoc.col, tDoc.id)
+        const snap = await getDoc(ref)
+        const d = snap.exists() ? snap.data() : {}
+        const raw = (d?.emails ?? d?.adminEmails) as unknown
+        const list = Array.isArray(raw) ? raw.map((v) => String(v).trim().toLowerCase()) : []
+        const next = enable
+          ? Array.from(new Set([...list, email]))
+          : list.filter((v) => v !== email)
+        await setDoc(ref, { emails: next }, { merge: true })
+      } catch {
+        // Non-blocking.
+      }
+    }
+  }, [])
   const saveEditUser = async () => {
     if (!editingUser) return; setSavingEditUser(true)
     try {
       const nextRestId = canManageTeamInOwnRestaurant ? (currentRestaurantId || null) : (editUserRestId || null)
-      await setDoc(doc(db,"users",editingUser.uid),{role:editUserRole,restaurantId:nextRestId,name:editUserName.trim()||null,phone:editUserPhone.trim()||null,address:editUserAddress.trim()||null,notes:editUserNotes.trim()||null,updatedAt:new Date().toISOString()},{merge:true})
-      setUsersData(p=>p.map(u=>u.uid===editingUser.uid?{...u,role:editUserRole,restaurantId:nextRestId,restaurantName:(restaurants||[]).find(r=>r.id===nextRestId)?.name}:u))
+      const makeSystemOwner = editUserRole === "system_owner"
+      const roleToSave = makeSystemOwner ? "user" : editUserRole
+      await setDoc(doc(db,"users",editingUser.uid),{
+        role: roleToSave,
+        isSystemOwner: makeSystemOwner,
+        restaurantId: nextRestId,
+        name:editUserName.trim()||null,
+        phone:editUserPhone.trim()||null,
+        address:editUserAddress.trim()||null,
+        notes:editUserNotes.trim()||null,
+        updatedAt:new Date().toISOString()
+      },{merge:true})
+      await setSystemOwnerEmailInConfig(editingUser.email, makeSystemOwner)
+      setUsersData(p=>p.map(u=>u.uid===editingUser.uid?{
+        ...u,
+        role: roleToSave,
+        isSystemOwner: makeSystemOwner,
+        restaurantId:nextRestId,
+        restaurantName:(restaurants||[]).find(r=>r.id===nextRestId)?.name
+      }:u))
       toast.success("משתמש עודכן"); setEditingUser(null)
     }
     catch { toast.error("שגיאה") } finally { setSavingEditUser(false) }
@@ -1304,8 +1345,8 @@ export function Settings() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium">תפקיד</label>
-                    <select className="w-full h-10 rounded-md border px-3 text-sm bg-background" value={editUserRole} onChange={e=>setEditUserRole(e.target.value as "manager"|"user")}>
-                      <option value="manager">מנהל</option><option value="user">משתמש</option>
+                    <select className="w-full h-10 rounded-md border px-3 text-sm bg-background" value={editUserRole} onChange={e=>setEditUserRole(e.target.value as "manager"|"user"|"system_owner")}>
+                      <option value="manager">מנהל</option><option value="user">משתמש</option><option value="system_owner">בעלים מערכת</option>
                     </select>
                   </div>
                   {canManageTeamInOwnRestaurant ? (
