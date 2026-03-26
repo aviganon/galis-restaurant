@@ -1373,6 +1373,12 @@ export function Settings() {
                     </div>
                   )}
                 </div>
+                {editingUser.isSystemOwner && editUserRole !== "system_owner" ? (
+                  <div className="rounded-md border border-amber-500/40 bg-amber-50/70 dark:bg-amber-950/30 px-3 py-2 text-xs leading-relaxed text-amber-900 dark:text-amber-200">
+                    <strong>אזהרה:</strong> אתה עומד להסיר הרשאת <strong>בעלים מערכת</strong> מהמשתמש הזה.
+                    הפעולה קריטית ועלולה לחסום גישה ניהולית אם אין בעלים נוספים.
+                  </div>
+                ) : null}
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">הערות</label>
                   <textarea value={editUserNotes} onChange={e=>setEditUserNotes(e.target.value)} placeholder="הערות נוספות..." className="w-full min-h-[72px] rounded-md border px-3 py-2 text-sm bg-background resize-none"/>
