@@ -391,6 +391,15 @@ export function Settings() {
     try {
       const nextRestId = canManageTeamInOwnRestaurant ? (currentRestaurantId || null) : (editUserRestId || null)
       const makeSystemOwner = editUserRole === "system_owner"
+      const wasSystemOwner = editingUser.isSystemOwner === true
+      if (wasSystemOwner && !makeSystemOwner) {
+        const remainingSystemOwners = usersData.filter((u) => u.isSystemOwner && u.uid !== editingUser.uid).length
+        if (remainingSystemOwners === 0) {
+          toast.error("לא ניתן להסיר בעלים מערכת אחרון. יש להגדיר קודם בעלים מערכת נוסף.")
+          setSavingEditUser(false)
+          return
+        }
+      }
       const roleToSave = makeSystemOwner ? "user" : editUserRole
       await setDoc(doc(db,"users",editingUser.uid),{
         role: roleToSave,
