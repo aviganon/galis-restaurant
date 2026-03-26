@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendEmailVerification,
   GoogleAuthProvider,
   signInWithPopup,
   signInWithRedirect,
@@ -379,7 +380,19 @@ export function LoginScreen(_props: LoginScreenProps) {
     setIsLoading(true)
     try {
       await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence)
-      await signInWithEmailAndPassword(auth, email, password)
+      const cred = await signInWithEmailAndPassword(auth, email, password)
+      const hasPasswordProvider = cred.user.providerData.some((p) => p?.providerId === "password")
+      if (hasPasswordProvider && !cred.user.emailVerified) {
+        try {
+          const verifyUrl = typeof window !== "undefined" ? window.location.origin : "https://galis-6ebbc.web.app"
+          await sendEmailVerification(cred.user, { url: verifyUrl })
+        } catch {
+          // ignore verification resend failure
+        }
+        await auth.signOut().catch(() => {})
+        setError("נדרש אימות כתובת מייל לפני כניסה. שלחנו לך מייל אימות חדש.")
+        return
+      }
     } catch (err: unknown) {
       const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
       setError(getAuthError(code) || (err instanceof Error ? err.message : t("authErrors.default")))
@@ -509,13 +522,20 @@ export function LoginScreen(_props: LoginScreenProps) {
         email: em,
       }, { merge: true })
       await setDoc(codeRef, { [inviteCodeFields.used]: true }, { merge: true })
+      try {
+        const verifyUrl = typeof window !== "undefined" ? window.location.origin : "https://galis-6ebbc.web.app"
+        await sendEmailVerification(userCred.user, { url: verifyUrl })
+      } catch {
+        // ignore
+      }
+      await auth.signOut().catch(() => {})
       setInviteCode("")
       setRestaurantName("")
       setBranch("")
       setRegisterEmail("")
       setRegisterPassword("")
       setActiveTab("login")
-      setError("")
+      setError("ההרשמה הושלמה. שלחנו מייל אימות — אחרי אימות הכתובת אפשר להתחבר.")
     } catch (err: unknown) {
       const authCode = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
       if (authCode === "auth/email-already-in-use") {

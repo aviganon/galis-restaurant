@@ -586,7 +586,7 @@ export function Settings() {
     }
     setCreating2(true)
     try {
-      const { createUserWithEmailAndPassword, signOut } = await import("firebase/auth")
+      const { createUserWithEmailAndPassword, signOut, sendEmailVerification } = await import("firebase/auth")
       const sec = getAuthForUserCreation()
       const cr = await createUserWithEmailAndPassword(sec, cEmail.trim(), cPass)
       const roleToSave = creatingSystemOwner ? "user" : cRole
@@ -602,6 +602,12 @@ export function Settings() {
         createdAt: new Date().toISOString(),
       })
       if (creatingSystemOwner) await setSystemOwnerEmailInConfig(cEmail.trim(), true)
+      try {
+        const verifyUrl = typeof window !== "undefined" ? window.location.origin : "https://galis-6ebbc.web.app"
+        await sendEmailVerification(cr.user, { url: verifyUrl })
+      } catch {
+        // Non-blocking.
+      }
       try {
         await signOut(sec)
       } catch {
