@@ -105,6 +105,7 @@ export function MobileNav({ currentPage, setCurrentPage, userRole, isSystemOwner
                 key={item.id}
                 type="button"
                 onClick={() => handleClick(item.id)}
+                aria-label={item.label}
                 className={cn(
                   "flex-1 flex flex-col items-center justify-center gap-0.5 relative transition-all duration-200 min-h-[48px] min-w-0 px-0.5 active:opacity-90",
                   isActive && "text-accent"
@@ -132,14 +133,28 @@ export function MobileNav({ currentPage, setCurrentPage, userRole, isSystemOwner
       </nav>
       {showMore && (
         <>
-          <div className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm lg:hidden" onClick={() => setShowMore(false)} />
-          <div className="fixed bottom-0 inset-x-0 z-50 lg:hidden bg-primary rounded-t-3xl animate-in slide-in-from-bottom duration-300 max-h-[85dvh] flex flex-col shadow-2xl">
+          <button
+            type="button"
+            aria-label={t("pages.close")}
+            className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm lg:hidden"
+            onClick={() => setShowMore(false)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("nav.moreOptions")}
+            className="fixed bottom-0 inset-x-0 z-50 lg:hidden bg-primary rounded-t-3xl animate-in slide-in-from-bottom duration-300 max-h-[85dvh] flex flex-col shadow-2xl"
+          >
             <div className="w-12 h-1.5 bg-primary-foreground/20 rounded-full mx-auto mt-3" />
             <div className="p-4 pb-safe">
               <div className="flex items-center justify-between mb-4">
                 <LanguageSwitcher />
                 <h3 className="text-xs font-bold text-primary-foreground/50 tracking-wider">{t("nav.moreOptions")}</h3>
-                <button onClick={() => setShowMore(false)} className="w-8 h-8 rounded-full bg-primary-foreground/10 flex items-center justify-center">
+                <button
+                  onClick={() => setShowMore(false)}
+                  aria-label={t("pages.close")}
+                  className="w-8 h-8 rounded-full bg-primary-foreground/10 flex items-center justify-center"
+                >
                   <X className="w-4 h-4 text-primary-foreground" />
                 </button>
               </div>

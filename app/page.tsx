@@ -586,6 +586,12 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:start-3 focus:z-[120] focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:shadow-md"
+      >
+        דלג לתוכן הראשי
+      </a>
       {inRestaurantWorkspace && (
         <RestaurantTopBar
           dir={dir}
@@ -639,6 +645,7 @@ export default function Home() {
         refreshIngredients={refreshIngredients}
       >
         <main
+          id="main-content"
           className={cn(
             compactSystemOwnerShell
               ? "pb-3 pt-[env(safe-area-inset-top,0px)] max-lg:pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] lg:pb-5"

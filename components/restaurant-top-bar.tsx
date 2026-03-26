@@ -149,6 +149,7 @@ export function RestaurantTopBar({
               size="icon"
               className="h-9 w-9 shrink-0 rounded-full"
               title={t("nav.settings")}
+              aria-label={t("nav.settings")}
               onClick={() => setCurrentPage("settings")}
             >
               <Settings className="h-4 w-4" />

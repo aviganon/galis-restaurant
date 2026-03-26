@@ -89,7 +89,7 @@ const moreNavItems = (
 export function DesktopNav({ currentPage, setCurrentPage, currentRestaurant, restaurants, onSelectRestaurant, userRole, isSystemOwner, userPermissions, onLogout, isImpersonating, onStopImpersonate }: DesktopNavProps) {
   const t = useTranslations()
   return (
-    <nav className="hidden lg:flex fixed top-0 inset-x-0 z-50 h-16 bg-primary text-primary-foreground border-b border-primary-foreground/10">
+    <nav aria-label={t("common.navigation")} className="hidden lg:flex fixed top-0 inset-x-0 z-50 h-16 bg-primary text-primary-foreground border-b border-primary-foreground/10">
       <div className="container mx-auto px-4 flex items-center justify-between">
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-3">
@@ -108,7 +108,12 @@ export function DesktopNav({ currentPage, setCurrentPage, currentRestaurant, res
                 <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
                 <span className="max-w-[120px] truncate font-medium">{currentRestaurant}</span>
                 {onStopImpersonate && (
-                  <button onClick={onStopImpersonate} title="back" className="opacity-60 hover:opacity-100 transition-opacity text-xs leading-none">
+                  <button
+                    onClick={onStopImpersonate}
+                    title={t("nav.backToNormal")}
+                    aria-label={t("nav.backToNormal")}
+                    className="opacity-60 hover:opacity-100 transition-opacity text-xs leading-none"
+                  >
                     X
                   </button>
                 )}
@@ -156,6 +161,7 @@ export function DesktopNav({ currentPage, setCurrentPage, currentRestaurant, res
         </div>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="sm" onClick={onLogout}
+            aria-label={t("common.logout")}
             className="text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10">
             <LogOut className="w-4 h-4 ml-2" />
             {t("common.logout")}
