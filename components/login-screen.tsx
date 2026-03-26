@@ -1,7 +1,15 @@
 "use client"
 
-import { useState, useRef } from "react"
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth"
+import { useState, useRef, useEffect, useCallback } from "react"
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  type User,
+} from "firebase/auth"
 import { auth, db } from "@/lib/firebase"
 import { sendPasswordResetReliable } from "@/lib/password-reset-client"
 import { doc, getDoc, setDoc } from "firebase/firestore"
@@ -39,6 +47,8 @@ import { LanguageSwitcher } from "@/components/language-switcher"
 import { useTranslations } from "@/lib/use-translations"
 
 interface LoginScreenProps {}
+const GOOGLE_AUTH_INTENT_KEY = "google-auth-intent"
+const GOOGLE_REGISTER_DRAFT_KEY = "google-register-draft"
 
 const authErrorToKey: Record<string, string> = {
   "auth/invalid-credential": "authErrors.invalidCredential",
@@ -201,10 +211,83 @@ export function LoginScreen(_props: LoginScreenProps) {
   const heroScale = useTransform(scrollYProgress, [0, 0.5], [1, 1.1])
   const heroY = useTransform(scrollYProgress, [0, 0.5], [0, 100])
 
-  const getAuthError = (code: string) => {
+  const getAuthError = useCallback((code: string) => {
     const key = authErrorToKey[code]
     return key ? t(key) : t("authErrors.default")
-  }
+  }, [t])
+
+  const completeGoogleLogin = useCallback(async (user: User) => {
+    const { usersCollection } = firestoreConfig
+    const userDoc = await getDoc(doc(db, usersCollection, user.uid))
+    if (!userDoc.exists()) {
+      await auth.signOut()
+      setError("משתמש לא נמצא במערכת. פנה למנהל לקבלת קוד הזמנה.")
+      return
+    }
+    setError("")
+  }, [])
+
+  const completeGoogleRegister = useCallback(async (
+    user: User,
+    draft: { code: string; name: string; br: string },
+  ) => {
+    const { code, name, br } = draft
+    const { inviteCodesCollection, inviteCodeFields, usersCollection, restaurantsCollection, restaurantFields } = firestoreConfig
+    const codeRef = doc(db, inviteCodesCollection, code)
+    const codeSnap = await getDoc(codeRef)
+    if (!codeSnap.exists()) { setError(t("login.invalidCode")); return }
+    const codeData = codeSnap.data()
+    if (codeData?.[inviteCodeFields.used]) { setError(t("login.codeUsed")); return }
+    if (codeData?.[inviteCodeFields.type] !== "manager") { setError(t("login.codeNoRestaurant")); return }
+    const existingRestId = codeData?.[inviteCodeFields.restaurantId] as string | undefined
+    let restId: string
+    if (existingRestId) {
+      restId = existingRestId
+    } else {
+      if (!name) { setError(t("login.enterRestaurantName")); return }
+      restId = `rest_${Date.now()}`
+      await setDoc(doc(db, restaurantsCollection, restId), {
+        [restaurantFields.name]: name,
+        [restaurantFields.branch]: br || "סניף ראשי",
+        target: 30,
+      })
+      await setDoc(codeRef, { [inviteCodeFields.restaurantId]: restId }, { merge: true })
+    }
+    await setDoc(doc(db, usersCollection, user.uid), { restaurantId: restId, role: "manager", email: user.email }, { merge: true })
+    await setDoc(codeRef, { [inviteCodeFields.used]: true }, { merge: true })
+    setInviteCode("")
+    setRestaurantName("")
+    setBranch("")
+    setError("")
+  }, [t])
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const result = await getRedirectResult(auth)
+        if (!result?.user || cancelled) return
+        const intent = sessionStorage.getItem(GOOGLE_AUTH_INTENT_KEY)
+        if (intent === "register") {
+          const raw = sessionStorage.getItem(GOOGLE_REGISTER_DRAFT_KEY)
+          const parsed = raw ? (JSON.parse(raw) as { code?: string; name?: string; br?: string }) : {}
+          const code = (parsed.code || "").trim().toUpperCase().replace(/\s/g, "")
+          await completeGoogleRegister(result.user, { code, name: (parsed.name || "").trim(), br: (parsed.br || "").trim() })
+        } else {
+          await completeGoogleLogin(result.user)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
+          setError(getAuthError(code) || (err instanceof Error ? err.message : t("authErrors.default")))
+        }
+      } finally {
+        sessionStorage.removeItem(GOOGLE_AUTH_INTENT_KEY)
+        sessionStorage.removeItem(GOOGLE_REGISTER_DRAFT_KEY)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [completeGoogleLogin, completeGoogleRegister, getAuthError, t])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -342,18 +425,12 @@ export function LoginScreen(_props: LoginScreenProps) {
     try {
       const provider = new GoogleAuthProvider()
       const result = await signInWithPopup(auth, provider)
-      const user = result.user
-      const { usersCollection } = firestoreConfig
-      const userDoc = await getDoc(doc(db, usersCollection, user.uid))
-      if (!userDoc.exists()) {
-        await auth.signOut()
-        setError("משתמש לא נמצא במערכת. פנה למנהל לקבלת קוד הזמנה.")
-        return
-      }
+      await completeGoogleLogin(result.user)
     } catch (err) {
       const code = err && typeof err === "object" && "code" in err ? String(err.code) : ""
       if (code === "auth/popup-blocked") {
-        setError("הדפדפן חסם את חלון ההתחברות של Google. אפשר חלונות קופצים לאתר ונסה שוב.")
+        sessionStorage.setItem(GOOGLE_AUTH_INTENT_KEY, "login")
+        await signInWithRedirect(auth, new GoogleAuthProvider())
       } else if (code !== "auth/popup-closed-by-user") {
         setError(getAuthError(code) || (err instanceof Error ? err.message : t("authErrors.default")))
       }
@@ -368,41 +445,26 @@ export function LoginScreen(_props: LoginScreenProps) {
     if (!code) { setError(t("login.enterInviteCode")); return }
     setIsLoading(true)
     try {
-      const { inviteCodesCollection, inviteCodeFields, usersCollection, restaurantsCollection, restaurantFields } = firestoreConfig
+      const { inviteCodesCollection, inviteCodeFields } = firestoreConfig
       const codeRef = doc(db, inviteCodesCollection, code)
       const codeSnap = await getDoc(codeRef)
       if (!codeSnap.exists()) { setError(t("login.invalidCode")); return }
       const codeData = codeSnap.data()
       if (codeData?.[inviteCodeFields.used]) { setError(t("login.codeUsed")); return }
       if (codeData?.[inviteCodeFields.type] !== "manager") { setError(t("login.codeNoRestaurant")); return }
-      const existingRestId = codeData?.[inviteCodeFields.restaurantId] as string | undefined
-      let restId: string
-      if (existingRestId) {
-        restId = existingRestId
-      } else {
-        if (!name) { setError(t("login.enterRestaurantName")); return }
-        restId = `rest_${Date.now()}`
-      }
+      if (!codeData?.[inviteCodeFields.restaurantId] && !name) { setError(t("login.enterRestaurantName")); return }
+      const draft = { code, name, br }
+      sessionStorage.setItem(GOOGLE_AUTH_INTENT_KEY, "register")
+      sessionStorage.setItem(GOOGLE_REGISTER_DRAFT_KEY, JSON.stringify(draft))
       const provider = new GoogleAuthProvider()
       const result = await signInWithPopup(auth, provider)
-      const user = result.user
-      if (!existingRestId) {
-        await setDoc(doc(db, restaurantsCollection, restId), {
-          [restaurantFields.name]: name,
-          [restaurantFields.branch]: br || "סניף ראשי",
-          target: 30,
-        })
-        await setDoc(codeRef, { [inviteCodeFields.restaurantId]: restId }, { merge: true })
-      }
-      await setDoc(doc(db, usersCollection, user.uid), { restaurantId: restId, role: "manager", email: user.email }, { merge: true })
-      await setDoc(codeRef, { [inviteCodeFields.used]: true }, { merge: true })
-      setInviteCode("")
-      setRestaurantName("")
-      setBranch("")
+      await completeGoogleRegister(result.user, draft)
+      sessionStorage.removeItem(GOOGLE_AUTH_INTENT_KEY)
+      sessionStorage.removeItem(GOOGLE_REGISTER_DRAFT_KEY)
     } catch (err) {
       const authCode = err && typeof err === "object" && "code" in err ? String(err.code) : ""
       if (authCode === "auth/popup-blocked") {
-        setError("הדפדפן חסם את חלון ההרשמה של Google. אפשר חלונות קופצים לאתר ונסה שוב.")
+        await signInWithRedirect(auth, new GoogleAuthProvider())
       } else if (authCode !== "auth/popup-closed-by-user") {
         setError(err instanceof Error ? err.message : t("authErrors.default"))
       }
