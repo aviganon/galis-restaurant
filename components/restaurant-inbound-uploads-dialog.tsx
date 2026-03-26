@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Mail, Loader2, Eye, Play } from "lucide-react"
 import { firebaseBearerHeaders } from "@/lib/api-auth-client"
-import { ref, getDownloadURL } from "firebase/storage"
-import { db, storage } from "@/lib/firebase"
+import { db } from "@/lib/firebase"
 import { FilePreviewModal } from "@/components/file-preview-modal"
 import type { ExtractType, ExtractedSupplierItem, SalesReportPeriod } from "@/lib/ai-extract"
 import { detectDocumentType } from "@/lib/ai-extract"
@@ -72,6 +72,8 @@ export function RestaurantInboundUploadsDialog({
   const [fpmType, setFpmType] = useState<ExtractType>("p")
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [busyJobId, setBusyJobId] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "processing" | "done" | "error">("all")
+  const [typeFilter, setTypeFilter] = useState<"all" | "invoice" | "sales" | "other">("all")
 
   const mapDetectedToType = (detected: "menu" | "sales" | "invoice" | "unknown"): ExtractType =>
     detected === "sales" ? "s" : "p"
@@ -173,6 +175,14 @@ export function RestaurantInboundUploadsDialog({
   }, [open, restaurantId])
 
   const title = useMemo(() => "העלאות ממייל למסעדה", [])
+  const filteredRows = useMemo(() => {
+    return rows.filter((r) => {
+      const resolvedType = (r.detectedType as "invoice" | "sales" | "other" | undefined) || classifyByHeuristic(r)
+      const statusOk = statusFilter === "all" || (r.status || "pending") === statusFilter
+      const typeOk = typeFilter === "all" || resolvedType === typeFilter
+      return statusOk && typeOk
+    })
+  }, [rows, statusFilter, typeFilter])
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -193,13 +203,38 @@ export function RestaurantInboundUploadsDialog({
         ) : (
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "pending" | "processing" | "done" | "error")}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="סינון לפי סטטוס" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">כל הסטטוסים</SelectItem>
+                    <SelectItem value="pending">pending</SelectItem>
+                    <SelectItem value="processing">processing</SelectItem>
+                    <SelectItem value="done">done</SelectItem>
+                    <SelectItem value="error">error</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as "all" | "invoice" | "sales" | "other")}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="סינון לפי סוג מסמך" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">כל הסוגים</SelectItem>
+                    <SelectItem value="invoice">חשבונית ספק</SelectItem>
+                    <SelectItem value="sales">דוח מכירות</SelectItem>
+                    <SelectItem value="other">אחר</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               {loadError ? (
                 <div className="text-sm text-destructive py-3 text-center">{loadError}</div>
               ) : null}
-              {rows.length === 0 ? (
+              {filteredRows.length === 0 ? (
                 <div className="text-sm text-muted-foreground py-8 text-center">אין העלאות ממייל למסעדה זו</div>
               ) : (
-                rows.map((r) => (
+                filteredRows.map((r) => (
                   <div key={r.id} className="border rounded-lg p-3 space-y-1.5">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-medium truncate">{r.subject || "(ללא נושא)"}</p>
@@ -241,8 +276,25 @@ export function RestaurantInboundUploadsDialog({
                           variant="outline"
                           className="h-7 text-xs gap-1"
                           onClick={async () => {
-                            const url = await getDownloadURL(ref(storage, r.attachmentPaths![0]))
-                            window.open(url, "_blank")
+                            try {
+                              const headers = await firebaseBearerHeaders()
+                              const resp = await fetch("/api/inbound-jobs/file", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json", ...headers },
+                                body: JSON.stringify({
+                                  restaurantId,
+                                  jobId: r.id,
+                                  attachmentPath: r.attachmentPaths![0],
+                                }),
+                              })
+                              if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+                              const blob = await resp.blob()
+                              const objectUrl = URL.createObjectURL(blob)
+                              window.open(objectUrl, "_blank")
+                              setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+                            } catch {
+                              // ignore click failure
+                            }
                           }}
                         >
                           <Eye className="w-3.5 h-3.5" />
