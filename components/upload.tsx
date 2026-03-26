@@ -235,7 +235,7 @@ export function Upload() {
         toast.error((e as Error)?.message || "שגיאה בעיבוד הקובץ")
       }
     },
-    [selectedType, openFpm, processFilesToStorage]
+    [selectedType, openFpm, processFilesToStorage, mapDetectedToFpmType]
   )
 
   const handleConfirmSupplier = useCallback(
