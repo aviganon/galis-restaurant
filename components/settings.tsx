@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { onAuthStateChanged } from "firebase/auth"
-import { collection, getDocs, getDoc, writeBatch, doc, deleteDoc, setDoc } from "firebase/firestore"
+import { collection, getDocs, getDocsFromCache, getDoc, writeBatch, doc, deleteDoc, setDoc } from "firebase/firestore"
 import { auth, db, getAuthForUserCreation } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -416,39 +416,67 @@ export function Settings() {
   restaurantsRef.current = restaurants
 
   const loadU = useCallback(async () => {
-    setLoadingUsers2(true)
+    const shouldBlock = !usersLoaded
+    if (shouldBlock) setLoadingUsers2(true)
     try {
-      const s = await getDocs(collection(db, "users"))
+      const usersCol = collection(db, "users")
       const rs = restaurantsRef.current || []
+      const restNameById = new Map(rs.map((r) => [r.id, r.name]))
+      const mapUsers = (docs: { id: string; data: () => Record<string, unknown> }[]) =>
+        docs.map((d) => {
+          const dt = d.data()
+          return {
+            uid: d.id,
+            email: (dt.email as string) || "",
+            role: (dt.role as string) || "user",
+            restaurantId: (dt.restaurantId as string) || null,
+            restaurantName: ((dt.restaurantId as string) ? restNameById.get(dt.restaurantId as string) : undefined),
+            isSystemOwner: dt.isSystemOwner === true,
+          }
+        })
+
+      const applyVisible = (mapped: ReturnType<typeof mapUsers>) => {
+        const visible =
+          isSystemOwner && !isImpersonating
+            ? mapped.filter((u) => u.role !== "owner")
+            : mapped.filter(
+                (u) =>
+                  u.restaurantId === currentRestaurantId &&
+                  u.role !== "owner" &&
+                  u.isSystemOwner !== true,
+              )
+        setUsersData(visible)
+        setUsersLoaded(true)
+      }
+
+      // Quick first paint from local cache
+      try {
+        const cacheSnap = await getDocsFromCache(usersCol)
+        applyVisible(mapUsers(cacheSnap.docs as { id: string; data: () => Record<string, unknown> }[]))
+      } catch {
+        // cache miss/offline only: continue to server/network
+      }
+
+      // Fresh data from network/default source
+      const s = await getDocs(usersCol)
       const mapped = s.docs.map((d) => {
         const dt = d.data()
-        const r = rs.find((x) => x.id === dt.restaurantId)
         return {
           uid: d.id,
           email: dt.email || "",
           role: dt.role || "user",
           restaurantId: dt.restaurantId || null,
-          restaurantName: r?.name,
+          restaurantName: dt.restaurantId ? restNameById.get(dt.restaurantId) : undefined,
           isSystemOwner: dt.isSystemOwner === true,
         }
       })
-      const visible =
-        isSystemOwner && !isImpersonating
-          ? mapped.filter((u) => u.role !== "owner")
-          : mapped.filter(
-              (u) =>
-                u.restaurantId === currentRestaurantId &&
-                u.role !== "owner" &&
-                u.isSystemOwner !== true,
-            )
-      setUsersData(visible)
-      setUsersLoaded(true)
+      applyVisible(mapped)
     } catch {
       toast.error("שגיאה")
     } finally {
       setLoadingUsers2(false)
     }
-  }, [isSystemOwner, isImpersonating, currentRestaurantId])
+  }, [isSystemOwner, isImpersonating, currentRestaurantId, usersLoaded])
 
   useEffect(() => {
     if ((isSystemOwner && !isImpersonating) || canManageTeamInOwnRestaurant) void loadU()

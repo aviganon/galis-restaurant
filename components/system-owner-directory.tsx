@@ -7,6 +7,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   onSnapshot,
   orderBy,
   query,
@@ -136,7 +137,8 @@ export function SystemOwnerDirectory({
   useEffect(() => {
     let unsub: (() => void) | null = null
     try {
-      const q = query(collection(db, "inboundChangeRequests"), orderBy("createdAt", "desc"))
+      // Keep this lightweight for settings first paint.
+      const q = query(collection(db, "inboundChangeRequests"), orderBy("createdAt", "desc"), limit(200))
       unsub = onSnapshot(
         q,
         (snap) => {
