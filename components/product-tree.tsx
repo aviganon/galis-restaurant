@@ -171,6 +171,8 @@ export default function ProductTree() {
   const [dashboardModalTab, setDashboardModalTab] = useState<"dashboard" | "reports">("dashboard")
   const [aiSuggestLoading, setAiSuggestLoading] = useState(false)
   const [aiSuggestedDish, setAiSuggestedDish] = useState<ExtractedDishItem | null>(null)
+  const [aiSuggestedOptions, setAiSuggestedOptions] = useState<ExtractedDishItem[]>([])
+  const [aiIngredientModeFilter, setAiIngredientModeFilter] = useState<"all" | "new_only" | "existing_only">("all")
   const [aiChefStyle, setAiChefStyle] = useState<(typeof CHEF_STYLE_OPTIONS)[number]>("ללא העדפת שף")
   const [ingredientStock, setIngredientStock] = useState<Record<string, number>>({})
   const [restaurantIngredientNames, setRestaurantIngredientNames] = useState<Set<string>>(new Set())
@@ -826,7 +828,7 @@ export default function ProductTree() {
     [currentRestaurantId, refreshIngredients]
   )
 
-  const handleAiSuggest = useCallback(async () => {
+  const handleAiSuggest = useCallback(async (count = 1) => {
     const list = Object.entries(supplierPrices).map(([name, sp]) => ({
       name,
       price: sp.price,
@@ -840,11 +842,28 @@ export default function ProductTree() {
     }
     setAiSuggestLoading(true)
     setAiSuggestedDish(null)
+    setAiSuggestedOptions([])
     setIsAiSuggestOpen(true)
     try {
-      const suggested = await suggestDishFromIngredients(list, { chefStyle: aiChefStyle })
-      if (suggested) {
-        setAiSuggestedDish(suggested)
+      const variants = Array.from({ length: Math.max(1, count) }, (_, i) => i)
+      const results = await Promise.all(
+        variants.map((i) =>
+          suggestDishFromIngredients(list, {
+            chefStyle: aiChefStyle,
+            variantHint: count > 1 ? `וריאציה מספר ${i + 1}` : undefined,
+          }),
+        ),
+      )
+      const dedup = new Map<string, ExtractedDishItem>()
+      results.forEach((r) => {
+        if (!r?.name?.trim()) return
+        const key = r.name.trim().toLowerCase()
+        if (!dedup.has(key)) dedup.set(key, r)
+      })
+      const options = Array.from(dedup.values())
+      if (options.length > 0) {
+        setAiSuggestedOptions(options)
+        setAiSuggestedDish(options[0])
       } else {
         toast.error("לא הצלחתי להציע מתכון — נסה שוב")
         setIsAiSuggestOpen(false)
@@ -1097,11 +1116,21 @@ export default function ProductTree() {
               size="sm"
               variant="outline"
               className="gap-1.5"
-              onClick={handleAiSuggest}
+              onClick={() => void handleAiSuggest(1)}
               disabled={aiSuggestLoading || Object.keys(supplierPrices).length === 0}
             >
               {aiSuggestLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
               <span className="hidden sm:inline">{t("pages.productTree.aiSuggest")}</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => void handleAiSuggest(3)}
+              disabled={aiSuggestLoading || Object.keys(supplierPrices).length === 0}
+            >
+              {aiSuggestLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ListOrdered className="w-4 h-4" />}
+              <span className="hidden sm:inline">AI ×3</span>
             </Button>
             <Select value={aiChefStyle} onValueChange={(v) => setAiChefStyle(v as (typeof CHEF_STYLE_OPTIONS)[number])}>
               <SelectTrigger className="h-8 w-[170px]">
@@ -1781,7 +1810,7 @@ export default function ProductTree() {
             </div>
           )}
 
-          <Dialog open={isAiSuggestOpen} onOpenChange={(o) => { setIsAiSuggestOpen(o); if (!o) setAiSuggestedDish(null) }}>
+          <Dialog open={isAiSuggestOpen} onOpenChange={(o) => { setIsAiSuggestOpen(o); if (!o) { setAiSuggestedDish(null); setAiSuggestedOptions([]); setAiIngredientModeFilter("all") } }}>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
@@ -1792,6 +1821,24 @@ export default function ProductTree() {
               </DialogHeader>
               {aiSuggestedDish ? (
                 <div className="space-y-4 py-2">
+                  {aiSuggestedOptions.length > 1 ? (
+                    <div className="rounded-lg border p-2.5 bg-muted/30">
+                      <p className="text-xs font-medium mb-2">בחר הצעה:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {aiSuggestedOptions.map((opt, idx) => (
+                          <Button
+                            key={`${opt.name}-${idx}`}
+                            size="sm"
+                            variant={aiSuggestedDish?.name === opt.name ? "default" : "outline"}
+                            className="h-7 text-xs"
+                            onClick={() => setAiSuggestedDish(opt)}
+                          >
+                            {idx + 1}. {opt.name}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   <div>
                     <p className="font-medium text-lg">{aiSuggestedDish.name}</p>
                     <p className="text-sm text-muted-foreground">{aiSuggestedDish.category} • ₪{(aiSuggestedDish.price || 0).toFixed(0)}</p>
@@ -1814,12 +1861,31 @@ export default function ProductTree() {
                       <p className="text-sm text-amber-700 dark:text-amber-400">{t("pages.productTree.aiSuggestNoMatchedIngredients")}</p>
                     ) : (
                       <>
+                        <div className="mb-2">
+                          <Select value={aiIngredientModeFilter} onValueChange={(v) => setAiIngredientModeFilter(v as "all" | "new_only" | "existing_only")}>
+                            <SelectTrigger className="h-8 w-full sm:w-[260px]">
+                              <SelectValue placeholder="סינון הצעה לפי סוג מנה" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">כל הרכיבים בהצעה</SelectItem>
+                              <SelectItem value="new_only">רק רכיבים חדשים (לא קיימים במסעדה)</SelectItem>
+                              <SelectItem value="existing_only">רק רכיבים קיימים במסעדה</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <div className="mb-2 text-xs text-muted-foreground">
                           קיימים במסעדה: {(aiSuggestedDish.ingredients || []).filter((ing) => isIngredientInRestaurant(ing.name)).length} ·
                           חדשים להצעה: {(aiSuggestedDish.ingredients || []).filter((ing) => !isIngredientInRestaurant(ing.name)).length}
                         </div>
                         <ul className="space-y-2.5 text-sm">
-                        {(aiSuggestedDish.ingredients || []).map((ing, i) => {
+                        {(aiSuggestedDish.ingredients || [])
+                          .filter((ing) => {
+                            const exists = isIngredientInRestaurant(ing.name)
+                            if (aiIngredientModeFilter === "new_only") return !exists
+                            if (aiIngredientModeFilter === "existing_only") return exists
+                            return true
+                          })
+                          .map((ing, i) => {
                           const sp = supplierPrices[ing.name]
                           const existsInRestaurant = isIngredientInRestaurant(ing.name)
                           return (
