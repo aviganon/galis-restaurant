@@ -322,6 +322,26 @@ export function LoginScreen(_props: LoginScreenProps) {
     return true
   }, [t])
 
+  const isSystemOwnerEmail = useCallback(async (emailToCheck: string): Promise<boolean> => {
+    const normalized = emailToCheck.trim().toLowerCase()
+    if (!normalized) return false
+    const { adminsDocPath, adminsEmailsField } = firestoreConfig
+    const altPaths = [adminsDocPath, { collection: "config" as const, docId: "adminEmails" as const }]
+    for (const p of altPaths) {
+      const snap = await getDoc(doc(db, p.collection, p.docId))
+      if (!snap.exists()) continue
+      const data = snap.data()
+      const raw = data?.[adminsEmailsField] ?? data?.emails ?? data?.adminEmails
+      const list: string[] = Array.isArray(raw)
+        ? raw.map((e) => String(e).trim().toLowerCase())
+        : raw && typeof raw === "object"
+          ? Object.keys(raw).map((e) => String(e).trim().toLowerCase())
+          : []
+      if (list.includes(normalized)) return true
+    }
+    return false
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     void (async () => {
@@ -432,6 +452,11 @@ export function LoginScreen(_props: LoginScreenProps) {
     try {
       await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence)
       const { inviteCodesCollection, inviteCodeFields, restaurantsCollection, restaurantFields, usersCollection } = firestoreConfig
+      if (await isSystemOwnerEmail(em)) {
+        setError("המייל הזה מוגדר כבעלים מערכת. יש להשתמש במייל אחר להרשמה למסעדה.")
+        setIsLoading(false)
+        return
+      }
       const codeRef = doc(db, inviteCodesCollection, code)
       const codeSnap = await getDoc(codeRef)
       if (!codeSnap.exists()) {
@@ -546,6 +571,12 @@ export function LoginScreen(_props: LoginScreenProps) {
       saveGoogleAuthDraft("register", draft)
       const provider = new GoogleAuthProvider()
       const result = await signInWithPopup(auth, provider)
+      const signedEmail = (result.user.email || "").trim().toLowerCase()
+      if (signedEmail && await isSystemOwnerEmail(signedEmail)) {
+        await auth.signOut().catch(() => {})
+        setError("המייל הזה מוגדר כבעלים מערכת. יש להשתמש במייל אחר להרשמה למסעדה.")
+        return
+      }
       const ok = await completeGoogleRegister(result.user, draft)
       if (!ok) return
       clearGoogleAuthDraft()
