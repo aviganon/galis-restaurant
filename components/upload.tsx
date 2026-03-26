@@ -376,9 +376,8 @@ export function Upload() {
     const q = query(
       collection(db, "inboundJobs"),
       where("restaurantId", "==", currentRestaurantId),
-      where("status", "==", "pending"),
       orderBy("receivedAt", "desc"),
-      limit(10)
+      limit(50)
     )
     const unsub = onSnapshot(q, (snap) => {
       snap.docChanges().forEach((change) => {
@@ -389,6 +388,7 @@ export function Upload() {
             attachmentPaths?: string[]
             receivedAt?: { toDate?: () => Date } | string | number
             fromEmail?: string
+            status?: "pending" | "processing" | "done" | "error" | string
             }
             const path0 = job.attachmentPaths?.[0]
             const nameFromPath = typeof path0 === "string" ? path0.split("/").pop() : undefined
@@ -402,13 +402,15 @@ export function Upload() {
               uploadedAtStr = new Date().toLocaleString("he-IL")
             }
 
+            const mappedStatus: UploadedFile["status"] =
+              job.status === "error" ? "error" : job.status === "done" ? "completed" : "processing"
             const emailFile: UploadedFile = {
               id: jobId,
               name: nameFromPath ?? "קובץ ממייל",
               type: "invoice",
               size: "",
-              status: "completed",
-              progress: 100,
+              status: mappedStatus,
+              progress: mappedStatus === "processing" ? 60 : 100,
               uploadedAt: uploadedAtStr,
               source: "email",
               fromEmail: job.fromEmail,
