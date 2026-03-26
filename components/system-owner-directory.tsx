@@ -450,19 +450,10 @@ export function SystemOwnerDirectory({
                     const active = selectedRestId === r.id && panelTab === "restaurant"
                     return (
                       <div key={r.id} className="border-b border-border last:border-b-0">
+                        {/* לא לעטוף כפתורים (כולל דיאלוג העלאות) ב-div עם role="button" — זה מקונן אינטראקציה וגורם לקריסת Radix Dialog */}
                         <div
-                          role="button"
-                          tabIndex={0}
-                          title={active ? "לחיצה על הרקע סוגרת את פאנל הפרטים" : undefined}
-                          onClick={() => selectRestaurant(r.id)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault()
-                              selectRestaurant(r.id)
-                            }
-                          }}
                           className={cn(
-                            "w-full text-start p-3 transition-colors hover:bg-muted/60 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-none",
+                            "w-full text-start p-3 transition-colors hover:bg-muted/60 rounded-none",
                             active && "bg-primary/10 ring-1 ring-inset ring-primary/25"
                           )}
                         >
@@ -472,9 +463,24 @@ export function SystemOwnerDirectory({
                                 className="flex w-full items-start justify-between gap-2"
                                 dir={layoutDir}
                               >
-                                <div className="font-medium text-sm min-w-0 flex-1 leading-snug text-start">
-                                  {r.emoji ? `${r.emoji} ` : ""}
-                                  {r.name}
+                                <div
+                                  role="button"
+                                  tabIndex={0}
+                                  title={active ? "לחיצה על הרקע סוגרת את פאנל הפרטים" : undefined}
+                                  onClick={() => selectRestaurant(r.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault()
+                                      selectRestaurant(r.id)
+                                    }
+                                  }}
+                                  className="min-w-0 flex-1 space-y-1 text-start rounded-md cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                >
+                                  <div className="font-medium text-sm min-w-0 flex-1 leading-snug text-start">
+                                    {r.emoji ? `${r.emoji} ` : ""}
+                                    {r.name}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">{r.branch || "סניף ראשי"}</div>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0 flex-wrap justify-start">
                                   <Button
@@ -483,8 +489,7 @@ export function SystemOwnerDirectory({
                                     size="sm"
                                     className="h-9 sm:h-7 px-2 text-[11px] gap-1"
                                     title="עריכת פרטי מסעדה"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
+                                    onClick={() => {
                                       ensureRestaurantSelected(r.id)
                                       setEditRestaurantId(r.id)
                                     }}
@@ -492,30 +497,17 @@ export function SystemOwnerDirectory({
                                     <Pencil className="h-3 w-3 shrink-0" />
                                     עריכה
                                   </Button>
-                                  <span
-                                    onClick={(e) => e.stopPropagation()}
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                  >
-                                    <RestaurantInboundUploadsDialog
-                                      restaurantId={r.id}
-                                      triggerLabel="העלאות"
-                                    />
-                                  </span>
-                                  {restaurantRowActions ? (
-                                    <span
-                                      onClick={(e) => e.stopPropagation()}
-                                      onMouseDown={(e) => e.stopPropagation()}
-                                    >
-                                      {restaurantRowActions(r)}
-                                    </span>
-                                  ) : null}
+                                  <RestaurantInboundUploadsDialog
+                                    restaurantId={r.id}
+                                    triggerLabel="העלאות"
+                                  />
+                                  {restaurantRowActions ? restaurantRowActions(r) : null}
                                   <Button
                                     type="button"
                                     variant="outline"
                                     size="sm"
                                     className="h-9 sm:h-7 px-2 text-[11px] gap-1"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
+                                    onClick={() => {
                                       ensureRestaurantSelected(r.id)
                                       setStaffDialogRestId(r.id)
                                     }}
@@ -533,8 +525,7 @@ export function SystemOwnerDirectory({
                                         "animate-pulse ring-2 ring-amber-500/70 ring-offset-1 ring-offset-background bg-amber-50/90 dark:bg-amber-950/50",
                                     )}
                                     title="בקשות שינוי כתובת ייבוא למסעדה זו"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
+                                    onClick={() => {
                                       ensureRestaurantSelected(r.id)
                                       setChangeRequestsRestId(r.id)
                                     }}
@@ -555,11 +546,9 @@ export function SystemOwnerDirectory({
                                   </Badge>
                                 </div>
                               </div>
-                              <div className="text-xs text-muted-foreground">{r.branch || "סניף ראשי"}</div>
                               <button
                                 type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
+                                onClick={() => {
                                   ensureRestaurantSelected(r.id)
                                   setInboundDialogRestId(r.id)
                                 }}
