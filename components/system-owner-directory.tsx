@@ -21,6 +21,7 @@ import type { Restaurant } from "@/contexts/app-context"
 import { buildInboundAddress, type InboundSettings } from "@/lib/inbound-email"
 import { InboundEmailSettings } from "@/components/inbound-email-settings"
 import { InboundChangeRequestsPanel } from "@/components/inbound-change-requests-panel"
+import { RestaurantInboundUploadsDialog } from "@/components/restaurant-inbound-uploads-dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   AlertDialog,
@@ -470,6 +471,15 @@ export function SystemOwnerDirectory({
                                     <Pencil className="h-3 w-3 shrink-0" />
                                     עריכה
                                   </Button>
+                                  <span
+                                    onClick={(e) => e.stopPropagation()}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                  >
+                                    <RestaurantInboundUploadsDialog
+                                      restaurantId={r.id}
+                                      triggerLabel="העלאות"
+                                    />
+                                  </span>
                                   <Button
                                     type="button"
                                     variant="outline"

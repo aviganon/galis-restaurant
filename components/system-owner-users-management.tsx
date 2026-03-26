@@ -8,7 +8,6 @@ import { UserPlus, Loader2, Ticket, Copy } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
 import { useLanguage } from "@/contexts/language-context"
-import { RestaurantInboundUploadsDialog } from "@/components/restaurant-inbound-uploads-dialog"
 
 export type UsersManagementRow = {
   uid: string
@@ -60,7 +59,6 @@ export type SystemOwnerUsersManagementProps = {
   restaurantInviteCode: string | null
   generatingRestaurantInviteCode: boolean
   onGenerateRestaurantInviteCode: () => void | Promise<void>
-  selectedRestaurantId?: string | null
 }
 
 /** סטטיסטיקות + רענון + יצירת משתמש + טופס — מעל רשימת המשתמשים בטאב «לפי משתמש» */
@@ -96,7 +94,6 @@ export function SystemOwnerUserTabToolbar({
   restaurantInviteCode,
   generatingRestaurantInviteCode,
   onGenerateRestaurantInviteCode,
-  selectedRestaurantId,
 }: Pick<
   SystemOwnerUsersManagementProps,
   | "usersData"
@@ -130,7 +127,6 @@ export function SystemOwnerUserTabToolbar({
   | "restaurantInviteCode"
   | "generatingRestaurantInviteCode"
   | "onGenerateRestaurantInviteCode"
-  | "selectedRestaurantId"
 >) {
   const t = useTranslations()
   const { dir } = useLanguage()
@@ -193,10 +189,6 @@ export function SystemOwnerUserTabToolbar({
             <Ticket className="w-3.5 h-3.5" />
             {t("pages.settings.restaurantInviteCodeGenerator")}
           </button>
-          <RestaurantInboundUploadsDialog
-            restaurantId={selectedRestaurantId ?? null}
-            triggerLabel="העלאות למסעדה"
-          />
         </div>
       </div>
 
