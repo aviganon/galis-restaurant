@@ -842,6 +842,10 @@ export const translations = {
         createInviteCodeForRest: "צור קוד הרשמה",
         noInviteCodeHint: "אין קוד משויך — לחץ ליצירת קוד להרשמת מנהל",
         inviteCodeCreatedForRest: "קוד הזמנה נוצר ונשמר — אפשר להעתיק ולשלוח",
+        inviteCodeDialogTitle: "קוד הזמנה",
+        inviteCodeDialogDesc:
+          "שלח את הקוד למי שאמור להירשם כמנהל במסך הכניסה. אחרי הזנת הקוד והרשמה — נוצרת גישה למסעדה זו.",
+        copyInviteCodeButton: "העתק קוד",
         impersonatingRest: "מתחזה כמסעדה",
         adminPanelTitle: "פאנל ניהול",
         systemOwnerDesc: "בעלים — ניהול כל המסעדות, משתמשים, התחזה וכו'.",
@@ -1799,6 +1803,10 @@ export const translations = {
         createInviteCodeForRest: "Create invite code",
         noInviteCodeHint: "No code linked — click to create a manager signup code",
         inviteCodeCreatedForRest: "Invite code created — you can copy and share it",
+        inviteCodeDialogTitle: "Invite code",
+        inviteCodeDialogDesc:
+          "Send this code to the person who should register as manager on the login screen. After they enter the code and sign up, they get access to this restaurant.",
+        copyInviteCodeButton: "Copy code",
         impersonatingRest: "Impersonating restaurant",
         adminPanelTitle: "Admin panel",
         systemOwnerDesc: "Owner — manage all restaurants, users, impersonation, etc.",

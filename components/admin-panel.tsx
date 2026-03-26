@@ -499,6 +499,7 @@ export function AdminPanel() {
   const [panelInviteCode, setPanelInviteCode] = useState<string | null>(null)
   const [loadingPanelInviteCode, setLoadingPanelInviteCode] = useState(false)
   const [creatingInviteCodeForRest, setCreatingInviteCodeForRest] = useState(false)
+  const [inviteCodeDialogOpen, setInviteCodeDialogOpen] = useState(false)
   const [restChipLoading, setRestChipLoading] = useState(false)
   const [restChipDishes, setRestChipDishes] = useState<{name:string;price:number;fc:number}[]>([])
   const [restChipOrders, setRestChipOrders] = useState<{id:string;supplier:string;date:string;total:number;status:string}[]>([])
@@ -1943,6 +1944,10 @@ export function AdminPanel() {
     }
   }, [selectedRestDetail, restsWithDetails])
 
+  useEffect(() => {
+    setInviteCodeDialogOpen(false)
+  }, [selectedRestDetail])
+
   const handleCreateInviteCodeForSelectedRest = async () => {
     if (!selectedRestDetail) return
     setCreatingInviteCodeForRest(true)
@@ -1971,6 +1976,7 @@ export function AdminPanel() {
         prev.map((r) => (r.id === selectedRestDetail ? { ...r, linkedInviteCode: code } : r))
       )
       toast.success(t("pages.adminPanel.inviteCodeCreatedForRest"))
+      setInviteCodeDialogOpen(true)
     } catch (e) {
       toast.error((e as Error).message)
     } finally {
@@ -2696,23 +2702,57 @@ export function AdminPanel() {
                               {t("pages.adminPanel.inviteCodeLoading")}
                             </Button>
                           ) : panelInviteCode ? (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              className="font-mono text-xs max-w-[min(100%,14rem)] truncate"
-                              title={panelInviteCode}
-                              onClick={async () => {
-                                try {
-                                  await navigator.clipboard.writeText(panelInviteCode)
-                                  toast.success(t("pages.adminPanel.inviteCodeCopied"))
-                                } catch {
-                                  toast.error("Clipboard")
-                                }
-                              }}
-                            >
-                              <Copy className="w-4 h-4 me-1 shrink-0" />
-                              <span className="truncate">{panelInviteCode}</span>
-                            </Button>
+                            <>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                className="gap-1"
+                                title={t("pages.adminPanel.inviteCodeDialogTitle")}
+                                onClick={() => setInviteCodeDialogOpen(true)}
+                              >
+                                <Ticket className="w-4 h-4 shrink-0" />
+                                {t("pages.adminPanel.inviteCodeDialogTitle")}
+                              </Button>
+                              <Dialog open={inviteCodeDialogOpen} onOpenChange={setInviteCodeDialogOpen}>
+                                <DialogContent className="sm:max-w-md" dir={dir}>
+                                  <DialogHeader>
+                                    <DialogTitle>{t("pages.adminPanel.inviteCodeDialogTitle")}</DialogTitle>
+                                    <DialogDescription className="text-start text-foreground/90">
+                                      {t("pages.adminPanel.inviteCodeDialogDesc")}
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <div className="rounded-lg border bg-muted/50 px-4 py-3 text-center space-y-1">
+                                    <p className="text-xs text-muted-foreground truncate" title={selectedRest.name}>
+                                      {selectedRest.name}
+                                    </p>
+                                    <code
+                                      className="block font-mono text-lg font-semibold tracking-wide break-all"
+                                      dir="ltr"
+                                    >
+                                      {panelInviteCode}
+                                    </code>
+                                  </div>
+                                  <DialogFooter>
+                                    <Button
+                                      type="button"
+                                      className="w-full sm:w-auto"
+                                      onClick={async () => {
+                                        try {
+                                          await navigator.clipboard.writeText(panelInviteCode)
+                                          toast.success(t("pages.adminPanel.inviteCodeCopied"))
+                                        } catch {
+                                          toast.error("Clipboard")
+                                        }
+                                      }}
+                                    >
+                                      <Copy className="w-4 h-4 me-1 shrink-0" />
+                                      {t("pages.adminPanel.copyInviteCodeButton")}
+                                    </Button>
+                                  </DialogFooter>
+                                </DialogContent>
+                              </Dialog>
+                            </>
                           ) : (
                             <Button
                               size="sm"
