@@ -161,7 +161,13 @@ service cloud.firestore {
         isConfigAdmin()
         || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && resource.data.restaurantId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId)
       );
-      allow write: if false;
+      // לקליינט מותר לעדכן רק status בלבד, ורק למסעדה שלו.
+      allow update: if request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && resource.data.restaurantId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(["status"])
+        && request.resource.data.status in ["pending", "processing", "done", "error"];
+      allow create, delete: if false;
     }
 
     // inbound email lookup — token → restaurantId (מייל נכנס)
