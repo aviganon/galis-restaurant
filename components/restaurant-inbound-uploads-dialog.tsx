@@ -1,13 +1,12 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { collection, limit, onSnapshot, orderBy, query, where } from "firebase/firestore"
-import { db } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Mail, Loader2 } from "lucide-react"
+import { firebaseBearerHeaders } from "@/lib/api-auth-client"
 
 type InboundJobRow = {
   id: string
@@ -43,26 +42,31 @@ export function RestaurantInboundUploadsDialog({
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [rows, setRows] = useState<InboundJobRow[]>([])
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open || !restaurantId) return
     setLoading(true)
-    const q = query(
-      collection(db, "inboundJobs"),
-      where("restaurantId", "==", restaurantId),
-      orderBy("receivedAt", "desc"),
-      limit(100),
-    )
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const next: InboundJobRow[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<InboundJobRow, "id">) }))
-        setRows(next)
+    setLoadError(null)
+    void (async () => {
+      try {
+        const headers = await firebaseBearerHeaders()
+        const res = await fetch("/api/inbound-jobs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...headers },
+          body: JSON.stringify({ restaurantId }),
+          cache: "no-store",
+        })
+        const json = (await res.json().catch(() => ({}))) as { jobs?: InboundJobRow[]; error?: string }
+        if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
+        setRows(Array.isArray(json.jobs) ? json.jobs : [])
+      } catch (e) {
+        setRows([])
+        setLoadError((e as Error)?.message || "שגיאה בטעינת העלאות")
+      } finally {
         setLoading(false)
-      },
-      () => setLoading(false),
-    )
-    return () => unsub()
+      }
+    })()
   }, [open, restaurantId])
 
   const title = useMemo(() => "העלאות ממייל למסעדה", [])
@@ -86,6 +90,9 @@ export function RestaurantInboundUploadsDialog({
         ) : (
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-2">
+              {loadError ? (
+                <div className="text-sm text-destructive py-3 text-center">{loadError}</div>
+              ) : null}
               {rows.length === 0 ? (
                 <div className="text-sm text-muted-foreground py-8 text-center">אין העלאות ממייל למסעדה זו</div>
               ) : (
