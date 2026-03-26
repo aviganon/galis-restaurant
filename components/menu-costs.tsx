@@ -126,7 +126,12 @@ function mapExtractedSalesToRows(items: ExtractedSalesItem[]): SalesRow[] {
     })
 }
 
-export function MenuCosts() {
+type MenuCostsProps = {
+  /** מצב מודאל מעץ המוצר — כיווץ כותרת/מדדים והטבלה תופסת גובה מלא */
+  embeddedInProductTree?: boolean
+}
+
+export function MenuCosts({ embeddedInProductTree = false }: MenuCostsProps) {
   const t = useTranslations()
   const { locale } = useLanguage()
   const { currentRestaurantId, userRole, isSystemOwner, refreshIngredientsKey, refreshIngredients } = useApp()
@@ -158,7 +163,7 @@ export function MenuCosts() {
   const [savedSalesDateTo, setSavedSalesDateTo] = useState<string | undefined>(undefined)
   const [addMissingDishesFromSales, setAddMissingDishesFromSales] = useState(true)
   const [savingSales, setSavingSales] = useState(false)
-  const [showDropZone, setShowDropZone] = useState(true)
+  const [showDropZone, setShowDropZone] = useState(!embeddedInProductTree)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dropRef = useRef<HTMLDivElement>(null)
 
@@ -480,15 +485,38 @@ export function MenuCosts() {
     criticalItems: items.filter((i) => i.status === "critical" || i.status === "warning").length,
   }
 
-  if (loading) return (<div className="p-4 md:p-6 flex items-center justify-center min-h-[40vh]"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>)
-  if (!currentRestaurantId) return (<div className="p-4 md:p-6"><h1 className="text-2xl font-bold mb-1">{t("nav.menuCosts")}</h1><p className="text-muted-foreground">{t("pages.menuCosts.selectRestaurant")}</p></div>)
+  if (loading) {
+    return (
+      <div
+        className={cn(
+          "flex items-center justify-center",
+          embeddedInProductTree ? "min-h-[100px] flex-1" : "min-h-[40vh] p-4 md:p-6",
+        )}
+      >
+        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+  if (!currentRestaurantId) {
+    return (
+      <div className={cn("p-4 md:p-6", embeddedInProductTree && "p-3")}>
+        <h1 className="text-2xl font-bold mb-1">{t("nav.menuCosts")}</h1>
+        <p className="text-muted-foreground">{t("pages.menuCosts.selectRestaurant")}</p>
+      </div>
+    )
+  }
 
-  return (
-    <div className="p-4 md:p-6 space-y-6 overflow-y-auto">
-
-      <Card className="border-dashed">
+  const salesImportCard = (
+      <Card className={cn("border-dashed", embeddedInProductTree && "shrink-0")}>
         <CardContent className="p-0">
-          <button onClick={() => setShowDropZone((v) => !v)} className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+          <button
+            type="button"
+            onClick={() => setShowDropZone((v) => !v)}
+            className={cn(
+              "flex w-full items-center justify-between font-medium text-muted-foreground transition-colors hover:text-foreground",
+              embeddedInProductTree ? "px-3 py-2 text-xs" : "px-4 py-3 text-sm",
+            )}
+          >
             <span className="flex items-center gap-2"><Upload className="w-4 h-4" />{t("pages.menuCosts.salesImportTitle")}</span>
             {showDropZone ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
@@ -532,10 +560,17 @@ export function MenuCosts() {
           </AnimatePresence>
         </CardContent>
       </Card>
+  )
 
-      {(savedSalesDateFrom || savedSalesDateTo) && (
-        <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-2 px-0.5">
-          <Badge variant="outline" className="font-normal shrink-0">
+  const savedDatesLine =
+    (savedSalesDateFrom || savedSalesDateTo) ? (
+        <p
+          className={cn(
+            "text-muted-foreground flex flex-wrap items-center gap-2 px-0.5",
+            embeddedInProductTree ? "text-[10px] leading-tight shrink-0" : "text-xs",
+          )}
+        >
+          <Badge variant="outline" className="font-normal shrink-0 text-[10px] py-0">
             {t("pages.menuCosts.salesReportSavedDatesBadge")}
           </Badge>
           <span>
@@ -548,8 +583,9 @@ export function MenuCosts() {
             })()}
           </span>
         </p>
-      )}
+      ) : null
 
+  const bigStatsGrid = (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 auto-rows-fr">
         {[
           { icon: UtensilsCrossed, color: "bg-primary/10 text-primary",        label: t("pages.menuCosts.menuItems"),    value: stats.totalItems },
@@ -567,31 +603,148 @@ export function MenuCosts() {
           </motion.div>
         ))}
       </div>
+  )
 
-      <Card><CardContent className="p-4">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex items-center gap-2 flex-1">
-            <span className="font-bold text-lg">{t("nav.menuCosts")}</span>
-            <Badge variant="secondary">{filteredItems.length} {t("pages.menuCosts.dish")}</Badge>
+  const compactStatsRow = (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-border/60 bg-muted/30 px-2 py-1.5 text-[11px] sm:text-xs shrink-0">
+      <span className="inline-flex items-center gap-1 text-muted-foreground">
+        <UtensilsCrossed className="w-3.5 h-3.5 shrink-0 text-primary" />
+        <span className="font-semibold text-foreground tabular-nums">{stats.totalItems}</span>
+        {t("pages.menuCosts.menuItems")}
+      </span>
+      <span className="text-border" aria-hidden>
+        |
+      </span>
+      <span className="text-muted-foreground">
+        {t("pages.menuCosts.avgFoodCost")}: <span className="font-semibold text-amber-700 dark:text-amber-400 tabular-nums">{stats.avgFoodCost.toFixed(1)}%</span>
+      </span>
+      <span className="text-border" aria-hidden>
+        |
+      </span>
+      <span className="text-muted-foreground">
+        {t("pages.menuCosts.grossProfit")}: <span className="font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">{stats.totalProfit.toLocaleString()} ₪</span>
+      </span>
+      <span className="text-border" aria-hidden>
+        |
+      </span>
+      <span className="text-muted-foreground">
+        {t("pages.menuCosts.dishesToReview")}: <span className="font-semibold text-red-700 dark:text-red-400 tabular-nums">{stats.criticalItems}</span>
+      </span>
+    </div>
+  )
+
+  const exportExcel = () => {
+    const rows = filteredItems.map((i) => ({
+      מנה: i.name,
+      קטגוריה: i.category,
+      "מחיר מכירה": i.salePrice,
+      "עלות מזון": i.foodCost.toFixed(2),
+      "עלות %": i.foodCostPercent.toFixed(1),
+      רווח: i.profit.toFixed(2),
+      "מרווח %": i.profitMargin.toFixed(1),
+      סטטוס:
+        i.status === "excellent"
+          ? "מצוין"
+          : i.status === "good"
+            ? "טוב"
+            : i.status === "warning"
+              ? "אזהרה"
+              : "קריטי",
+    }))
+    downloadExcel(rows, `עלויות_תפריט_${new Date().toISOString().slice(0, 10)}`, "עלויות")
+    toast.success(t("pages.ingredients.fileDownloaded"))
+  }
+
+  const toolbarCard = (
+      <Card>
+        <CardContent className={cn("p-4", embeddedInProductTree && "p-2.5")}>
+        <div className={cn("flex flex-col gap-3", !embeddedInProductTree && "md:flex-row md:gap-4")}>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className={cn("font-bold", embeddedInProductTree ? "text-sm" : "text-lg")}>{t("nav.menuCosts")}</span>
+            <Badge variant="secondary" className={embeddedInProductTree ? "text-[10px] px-1.5 py-0" : ""}>
+              {filteredItems.length} {t("pages.menuCosts.dish")}
+            </Badge>
           </div>
-          <Button variant="outline" className="rounded-full" onClick={() => {
-            const rows = filteredItems.map((i) => ({ "מנה": i.name, "קטגוריה": i.category, "מחיר מכירה": i.salePrice, "עלות מזון": i.foodCost.toFixed(2), "עלות %": i.foodCostPercent.toFixed(1), "רווח": i.profit.toFixed(2), "מרווח %": i.profitMargin.toFixed(1), "סטטוס": i.status === "excellent" ? "מצוין" : i.status === "good" ? "טוב" : i.status === "warning" ? "אזהרה" : "קריטי" }))
-            downloadExcel(rows, `עלויות_תפריט_${new Date().toISOString().slice(0, 10)}`, "עלויות")
-            toast.success(t("pages.ingredients.fileDownloaded"))
-          }}><Download className="w-4 h-4 ml-2" />{t("pages.menuCosts.exportReport")}</Button>
+          <Button
+            variant="outline"
+            className={cn("rounded-full shrink-0", embeddedInProductTree && "h-8 text-xs px-3")}
+            onClick={exportExcel}
+          >
+            <Download className="w-4 h-4 ml-2" />
+            {t("pages.menuCosts.exportReport")}
+          </Button>
         </div>
-        <div className="flex flex-col md:flex-row gap-3 mt-4">
-          <div className="relative flex-1"><Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input placeholder={t("pages.menuCosts.searchPlaceholder")} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pr-10" /></div>
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}><SelectTrigger className="w-full md:w-[150px]"><SelectValue /></SelectTrigger><SelectContent>{categories.map((cat) => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}</SelectContent></Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="w-full md:w-[150px]"><SelectValue placeholder={t("pages.menuCosts.status")} /></SelectTrigger><SelectContent><SelectItem value="all">{t("pages.menuCosts.allStatuses")}</SelectItem><SelectItem value="excellent">{t("pages.menuCosts.excellent")}</SelectItem><SelectItem value="good">{t("pages.menuCosts.good")}</SelectItem><SelectItem value="warning">{t("pages.menuCosts.checkReview")}</SelectItem><SelectItem value="critical">{t("pages.menuCosts.problematic")}</SelectItem></SelectContent></Select>
-          <Select value={sortBy} onValueChange={setSortBy}><SelectTrigger className="w-full md:w-[180px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="name">שם מנה</SelectItem><SelectItem value="cost_asc">עלות נמוכה</SelectItem><SelectItem value="cost_desc">עלות גבוהה</SelectItem><SelectItem value="profit_desc">רווח גבוה</SelectItem><SelectItem value="profit_asc">רווח נמוך</SelectItem><SelectItem value="sales_desc">מכירות</SelectItem></SelectContent></Select>
+        <div
+          className={cn(
+            "flex flex-wrap gap-2",
+            embeddedInProductTree ? "mt-2 items-center" : "mt-4 flex-col md:flex-row gap-3",
+          )}
+        >
+          <div className={cn("relative", embeddedInProductTree ? "min-w-[min(100%,12rem)] flex-1 max-w-md" : "flex-1")}>
+            <Search className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              placeholder={t("pages.menuCosts.searchPlaceholder")}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={cn("pe-10", embeddedInProductTree && "h-8 text-sm")}
+            />
+          </div>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className={cn("w-full md:w-[150px]", embeddedInProductTree && "h-8 w-[min(100%,7.5rem)] text-xs md:w-[7.5rem]")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>{categories.map((cat) => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}</SelectContent>
+          </Select>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className={cn("w-full md:w-[150px]", embeddedInProductTree && "h-8 w-[min(100%,7.5rem)] text-xs md:w-[7.5rem]")}>
+              <SelectValue placeholder={t("pages.menuCosts.status")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("pages.menuCosts.allStatuses")}</SelectItem>
+              <SelectItem value="excellent">{t("pages.menuCosts.excellent")}</SelectItem>
+              <SelectItem value="good">{t("pages.menuCosts.good")}</SelectItem>
+              <SelectItem value="warning">{t("pages.menuCosts.checkReview")}</SelectItem>
+              <SelectItem value="critical">{t("pages.menuCosts.problematic")}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className={cn("w-full md:w-[180px]", embeddedInProductTree && "h-8 w-[min(100%,9.5rem)] text-xs md:w-[9.5rem]")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name">שם מנה</SelectItem>
+              <SelectItem value="cost_asc">עלות נמוכה</SelectItem>
+              <SelectItem value="cost_desc">עלות גבוהה</SelectItem>
+              <SelectItem value="profit_desc">רווח גבוה</SelectItem>
+              <SelectItem value="profit_asc">רווח נמוך</SelectItem>
+              <SelectItem value="sales_desc">מכירות</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-      </CardContent></Card>
+      </CardContent>
+      </Card>
+  )
 
-      <Card><CardContent className="p-0"><div className="overflow-x-auto"><Table>
+  const dataTableCard = (
+      <Card className={cn(embeddedInProductTree && "flex min-h-0 flex-1 flex-col overflow-hidden")}>
+        <CardContent className={cn("p-0", embeddedInProductTree && "flex min-h-0 flex-1 flex-col")}>
+          <div className={cn(embeddedInProductTree ? "min-h-0 flex-1 overflow-auto" : "overflow-x-auto")}>
+            <Table>
         <TableHeader><TableRow><TableHead className="text-right">מנה</TableHead><TableHead className="text-center">קטגוריה</TableHead><TableHead className="text-center">מחיר מכירה</TableHead><TableHead className="text-center">עלות מזון</TableHead><TableHead className="text-center">% עלות</TableHead><TableHead className="text-center">רווח</TableHead><TableHead className="text-center">{salesColumnTitleForPeriod(t, savedSalesReportPeriod)}</TableHead><TableHead className="text-center">סטטוס</TableHead></TableRow></TableHeader>
         <TableBody>
-          {filteredItems.length === 0 ? (<TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">{t("pages.menuCosts.noItems")}. {t("pages.recipes.addInProductTree")}</TableCell></TableRow>) : (
+          {filteredItems.length === 0 ? (
+            <TableRow>
+              <TableCell
+                colSpan={8}
+                className={cn(
+                  "text-center text-muted-foreground",
+                  embeddedInProductTree ? "py-4 text-sm" : "py-8",
+                )}
+              >
+                {t("pages.menuCosts.noItems")}. {t("pages.recipes.addInProductTree")}
+              </TableCell>
+            </TableRow>
+          ) : (
             filteredItems.map((item, index) => {
               const statusConfig = getStatusConfig(item.status); const StatusIcon = statusConfig.icon
               const costBarColor = item.foodCostPercent > 35 ? "bg-red-500" : item.foodCostPercent > 30 ? "bg-amber-500" : "bg-emerald-500"
@@ -619,7 +772,31 @@ export function MenuCosts() {
             })
           )}
         </TableBody>
-      </Table></div></CardContent></Card>
+      </Table>
+          </div>
+        </CardContent>
+      </Card>
+  )
+
+  return (
+    <>
+      {embeddedInProductTree ? (
+        <div className="flex h-full min-h-0 flex-col gap-2 overflow-hidden p-2 sm:p-3">
+          {savedDatesLine}
+          {compactStatsRow}
+          {toolbarCard}
+          {dataTableCard}
+          {salesImportCard}
+        </div>
+      ) : (
+        <div className="space-y-6 overflow-y-auto p-4 md:p-6">
+          {salesImportCard}
+          {savedDatesLine}
+          {bigStatsGrid}
+          {toolbarCard}
+          {dataTableCard}
+        </div>
+      )}
 
       <Dialog
         open={preview.open}
@@ -741,7 +918,6 @@ export function MenuCosts() {
           </div>
         </DialogContent>
       </Dialog>
-
-    </div>
+    </>
   )
 }

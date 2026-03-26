@@ -1941,14 +1941,26 @@ export default function ProductTree() {
           </Dialog>
 
           {showMenuCosts && (
-            <div style={{position:'fixed',inset:0,zIndex:70,display:'flex',alignItems:'center',justifyContent:'center'}}>
-              <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.5)'}} onClick={() => setShowMenuCosts(false)} />
-              <div style={{position:'relative',width:'92vw',height:'88vh',background:'var(--background)',borderRadius:'12px',boxShadow:'0 25px 50px rgba(0,0,0,0.3)',overflow:'visible',display:'flex',flexDirection:'column'}}>
-                <button onClick={() => setShowMenuCosts(false)} style={{position:'absolute',top:'12px',left:'12px',zIndex:10,width:'32px',height:'32px',borderRadius:'50%',border:'none',background:'var(--muted)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  <X style={{width:'16px',height:'16px'}} />
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4">
+              <div
+                className="absolute inset-0 bg-black/50"
+                aria-hidden
+                onClick={() => setShowMenuCosts(false)}
+              />
+              <div
+                className="relative flex h-[min(88vh,900px)] w-full max-w-[min(92vw,1200px)] flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl"
+                dir={isRtl ? "rtl" : "ltr"}
+              >
+                <button
+                  type="button"
+                  onClick={() => setShowMenuCosts(false)}
+                  className="absolute start-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-muted text-foreground shadow-sm transition-colors hover:bg-muted/80"
+                  aria-label={t("pages.close")}
+                >
+                  <X className="h-4 w-4" />
                 </button>
-                <div style={{overflowY:'auto',flex:1}}>
-                  <MenuCosts />
+                <div className="flex min-h-0 flex-1 flex-col pt-12">
+                  <MenuCosts embeddedInProductTree />
                 </div>
               </div>
             </div>
