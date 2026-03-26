@@ -1,0 +1,9 @@
+{
+  "name": "btc-forecast",
+  "private": true,
+  "description": "תחזית BTC — FastAPI + React",
+  "scripts": {
+    "backend": "cd backend && .venv/bin/python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000",
+    "frontend": "cd frontend && npm run dev"
+  }
+}
