@@ -66,6 +66,7 @@ import { useLanguage } from "@/contexts/language-context"
 import { postInviteEmail } from "@/lib/invite-email"
 import { setUserPasswordAsAdmin } from "@/lib/set-user-password-client"
 import { createUniqueInviteCode } from "@/lib/invite-code-document"
+import { deleteOrphanAuthUserIfAllowed } from "@/lib/delete-orphan-auth-user-client"
 import { directoryUserRoleLabel, directoryUserRoleSearchText } from "@/lib/directory-user-role-label"
 
 export type DirectoryUserRow = {
@@ -1642,11 +1643,21 @@ function RestaurantStaffActions({
     try {
       const { createUserWithEmailAndPassword } = await import("firebase/auth")
       const secondaryAuth = getAuthForUserCreation()
-      const cr = await createUserWithEmailAndPassword(
-        secondaryAuth,
-        createEmail.trim(),
-        createPassword
-      )
+      const createOnce = () =>
+        createUserWithEmailAndPassword(secondaryAuth, createEmail.trim(), createPassword)
+      let cr: Awaited<ReturnType<typeof createUserWithEmailAndPassword>>
+      try {
+        cr = await createOnce()
+      } catch (firstErr) {
+        const code = firstErr && typeof firstErr === "object" && "code" in firstErr ? String((firstErr as { code: string }).code) : ""
+        if (code !== "auth/email-already-in-use") throw firstErr
+        const released = await deleteOrphanAuthUserIfAllowed(createEmail.trim())
+        if (!released.ok) {
+          setCreateErr(released.error)
+          return
+        }
+        cr = await createOnce()
+      }
       await setDoc(
         doc(db, "users", cr.user.uid),
         {
@@ -1698,7 +1709,7 @@ function RestaurantStaffActions({
       await onRefreshUsers()
     } catch (e: unknown) {
       const c = e && typeof e === "object" && "code" in e ? String((e as { code: string }).code) : ""
-      setCreateErr(c === "auth/email-already-in-use" ? "אימייל כבר בשימוש" : (e as Error).message || "שגיאה")
+      setCreateErr(c === "auth/email-already-in-use" ? "אימייל בשימוש — לא ניתן לשחרר (אולי המשתמש עדיין קיים במערכת)" : (e as Error).message || "שגיאה")
     } finally {
       setCreating(false)
     }

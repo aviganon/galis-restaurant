@@ -56,6 +56,7 @@ import { postInviteEmail } from "@/lib/invite-email"
 import { createUniqueInviteCode } from "@/lib/invite-code-document"
 import { useLanguage } from "@/contexts/language-context"
 import { sendPasswordResetReliable } from "@/lib/password-reset-client"
+import { deleteOrphanAuthUserIfAllowed } from "@/lib/delete-orphan-auth-user-client"
 import { AI_CHEF_STYLES, AI_KNOWN_RECIPE_IDEAS } from "@/lib/ai-chef-catalog"
 
 export function Settings() {
@@ -663,85 +664,102 @@ export function Settings() {
     try {
       const { createUserWithEmailAndPassword, signOut, sendEmailVerification } = await import("firebase/auth")
       const sec = getAuthForUserCreation()
-      const cr = await createUserWithEmailAndPassword(sec, cEmail.trim(), cPass)
-      const roleToSave = creatingSystemOwner ? "user" : cRole
-      await setDoc(doc(db, "users", cr.user.uid), {
-        email: cEmail.trim(),
-        role: roleToSave,
-        isSystemOwner: creatingSystemOwner,
-        restaurantId: effectiveRestId,
-        name: cName.trim() || null,
-        phone: cPhone.trim() || null,
-        address: cAddress.trim() || null,
-        notes: cNotes.trim() || null,
-        createdAt: new Date().toISOString(),
-      })
-      if (creatingSystemOwner) await setSystemOwnerEmailInConfig(cEmail.trim(), true)
-      try {
-        const verifyUrl = typeof window !== "undefined" ? window.location.origin : "https://galis-6ebbc.web.app"
-        await sendEmailVerification(cr.user, { url: verifyUrl })
-      } catch {
-        // Non-blocking.
-      }
-      try {
-        await signOut(sec)
-      } catch {
-        /* */
-      }
-      setUsersData((p) => [
-        ...p,
-        {
-          uid: cr.user.uid,
+
+      const completeUserCreation = async (cr: Awaited<ReturnType<typeof createUserWithEmailAndPassword>>) => {
+        const roleToSave = creatingSystemOwner ? "user" : cRole
+        await setDoc(doc(db, "users", cr.user.uid), {
           email: cEmail.trim(),
           role: roleToSave,
           isSystemOwner: creatingSystemOwner,
           restaurantId: effectiveRestId,
-          restaurantName: (restaurants || []).find((r) => r.id === effectiveRestId)?.name,
-        },
-      ])
-      const restName = effectiveRestId ? (restaurants || []).find((r) => r.id === effectiveRestId)?.name : null
-      let inviteCode: string | undefined
-      if (!creatingSystemOwner) {
-        try {
-          inviteCode = await createUniqueInviteCode({
-            restaurantId: effectiveRestId,
-            role: cRole,
-          })
-        } catch {
-          toast.warning("לא נוצר קוד הזמנה — המייל יישלח בלי קוד")
-        }
-      }
-      try {
-        await postInviteEmail({
-          email: cEmail.trim(),
-          restaurantName: restName,
-          role: creatingSystemOwner ? "owner" : cRole,
-          accountCreated: true,
-          inviteCode: inviteCode ?? null,
+          name: cName.trim() || null,
+          phone: cPhone.trim() || null,
+          address: cAddress.trim() || null,
+          notes: cNotes.trim() || null,
+          createdAt: new Date().toISOString(),
         })
-        toast.success(
-          inviteCode
-            ? "המשתמש נוצר — נשלח מייל עם פרטי התחברות וקוד הזמנה"
-            : "המשתמש נוצר — נשלח מייל עם הוראות התחברות",
-        )
-      } catch (inviteErr) {
-        toast.success("המשתמש נוצר במערכת")
-        toast.warning(
-          `שליחת מייל ההזמנה נכשלה: ${(inviteErr as Error).message || "בדוק RESEND_API_KEY"}`,
-        )
+        if (creatingSystemOwner) await setSystemOwnerEmailInConfig(cEmail.trim(), true)
+        try {
+          const verifyUrl = typeof window !== "undefined" ? window.location.origin : "https://galis-6ebbc.web.app"
+          await sendEmailVerification(cr.user, { url: verifyUrl })
+        } catch {
+          // Non-blocking.
+        }
+        try {
+          await signOut(sec)
+        } catch {
+          /* */
+        }
+        setUsersData((p) => [
+          ...p,
+          {
+            uid: cr.user.uid,
+            email: cEmail.trim(),
+            role: roleToSave,
+            isSystemOwner: creatingSystemOwner,
+            restaurantId: effectiveRestId,
+            restaurantName: (restaurants || []).find((r) => r.id === effectiveRestId)?.name,
+          },
+        ])
+        const restName = effectiveRestId ? (restaurants || []).find((r) => r.id === effectiveRestId)?.name : null
+        let inviteCode: string | undefined
+        if (!creatingSystemOwner) {
+          try {
+            inviteCode = await createUniqueInviteCode({
+              restaurantId: effectiveRestId,
+              role: cRole,
+            })
+          } catch {
+            toast.warning("לא נוצר קוד הזמנה — המייל יישלח בלי קוד")
+          }
+        }
+        try {
+          await postInviteEmail({
+            email: cEmail.trim(),
+            restaurantName: restName,
+            role: creatingSystemOwner ? "owner" : cRole,
+            accountCreated: true,
+            inviteCode: inviteCode ?? null,
+          })
+          toast.success(
+            inviteCode
+              ? "המשתמש נוצר — נשלח מייל עם פרטי התחברות וקוד הזמנה"
+              : "המשתמש נוצר — נשלח מייל עם הוראות התחברות",
+          )
+        } catch (inviteErr) {
+          toast.success("המשתמש נוצר במערכת")
+          toast.warning(
+            `שליחת מייל ההזמנה נכשלה: ${(inviteErr as Error).message || "בדוק RESEND_API_KEY"}`,
+          )
+        }
+        setCEmail("")
+        setCPass("")
+        if (!canManageTeamInOwnRestaurant) setCRest("")
+        setCRole("user")
+        setCName("")
+        setCPhone("")
+        setCAddress("")
+        setCNotes("")
+        setShowCreate2(false)
       }
-      setCEmail("")
-      setCPass("")
-      if (!canManageTeamInOwnRestaurant) setCRest("")
-      setCRole("user")
-      setCName("")
-      setCPhone("")
-      setCAddress("")
-      setCNotes("")
-      setShowCreate2(false)
+
+      let cr: Awaited<ReturnType<typeof createUserWithEmailAndPassword>>
+      try {
+        cr = await createUserWithEmailAndPassword(sec, cEmail.trim(), cPass)
+      } catch (firstErr) {
+        const code = (firstErr as { code?: string }).code
+        if (code !== "auth/email-already-in-use") throw firstErr
+        const released = await deleteOrphanAuthUserIfAllowed(cEmail.trim())
+        if (!released.ok) {
+          setCErr(released.error)
+          return
+        }
+        cr = await createUserWithEmailAndPassword(sec, cEmail.trim(), cPass)
+      }
+      await completeUserCreation(cr)
     } catch (e) {
       const c = (e as { code?: string }).code
-      setCErr(c === "auth/email-already-in-use" ? "אימייל בשימוש" : (e as Error).message || "שגיאה")
+      setCErr(c === "auth/email-already-in-use" ? "אימייל בשימוש — לא ניתן לשחרר (אולי המשתמש עדיין קיים במערכת)" : (e as Error).message || "שגיאה")
     } finally {
       setCreating2(false)
     }

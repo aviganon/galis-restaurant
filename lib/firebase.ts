@@ -7,6 +7,7 @@ import {
   persistentMultipleTabManager,
 } from "firebase/firestore"
 import { getStorage } from "firebase/storage"
+import { getFunctions } from "firebase/functions"
 
 /** ייצוא לשימוש ב־App משני (יצירת משתמש בלי להחליף את ההתחברות הנוכחית) */
 export const firebaseConfig = {
@@ -60,3 +61,8 @@ function createFirestore() {
 
 export const db = createFirestore()
 export const storage = getStorage(app)
+
+/** Cloud Functions — אותו אזור כמו deleteOrphanAuthUser (v2) */
+export function getFirebaseFunctions() {
+  return getFunctions(app, "us-central1")
+}

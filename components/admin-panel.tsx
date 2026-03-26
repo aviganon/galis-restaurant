@@ -78,7 +78,8 @@ import { FilePreviewModal } from "@/components/file-preview-modal"
 import type { ExtractedSupplierItem } from "@/lib/ai-extract"
 import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplier-ingredients"
 import { firestoreConfig } from "@/lib/firestore-config"
-import { db, auth, storage } from "@/lib/firebase"
+import { db, auth, storage, getAuthForUserCreation } from "@/lib/firebase"
+import { deleteOrphanAuthUserIfAllowed } from "@/lib/delete-orphan-auth-user-client"
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage"
 import type { UserPermissions } from "@/contexts/app-context"
 
@@ -2093,17 +2094,35 @@ export function AdminPanel() {
     if (createUserPassword.length < 6) { setCreateUserError("הסיסמה חייבת להיות לפחות 6 תווים"); return }
     setCreatingUser(true)
     try {
-      const { createUserWithEmailAndPassword } = await import("firebase/auth")
-      const { auth: fbAuth } = await import("@/lib/firebase")
-      const cred = await createUserWithEmailAndPassword(fbAuth, createUserEmail.trim(), createUserPassword)
+      const { createUserWithEmailAndPassword, signOut } = await import("firebase/auth")
+      const sec = getAuthForUserCreation()
+      const createOnce = () => createUserWithEmailAndPassword(sec, createUserEmail.trim(), createUserPassword)
+      let cred: Awaited<ReturnType<typeof createUserWithEmailAndPassword>>
+      try {
+        cred = await createOnce()
+      } catch (e) {
+        const code = (e as { code?: string }).code
+        if (code !== "auth/email-already-in-use") throw e
+        const released = await deleteOrphanAuthUserIfAllowed(createUserEmail.trim())
+        if (!released.ok) {
+          setCreateUserError(released.error)
+          return
+        }
+        cred = await createOnce()
+      }
       const { doc: fd, setDoc: sd } = await import("firebase/firestore")
       await sd(fd(db, "users", cred.user.uid), { email: createUserEmail.trim(), role: createUserRole, restaurantId: createUserRestId || null })
+      try {
+        await signOut(sec)
+      } catch {
+        /* */
+      }
       setAllSystemUsers(prev => [...prev, { uid: cred.user.uid, email: createUserEmail.trim(), role: createUserRole, restaurantId: createUserRestId || null, restaurantName: restsWithDetails.find(r=>r.id===createUserRestId)?.name }])
       toast.success("משתמש נוצר: " + createUserEmail.trim())
       setCreateUserEmail(""); setCreateUserPassword(""); setCreateUserRestId(""); setShowCreateUser(false)
     } catch(e) {
       const code = (e as {code?:string}).code
-      setCreateUserError(code === "auth/email-already-in-use" ? "אימייל כבר בשימוש" : (e as Error).message || "שגיאה ביצירת משתמש")
+      setCreateUserError(code === "auth/email-already-in-use" ? "אימייל כבר בשימוש — לא ניתן לשחרר (אולי המשתמש עדיין קיים במערכת)" : (e as Error).message || "שגיאה ביצירת משתמש")
     } finally { setCreatingUser(false) }
   }
 

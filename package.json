@@ -14,7 +14,7 @@
     "start": "next start",
     "start:3001": "next start -p 3001",
     "build:export": "next build",
-    "deploy": "unset npm_config_devdir && npm run build && firebase deploy --only hosting,firestore:rules",
+    "deploy": "unset npm_config_devdir && npm run build && (cd functions && npm run build) && firebase deploy --only hosting,firestore:rules,functions --force",
     "push": "git add . && (git diff --cached --quiet || git commit -m 'עדכון') && git push",
     "lint": "unset npm_config_devdir && eslint .",
     "lint:fix": "eslint . --fix",
