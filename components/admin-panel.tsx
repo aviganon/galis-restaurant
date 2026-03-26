@@ -80,6 +80,7 @@ import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplie
 import { firestoreConfig } from "@/lib/firestore-config"
 import { db, auth, storage, getAuthForUserCreation } from "@/lib/firebase"
 import { deleteOrphanAuthUserIfAllowed } from "@/lib/delete-orphan-auth-user-client"
+import { postInviteEmail } from "@/lib/invite-email"
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage"
 import type { UserPermissions } from "@/contexts/app-context"
 
@@ -2117,6 +2118,24 @@ export function AdminPanel() {
       } catch {
         /* */
       }
+
+      // שליחת אימות כתובת מייל בתוך אותו מייל (דרך /api/invite).
+      // אחרת משתמשים שנוצרו עם Auth + סיסמה לא יוכלו להיכנס עד אימות.
+      try {
+        const restName =
+          createUserRestId
+            ? (restsWithDetails.find((r) => r.id === createUserRestId)?.name ?? createUserRestId)
+            : null
+        await postInviteEmail({
+          email: createUserEmail.trim(),
+          restaurantName: restName,
+          role: createUserRole,
+          accountCreated: true,
+        })
+      } catch {
+        // Non-blocking: אם המייל לא נשלח, המשתמש עדיין קיים במערכת ויכול לבקש אימות/איפוס.
+      }
+
       setAllSystemUsers(prev => [...prev, { uid: cred.user.uid, email: createUserEmail.trim(), role: createUserRole, restaurantId: createUserRestId || null, restaurantName: restsWithDetails.find(r=>r.id===createUserRestId)?.name }])
       toast.success("משתמש נוצר: " + createUserEmail.trim())
       setCreateUserEmail(""); setCreateUserPassword(""); setCreateUserRestId(""); setShowCreateUser(false)

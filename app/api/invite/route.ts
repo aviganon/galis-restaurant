@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 import { requireFirebaseUser } from "@/lib/api-verify-firebase"
 import { canSendInviteEmail, loadAdminEmailSet } from "@/lib/firebase-admin-permissions"
-import { getFirebaseAdminFirestore } from "@/lib/firebase-admin-server"
+import { getFirebaseAdminAuth, getFirebaseAdminFirestore } from "@/lib/firebase-admin-server"
 
 const fromEmail = process.env.RESEND_FROM_EMAIL || "Restaurant Pro <onboarding@resend.dev>"
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://restaurant-pro.web.app"
@@ -19,7 +19,14 @@ export async function POST(req: NextRequest) {
     if (!auth.ok) return auth.response
 
     const db = getFirebaseAdminFirestore()
+    const adminAuth = getFirebaseAdminAuth()
     if (!db) {
+      return NextResponse.json(
+        { error: "השרת לא מוגדר לאדמין (הוסף FIREBASE_SERVICE_ACCOUNT_JSON)" },
+        { status: 503 },
+      )
+    }
+    if (!adminAuth) {
       return NextResponse.json(
         { error: "השרת לא מוגדר לאדמין (הוסף FIREBASE_SERVICE_ACCOUNT_JSON)" },
         { status: 503 },
@@ -57,6 +64,17 @@ export async function POST(req: NextRequest) {
     }
 
     const resend = new Resend(apiKey)
+
+    // לכל accountCreated (משתמש נוצר עם סיסמה), נצרף קישור אימות כתובת מייל לתוך אותו מייל.
+    // אם הלקוח שלח emailVerificationLink נשתמש בו; אחרת ניצור כאן.
+    let resolvedEmailVerificationLink = emailVerificationLink
+    if (accountCreated && !resolvedEmailVerificationLink) {
+      try {
+        resolvedEmailVerificationLink = await adminAuth.generateEmailVerificationLink(to, { url: appUrl })
+      } catch (e) {
+        console.error("[invite] generateEmailVerificationLink failed:", e)
+      }
+    }
 
     const roleLine =
       role && (role === "manager" || role === "user")
@@ -98,9 +116,9 @@ export async function POST(req: NextRequest) {
   </ul>
   ${codeBlockHtml}
   ${
-    emailVerificationLink
+    resolvedEmailVerificationLink
       ? `<p style="margin-top: 14px; font-size: 13px; color: #666;">
-אימות כתובת המייל: <a href="${escapeHtml(emailVerificationLink)}" target="_blank" rel="noopener noreferrer">לחץ כאן</a>.
+אימות כתובת המייל: <a href="${escapeHtml(resolvedEmailVerificationLink)}" target="_blank" rel="noopener noreferrer">לחץ כאן</a>.
 </p>`
       : ""
   }
