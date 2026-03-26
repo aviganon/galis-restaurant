@@ -39,8 +39,7 @@ export async function POST(req: NextRequest) {
     const snap = await db
       .collection("inboundJobs")
       .where("restaurantId", "==", restaurantId)
-      .orderBy("receivedAt", "desc")
-      .limit(200)
+      .limit(300)
       .get()
 
     const jobs = snap.docs.map((d) => {
@@ -54,11 +53,11 @@ export async function POST(req: NextRequest) {
         receivedAt: data.receivedAt ?? "",
         attachmentPaths: Array.isArray(data.attachmentPaths) ? data.attachmentPaths : [],
       }
-    })
+    }).sort((a, b) => String(b.receivedAt || "").localeCompare(String(a.receivedAt || "")))
     return NextResponse.json({ jobs })
   } catch (e) {
-    console.error("[inbound-jobs] GET failed:", e)
-    return NextResponse.json({ error: "שגיאה לא צפויה" }, { status: 500 })
+    console.error("[inbound-jobs] POST failed:", e)
+    return NextResponse.json({ error: (e as Error)?.message || "שגיאה לא צפויה" }, { status: 500 })
   }
 }
 
