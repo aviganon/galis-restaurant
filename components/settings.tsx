@@ -432,6 +432,8 @@ export function Settings() {
             restaurantId: (dt.restaurantId as string) || null,
             restaurantName: ((dt.restaurantId as string) ? restNameById.get(dt.restaurantId as string) : undefined),
             isSystemOwner: dt.isSystemOwner === true,
+            isOnline: dt.isOnline === true,
+            lastSeenAt: (dt.lastSeenAt as string | number | { toDate?: () => Date } | null) ?? null,
           }
         })
 
@@ -468,6 +470,8 @@ export function Settings() {
           restaurantId: dt.restaurantId || null,
           restaurantName: dt.restaurantId ? restNameById.get(dt.restaurantId) : undefined,
           isSystemOwner: dt.isSystemOwner === true,
+          isOnline: dt.isOnline === true,
+          lastSeenAt: (dt.lastSeenAt as string | number | { toDate?: () => Date } | null) ?? null,
         }
       })
       applyVisible(mapped)

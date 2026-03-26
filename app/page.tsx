@@ -8,6 +8,7 @@ import {
   getDoc,
   getDocFromServer,
   getDocsFromServer,
+  serverTimestamp,
   setDoc,
   collection,
   getDocs,
@@ -418,9 +419,61 @@ export default function Home() {
   }, [isSystemOwner, impersonatingRestaurant, currentPage])
 
   const handleLogout = () => {
+    const uid = auth.currentUser?.uid
+    if (uid) {
+      void setDoc(
+        doc(db, firestoreConfig.usersCollection, uid),
+        { isOnline: false, lastSeenAt: serverTimestamp() },
+        { merge: true },
+      ).catch(() => {})
+    }
     signOut(auth)
     setIsLoggedIn(false)
   }
+
+  useEffect(() => {
+    const user = auth.currentUser
+    if (!isLoggedIn || !user) return
+    const userRef = doc(db, firestoreConfig.usersCollection, user.uid)
+    let stopped = false
+
+    const writePresence = async (online: boolean) => {
+      if (stopped) return
+      try {
+        await setDoc(
+          userRef,
+          {
+            isOnline: online,
+            lastSeenAt: serverTimestamp(),
+          },
+          { merge: true },
+        )
+      } catch {
+        // Non-blocking
+      }
+    }
+
+    void writePresence(true)
+    const tick = window.setInterval(() => {
+      void writePresence(document.visibilityState === "visible")
+    }, 30000)
+
+    const onVisibility = () => {
+      void writePresence(document.visibilityState === "visible")
+    }
+    const onBeforeUnload = () => {
+      void writePresence(false)
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+    window.addEventListener("beforeunload", onBeforeUnload)
+    return () => {
+      stopped = true
+      window.clearInterval(tick)
+      document.removeEventListener("visibilitychange", onVisibility)
+      window.removeEventListener("beforeunload", onBeforeUnload)
+      void writePresence(false)
+    }
+  }, [isLoggedIn])
 
   const effectiveRestaurantId = impersonatingRestaurant?.id ?? currentRestaurantId
   const effectiveRestaurantName = impersonatingRestaurant?.name ?? currentRestaurant

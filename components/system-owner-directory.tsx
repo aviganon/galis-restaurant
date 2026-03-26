@@ -76,6 +76,14 @@ export type DirectoryUserRow = {
   restaurantName?: string
   /** כשמוגדר — התפקיד המוצג הוא «בעל מערכת» (לא רק users.role) */
   isSystemOwner?: boolean
+  isOnline?: boolean
+  lastSeenAt?: string | number | { toDate?: () => Date } | null
+}
+
+function formatLastSeen(v: DirectoryUserRow["lastSeenAt"]): string {
+  if (!v) return "—"
+  if (typeof v === "object" && typeof v?.toDate === "function") return v.toDate().toLocaleString("he-IL")
+  return new Date(v as string | number).toLocaleString("he-IL")
 }
 
 type Props = {
@@ -646,6 +654,13 @@ export function SystemOwnerDirectory({
                               <div className="text-xs text-muted-foreground mt-1">
                                 {u.restaurantName || "ללא מסעדה"} · {directoryUserRoleLabel(u)}
                               </div>
+                              <div className="text-[11px] mt-1 flex items-center gap-2">
+                                <span className={cn("inline-flex items-center gap-1", u.isOnline ? "text-emerald-600" : "text-muted-foreground")}>
+                                  <span className={cn("inline-block h-2 w-2 rounded-full", u.isOnline ? "bg-emerald-500" : "bg-muted-foreground/50")} />
+                                  {u.isOnline ? "מחובר עכשיו" : "לא מחובר"}
+                                </span>
+                                <span className="text-muted-foreground">נראה לאחרונה: {formatLastSeen(u.lastSeenAt)}</span>
+                              </div>
                             </div>
                             <UserCircle2 className="w-4 h-4 shrink-0 text-muted-foreground mt-0.5" />
                           </div>
@@ -671,6 +686,16 @@ export function SystemOwnerDirectory({
                                   <strong className="text-foreground">
                                     {u.restaurantName || "— לא משויך —"}
                                   </strong>
+                                </p>
+                                <p>
+                                  סטטוס:{" "}
+                                  <strong className={cn(u.isOnline ? "text-emerald-600" : "text-foreground")}>
+                                    {u.isOnline ? "מחובר עכשיו" : "לא מחובר"}
+                                  </strong>
+                                </p>
+                                <p>
+                                  נראה לאחרונה:{" "}
+                                  <strong className="text-foreground">{formatLastSeen(u.lastSeenAt)}</strong>
                                 </p>
                               </div>
                               <div className="flex flex-wrap gap-2 pt-1">
