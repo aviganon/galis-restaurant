@@ -8,6 +8,9 @@ import {
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
   type User,
 } from "firebase/auth"
 import { auth, db } from "@/lib/firebase"
@@ -229,6 +232,7 @@ export function LoginScreen(_props: LoginScreenProps) {
   const [activeTab, setActiveTab] = useState("login")
   const [isMuted, setIsMuted] = useState(true)
   const [showVideo, setShowVideo] = useState(false)
+  const [rememberMe, setRememberMe] = useState(true)
   const videoRef = useRef<HTMLVideoElement>(null)
   const heroRef = useRef<HTMLDivElement>(null)
 
@@ -336,6 +340,7 @@ export function LoginScreen(_props: LoginScreenProps) {
     setError("")
     setIsLoading(true)
     try {
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence)
       await signInWithEmailAndPassword(auth, email, password)
     } catch (err: unknown) {
       const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
@@ -388,6 +393,7 @@ export function LoginScreen(_props: LoginScreenProps) {
     }
     setIsLoading(true)
     try {
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence)
       const { inviteCodesCollection, inviteCodeFields, restaurantsCollection, restaurantFields, usersCollection } = firestoreConfig
       const codeRef = doc(db, inviteCodesCollection, code)
       const codeSnap = await getDoc(codeRef)
@@ -465,6 +471,7 @@ export function LoginScreen(_props: LoginScreenProps) {
     setError("")
     setIsLoading(true)
     try {
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence)
       const provider = new GoogleAuthProvider()
       const result = await signInWithPopup(auth, provider)
       await completeGoogleLogin(result.user)
@@ -489,6 +496,7 @@ export function LoginScreen(_props: LoginScreenProps) {
     if (!code) { setError(t("login.enterInviteCode")); return }
     setIsLoading(true)
     try {
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence)
       const { inviteCodesCollection, inviteCodeFields } = firestoreConfig
       const codeRef = doc(db, inviteCodesCollection, code)
       const codeSnap = await getDoc(codeRef)
@@ -919,7 +927,14 @@ export function LoginScreen(_props: LoginScreenProps) {
                       </div>
 
                       <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="remember" name="remember" className="rounded" />
+                        <input
+                          type="checkbox"
+                          id="remember"
+                          name="remember"
+                          className="rounded"
+                          checked={rememberMe}
+                          onChange={(e) => setRememberMe(e.target.checked)}
+                        />
                         <span className="text-sm text-muted-foreground">{t("login.rememberMe")}</span>
                       </label>
 
