@@ -739,7 +739,7 @@ function parseSuggestDishQty(v: unknown): number {
 
 export async function suggestDishFromIngredients(
   ingredients: IngredientForSuggestion[],
-  options?: { chefStyle?: string; variantHint?: string }
+  options?: { chefStyle?: string; variantHint?: string; allowedRecipeNames?: string[] }
 ): Promise<ExtractedDishItem | null> {
   if (ingredients.length === 0) return null
   const list = ingredients
@@ -754,6 +754,9 @@ export async function suggestDishFromIngredients(
   const variationPrompt = variantHint
     ? `וריאציית יצירה: ${variantHint}. הקפד שהרעיון יהיה שונה מרעיונות בסיסיים נפוצים.`
     : ""
+  const recipeScope = Array.isArray(options?.allowedRecipeNames) && options!.allowedRecipeNames!.length > 0
+    ? `רעיונות מועדפים למסעדה: ${options!.allowedRecipeNames!.slice(0, 60).join(", ")}. העדף להציע מנה מתוך הרשימה או וריאציה קרובה לה.`
+    : ""
   const data = await callClaude({
     model: SUGGEST_DISH_MODEL,
     max_tokens: 4000,
@@ -764,7 +767,7 @@ export async function suggestDishFromIngredients(
         content: [
           {
             type: "text",
-            text: `רשימת הרכיבים במסעדה:\n${list}\n\n${chefPrompt}\n${variationPrompt}\n\nהצע מנה או משקה עם description, preparationSteps (מערך של לפחות 4 שלבים בעברית תקנית), ו-ingredients (שמות רכיבים זהים לרשימה).\nהחזר גם שדה suggestedByChef עם שם השף/הסגנון שנבחר בפועל (או "ללא העדפת שף").\nלפני סיום: קרא בקול את description וכל preparationSteps — תקן כל שגיאת דקדוק או מילה שגויה.\nהחזר **רק** JSON תקין — ללא הסבר לפני או אחרי.`,
+            text: `רשימת הרכיבים במסעדה:\n${list}\n\n${chefPrompt}\n${variationPrompt}\n${recipeScope}\n\nהצע מנה או משקה עם description, preparationSteps (מערך של לפחות 4 שלבים בעברית תקנית), ו-ingredients (שמות רכיבים זהים לרשימה).\nהחזר גם שדה suggestedByChef עם שם השף/הסגנון שנבחר בפועל (או "ללא העדפת שף").\nלפני סיום: קרא בקול את description וכל preparationSteps — תקן כל שגיאת דקדוק או מילה שגויה.\nהחזר **רק** JSON תקין — ללא הסבר לפני או אחרי.`,
           },
         ],
       },

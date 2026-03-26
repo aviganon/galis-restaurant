@@ -46,6 +46,7 @@ import { getClaudeApiKey } from "@/lib/claude"
 import { confirmSupplierInvoiceImport, confirmSalesReportImport } from "@/lib/restaurant-import-handlers"
 import { loadGlobalPriceSubdocsMap, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
 import { normalizeDishCategoryToHebrew } from "@/lib/dish-category-hebrew"
+import { AI_CHEF_STYLES, AI_KNOWN_RECIPE_IDEAS } from "@/lib/ai-chef-catalog"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
 import { useLanguage } from "@/contexts/language-context"
@@ -124,16 +125,7 @@ const CATEGORY_TO_KEY: Record<string, string> = {
   "אחר": "other",
 }
 export default function ProductTree() {
-  const CHEF_STYLE_OPTIONS = [
-    "ללא העדפת שף",
-    "אייל שני",
-    "מאיר אדוני",
-    "חיים כהן",
-    "ישראל אהרוני",
-    "אסף גרניט",
-    "יובל בן נריה",
-    "רותי ברודו",
-  ] as const
+  const CHEF_STYLE_OPTIONS = ["ללא העדפת שף", ...AI_CHEF_STYLES] as const
   const [ingredientsModalOpen, setIngredientsModalOpen] = useState(false)
   const [suppliersModalOpen, setSuppliersModalOpen] = useState(false)
   const [dishImages, setDishImages] = useState<Record<string,string>>({})
@@ -176,6 +168,8 @@ export default function ProductTree() {
   const [aiChefStyle, setAiChefStyle] = useState<(typeof CHEF_STYLE_OPTIONS)[number]>("ללא העדפת שף")
   const [ingredientStock, setIngredientStock] = useState<Record<string, number>>({})
   const [restaurantIngredientNames, setRestaurantIngredientNames] = useState<Set<string>>(new Set())
+  const [allowedChefStyles, setAllowedChefStyles] = useState<string[]>([...AI_CHEF_STYLES])
+  const [allowedRecipeIdeas, setAllowedRecipeIdeas] = useState<string[]>([...AI_KNOWN_RECIPE_IDEAS])
   const [importFile, setImportFile] = useState<File | null>(null)
   const [fpmOpen, setFpmOpen] = useState(false)
   /** סוג חילוץ ב-FilePreviewModal: p חשבונית, d מנות, s מכירות */
@@ -247,11 +241,12 @@ export default function ProductTree() {
     setLoading(true)
     const load = async () => {
       try {
-        const [recSnap, restIngSnap, asDoc, globalIngSnap] = await Promise.all([
+        const [recSnap, restIngSnap, asDoc, globalIngSnap, aiCatalogDoc] = await Promise.all([
           getDocs(collection(db, "restaurants", currentRestaurantId, "recipes")),
           getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients")),
           getDoc(doc(db, "restaurants", currentRestaurantId, "appState", "assignedSuppliers")),
           getDocs(collection(db, "ingredients")),
+          getDoc(doc(db, "restaurants", currentRestaurantId, "appState", "aiSuggestionCatalog")),
         ])
         const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
         const subPricesByIngredient =
@@ -330,6 +325,11 @@ export default function ProductTree() {
         setSupplierPrices(newPrices)
         setIngredientStock(newStock)
         setRestaurantIngredientNames(restaurantNames)
+        const aiConf = aiCatalogDoc.data() as { chefs?: string[]; recipes?: string[] } | undefined
+        const chefs = Array.isArray(aiConf?.chefs) && aiConf!.chefs!.length > 0 ? aiConf!.chefs! : [...AI_CHEF_STYLES]
+        const recipes = Array.isArray(aiConf?.recipes) && aiConf!.recipes!.length > 0 ? aiConf!.recipes! : [...AI_KNOWN_RECIPE_IDEAS]
+        setAllowedChefStyles(chefs)
+        setAllowedRecipeIdeas(recipes)
       } catch (e) {
         console.error("load recipes/ingredients:", e)
         toast.error("שגיאה בטעינת עץ מוצר")
@@ -345,6 +345,13 @@ export default function ProductTree() {
     if (!key) return false
     return restaurantIngredientNames.has(key)
   }, [restaurantIngredientNames])
+
+  useEffect(() => {
+    if (aiChefStyle === "ללא העדפת שף") return
+    if (!allowedChefStyles.includes(aiChefStyle)) {
+      setAiChefStyle(allowedChefStyles[0] ? (allowedChefStyles[0] as (typeof CHEF_STYLE_OPTIONS)[number]) : "ללא העדפת שף")
+    }
+  }, [aiChefStyle, allowedChefStyles])
 
   const saveTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   useEffect(() => () => {
@@ -851,6 +858,7 @@ export default function ProductTree() {
           suggestDishFromIngredients(list, {
             chefStyle: aiChefStyle,
             variantHint: count > 1 ? `וריאציה מספר ${i + 1}` : undefined,
+            allowedRecipeNames: allowedRecipeIdeas,
           }),
         ),
       )
@@ -874,7 +882,7 @@ export default function ProductTree() {
     } finally {
       setAiSuggestLoading(false)
     }
-  }, [supplierPrices, ingredientStock, t, aiChefStyle])
+  }, [supplierPrices, ingredientStock, t, aiChefStyle, allowedRecipeIdeas])
 
   const handleAddAiSuggestedDish = useCallback(() => {
     if (!aiSuggestedDish?.name?.trim()) return
@@ -1137,7 +1145,7 @@ export default function ProductTree() {
                 <SelectValue placeholder="בחר שף להצעה" />
               </SelectTrigger>
               <SelectContent>
-                {CHEF_STYLE_OPTIONS.map((chef) => (
+                {CHEF_STYLE_OPTIONS.filter((chef) => chef === "ללא העדפת שף" || allowedChefStyles.includes(chef)).map((chef) => (
                   <SelectItem key={chef} value={chef}>{chef}</SelectItem>
                 ))}
               </SelectContent>

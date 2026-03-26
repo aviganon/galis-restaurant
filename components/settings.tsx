@@ -56,6 +56,7 @@ import { postInviteEmail } from "@/lib/invite-email"
 import { createUniqueInviteCode } from "@/lib/invite-code-document"
 import { useLanguage } from "@/contexts/language-context"
 import { sendPasswordResetReliable } from "@/lib/password-reset-client"
+import { AI_CHEF_STYLES, AI_KNOWN_RECIPE_IDEAS } from "@/lib/ai-chef-catalog"
 
 export function Settings() {
   const t = useTranslations()
@@ -91,6 +92,11 @@ export function Settings() {
   const [apiKeyInput, setApiKeyInput] = useState("")
   const [savingApiKey, setSavingApiKey] = useState(false)
   const [apiKeySaved, setApiKeySaved] = useState(false)
+  const [aiCatalogRestId, setAiCatalogRestId] = useState("")
+  const [aiCatalogChefs, setAiCatalogChefs] = useState<string[]>([...AI_CHEF_STYLES])
+  const [aiCatalogRecipes, setAiCatalogRecipes] = useState<string[]>([...AI_KNOWN_RECIPE_IDEAS])
+  const [loadingAiCatalog, setLoadingAiCatalog] = useState(false)
+  const [savingAiCatalog, setSavingAiCatalog] = useState(false)
   const [usersData, setUsersData] = useState<
     {
       uid: string
@@ -459,6 +465,44 @@ export function Settings() {
       await setDoc(doc(db,"appConfig","claudeApi"),{key:apiKeyInput.trim(),updatedAt:new Date().toISOString()},{merge:true})
       setApiKeySaved(true); setTimeout(()=>setApiKeySaved(false),3000)
     } catch { toast.error("שגיאה") } finally { setSavingApiKey(false) }
+  }
+
+  useEffect(() => {
+    if (!isSystemOwner || isImpersonating) return
+    if (!aiCatalogRestId && (restaurants || []).length > 0) setAiCatalogRestId((restaurants || [])[0].id)
+  }, [isSystemOwner, isImpersonating, aiCatalogRestId, restaurants])
+
+  useEffect(() => {
+    if (!isSystemOwner || isImpersonating || !aiCatalogRestId) return
+    setLoadingAiCatalog(true)
+    getDoc(doc(db, "restaurants", aiCatalogRestId, "appState", "aiSuggestionCatalog"))
+      .then((snap) => {
+        const d = snap.data() as { chefs?: string[]; recipes?: string[] } | undefined
+        setAiCatalogChefs(Array.isArray(d?.chefs) && d!.chefs!.length > 0 ? d!.chefs! : [...AI_CHEF_STYLES])
+        setAiCatalogRecipes(Array.isArray(d?.recipes) && d!.recipes!.length > 0 ? d!.recipes! : [...AI_KNOWN_RECIPE_IDEAS])
+      })
+      .catch(() => {
+        setAiCatalogChefs([...AI_CHEF_STYLES])
+        setAiCatalogRecipes([...AI_KNOWN_RECIPE_IDEAS])
+      })
+      .finally(() => setLoadingAiCatalog(false))
+  }, [isSystemOwner, isImpersonating, aiCatalogRestId])
+
+  const saveAiCatalogForRestaurant = async () => {
+    if (!aiCatalogRestId) return
+    setSavingAiCatalog(true)
+    try {
+      await setDoc(
+        doc(db, "restaurants", aiCatalogRestId, "appState", "aiSuggestionCatalog"),
+        { chefs: aiCatalogChefs, recipes: aiCatalogRecipes, updatedAt: new Date().toISOString() },
+        { merge: true },
+      )
+      toast.success("הגדרות שפים ומתכונים נשמרו למסעדה")
+    } catch (e) {
+      toast.error((e as Error)?.message || "שגיאה בשמירה")
+    } finally {
+      setSavingAiCatalog(false)
+    }
   }
 
   /** תמיד עדכני — מונע loadU עם restaurants ריק אחרי רינדור ראשון (מרוצים / לחיצות בהגדרות) */
@@ -861,6 +905,79 @@ export function Settings() {
                 </Button>
               </div>
               {apiKeySaved ? <p className="text-xs text-emerald-600">{t("pages.settings.claudeApiKeySaved")}</p> : null}
+            </CardContent>
+          </Card>
+          <Card className="mt-2 border border-primary/10 bg-card/90 shadow-sm" dir={systemOwnerPanelDir}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                <User className="w-5 h-5 text-muted-foreground shrink-0" />
+                קטלוג AI לשפים ומתכונים
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                המערכת מכירה כרגע {AI_KNOWN_RECIPE_IDEAS.length} רעיונות מתכון בסיסיים ו-{AI_CHEF_STYLES.length} סגנונות שף.
+              </p>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">מסעדה</label>
+                <select
+                  className="w-full h-10 rounded-md border px-3 text-sm bg-background"
+                  value={aiCatalogRestId}
+                  onChange={(e) => setAiCatalogRestId(e.target.value)}
+                >
+                  {(restaurants || []).map((r) => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
+              {loadingAiCatalog ? (
+                <p className="text-xs text-muted-foreground">טוען הגדרות...</p>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">שפים להצגה בהצעות AI</p>
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      {AI_CHEF_STYLES.map((chef) => (
+                        <label key={chef} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={aiCatalogChefs.includes(chef)}
+                            onChange={(e) => {
+                              setAiCatalogChefs((prev) =>
+                                e.target.checked ? Array.from(new Set([...prev, chef])) : prev.filter((x) => x !== chef),
+                              )
+                            }}
+                          />
+                          <span>{chef}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">מתכונים מוכרים להצעות (בחירה למסעדה)</p>
+                    <div className="grid sm:grid-cols-2 gap-2 max-h-56 overflow-auto border rounded-lg p-2">
+                      {AI_KNOWN_RECIPE_IDEAS.map((r) => (
+                        <label key={r} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={aiCatalogRecipes.includes(r)}
+                            onChange={(e) => {
+                              setAiCatalogRecipes((prev) =>
+                                e.target.checked ? Array.from(new Set([...prev, r])) : prev.filter((x) => x !== r),
+                              )
+                            }}
+                          />
+                          <span>{r}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <Button size="sm" onClick={saveAiCatalogForRestaurant} disabled={savingAiCatalog || !aiCatalogRestId}>
+                    {savingAiCatalog ? <Loader2 className="w-4 h-4 animate-spin ms-2" /> : null}
+                    שמור למסעדה
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
