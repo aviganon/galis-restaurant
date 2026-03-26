@@ -99,6 +99,15 @@ export function Upload() {
   const [activeInboundJobId, setActiveInboundJobId] = useState<string | null>(null)
   const [detectingType, setDetectingType] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const setInboundJobStatusSafe = useCallback(async (jobId: string | null, status: "processing" | "done" | "error") => {
+    if (!jobId) return
+    try {
+      await setDoc(doc(db, "inboundJobs", jobId), { status }, { merge: true })
+    } catch (e) {
+      // Non-blocking: UI parsing must continue even if rules deny client status writes.
+      console.warn("[inboundJobs] status update skipped:", status, e)
+    }
+  }, [])
 
   const mapDetectedToFpmType = useCallback((detected: DetectedDocType): "p" | "d" | "s" => {
     if (detected === "menu") return "d"
@@ -241,10 +250,8 @@ export function Upload() {
         refreshIngredients,
       })
       if (ok) {
-        if (activeInboundJobId) {
-          await setDoc(doc(db, "inboundJobs", activeInboundJobId), { status: "done" }, { merge: true })
-          setActiveInboundJobId(null)
-        }
+        await setInboundJobStatusSafe(activeInboundJobId, "done")
+        setActiveInboundJobId(null)
         setUploads((prev) => [
           {
             id: `${Date.now()}`,
@@ -261,7 +268,7 @@ export function Upload() {
       }
       setFpmFile(null)
     },
-    [activeInboundJobId, currentRestaurantId, isOwner, fpmFile, refreshIngredients]
+    [activeInboundJobId, currentRestaurantId, isOwner, fpmFile, refreshIngredients, setInboundJobStatusSafe]
   )
 
   const handleConfirmDishes = useCallback(
@@ -313,20 +320,16 @@ export function Upload() {
           `${newDishes.length} מנות נוספו בהצלחה${skipped > 0 ? ` (${skipped} כבר קיימות — דולגו)` : ""} — עבור לעץ מוצר לעריכה`
         )
         refreshIngredients?.()
-        if (activeInboundJobId) {
-          await setDoc(doc(db, "inboundJobs", activeInboundJobId), { status: "done" }, { merge: true })
-          setActiveInboundJobId(null)
-        }
+        await setInboundJobStatusSafe(activeInboundJobId, "done")
+        setActiveInboundJobId(null)
       } catch (e) {
         toast.error("שגיאה בשמירה: " + (e as Error).message)
-        if (activeInboundJobId) {
-          await setDoc(doc(db, "inboundJobs", activeInboundJobId), { status: "error" }, { merge: true })
-          setActiveInboundJobId(null)
-        }
+        await setInboundJobStatusSafe(activeInboundJobId, "error")
+        setActiveInboundJobId(null)
       }
       setFpmFile(null)
     },
-    [activeInboundJobId, currentRestaurantId, refreshIngredients]
+    [activeInboundJobId, currentRestaurantId, refreshIngredients, setInboundJobStatusSafe]
   )
 
   const handleConfirmSales = useCallback(
@@ -345,13 +348,11 @@ export function Upload() {
         meta,
         refreshIngredients,
       })
-      if (activeInboundJobId) {
-        await setDoc(doc(db, "inboundJobs", activeInboundJobId), { status: "done" }, { merge: true })
-        setActiveInboundJobId(null)
-      }
+      await setInboundJobStatusSafe(activeInboundJobId, "done")
+      setActiveInboundJobId(null)
       setFpmFile(null)
     },
-    [activeInboundJobId, currentRestaurantId, refreshIngredients]
+    [activeInboundJobId, currentRestaurantId, refreshIngredients, setInboundJobStatusSafe]
   )
 
   // Safari/Chrome: מונע מהדפדפן לפתוח קובץ כשמשחררים מחוץ לאזור — חיוני לגרירה
@@ -422,7 +423,7 @@ export function Upload() {
 
             if (!path0) return
             try {
-              await setDoc(doc(db, "inboundJobs", jobId), { status: "processing" }, { merge: true })
+              await setInboundJobStatusSafe(jobId, "processing")
               const url = await getDownloadURL(ref(storage, path0))
               const res = await fetch(url)
               const blob = await res.blob()
@@ -449,14 +450,14 @@ export function Upload() {
               openFpm(file, forceType)
             } catch (e) {
               console.error("[inboundJobs] auto process failed:", e)
-              await setDoc(doc(db, "inboundJobs", jobId), { status: "error" }, { merge: true })
+              await setInboundJobStatusSafe(jobId, "error")
             }
           })()
         }
       })
     })
     return () => unsub()
-  }, [currentRestaurantId, mapDetectedToFpmType, openFpm])
+  }, [currentRestaurantId, mapDetectedToFpmType, openFpm, setInboundJobStatusSafe])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
