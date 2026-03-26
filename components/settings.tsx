@@ -111,7 +111,7 @@ export function Settings() {
   const [restaurantInviteCode, setRestaurantInviteCode] = useState<string | null>(null)
   const [generatingRestaurantInviteCode, setGeneratingRestaurantInviteCode] = useState(false)
   const [cEmail, setCEmail] = useState(""); const [cPass, setCPass] = useState("")
-  const [cRole, setCRole] = useState<"manager"|"user">("user"); const [cRest, setCRest] = useState("")
+  const [cRole, setCRole] = useState<"manager"|"user"|"system_owner">("user"); const [cRest, setCRest] = useState("")
   const [cName, setCName] = useState(""); const [cPhone, setCPhone] = useState("")
   const [cAddress, setCAddress] = useState(""); const [cNotes, setCNotes] = useState("")
   const [cErr, setCErr] = useState<string|null>(null); const [creating2, setCreating2] = useState(false)
@@ -574,8 +574,9 @@ export function Settings() {
       setCErr("נא למלא אימייל וסיסמה")
       return
     }
-    const effectiveRestId = canManageTeamInOwnRestaurant ? currentRestaurantId || "" : cRest
-    if (!effectiveRestId) {
+    const creatingSystemOwner = cRole === "system_owner"
+    const effectiveRestId = creatingSystemOwner ? null : (canManageTeamInOwnRestaurant ? currentRestaurantId || "" : cRest)
+    if (!creatingSystemOwner && !effectiveRestId) {
       setCErr("נא לבחור מסעדה")
       return
     }
@@ -588,9 +589,11 @@ export function Settings() {
       const { createUserWithEmailAndPassword, signOut } = await import("firebase/auth")
       const sec = getAuthForUserCreation()
       const cr = await createUserWithEmailAndPassword(sec, cEmail.trim(), cPass)
+      const roleToSave = creatingSystemOwner ? "user" : cRole
       await setDoc(doc(db, "users", cr.user.uid), {
         email: cEmail.trim(),
-        role: cRole,
+        role: roleToSave,
+        isSystemOwner: creatingSystemOwner,
         restaurantId: effectiveRestId,
         name: cName.trim() || null,
         phone: cPhone.trim() || null,
@@ -598,6 +601,7 @@ export function Settings() {
         notes: cNotes.trim() || null,
         createdAt: new Date().toISOString(),
       })
+      if (creatingSystemOwner) await setSystemOwnerEmailInConfig(cEmail.trim(), true)
       try {
         await signOut(sec)
       } catch {
@@ -608,26 +612,29 @@ export function Settings() {
         {
           uid: cr.user.uid,
           email: cEmail.trim(),
-          role: cRole,
+          role: roleToSave,
+          isSystemOwner: creatingSystemOwner,
           restaurantId: effectiveRestId,
           restaurantName: (restaurants || []).find((r) => r.id === effectiveRestId)?.name,
         },
       ])
       const restName = effectiveRestId ? (restaurants || []).find((r) => r.id === effectiveRestId)?.name : null
       let inviteCode: string | undefined
-      try {
-        inviteCode = await createUniqueInviteCode({
-          restaurantId: effectiveRestId,
-          role: cRole,
-        })
-      } catch {
-        toast.warning("לא נוצר קוד הזמנה — המייל יישלח בלי קוד")
+      if (!creatingSystemOwner) {
+        try {
+          inviteCode = await createUniqueInviteCode({
+            restaurantId: effectiveRestId,
+            role: cRole,
+          })
+        } catch {
+          toast.warning("לא נוצר קוד הזמנה — המייל יישלח בלי קוד")
+        }
       }
       try {
         await postInviteEmail({
           email: cEmail.trim(),
           restaurantName: restName,
-          role: cRole,
+          role: creatingSystemOwner ? "owner" : cRole,
           accountCreated: true,
           inviteCode: inviteCode ?? null,
         })
@@ -645,6 +652,7 @@ export function Settings() {
       setCEmail("")
       setCPass("")
       if (!canManageTeamInOwnRestaurant) setCRest("")
+      setCRole("user")
       setCName("")
       setCPhone("")
       setCAddress("")

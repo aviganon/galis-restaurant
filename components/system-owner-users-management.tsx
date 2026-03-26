@@ -38,8 +38,8 @@ export type SystemOwnerUsersManagementProps = {
   setCEmail: (v: string) => void
   cPass: string
   setCPass: (v: string) => void
-  cRole: "manager" | "user"
-  setCRole: (v: "manager" | "user") => void
+  cRole: "manager" | "user" | "system_owner"
+  setCRole: (v: "manager" | "user" | "system_owner") => void
   cRest: string
   setCRest: (v: string) => void
   cName: string
@@ -270,23 +270,31 @@ export function SystemOwnerUserTabToolbar({
               <select
                 className="w-full h-9 rounded-md border px-3 text-sm bg-background"
                 value={cRole}
-                onChange={(e) => setCRole(e.target.value as "manager" | "user")}
+                onChange={(e) => setCRole(e.target.value as "manager" | "user" | "system_owner")}
               >
                 <option value="manager">מנהל</option>
                 <option value="user">משתמש</option>
+                <option value="system_owner">בעלים מערכת</option>
               </select>
             </div>
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">מסעדה</label>
-              <select className="w-full h-9 rounded-md border px-3 text-sm bg-background" value={cRest} onChange={(e) => setCRest(e.target.value)}>
-                <option value="">— ללא —</option>
-                {rs.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {cRole === "system_owner" ? (
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">מסעדה</label>
+                <Input readOnly value="— לא נדרש לבעלים מערכת —" className="h-9 bg-muted" />
+              </div>
+            ) : (
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">מסעדה</label>
+                <select className="w-full h-9 rounded-md border px-3 text-sm bg-background" value={cRest} onChange={(e) => setCRest(e.target.value)}>
+                  <option value="">— ללא —</option>
+                  {rs.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="sm:col-span-2">
               <label className="text-xs text-muted-foreground block mb-1">כתובת</label>
               <Input value={cAddress} onChange={(e) => setCAddress(e.target.value)} placeholder="רחוב, עיר" />
