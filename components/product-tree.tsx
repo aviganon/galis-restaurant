@@ -916,7 +916,7 @@ export default function ProductTree() {
       toast.success("הרשומה נמחקה")
     } catch (e) {
       console.error("delete import history failed:", e)
-      toast.error("מחיקה נכשלה")
+      toast.error((e as Error)?.message || "מחיקה נכשלה")
     } finally {
       setDeletingImportId(null)
     }

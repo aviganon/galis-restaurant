@@ -167,7 +167,12 @@ service cloud.firestore {
         && resource.data.restaurantId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId
         && request.resource.data.diff(resource.data).changedKeys().hasOnly(["status"])
         && request.resource.data.status in ["pending", "processing", "done", "error"];
-      allow create, delete: if false;
+      allow create: if false;
+      // מחיקה מהאפליקציה (עץ מוצר → ייבוא) — רק למסעדה של המשתמש או בעל מערכת/אדמין
+      allow delete: if request.auth != null && (
+        canManageAllRestaurants()
+        || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && resource.data.restaurantId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId)
+      );
     }
 
     // inbound email lookup — token → restaurantId (מייל נכנס)
