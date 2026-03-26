@@ -52,6 +52,7 @@ import { cn } from "@/lib/utils"
 import { InboundEmailSettings } from "@/components/inbound-email-settings"
 import { SystemOwnerDirectory } from "@/components/system-owner-directory"
 import { SystemOwnerUserTabBulkSection, SystemOwnerUserTabToolbar } from "@/components/system-owner-users-management"
+import { firebaseBearerHeaders } from "@/lib/api-auth-client"
 import { postInviteEmail } from "@/lib/invite-email"
 import { createUniqueInviteCode } from "@/lib/invite-code-document"
 import { useLanguage } from "@/contexts/language-context"
@@ -662,7 +663,7 @@ export function Settings() {
     }
     setCreating2(true)
     try {
-      const { createUserWithEmailAndPassword, signOut, sendEmailVerification } = await import("firebase/auth")
+      const { createUserWithEmailAndPassword, signOut } = await import("firebase/auth")
       const sec = getAuthForUserCreation()
 
       const completeUserCreation = async (cr: Awaited<ReturnType<typeof createUserWithEmailAndPassword>>) => {
@@ -679,11 +680,24 @@ export function Settings() {
           createdAt: new Date().toISOString(),
         })
         if (creatingSystemOwner) await setSystemOwnerEmailInConfig(cEmail.trim(), true)
-        try {
-          const verifyUrl = typeof window !== "undefined" ? window.location.origin : "https://galis-6ebbc.web.app"
-          await sendEmailVerification(cr.user, { url: verifyUrl })
-        } catch {
-          // Non-blocking.
+
+        // עבור בעל מערכת: אנחנו מוסיפים קישור אימות כתובת למייל שנשלח ע"י Resend.
+        // (בגלל שחלק מהפרויקטים/הגדרות עלולים למנוע שליחה דרך Firebase Auth, ולכן לא סומכים רק על sendEmailVerification.)
+        let emailVerificationLink: string | null = null
+        if (creatingSystemOwner) {
+          try {
+            const headers = await firebaseBearerHeaders()
+            const res = await fetch("/api/auth/generate-email-verification-link", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", ...headers },
+              body: JSON.stringify({ email: cEmail.trim() }),
+              cache: "no-store",
+            })
+            const j = await res.json().catch(() => ({}))
+            if (res.ok && typeof j?.link === "string") emailVerificationLink = j.link
+          } catch {
+            // Non-blocking.
+          }
         }
         try {
           await signOut(sec)
@@ -720,6 +734,7 @@ export function Settings() {
             role: creatingSystemOwner ? "owner" : cRole,
             accountCreated: true,
             inviteCode: inviteCode ?? null,
+            emailVerificationLink: creatingSystemOwner ? emailVerificationLink : null,
           })
           toast.success(
             inviteCode

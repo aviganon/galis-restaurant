@@ -40,6 +40,8 @@ export async function POST(req: NextRequest) {
     const accountCreated = body.accountCreated === true
     const inviteCode =
       typeof body.inviteCode === "string" && body.inviteCode.trim() ? body.inviteCode.trim().toUpperCase() : undefined
+    const emailVerificationLink =
+      typeof body.emailVerificationLink === "string" && body.emailVerificationLink.trim() ? body.emailVerificationLink.trim() : undefined
 
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "חסר אימייל" }, { status: 400 })
@@ -95,6 +97,13 @@ export async function POST(req: NextRequest) {
     <li><strong>סיסמה:</strong> זו שהגדיר עבורך מנהל המערכת בעת יצירת החשבון (לא נשלחת במייל מטעמי אבטחה)</li>
   </ul>
   ${codeBlockHtml}
+  ${
+    emailVerificationLink
+      ? `<p style="margin-top: 14px; font-size: 13px; color: #666;">
+אימות כתובת המייל: <a href="${escapeHtml(emailVerificationLink)}" target="_blank" rel="noopener noreferrer">לחץ כאן</a>.
+</p>`
+      : ""
+  }
   <p><strong>איך נכנסים:</strong></p>
   <ol>
     <li>גלוש לכתובת: <a href="${appUrl}">${appUrl}</a></li>

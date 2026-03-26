@@ -7,6 +7,8 @@ export async function postInviteEmail(payload: {
   role?: string
   /** true כשנוצר חשבון Auth + מסמך users — המייל מסביר התחברות ולא הרשמה */
   accountCreated?: boolean
+  /** קישור לאימות כתובת המייל (Email Verification) — נשלח רק אם הצלחנו לייצר אותו */
+  emailVerificationLink?: string | null
   /** קוד הזמנה שנוצר ב־Firestore (אוטומטי אחרי יצירת משתמש) */
   inviteCode?: string | null
 }): Promise<void> {
