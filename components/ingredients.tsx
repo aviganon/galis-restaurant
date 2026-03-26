@@ -227,8 +227,13 @@ export function Ingredients() {
   const justify = isRtl ? "justify-end" : "justify-start"
   const tRef = React.useRef(t)
   tRef.current = t
-  const { currentRestaurantId, setCurrentPage, userRole, isSystemOwner, refreshIngredients } = useApp()
+  const { currentRestaurantId, setCurrentPage, userRole, isSystemOwner, refreshIngredients, userPermissions } = useApp()
   const isOwner = isOwnerRole(userRole, isSystemOwner)
+  /** השוואת מחיר מול ספקים גלובליים + אינטרנט — לכל משתמש מסעדה (לא רק בעל מסעדה) */
+  const canSeePriceCompare = React.useMemo(
+    () => Boolean(currentRestaurantId) && userPermissions?.canSeeIngredients !== false,
+    [currentRestaurantId, userPermissions?.canSeeIngredients]
+  )
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [suppliers, setSuppliers] = useState<string[]>([])
   const [selectedIngIds, setSelectedIngIds] = useState<Set<string>>(new Set())
@@ -285,13 +290,23 @@ export function Ingredients() {
   const INGREDIENTS_COLUMN_ORDER_KEY = "ingredients-column-order"
   const defaultColumnOrder = ["name", "price", "source", "cheapest", "unit", "waste", "stock", "minStock", "supplier", "sku", "status", "actions"] as const
 
-  /** בעלים: עמודות «מקור» ו«הכי זול» תמיד זמינות — לא מסתירים בטעות דרך localStorage */
+  /** עמודות «מקור» ו«הכי זול» תמיד זמינות כשיש השוואת מחירים — לא מסתירים בטעות דרך localStorage */
   const columnIsEffectivelyVisible = useCallback(
-    (key: string, visibility: Record<string, boolean>, owner: boolean) => {
-      if (owner && (key === "cheapest" || key === "source")) return true
+    (key: string, visibility: Record<string, boolean>, lockPriceCols: boolean) => {
+      if (lockPriceCols && (key === "cheapest" || key === "source")) return true
       return visibility[key] !== false
     },
     []
+  )
+
+  /** אילו עמודות מוצגות בטבלה (מקור/הכי זול לכל המסעדה; פעולות רק לבעל מסעדה/בעל מערכת) */
+  const columnShownInTable = useCallback(
+    (k: string) => {
+      if (k === "source" || k === "cheapest") return canSeePriceCompare
+      if (k === "actions") return isOwner
+      return true
+    },
+    [canSeePriceCompare, isOwner]
   )
 
   const [columnOrder, setColumnOrder] = useState<string[]>(() => {
@@ -317,10 +332,10 @@ export function Ingredients() {
     } catch (_) {}
     return {}
   })
-  const visibleColumnOrder = columnOrder.filter((k) => columnIsEffectivelyVisible(k, columnVisibility, isOwner))
+  const visibleColumnOrder = columnOrder.filter((k) => columnIsEffectivelyVisible(k, columnVisibility, canSeePriceCompare))
   const toggleColumnVisibility = useCallback(
     (key: string) => {
-      if (isOwner && (key === "cheapest" || key === "source")) return
+      if (canSeePriceCompare && (key === "cheapest" || key === "source")) return
       setColumnVisibility((prev) => {
         const next = { ...prev, [key]: prev[key] === false }
         try {
@@ -329,15 +344,13 @@ export function Ingredients() {
         return next
       })
     },
-    [isOwner]
+    [canSeePriceCompare]
   )
-  const displayColumnOrder = visibleColumnOrder.filter((k) => (k !== "source" && k !== "cheapest" && k !== "actions") || isOwner)
+  const displayColumnOrder = visibleColumnOrder.filter(columnShownInTable)
   const handleColumnReorder = useCallback((fromIndex: number, toIndex: number) => {
     setColumnOrder((prev) => {
       const display = prev.filter(
-        (k) =>
-          columnIsEffectivelyVisible(k, columnVisibility, isOwner) &&
-          ((k !== "source" && k !== "cheapest" && k !== "actions") || isOwner)
+        (k) => columnIsEffectivelyVisible(k, columnVisibility, canSeePriceCompare) && columnShownInTable(k)
       )
       if (fromIndex < 0 || fromIndex >= display.length || toIndex < 0 || toIndex >= display.length) return prev
       const displayOrder = [...display]
@@ -348,7 +361,7 @@ export function Ingredients() {
       try { localStorage.setItem(INGREDIENTS_COLUMN_ORDER_KEY, JSON.stringify(next)) } catch (_) {}
       return next
     })
-  }, [columnVisibility, isOwner, columnIsEffectivelyVisible])
+  }, [columnVisibility, canSeePriceCompare, columnIsEffectivelyVisible, columnShownInTable])
 
   const INGREDIENTS_ROW_DENSITY_KEY = "ingredients-row-density"
   type RowDensity = "compact" | "normal" | "expanded"
@@ -367,7 +380,7 @@ export function Ingredients() {
   const densityCellClass = rowDensity === "compact" ? "py-1 px-1.5" : rowDensity === "expanded" ? "py-3 px-3" : "py-2 px-2"
 
   useEffect(() => {
-    if (!isOwner) return
+    if (!canSeePriceCompare) return
     setColumnVisibility((prev) => {
       if (prev.cheapest !== false && prev.source !== false) return prev
       const next = { ...prev }
@@ -378,7 +391,7 @@ export function Ingredients() {
       } catch (_) {}
       return next
     })
-  }, [isOwner])
+  }, [canSeePriceCompare])
 
   const loadIngredients = useCallback(async () => {
     if (!currentRestaurantId) {
@@ -393,7 +406,7 @@ export function Ingredients() {
         getDocs(collection(db, "ingredients")),
       ])
       let pricesSnap: Awaited<ReturnType<typeof getDocs>> | null = null
-      if (isOwner) {
+      if (canSeePriceCompare) {
         try {
           pricesSnap = await getDocs(collectionGroup(db, "prices"))
         } catch {
@@ -409,7 +422,7 @@ export function Ingredients() {
       const restSupSet = new Set<string>()
 
       const globalCheapestByIngredient = new Map<string, GlobalCheapest>()
-      if (isOwner && pricesSnap) {
+      if (canSeePriceCompare && pricesSnap) {
         pricesSnap.forEach((d) => {
           const data = d.data() as { price?: unknown; unit?: unknown; supplier?: unknown }
           const parentId = d.ref.parent.parent?.id
@@ -430,7 +443,7 @@ export function Ingredients() {
         const price = typeof data.price === "number" ? data.price : 0
         const unit = (data.unit as string) || "ק\"ג"
         const sup = (data.supplier as string) || ""
-        if (isOwner && price > 0) {
+        if (canSeePriceCompare && price > 0) {
           const existing = globalCheapestByIngredient.get(d.id)
           const ppkg = pricePerKg(price, unit)
           if (!existing || ppkg < pricePerKg(existing.price, existing.unit)) {
@@ -452,8 +465,8 @@ export function Ingredients() {
           supplier: (data.supplier as string) || "",
           sku: (data.sku as string) || "",
           category: (data.category as string) || "אחר",
-          priceSource: isOwner ? "mine" : undefined,
-          globalCheapest: isOwner ? globalCheapestByIngredient.get(d.id) : undefined,
+          priceSource: canSeePriceCompare ? "mine" : undefined,
+          globalCheapest: canSeePriceCompare ? globalCheapestByIngredient.get(d.id) : undefined,
           inRestaurant: true,
         }
         byId.set(d.id, ing)
@@ -479,8 +492,8 @@ export function Ingredients() {
           supplier: picked.supplier,
           sku: (data.sku as string) || "",
           category: (data.category as string) || "אחר",
-          priceSource: isOwner ? "market" : undefined,
-          globalCheapest: isOwner ? globalCheapestByIngredient.get(d.id) : undefined,
+          priceSource: canSeePriceCompare ? "market" : undefined,
+          globalCheapest: canSeePriceCompare ? globalCheapestByIngredient.get(d.id) : undefined,
           inRestaurant: false,
         }
         byId.set(d.id, ing)
@@ -490,7 +503,7 @@ export function Ingredients() {
       setIngredients(ings)
       setSuppliers(["כל הספקים", ...Array.from(supSet).sort()])
       setRestaurantSuppliers(Array.from(restSupSet).sort())
-      if (isOwner && ings.length > 0) {
+      if (canSeePriceCompare && ings.length > 0) {
         const webCache: Record<string, { price: number; store: string; unit: string; source: string }> = {}
         await Promise.all(
           ings.map(async (ing) => {
@@ -514,7 +527,7 @@ export function Ingredients() {
     } finally {
       setLoading(false)
     }
-  }, [currentRestaurantId, isOwner])
+  }, [currentRestaurantId, canSeePriceCompare])
 
   useEffect(() => {
     loadIngredients()
@@ -1348,7 +1361,7 @@ export function Ingredients() {
                 <SelectItem value="ok">{t("pages.ingredients.stockOk")}</SelectItem>
               </SelectContent>
             </Select>
-            {isOwner && (
+            {canSeePriceCompare && (
               <>
                 <Select value={priceSourceFilter} onValueChange={(v) => setPriceSourceFilter(v as "all" | "mine" | "market")}>
                   <SelectTrigger className={cn("w-full sm:w-[140px]", textAlign)}>
@@ -1387,8 +1400,8 @@ export function Ingredients() {
                 ))}
                 <div className="border-t my-1" />
                 <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{t("pages.ingredients.showHideColumns")}</div>
-                {defaultColumnOrder.filter((k) => (k !== "source" && k !== "cheapest" && k !== "actions") || isOwner).map((k) => {
-                  const isVisible = columnIsEffectivelyVisible(k, columnVisibility, isOwner)
+                {defaultColumnOrder.filter(columnShownInTable).map((k) => {
+                  const isVisible = columnIsEffectivelyVisible(k, columnVisibility, canSeePriceCompare)
                   const colLabels: Record<string, string> = {
                     name: t("pages.ingredients.ingredientName"),
                     price: t("pages.ingredients.price"),
@@ -1408,7 +1421,7 @@ export function Ingredients() {
                     <DropdownMenuCheckboxItem
                       key={k}
                       checked={isVisible}
-                      disabled={isOwner && (k === "cheapest" || k === "source")}
+                      disabled={canSeePriceCompare && (k === "cheapest" || k === "source")}
                       onCheckedChange={() => toggleColumnVisibility(k)}
                     >
                       {label}
