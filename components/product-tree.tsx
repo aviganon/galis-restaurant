@@ -30,6 +30,7 @@ import { db, storage } from "@/lib/firebase"
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage"
 import { useApp } from "@/contexts/app-context"
 import { FilePreviewModal } from "@/components/file-preview-modal"
+import { RestaurantInboundUploadsDialog } from "@/components/restaurant-inbound-uploads-dialog"
 import { Dashboard } from "@/components/dashboard"
 import { Reports } from "@/components/reports"
 import {
@@ -1518,6 +1519,10 @@ export default function ProductTree() {
                   </div>
                 </DialogContent>
               </Dialog>
+              <RestaurantInboundUploadsDialog
+                restaurantId={currentRestaurantId}
+                triggerLabel="העלאות ממייל"
+              />
             </div>
           </div>
 

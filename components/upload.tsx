@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react"
 import { motion } from "framer-motion"
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage"
-import { writeBatch, doc, getDocs, collection, query, where, orderBy, limit, onSnapshot } from "firebase/firestore"
+import { writeBatch, doc, getDocs, collection, query, where, orderBy, limit, onSnapshot, setDoc } from "firebase/firestore"
 import { confirmSupplierInvoiceImport, confirmSalesReportImport } from "@/lib/restaurant-import-handlers"
 import { auth, storage, db } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
@@ -96,15 +96,16 @@ export function Upload() {
   const [fpmOpen, setFpmOpen] = useState(false)
   const [fpmFile, setFpmFile] = useState<File | null>(null)
   const [fpmType, setFpmType] = useState<"p" | "d" | "s">("p")
+  const [activeInboundJobId, setActiveInboundJobId] = useState<string | null>(null)
   const [detectingType, setDetectingType] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const mapDetectedToFpmType = (detected: DetectedDocType): "p" | "d" | "s" => {
+  const mapDetectedToFpmType = useCallback((detected: DetectedDocType): "p" | "d" | "s" => {
     if (detected === "menu") return "d"
     if (detected === "sales") return "s"
     if (detected === "invoice") return "p"
     return "p"
-  }
+  }, [])
 
   const processFilesToStorage = useCallback((files: File[]) => {
     const uid = auth.currentUser?.uid ?? "anonymous"
@@ -240,6 +241,10 @@ export function Upload() {
         refreshIngredients,
       })
       if (ok) {
+        if (activeInboundJobId) {
+          await setDoc(doc(db, "inboundJobs", activeInboundJobId), { status: "done" }, { merge: true })
+          setActiveInboundJobId(null)
+        }
         setUploads((prev) => [
           {
             id: `${Date.now()}`,
@@ -256,7 +261,7 @@ export function Upload() {
       }
       setFpmFile(null)
     },
-    [currentRestaurantId, isOwner, fpmFile, refreshIngredients]
+    [activeInboundJobId, currentRestaurantId, isOwner, fpmFile, refreshIngredients]
   )
 
   const handleConfirmDishes = useCallback(
@@ -308,12 +313,20 @@ export function Upload() {
           `${newDishes.length} מנות נוספו בהצלחה${skipped > 0 ? ` (${skipped} כבר קיימות — דולגו)` : ""} — עבור לעץ מוצר לעריכה`
         )
         refreshIngredients?.()
+        if (activeInboundJobId) {
+          await setDoc(doc(db, "inboundJobs", activeInboundJobId), { status: "done" }, { merge: true })
+          setActiveInboundJobId(null)
+        }
       } catch (e) {
         toast.error("שגיאה בשמירה: " + (e as Error).message)
+        if (activeInboundJobId) {
+          await setDoc(doc(db, "inboundJobs", activeInboundJobId), { status: "error" }, { merge: true })
+          setActiveInboundJobId(null)
+        }
       }
       setFpmFile(null)
     },
-    [currentRestaurantId, refreshIngredients]
+    [activeInboundJobId, currentRestaurantId, refreshIngredients]
   )
 
   const handleConfirmSales = useCallback(
@@ -332,9 +345,13 @@ export function Upload() {
         meta,
         refreshIngredients,
       })
+      if (activeInboundJobId) {
+        await setDoc(doc(db, "inboundJobs", activeInboundJobId), { status: "done" }, { merge: true })
+        setActiveInboundJobId(null)
+      }
       setFpmFile(null)
     },
-    [currentRestaurantId, refreshIngredients]
+    [activeInboundJobId, currentRestaurantId, refreshIngredients]
   )
 
   // Safari/Chrome: מונע מהדפדפן לפתוח קובץ כשמשחררים מחוץ לאזור — חיוני לגרירה
@@ -366,42 +383,78 @@ export function Upload() {
     const unsub = onSnapshot(q, (snap) => {
       snap.docChanges().forEach((change) => {
         if (change.type === "added") {
-          const job = change.doc.data() as {
+          void (async () => {
+            const jobId = change.doc.id
+            const job = change.doc.data() as {
             attachmentPaths?: string[]
             receivedAt?: { toDate?: () => Date } | string | number
             fromEmail?: string
-          }
-          const path0 = job.attachmentPaths?.[0]
-          const nameFromPath = typeof path0 === "string" ? path0.split("/").pop() : undefined
-          const receivedRaw = job.receivedAt
-          let uploadedAtStr: string
-          if (receivedRaw && typeof (receivedRaw as { toDate?: () => Date }).toDate === "function") {
-            uploadedAtStr = (receivedRaw as { toDate: () => Date }).toDate().toLocaleString("he-IL")
-          } else if (receivedRaw !== undefined && receivedRaw !== null) {
-            uploadedAtStr = new Date(receivedRaw as string | number).toLocaleString("he-IL")
-          } else {
-            uploadedAtStr = new Date().toLocaleString("he-IL")
-          }
-          const emailFile: UploadedFile = {
-            id: change.doc.id,
-            name: nameFromPath ?? "קובץ ממייל",
-            type: "invoice",
-            size: "",
-            status: "completed",
-            progress: 100,
-            uploadedAt: uploadedAtStr,
-            source: "email",
-            fromEmail: job.fromEmail,
-          }
-          setUploads((prev) => {
-            if (prev.find((u) => u.id === change.doc.id)) return prev
-            return [emailFile, ...prev]
-          })
+            }
+            const path0 = job.attachmentPaths?.[0]
+            const nameFromPath = typeof path0 === "string" ? path0.split("/").pop() : undefined
+            const receivedRaw = job.receivedAt
+            let uploadedAtStr: string
+            if (receivedRaw && typeof (receivedRaw as { toDate?: () => Date }).toDate === "function") {
+              uploadedAtStr = (receivedRaw as { toDate: () => Date }).toDate().toLocaleString("he-IL")
+            } else if (receivedRaw !== undefined && receivedRaw !== null) {
+              uploadedAtStr = new Date(receivedRaw as string | number).toLocaleString("he-IL")
+            } else {
+              uploadedAtStr = new Date().toLocaleString("he-IL")
+            }
+
+            const emailFile: UploadedFile = {
+              id: jobId,
+              name: nameFromPath ?? "קובץ ממייל",
+              type: "invoice",
+              size: "",
+              status: "completed",
+              progress: 100,
+              uploadedAt: uploadedAtStr,
+              source: "email",
+              fromEmail: job.fromEmail,
+            }
+            setUploads((prev) => {
+              if (prev.find((u) => u.id === jobId)) return prev
+              return [emailFile, ...prev]
+            })
+
+            if (!path0) return
+            try {
+              await setDoc(doc(db, "inboundJobs", jobId), { status: "processing" }, { merge: true })
+              const url = await getDownloadURL(ref(storage, path0))
+              const res = await fetch(url)
+              const blob = await res.blob()
+              const inferredType = blob.type || "application/octet-stream"
+              const file = Object.assign(blob, {
+                name: nameFromPath ?? "inbound-file",
+                lastModified: Date.now(),
+                type: inferredType,
+              }) as File
+              setUploads((prev) =>
+                prev.map((u) => (u.id === jobId ? { ...u, downloadUrl: url } : u))
+              )
+              const hasKey = await getClaudeApiKey()
+              let forceType: "p" | "d" | "s" = "p"
+              if (hasKey) {
+                try {
+                  const detected = await detectDocumentType(file)
+                  forceType = mapDetectedToFpmType(detected)
+                } catch {
+                  forceType = "p"
+                }
+              }
+              setActiveInboundJobId(jobId)
+              openFpm(file, forceType)
+            } catch (e) {
+              console.error("[inboundJobs] auto process failed:", e)
+              await setDoc(doc(db, "inboundJobs", jobId), { status: "error" }, { merge: true })
+            }
+          })()
         }
       })
     })
     return () => unsub()
-  }, [currentRestaurantId])
+  }, [currentRestaurantId, mapDetectedToFpmType, openFpm])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()

@@ -724,6 +724,7 @@ export function Settings() {
                 restaurantInviteCode={restaurantInviteCode}
                 generatingRestaurantInviteCode={generatingRestaurantInviteCode}
                 onGenerateRestaurantInviteCode={handleGenerateRestaurantInviteCode}
+                selectedRestaurantId={inboundEmailRestId}
               />
             }
             userTabBulk={
