@@ -352,7 +352,9 @@ export function LoginScreen(_props: LoginScreenProps) {
       }
     } catch (err) {
       const code = err && typeof err === "object" && "code" in err ? String(err.code) : ""
-      if (code !== "auth/popup-closed-by-user") {
+      if (code === "auth/popup-blocked") {
+        setError("הדפדפן חסם את חלון ההתחברות של Google. אפשר חלונות קופצים לאתר ונסה שוב.")
+      } else if (code !== "auth/popup-closed-by-user") {
         setError(getAuthError(code) || (err instanceof Error ? err.message : t("authErrors.default")))
       }
     } finally { setIsLoading(false) }
@@ -399,7 +401,11 @@ export function LoginScreen(_props: LoginScreenProps) {
       setBranch("")
     } catch (err) {
       const authCode = err && typeof err === "object" && "code" in err ? String(err.code) : ""
-      if (authCode !== "auth/popup-closed-by-user") setError(err instanceof Error ? err.message : t("authErrors.default"))
+      if (authCode === "auth/popup-blocked") {
+        setError("הדפדפן חסם את חלון ההרשמה של Google. אפשר חלונות קופצים לאתר ונסה שוב.")
+      } else if (authCode !== "auth/popup-closed-by-user") {
+        setError(err instanceof Error ? err.message : t("authErrors.default"))
+      }
     } finally { setIsLoading(false) }
   }
 
