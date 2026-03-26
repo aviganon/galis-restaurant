@@ -101,6 +101,8 @@ type Props = {
   userTabToolbar?: ReactNode
   /** טבלה מלאה + הזמנות — מתחת לרשימה/פרטים */
   userTabBulk?: ReactNode
+  /** פעולות ליד טאבי "לפי מסעדה/לפי משתמש" */
+  userTabHeaderActions?: ReactNode
   /** אחרי שמירת פרטי מסעדה — רענון רשימת מסעדות מה־context */
   onRestaurantSaved?: () => void
   /** אחרי מחיקת מסעדה (למשל עדכון בחירה בהגדרות) */
@@ -122,6 +124,7 @@ export function SystemOwnerDirectory({
   onSendInvite,
   userTabToolbar,
   userTabBulk,
+  userTabHeaderActions,
   onRestaurantSaved,
   onRestaurantDeleted,
   hideCardHeader = false,
@@ -371,12 +374,13 @@ export function SystemOwnerDirectory({
         </div>
 
         {/* ללא Radix Tabs: Content מוסתר עם display:none לא תמיד מתעדכן כש־restaurants מגיעים מהמאזין — טאבים ידניים */}
-        <div
-          role="tablist"
-          className="bg-muted text-muted-foreground grid w-full max-w-md grid-cols-2 h-10 items-stretch gap-1 rounded-lg p-1"
-          dir={layoutDir}
-        >
-          <button
+        <div className="flex flex-wrap items-center justify-between gap-2" dir={layoutDir}>
+          <div
+            role="tablist"
+            className="bg-muted text-muted-foreground grid w-full max-w-md grid-cols-2 h-10 items-stretch gap-1 rounded-lg p-1"
+            dir={layoutDir}
+          >
+            <button
             type="button"
             role="tab"
             aria-selected={panelTab === "restaurant"}
@@ -394,8 +398,8 @@ export function SystemOwnerDirectory({
           >
             <Building2 className="w-3.5 h-3.5 shrink-0" />
             לפי מסעדה
-          </button>
-          <button
+            </button>
+            <button
             type="button"
             role="tab"
             aria-selected={panelTab === "user"}
@@ -413,7 +417,9 @@ export function SystemOwnerDirectory({
           >
             <Users className="w-3.5 h-3.5 shrink-0" />
             לפי משתמש
-          </button>
+            </button>
+          </div>
+          {userTabHeaderActions}
         </div>
 
         {panelTab === "restaurant" ? (

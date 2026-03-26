@@ -170,6 +170,7 @@ export default function ProductTree() {
   const [restaurantIngredientNames, setRestaurantIngredientNames] = useState<Set<string>>(new Set())
   const [allowedChefStyles, setAllowedChefStyles] = useState<string[]>([...AI_CHEF_STYLES])
   const [allowedRecipeIdeas, setAllowedRecipeIdeas] = useState<string[]>([...AI_KNOWN_RECIPE_IDEAS])
+  const [allowedRecipesByChef, setAllowedRecipesByChef] = useState<Record<string, string[]>>({})
   const [importFile, setImportFile] = useState<File | null>(null)
   const [fpmOpen, setFpmOpen] = useState(false)
   /** סוג חילוץ ב-FilePreviewModal: p חשבונית, d מנות, s מכירות */
@@ -325,11 +326,12 @@ export default function ProductTree() {
         setSupplierPrices(newPrices)
         setIngredientStock(newStock)
         setRestaurantIngredientNames(restaurantNames)
-        const aiConf = aiCatalogDoc.data() as { chefs?: string[]; recipes?: string[] } | undefined
+        const aiConf = aiCatalogDoc.data() as { chefs?: string[]; recipes?: string[]; recipesByChef?: Record<string, string[]> } | undefined
         const chefs = Array.isArray(aiConf?.chefs) && aiConf!.chefs!.length > 0 ? aiConf!.chefs! : [...AI_CHEF_STYLES]
         const recipes = Array.isArray(aiConf?.recipes) && aiConf!.recipes!.length > 0 ? aiConf!.recipes! : [...AI_KNOWN_RECIPE_IDEAS]
         setAllowedChefStyles(chefs)
         setAllowedRecipeIdeas(recipes)
+        setAllowedRecipesByChef(aiConf?.recipesByChef && typeof aiConf.recipesByChef === "object" ? aiConf.recipesByChef : {})
       } catch (e) {
         console.error("load recipes/ingredients:", e)
         toast.error("שגיאה בטעינת עץ מוצר")
@@ -858,7 +860,10 @@ export default function ProductTree() {
           suggestDishFromIngredients(list, {
             chefStyle: aiChefStyle,
             variantHint: count > 1 ? `וריאציה מספר ${i + 1}` : undefined,
-            allowedRecipeNames: allowedRecipeIdeas,
+            allowedRecipeNames:
+              aiChefStyle !== "ללא העדפת שף" && Array.isArray(allowedRecipesByChef[aiChefStyle]) && allowedRecipesByChef[aiChefStyle].length > 0
+                ? allowedRecipesByChef[aiChefStyle]
+                : allowedRecipeIdeas,
           }),
         ),
       )
@@ -882,7 +887,7 @@ export default function ProductTree() {
     } finally {
       setAiSuggestLoading(false)
     }
-  }, [supplierPrices, ingredientStock, t, aiChefStyle, allowedRecipeIdeas])
+  }, [supplierPrices, ingredientStock, t, aiChefStyle, allowedRecipeIdeas, allowedRecipesByChef])
 
   const handleAddAiSuggestedDish = useCallback(() => {
     if (!aiSuggestedDish?.name?.trim()) return
