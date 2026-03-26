@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useRef } from "react"
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { collection, getDocs, doc, getDoc, setDoc, writeBatch, deleteDoc, addDoc, collectionGroup, query, where } from "firebase/firestore"
 import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplier-ingredients"
 import { supplierFirestoreDocId } from "@/lib/supplier-firestore-id"
@@ -99,6 +99,8 @@ export default function Suppliers() {
   const [supplierDetailLoading, setSupplierDetailLoading] = useState(false)
   const [stockChipFilter, setStockChipFilter] = useState<"all"|"ok"|"low"|"zero">("all")
   const [supplierIngFilter, setSupplierIngFilter] = useState("")
+  const [supplierIngSort, setSupplierIngSort] = useState<"name" | "price_desc" | "stock_asc">("name")
+  const [selectedSupplierIngNames, setSelectedSupplierIngNames] = useState<Set<string>>(new Set())
   const [reorderPanelOpen, setReorderPanelOpen] = useState(false)
   const [globalReorderOpen, setGlobalReorderOpen] = useState(false)
   const [showPurchaseOrdersPanel, setShowPurchaseOrdersPanel] = useState(false)
@@ -472,6 +474,41 @@ export default function Suppliers() {
     }
   }
 
+  const filteredSupplierDetailItems = useMemo(() => {
+    const rows = (supplierDetailItems || [])
+      .filter((i) =>
+        stockChipFilter === "all" ||
+        (stockChipFilter === "ok" && i.stock > 0 && (i.minStock === 0 || i.stock >= i.minStock)) ||
+        (stockChipFilter === "low" && i.stock > 0 && i.minStock > 0 && i.stock < i.minStock) ||
+        (stockChipFilter === "zero" && i.stock === 0),
+      )
+      .filter((i) => !supplierIngFilter || i.name.includes(supplierIngFilter))
+    if (supplierIngSort === "price_desc") return [...rows].sort((a, b) => b.price - a.price)
+    if (supplierIngSort === "stock_asc") return [...rows].sort((a, b) => a.stock - b.stock)
+    return [...rows].sort((a, b) => a.name.localeCompare(b.name, "he"))
+  }, [supplierDetailItems, stockChipFilter, supplierIngFilter, supplierIngSort])
+
+  const deleteSelectedSupplierIngredients = useCallback(async () => {
+    if (!currentRestaurantId || selectedSupplierIngNames.size === 0) return
+    if (!window.confirm(`למחוק ${selectedSupplierIngNames.size} רכיבים מהמסעדה?`)) return
+    setDeletingIngredientName("__bulk__")
+    try {
+      const batch = writeBatch(db)
+      Array.from(selectedSupplierIngNames).forEach((name) => {
+        batch.delete(doc(db, "restaurants", currentRestaurantId, "ingredients", name))
+      })
+      await batch.commit()
+      setSupplierDetailItems((prev) => prev.filter((i) => !selectedSupplierIngNames.has(i.name)))
+      setSelectedSupplierIngNames(new Set())
+      toast.success("הרכיבים שנבחרו נמחקו")
+      loadSuppliers()
+    } catch (e) {
+      toast.error((e as Error)?.message || t("pages.ingredients.deleteError"))
+    } finally {
+      setDeletingIngredientName(null)
+    }
+  }, [currentRestaurantId, selectedSupplierIngNames, loadSuppliers, t])
+
   const openEditIngredient = (item: { name: string; price: number; unit: string; waste: number; stock: number; minStock: number; sku: string }) => {
     setEditingIngredient(item)
     setEditIngPrice(String(item.price))
@@ -597,6 +634,9 @@ export default function Suppliers() {
       setSupplierDetailItems([])
       setSupplierDetailName("")
     }
+    setSelectedSupplierIngNames(new Set())
+    setSupplierIngFilter("")
+    setSupplierIngSort("name")
   }, [selectedSupplierDetail, loadSupplierDetail])
 
   const openIngredientPriceCompare = useCallback(async (ingredientName: string) => {
@@ -1072,18 +1112,33 @@ export default function Suppliers() {
                       );
                     })()}
                     <div className="flex items-center justify-between mb-2 gap-2">
-                      <p className="text-sm font-medium">רכיבים ({(supplierDetailItems || []).filter(i=>
-                        stockChipFilter==="all"||
-                        (stockChipFilter==="ok"&&i.stock>0&&(i.minStock===0||i.stock>=i.minStock))||
-                        (stockChipFilter==="low"&&i.stock>0&&i.minStock>0&&i.stock<i.minStock)||
-                        (stockChipFilter==="zero"&&i.stock===0)
-                      ).filter(i=>!supplierIngFilter||i.name.includes(supplierIngFilter)).length})</p>
+                      <p className="text-sm font-medium">רכיבים ({filteredSupplierDetailItems.length})</p>
                       {(supplierDetailItems||[]).length>5&&(
-                        <div className="relative">
-                          <Search className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground"/>
-                          <input value={supplierIngFilter} onChange={e=>setSupplierIngFilter(e.target.value)}
-                            placeholder="חיפוש..." dir="rtl"
-                            className="h-8 pl-3 pr-8 rounded-md border text-sm bg-background w-40 focus:outline-none focus:ring-1 focus:ring-primary"/>
+                        <div className="flex items-center gap-2">
+                          <div className="relative">
+                            <Search className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground"/>
+                            <input value={supplierIngFilter} onChange={e=>setSupplierIngFilter(e.target.value)}
+                              placeholder="חיפוש..." dir="rtl"
+                              className="h-8 pl-3 pr-8 rounded-md border text-sm bg-background w-40 focus:outline-none focus:ring-1 focus:ring-primary"/>
+                          </div>
+                          <Select value={supplierIngSort} onValueChange={(v) => setSupplierIngSort(v as "name" | "price_desc" | "stock_asc")}>
+                            <SelectTrigger className="h-8 w-[130px]"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="name">מיון: שם</SelectItem>
+                              <SelectItem value="price_desc">מיון: מחיר</SelectItem>
+                              <SelectItem value="stock_asc">מיון: מלאי</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            className="h-8"
+                            disabled={selectedSupplierIngNames.size === 0 || deletingIngredientName === "__bulk__"}
+                            onClick={() => void deleteSelectedSupplierIngredients()}
+                          >
+                            {deletingIngredientName === "__bulk__" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "מחק נבחרים"}
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -1096,6 +1151,16 @@ export default function Suppliers() {
                           <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
                             <TableRow>
                               <TableHead className="text-right">רכיב</TableHead>
+                              <TableHead className="text-right w-8">
+                                <input
+                                  type="checkbox"
+                                  checked={filteredSupplierDetailItems.length > 0 && filteredSupplierDetailItems.every((i) => selectedSupplierIngNames.has(i.name))}
+                                  onChange={(e) => {
+                                    if (e.target.checked) setSelectedSupplierIngNames(new Set(filteredSupplierDetailItems.map((i) => i.name)))
+                                    else setSelectedSupplierIngNames(new Set())
+                                  }}
+                                />
+                              </TableHead>
                               <TableHead className="text-right">מחיר</TableHead>
                               <TableHead className="text-right">יחידה</TableHead>
                               <TableHead className="text-right">פחת %</TableHead>
@@ -1107,14 +1172,23 @@ export default function Suppliers() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {(supplierDetailItems || []).filter(i=>
-                              stockChipFilter==="all"||
-                              (stockChipFilter==="ok"&&i.stock>0&&(i.minStock===0||i.stock>=i.minStock))||
-                              (stockChipFilter==="low"&&i.stock>0&&i.minStock>0&&i.stock<i.minStock)||
-                              (stockChipFilter==="zero"&&i.stock===0)
-                            ).filter(i=>!supplierIngFilter||i.name.includes(supplierIngFilter)).map((i) => (
+                            {filteredSupplierDetailItems.map((i) => (
                               <TableRow key={i.name}>
                                 <TableCell className="font-medium text-right">{i.name}</TableCell>
+                                <TableCell className="text-right">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedSupplierIngNames.has(i.name)}
+                                    onChange={(e) => {
+                                      setSelectedSupplierIngNames((prev) => {
+                                        const next = new Set(prev)
+                                        if (e.target.checked) next.add(i.name)
+                                        else next.delete(i.name)
+                                        return next
+                                      })
+                                    }}
+                                  />
+                                </TableCell>
                                 <TableCell className="text-right">₪{i.price.toFixed(2)}</TableCell>
                                 <TableCell className="text-right">{i.unit}</TableCell>
                                 <TableCell className="text-right">{i.waste}%</TableCell>

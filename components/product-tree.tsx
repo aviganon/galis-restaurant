@@ -30,7 +30,6 @@ import { db, storage } from "@/lib/firebase"
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage"
 import { useApp } from "@/contexts/app-context"
 import { FilePreviewModal } from "@/components/file-preview-modal"
-import { RestaurantInboundUploadsDialog } from "@/components/restaurant-inbound-uploads-dialog"
 import { Dashboard } from "@/components/dashboard"
 import { Reports } from "@/components/reports"
 import {
@@ -98,6 +97,16 @@ interface SupplierPrice {
   prev: number
   unit: string
   supplier: string
+}
+
+interface ImportHistoryRow {
+  id: string
+  source: "manual" | "email"
+  fileName: string
+  uploadedAt: string
+  supplier?: string
+  status?: string
+  documentType?: string
 }
 
 const VAT_RATE = 1.17
@@ -172,12 +181,22 @@ export default function ProductTree() {
   const [fpmExtractType, setFpmExtractType] = useState<ExtractType>("d")
   const [importSourceKind, setImportSourceKind] = useState<"auto" | "invoice" | "sales" | "recipes" | "dishImage">("auto")
   const [detectingImport, setDetectingImport] = useState(false)
+  const [importHistory, setImportHistory] = useState<ImportHistoryRow[]>([])
+  const [importHistoryLoading, setImportHistoryLoading] = useState(false)
+  const [importHistoryFilter, setImportHistoryFilter] = useState<"all" | "manual" | "email">("all")
+  const [deletingImportId, setDeletingImportId] = useState<string | null>(null)
   const importFileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const [isCostPanelExpanded, setIsCostPanelExpanded] = useState(true)
   /** סרגל לוח בקרה / עלויות תפריט / AI — ניתן להסתיר; העדפה נשמרת במכשיר */
   const [menuToolsOpen, setMenuToolsOpen] = useState(true)
   const [editingDish, setEditingDish] = useState<string | null>(null)
+  const [prepOpen, setPrepOpen] = useState(false)
+  const [prepEditMode, setPrepEditMode] = useState(false)
+  const [prepDraft, setPrepDraft] = useState("")
+  const [dishIngredientSearch, setDishIngredientSearch] = useState("")
+  const [dishIngredientSort, setDishIngredientSort] = useState<"name" | "qty_desc" | "cost_desc">("name")
+  const [selectedDishIngredientKeys, setSelectedDishIngredientKeys] = useState<Set<string>>(new Set())
   const [menuVisibilityOpen, setMenuVisibilityOpen] = useState(false)
   const [menuVisibilityExpanded, setMenuVisibilityExpanded] = useState(false)
   const [menuSwapPick, setMenuSwapPick] = useState<{ id: string; zone: "menu" | "pool" } | null>(null)
@@ -579,6 +598,20 @@ export default function ProductTree() {
   const currentPriceBeforeVat = currentDish ? currentDish.sellingPrice / VAT_RATE : 0
   const currentProfit = currentPriceBeforeVat - currentCost
   const currentMargin = currentPriceBeforeVat > 0 ? (currentProfit / currentPriceBeforeVat * 100) : 0
+  const dishIngredientRows = useMemo(() => {
+    if (!currentDish) return [] as Array<{ ing: Ingredient; idx: number; key: string; cost: number }>
+    const q = dishIngredientSearch.trim().toLowerCase()
+    const rows = (currentDish.ingredients || []).map((ing, idx) => ({
+      ing,
+      idx,
+      key: `${idx}:${ing.name}`,
+      cost: calcIngredientCost(ing.name, ing.qty, ing.waste, ing.unit, ing.isSubRecipe),
+    }))
+    const filtered = q ? rows.filter((r) => r.ing.name.toLowerCase().includes(q)) : rows
+    if (dishIngredientSort === "qty_desc") return filtered.sort((a, b) => (b.ing.qty || 0) - (a.ing.qty || 0))
+    if (dishIngredientSort === "cost_desc") return filtered.sort((a, b) => b.cost - a.cost)
+    return filtered.sort((a, b) => a.ing.name.localeCompare(b.ing.name, "he"))
+  }, [currentDish, dishIngredientSearch, dishIngredientSort])
 
   // Update selling price
   const updateSellingPrice = (price: number) => {
@@ -589,6 +622,49 @@ export default function ProductTree() {
       return next
     })
   }
+
+  useEffect(() => {
+    const notes = currentDish?.preparationNotes || ""
+    setPrepDraft(notes)
+    setPrepEditMode(false)
+    setPrepOpen(false)
+    setSelectedDishIngredientKeys(new Set())
+    setDishIngredientSearch("")
+    setDishIngredientSort("name")
+  }, [selectedDish, currentDish?.preparationNotes])
+
+  const savePreparationNotes = useCallback(() => {
+    if (!selectedDish || !currentDish) return
+    const nextNotes = prepDraft.trim()
+    const nextDish: Dish = {
+      ...currentDish,
+      preparationNotes: nextNotes || undefined,
+    }
+    setDishes((prev) => ({ ...prev, [selectedDish]: nextDish }))
+    void saveDishToFirestore(selectedDish, nextDish)
+    setPrepEditMode(false)
+    if (nextNotes) setPrepOpen(true)
+    toast.success(nextNotes ? "הוראות ההכנה נשמרו" : "הוראות ההכנה הוסרו")
+  }, [selectedDish, currentDish, prepDraft, saveDishToFirestore])
+
+  const removeSelectedDishIngredients = useCallback(() => {
+    if (!selectedDish || !currentDish || selectedDishIngredientKeys.size === 0) return
+    const idxSet = new Set(
+      Array.from(selectedDishIngredientKeys)
+        .map((k) => Number(k.split(":")[0]))
+        .filter((n) => Number.isFinite(n)),
+    )
+    if (idxSet.size === 0) return
+    setDishes((prev) => {
+      const dish = { ...prev[selectedDish] }
+      const ingredients = (dish.ingredients || []).filter((_, i) => !idxSet.has(i))
+      const next = { ...prev, [selectedDish]: { ...dish, ingredients } }
+      debouncedSaveDish(selectedDish, next[selectedDish])
+      return next
+    })
+    setSelectedDishIngredientKeys(new Set())
+    toast.success("הרכיבים שנבחרו הוסרו מהמנה")
+  }, [selectedDish, currentDish, selectedDishIngredientKeys, debouncedSaveDish])
 
   // Update ingredient
   const updateIngredient = (index: number, field: keyof Ingredient, value: number | string) => {
@@ -782,6 +858,74 @@ export default function ProductTree() {
     },
     [processImportFile]
   )
+
+  const loadImportHistory = useCallback(async () => {
+    if (!currentRestaurantId) return
+    setImportHistoryLoading(true)
+    try {
+      const [manualSnap, inboundSnap] = await Promise.all([
+        getDocs(collection(db, "restaurants", currentRestaurantId, "uploads")),
+        getDocs(collection(db, "restaurants", currentRestaurantId, "inboundJobs")),
+      ])
+      const manualRows: ImportHistoryRow[] = manualSnap.docs.map((d) => {
+        const v = d.data()
+        return {
+          id: `manual:${d.id}`,
+          source: "manual",
+          fileName: String(v.fileName || d.id),
+          uploadedAt: String(v.uploadedAt || v.createdAt || ""),
+          supplier: typeof v.supplier === "string" ? v.supplier : "",
+          status: "uploaded",
+        }
+      })
+      const mailRows: ImportHistoryRow[] = inboundSnap.docs.map((d) => {
+        const v = d.data()
+        const paths = Array.isArray(v.attachmentPaths) ? (v.attachmentPaths as string[]) : []
+        const first = paths[0] || ""
+        return {
+          id: `email:${d.id}`,
+          source: "email",
+          fileName: first.split("/").pop() || String(v.subject || d.id),
+          uploadedAt: String(v.receivedAt || v.createdAt || ""),
+          supplier: typeof v.fromEmail === "string" ? v.fromEmail : "",
+          status: typeof v.status === "string" ? v.status : "pending",
+          documentType: typeof v.documentType === "string" ? v.documentType : undefined,
+        }
+      })
+      const all = [...manualRows, ...mailRows].sort((a, b) => String(b.uploadedAt || "").localeCompare(String(a.uploadedAt || "")))
+      setImportHistory(all)
+    } catch (e) {
+      console.error("load import history failed:", e)
+      toast.error("שגיאה בטעינת היסטוריית ייבוא")
+    } finally {
+      setImportHistoryLoading(false)
+    }
+  }, [currentRestaurantId])
+
+  const deleteImportHistoryItem = useCallback(async (row: ImportHistoryRow) => {
+    if (!currentRestaurantId) return
+    if (!window.confirm(`למחוק את הרשומה "${row.fileName}"?`)) return
+    setDeletingImportId(row.id)
+    try {
+      if (row.source === "manual") {
+        await deleteDoc(doc(db, "restaurants", currentRestaurantId, "uploads", row.id.replace("manual:", "")))
+      } else {
+        await deleteDoc(doc(db, "restaurants", currentRestaurantId, "inboundJobs", row.id.replace("email:", "")))
+      }
+      setImportHistory((prev) => prev.filter((x) => x.id !== row.id))
+      toast.success("הרשומה נמחקה")
+    } catch (e) {
+      console.error("delete import history failed:", e)
+      toast.error("מחיקה נכשלה")
+    } finally {
+      setDeletingImportId(null)
+    }
+  }, [currentRestaurantId])
+
+  useEffect(() => {
+    if (!isImportModalOpen) return
+    void loadImportHistory()
+  }, [isImportModalOpen, loadImportHistory])
 
   const handleConfirmSupplierImport = useCallback(
     async (items: ExtractedSupplierItem[], supName: string, saveToGlobal?: boolean) => {
@@ -1572,13 +1716,54 @@ export default function ProductTree() {
                         בחר קובץ
                       </Button>
                     </div>
+
+                    <div className="pt-1 border-t space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-medium text-muted-foreground">היסטוריית ייבוא (מייל + קבצים)</p>
+                        <div className="flex items-center gap-1">
+                          <Button type="button" size="sm" variant={importHistoryFilter === "all" ? "default" : "outline"} className="h-7 text-xs px-2" onClick={() => setImportHistoryFilter("all")}>הכל</Button>
+                          <Button type="button" size="sm" variant={importHistoryFilter === "manual" ? "default" : "outline"} className="h-7 text-xs px-2" onClick={() => setImportHistoryFilter("manual")}>קבצים</Button>
+                          <Button type="button" size="sm" variant={importHistoryFilter === "email" ? "default" : "outline"} className="h-7 text-xs px-2" onClick={() => setImportHistoryFilter("email")}>מייל</Button>
+                          <Button type="button" size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => void loadImportHistory()} disabled={importHistoryLoading}>
+                            {importHistoryLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="max-h-56 overflow-y-auto space-y-1">
+                        {importHistory
+                          .filter((r) => importHistoryFilter === "all" || r.source === importHistoryFilter)
+                          .map((r) => (
+                            <div key={r.id} className="rounded-md border p-2 flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="text-xs font-medium truncate">{r.fileName}</div>
+                                <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                                  <Badge variant="outline" className="text-[10px] h-5">{r.source === "email" ? "מייל" : "קובץ"}</Badge>
+                                  {r.status ? <span>סטטוס: {r.status}</span> : null}
+                                  {r.documentType ? <span>סוג: {r.documentType}</span> : null}
+                                  {r.supplier ? <span>שולח/ספק: {r.supplier}</span> : null}
+                                  {r.uploadedAt ? <span>{r.uploadedAt.split("T")[0]}</span> : null}
+                                </div>
+                              </div>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="destructive"
+                                className="h-7 px-2"
+                                disabled={deletingImportId === r.id}
+                                onClick={() => void deleteImportHistoryItem(r)}
+                              >
+                                {deletingImportId === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                              </Button>
+                            </div>
+                          ))}
+                        {!importHistoryLoading && importHistory.filter((r) => importHistoryFilter === "all" || r.source === importHistoryFilter).length === 0 ? (
+                          <p className="text-xs text-muted-foreground text-center py-4">אין רשומות להצגה</p>
+                        ) : null}
+                      </div>
+                    </div>
                   </div>
                 </DialogContent>
               </Dialog>
-              <RestaurantInboundUploadsDialog
-                restaurantId={currentRestaurantId}
-                triggerLabel="העלאות ממייל"
-              />
             </div>
           </div>
 
@@ -2386,24 +2571,128 @@ export default function ProductTree() {
             
             {currentDish ? (
               <>
-                {(currentDish.recipeDescription || currentDish.preparationNotes) ? (
-                  <div className="mb-3 space-y-2 rounded-lg border bg-muted/30 p-3 text-sm">
-                    {currentDish.recipeDescription ? (
-                      <p className="text-muted-foreground leading-relaxed">{currentDish.recipeDescription}</p>
-                    ) : null}
-                    {currentDish.preparationNotes ? (
-                      <div>
-                        <p className="font-semibold mb-1">{t("pages.productTree.preparationNotesLabel")}</p>
-                        <div className="whitespace-pre-wrap leading-relaxed text-muted-foreground">{currentDish.preparationNotes}</div>
+                <div className="mb-3 space-y-2 rounded-lg border bg-muted/30 p-3 text-sm">
+                  {currentDish.recipeDescription ? (
+                    <p className="text-muted-foreground leading-relaxed">{currentDish.recipeDescription}</p>
+                  ) : null}
+                  <div className="rounded-md border bg-background/80 p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPrepOpen((v) => !v)}
+                        className="inline-flex items-center gap-1 text-sm font-semibold hover:text-primary"
+                      >
+                        {prepOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        {t("pages.productTree.preparationNotesLabel")}
+                      </button>
+                      {!prepEditMode ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPrepDraft(currentDish.preparationNotes || "")
+                            setPrepEditMode(true)
+                            setPrepOpen(true)
+                          }}
+                          className="text-xs px-2 py-1 rounded border hover:bg-muted"
+                        >
+                          {currentDish.preparationNotes ? "ערוך הוראות" : "הוסף הוראות"}
+                        </button>
+                      ) : null}
+                    </div>
+
+                    {prepOpen ? (
+                      <div className="mt-2">
+                        {prepEditMode ? (
+                          <div className="space-y-2">
+                            <textarea
+                              value={prepDraft}
+                              onChange={(e) => setPrepDraft(e.target.value)}
+                              rows={6}
+                              className="w-full rounded-md border bg-background px-3 py-2 text-sm leading-relaxed"
+                              placeholder="כתוב כאן הוראות הכנה למנה..."
+                            />
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={savePreparationNotes}
+                                className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs hover:opacity-90"
+                              >
+                                שמור הוראות
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPrepDraft(currentDish.preparationNotes || "")
+                                  setPrepEditMode(false)
+                                }}
+                                className="px-3 py-1.5 rounded-md border text-xs hover:bg-muted"
+                              >
+                                ביטול
+                              </button>
+                            </div>
+                          </div>
+                        ) : currentDish.preparationNotes ? (
+                          <div className="whitespace-pre-wrap leading-relaxed text-muted-foreground">
+                            {currentDish.preparationNotes}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">אין הוראות הכנה למנה זו.</p>
+                        )}
                       </div>
                     ) : null}
                   </div>
-                ) : null}
+                </div>
                 {/* Ingredients Table */}
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={dishIngredientSearch}
+                      onChange={(e) => setDishIngredientSearch(e.target.value)}
+                      placeholder="חיפוש רכיב במנה..."
+                      className="h-8 w-48"
+                    />
+                    <Select value={dishIngredientSort} onValueChange={(v) => setDishIngredientSort(v as "name" | "qty_desc" | "cost_desc")}>
+                      <SelectTrigger className="h-8 w-[150px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="name">מיון: שם</SelectItem>
+                        <SelectItem value="qty_desc">מיון: כמות</SelectItem>
+                        <SelectItem value="cost_desc">מיון: עלות</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">נבחרו: {selectedDishIngredientKeys.size}</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      className="h-8"
+                      disabled={selectedDishIngredientKeys.size === 0}
+                      onClick={removeSelectedDishIngredients}
+                    >
+                      מחק נבחרים
+                    </Button>
+                  </div>
+                </div>
                 <div className="overflow-auto -mx-2 px-2 max-h-[220px] min-h-[60px]">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border">
+                        <th className="text-right py-2 px-2 font-semibold text-muted-foreground w-8">
+                          <input
+                            type="checkbox"
+                            checked={dishIngredientRows.length > 0 && dishIngredientRows.every((r) => selectedDishIngredientKeys.has(r.key))}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedDishIngredientKeys(new Set(dishIngredientRows.map((r) => r.key)))
+                              } else {
+                                setSelectedDishIngredientKeys(new Set())
+                              }
+                            }}
+                          />
+                        </th>
                         <th className="text-right py-2 px-2 font-semibold text-muted-foreground">{t("pages.productTree.ingredientLabel")}</th>
                         <th className="text-right py-2 px-2 font-semibold text-muted-foreground hidden sm:table-cell">{t("pages.productTree.supplierLabel")}</th>
                         {canSeeCosts && <th className="text-right py-2 px-2 font-semibold text-muted-foreground">{t("pages.productTree.priceLabelShort")}</th>}
@@ -2416,7 +2705,7 @@ export default function ProductTree() {
                     </thead>
                     <tbody>
                       <AnimatePresence>
-                        {currentDish.ingredients.map((ing, idx) => {
+                        {dishIngredientRows.map(({ ing, idx, key }) => {
                           const sp = supplierPrices[ing.name]
                           const isCompound = dishes[ing.name]?.isCompound
                           const cost = calcIngredientCost(ing.name, ing.qty, ing.waste, ing.unit, ing.isSubRecipe)
@@ -2427,7 +2716,7 @@ export default function ProductTree() {
                           
                           return (
                             <motion.tr 
-                              key={`${ing.name}-${idx}`}
+                              key={key}
                               initial={{ opacity: 0, x: -10 }}
                               animate={{ opacity: 1, x: 0 }}
                               exit={{ opacity: 0, x: 10 }}
@@ -2436,6 +2725,20 @@ export default function ProductTree() {
                                 priceChanged && "bg-amber-500/5"
                               )}
                             >
+                              <td className="py-2 px-2">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedDishIngredientKeys.has(key)}
+                                  onChange={(e) => {
+                                    setSelectedDishIngredientKeys((prev) => {
+                                      const next = new Set(prev)
+                                      if (e.target.checked) next.add(key)
+                                      else next.delete(key)
+                                      return next
+                                    })
+                                  }}
+                                />
+                              </td>
                               <td className="py-2 px-2 font-medium">
                                 {ing.isSubRecipe && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded ml-1">{t("pages.productTree.subRecipe")}</span>}
                                 {ing.name}

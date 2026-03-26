@@ -956,9 +956,9 @@ export function Settings() {
           <Dialog open={aiCatalogDialogOpen} onOpenChange={setAiCatalogDialogOpen}>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" dir={systemOwnerPanelDir}>
               <DialogHeader>
-                <DialogTitle>שפים ומתכוני AI למסעדות</DialogTitle>
+                <DialogTitle>שפים ומתכוני AI למסעדה</DialogTitle>
                 <DialogDescription>
-                  המערכת מכירה כרגע {AI_KNOWN_RECIPE_IDEAS.length} רעיונות מתכון בסיסיים ו-{AI_CHEF_STYLES.length} סגנונות שף.
+                  הגדרות למסעדה הנוכחית בלבד. המערכת מכירה כרגע {AI_KNOWN_RECIPE_IDEAS.length} רעיונות מתכון בסיסיים ו-{AI_CHEF_STYLES.length} סגנונות שף.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-3">

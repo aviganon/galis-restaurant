@@ -563,14 +563,19 @@ export function SystemOwnerDirectory({
                                   setInboundDialogRestId(r.id)
                                 }}
                                 className={cn(
-                                  "w-full text-start rounded-md px-1.5 py-1 -mx-1.5 text-[11px] transition-colors",
-                                  "hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                  addr ? "font-mono text-muted-foreground" : "text-primary font-medium",
+                                  "w-full text-start rounded-md px-2 py-1.5 -mx-1.5 text-[11px] transition-colors border",
+                                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                  addr
+                                    ? "font-mono text-sky-800 bg-sky-50 border-sky-200 hover:bg-sky-100 dark:text-sky-200 dark:bg-sky-950/35 dark:border-sky-800"
+                                    : "text-primary font-medium bg-primary/10 border-primary/30 hover:bg-primary/15",
                                 )}
                                 dir="ltr"
                                 title={addr || "הוסף כתובת ייבוא"}
                               >
-                                {addr || "— אין כתובת מייל —"}
+                                <span className="inline-flex items-center gap-1.5">
+                                  <Mail className="w-3.5 h-3.5 shrink-0" />
+                                  <span>{addr || "— אין כתובת מייל —"}</span>
+                                </span>
                               </button>
                           </div>
                         </div>

@@ -464,6 +464,15 @@ export function AdminPanel() {
   const INVOICE_ACCEPT = ".xlsx,.xls,.csv,.pdf,.rtf,image/*"
   const [selectedSupplierDetail, setSelectedSupplierDetail] = useState<string | null>(null)
   const [activeSupplierChip, setActiveSupplierChip] = useState<"restaurants"|"ingredients"|"cost"|null>(null)
+  const [supplierChipIngFilter, setSupplierChipIngFilter] = useState("")
+  const [supplierChipIngSort, setSupplierChipIngSort] = useState<"name" | "price_desc" | "stock_asc">("name")
+  const [selectedSupplierChipIngIds, setSelectedSupplierChipIngIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    setSupplierChipIngFilter("")
+    setSupplierChipIngSort("name")
+    setSelectedSupplierChipIngIds(new Set())
+  }, [selectedSupplierDetail, activeSupplierChip])
   const [ingFilter, setIngFilter] = useState("")
   const [ingSortBy, setIngSortBy] = useState<"name"|"price"|"unit">("name")
   const [ingSortAsc, setIngSortAsc] = useState(true)
@@ -3190,19 +3199,80 @@ export function AdminPanel() {
                                   ) : activeSupplierChip==="ingredients" ? (
                                     <div>
                                       <p className="text-sm font-semibold mb-3 flex items-center gap-1.5"><ShoppingCart className="w-4 h-4 text-violet-500"/>רכיבים ({ings.length})</p>
-                                      {ings.length===0?<p className="text-sm text-muted-foreground">אין רכיבים</p>:(
+                                      {(() => {
+                                        const filtered = [...ings]
+                                          .filter((ing) => !supplierChipIngFilter.trim() || ing.name.toLowerCase().includes(supplierChipIngFilter.trim().toLowerCase()))
+                                        if (supplierChipIngSort === "price_desc") filtered.sort((a, b) => (b.price || 0) - (a.price || 0))
+                                        else if (supplierChipIngSort === "stock_asc") filtered.sort((a, b) => (a.stock || 0) - (b.stock || 0))
+                                        else filtered.sort((a, b) => (a.name || "").localeCompare(b.name || "", "he"))
+                                        return filtered.length===0 ? <p className="text-sm text-muted-foreground">אין רכיבים</p> : (
+                                        <>
+                                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                          <div className="flex items-center gap-2">
+                                            <Input
+                                              value={supplierChipIngFilter}
+                                              onChange={(e) => setSupplierChipIngFilter(e.target.value)}
+                                              placeholder="חיפוש רכיב..."
+                                              className="h-8 w-44"
+                                            />
+                                            <Select value={supplierChipIngSort} onValueChange={(v) => setSupplierChipIngSort(v as "name" | "price_desc" | "stock_asc")}>
+                                              <SelectTrigger className="h-8 w-[130px]"><SelectValue /></SelectTrigger>
+                                              <SelectContent>
+                                                <SelectItem value="name">מיון: שם</SelectItem>
+                                                <SelectItem value="price_desc">מיון: מחיר</SelectItem>
+                                                <SelectItem value="stock_asc">מיון: מלאי</SelectItem>
+                                              </SelectContent>
+                                            </Select>
+                                          </div>
+                                          <Button
+                                            size="sm"
+                                            variant="destructive"
+                                            className="h-8"
+                                            disabled={selectedSupplierChipIngIds.size === 0}
+                                            onClick={async () => {
+                                              const toDelete = filtered.filter((x) => selectedSupplierChipIngIds.has(x.id))
+                                              if (toDelete.length === 0) return
+                                              if (!window.confirm(`למחוק ${toDelete.length} רכיבים?`)) return
+                                              for (const ing of toDelete) {
+                                                await handleDeleteIngredientFromSupplier(ing, s.name, s.restaurantIds)
+                                              }
+                                              setSelectedSupplierChipIngIds(new Set())
+                                            }}
+                                          >
+                                            מחק נבחרים
+                                          </Button>
+                                        </div>
                                         <div className="overflow-x-auto"><table className="w-full text-sm">
-                                          <thead><tr className="border-b text-xs text-muted-foreground"><th className="text-right pb-1.5">רכיב</th><th className="text-center pb-1.5 w-20">מחיר</th><th className="text-center pb-1.5 w-20">יחידה</th><th className="text-center pb-1.5 w-24">מקט</th></tr></thead>
-                                          <tbody>{ings.map((ing,i)=>(
+                                          <thead><tr className="border-b text-xs text-muted-foreground"><th className="text-right pb-1.5 w-8"><input type="checkbox" checked={filtered.length>0 && filtered.every((x)=>selectedSupplierChipIngIds.has(x.id))} onChange={(e)=>{if(e.target.checked)setSelectedSupplierChipIngIds(new Set(filtered.map((x)=>x.id)));else setSelectedSupplierChipIngIds(new Set())}}/></th><th className="text-right pb-1.5">רכיב</th><th className="text-center pb-1.5 w-20">מחיר</th><th className="text-center pb-1.5 w-20">יחידה</th><th className="text-center pb-1.5 w-24">מקט</th><th className="text-center pb-1.5 w-28">פעולות</th></tr></thead>
+                                          <tbody>{filtered.map((ing,i)=>(
                                             <tr key={i} className="border-b last:border-0 hover:bg-muted/30">
+                                              <td className="py-1.5 text-center"><input type="checkbox" checked={selectedSupplierChipIngIds.has(ing.id)} onChange={(e)=>setSelectedSupplierChipIngIds((prev)=>{const n=new Set(prev);if(e.target.checked)n.add(ing.id);else n.delete(ing.id);return n})}/></td>
                                               <td className="py-1.5 font-medium">{ing.name}</td>
                                               <td className="py-1.5 text-center">₪{typeof ing.price==="number"?ing.price.toFixed(2):"—"}</td>
                                               <td className="py-1.5 text-center text-muted-foreground">{(ing as any).unit||"—"}</td>
                                               <td className="py-1.5 text-center text-muted-foreground text-xs">{(ing as any).sku||"—"}</td>
+                                              <td className="py-1.5 text-center">
+                                                <div className="flex items-center justify-center gap-1">
+                                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditAdminIngredient(ing)} title="ערוך">
+                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                  </Button>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                    onClick={() => handleDeleteIngredientFromSupplier(ing, s.name, s.restaurantIds)}
+                                                    title="מחק"
+                                                    disabled={deletingIngredientId === `${ing.source}-${ing.id}`}
+                                                  >
+                                                    {deletingIngredientId === `${ing.source}-${ing.id}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                                  </Button>
+                                                </div>
+                                              </td>
                                             </tr>
                                           ))}</tbody>
                                         </table></div>
-                                      )}
+                                        </>
+                                      )})()}
                                     </div>
                                   ) : activeSupplierChip==="cost" ? (
                                     <div>
