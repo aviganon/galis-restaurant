@@ -234,6 +234,8 @@ export function LoginScreen(_props: LoginScreenProps) {
   const [isMuted, setIsMuted] = useState(true)
   const [showVideo, setShowVideo] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
+  const loginErrorVisible = !!error && activeTab === "login"
+  const registerErrorVisible = !!error && activeTab === "register"
   const videoRef = useRef<HTMLVideoElement>(null)
   const heroRef = useRef<HTMLDivElement>(null)
 
@@ -975,8 +977,8 @@ export function LoginScreen(_props: LoginScreenProps) {
 
                   <TabsContent value="login" className="space-y-4 mt-0">
                     <form onSubmit={handleLogin} className="space-y-4">
-                      {error && (
-                        <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+                      {loginErrorVisible && (
+                        <div id="login-form-error" role="alert" aria-live="assertive" className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
                           {error}
                         </div>
                       )}
@@ -994,6 +996,8 @@ export function LoginScreen(_props: LoginScreenProps) {
                             className="pr-10 h-12 rounded-xl"
                             dir="ltr"
                             autoComplete="email"
+                            aria-invalid={loginErrorVisible}
+                            aria-describedby={loginErrorVisible ? "login-form-error" : undefined}
                           />
                         </div>
                       </div>
@@ -1011,6 +1015,8 @@ export function LoginScreen(_props: LoginScreenProps) {
                             onChange={(e) => setPassword(e.target.value)}
                             className="pr-10 h-12 rounded-xl"
                             autoComplete="current-password"
+                            aria-invalid={loginErrorVisible}
+                            aria-describedby={loginErrorVisible ? "login-form-error" : undefined}
                           />
                         </div>
                       </div>
@@ -1052,8 +1058,8 @@ export function LoginScreen(_props: LoginScreenProps) {
 
                   <TabsContent value="register" className="space-y-4 mt-0">
                     <form onSubmit={handleRegister} className="space-y-4">
-                      {error && activeTab === "register" && (
-                        <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+                      {registerErrorVisible && (
+                        <div id="register-form-error" role="alert" aria-live="assertive" className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
                           {error}
                         </div>
                       )}
@@ -1073,6 +1079,8 @@ export function LoginScreen(_props: LoginScreenProps) {
                           className="h-12 rounded-xl text-center tracking-widest font-mono"
                           dir="ltr"
                           autoComplete="one-time-code"
+                          aria-invalid={registerErrorVisible}
+                          aria-describedby={registerErrorVisible ? "register-form-error" : undefined}
                         />
                         <p className="text-xs text-muted-foreground">{t("login.inviteCodeHint")}</p>
                       </div>
@@ -1088,6 +1096,8 @@ export function LoginScreen(_props: LoginScreenProps) {
                             placeholder={t("login.restaurantNamePlaceholder")}
                             className="pr-10 h-12 rounded-xl"
                             autoComplete="organization"
+                            aria-invalid={registerErrorVisible}
+                            aria-describedby={registerErrorVisible ? "register-form-error" : undefined}
                           />
                         </div>
                       </div>
@@ -1103,6 +1113,8 @@ export function LoginScreen(_props: LoginScreenProps) {
                             placeholder={t("login.branchPlaceholder")}
                             className="pr-10 h-12 rounded-xl"
                             autoComplete="street-address"
+                            aria-invalid={registerErrorVisible}
+                            aria-describedby={registerErrorVisible ? "register-form-error" : undefined}
                           />
                         </div>
                       </div>
@@ -1146,6 +1158,8 @@ export function LoginScreen(_props: LoginScreenProps) {
                             className="pr-10 h-12 rounded-xl"
                             dir="ltr"
                             autoComplete="email"
+                            aria-invalid={registerErrorVisible}
+                            aria-describedby={registerErrorVisible ? "register-form-error" : undefined}
                           />
                         </div>
                       </div>
@@ -1162,6 +1176,8 @@ export function LoginScreen(_props: LoginScreenProps) {
                             placeholder="6+"
                             className="pr-10 h-12 rounded-xl"
                             autoComplete="new-password"
+                            aria-invalid={registerErrorVisible}
+                            aria-describedby={registerErrorVisible ? "register-form-error" : undefined}
                           />
                         </div>
                       </div>

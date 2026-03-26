@@ -251,11 +251,26 @@ export function SystemOwnerUserTabToolbar({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-muted-foreground block mb-1">אימייל *</label>
-              <Input type="email" dir="ltr" value={cEmail} onChange={(e) => setCEmail(e.target.value)} placeholder="user@example.com" />
+              <Input
+                type="email"
+                dir="ltr"
+                value={cEmail}
+                onChange={(e) => setCEmail(e.target.value)}
+                placeholder="user@example.com"
+                aria-invalid={!!cErr}
+                aria-describedby={cErr ? "create-user-error" : undefined}
+              />
             </div>
             <div>
               <label className="text-xs text-muted-foreground block mb-1">סיסמה *</label>
-              <Input type="password" value={cPass} onChange={(e) => setCPass(e.target.value)} placeholder="מינימום 6 תווים" />
+              <Input
+                type="password"
+                value={cPass}
+                onChange={(e) => setCPass(e.target.value)}
+                placeholder="מינימום 6 תווים"
+                aria-invalid={!!cErr}
+                aria-describedby={cErr ? "create-user-error" : undefined}
+              />
             </div>
             <div>
               <label className="text-xs text-muted-foreground block mb-1">שם מלא</label>
@@ -323,7 +338,7 @@ export function SystemOwnerUserTabToolbar({
               ביטול
             </button>
           </div>
-          {cErr ? <p className="text-xs text-destructive">{cErr}</p> : null}
+          {cErr ? <p id="create-user-error" role="alert" aria-live="assertive" className="text-xs text-destructive">{cErr}</p> : null}
           <p className="text-[11px] text-muted-foreground leading-relaxed">
             לאחר יצירה: נשמר ב-Firestore קוד הזמנה, ונשלח מייל עם אימייל, הוראות התחברות והקוד (נדרש RESEND בשרת).
           </p>
