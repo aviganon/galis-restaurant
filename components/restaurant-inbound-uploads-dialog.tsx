@@ -73,7 +73,7 @@ export function RestaurantInboundUploadsDialog({
   restaurantId: string | null
   triggerLabel: string
 }) {
-  const { userRole, isSystemOwner, refreshIngredients } = useApp()
+  const { userRole, isSystemOwner, refreshIngredients, restaurants } = useApp()
   const isOwner = !!isSystemOwner || userRole === "owner"
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -222,6 +222,10 @@ export function RestaurantInboundUploadsDialog({
   }, [open, restaurantId])
 
   const title = useMemo(() => "העלאות למסעדה (מייל + קבצים)", [])
+  const restaurantName = useMemo(() => {
+    if (!restaurantId) return null
+    return (restaurants || []).find((r) => r.id === restaurantId)?.name ?? null
+  }, [restaurantId, restaurants])
   const stalePendingRows = useMemo(() => {
     const now = Date.now()
     return rows
@@ -251,16 +255,21 @@ export function RestaurantInboundUploadsDialog({
           {triggerLabel}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-5xl w-[95vw] sm:w-[88vw] z-[90]">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
+          {restaurantId ? (
+            <div className="text-xs text-muted-foreground">
+              מסעדה: <span dir="ltr" className="font-mono">{restaurantName || restaurantId}</span>
+            </div>
+          ) : null}
         </DialogHeader>
         {loading ? (
           <div className="py-10 flex items-center justify-center text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin" />
           </div>
         ) : (
-          <ScrollArea className="max-h-[60vh]">
+          <ScrollArea className="max-h-[72vh]">
             <div className="space-y-2">
               {stalePendingRows.length > 0 ? (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 p-2.5 flex flex-wrap items-center justify-between gap-2">
