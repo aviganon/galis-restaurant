@@ -124,6 +124,16 @@ const CATEGORY_TO_KEY: Record<string, string> = {
   "אחר": "other",
 }
 export default function ProductTree() {
+  const CHEF_STYLE_OPTIONS = [
+    "ללא העדפת שף",
+    "אייל שני",
+    "מאיר אדוני",
+    "חיים כהן",
+    "ישראל אהרוני",
+    "אסף גרניט",
+    "יובל בן נריה",
+    "רותי ברודו",
+  ] as const
   const [ingredientsModalOpen, setIngredientsModalOpen] = useState(false)
   const [suppliersModalOpen, setSuppliersModalOpen] = useState(false)
   const [dishImages, setDishImages] = useState<Record<string,string>>({})
@@ -161,6 +171,7 @@ export default function ProductTree() {
   const [dashboardModalTab, setDashboardModalTab] = useState<"dashboard" | "reports">("dashboard")
   const [aiSuggestLoading, setAiSuggestLoading] = useState(false)
   const [aiSuggestedDish, setAiSuggestedDish] = useState<ExtractedDishItem | null>(null)
+  const [aiChefStyle, setAiChefStyle] = useState<(typeof CHEF_STYLE_OPTIONS)[number]>("ללא העדפת שף")
   const [ingredientStock, setIngredientStock] = useState<Record<string, number>>({})
   const [restaurantIngredientNames, setRestaurantIngredientNames] = useState<Set<string>>(new Set())
   const [importFile, setImportFile] = useState<File | null>(null)
@@ -831,7 +842,7 @@ export default function ProductTree() {
     setAiSuggestedDish(null)
     setIsAiSuggestOpen(true)
     try {
-      const suggested = await suggestDishFromIngredients(list)
+      const suggested = await suggestDishFromIngredients(list, { chefStyle: aiChefStyle })
       if (suggested) {
         setAiSuggestedDish(suggested)
       } else {
@@ -844,7 +855,7 @@ export default function ProductTree() {
     } finally {
       setAiSuggestLoading(false)
     }
-  }, [supplierPrices, ingredientStock, t])
+  }, [supplierPrices, ingredientStock, t, aiChefStyle])
 
   const handleAddAiSuggestedDish = useCallback(() => {
     if (!aiSuggestedDish?.name?.trim()) return
@@ -1092,6 +1103,16 @@ export default function ProductTree() {
               {aiSuggestLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
               <span className="hidden sm:inline">{t("pages.productTree.aiSuggest")}</span>
             </Button>
+            <Select value={aiChefStyle} onValueChange={(v) => setAiChefStyle(v as (typeof CHEF_STYLE_OPTIONS)[number])}>
+              <SelectTrigger className="h-8 w-[170px]">
+                <SelectValue placeholder="בחר שף להצעה" />
+              </SelectTrigger>
+              <SelectContent>
+                {CHEF_STYLE_OPTIONS.map((chef) => (
+                  <SelectItem key={chef} value={chef}>{chef}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               type="button"
               size="sm"
@@ -1774,6 +1795,9 @@ export default function ProductTree() {
                   <div>
                     <p className="font-medium text-lg">{aiSuggestedDish.name}</p>
                     <p className="text-sm text-muted-foreground">{aiSuggestedDish.category} • ₪{(aiSuggestedDish.price || 0).toFixed(0)}</p>
+                    <div className="mt-1">
+                      <Badge variant="outline" className="text-[11px]">הצעה לפי שף: {aiSuggestedDish.suggestedByChef || aiChefStyle}</Badge>
+                    </div>
                     {aiSuggestedDish.description ? (
                       <p className="text-sm mt-2 text-muted-foreground leading-relaxed">{aiSuggestedDish.description}</p>
                     ) : null}

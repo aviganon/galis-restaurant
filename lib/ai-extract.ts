@@ -31,6 +31,8 @@ export interface ExtractedDishItem {
   price: number
   category?: string
   ingredients?: Array<{ name: string; qty: number; unit: string }>
+  /** השראה מסגנון שף שנבחר להצעה */
+  suggestedByChef?: string
   /** תיאור קצר (טעם, הגשה) */
   description?: string
   /** שלבי הכנה / הרכבה — טקסט עם מספור */
@@ -736,13 +738,18 @@ function parseSuggestDishQty(v: unknown): number {
 }
 
 export async function suggestDishFromIngredients(
-  ingredients: IngredientForSuggestion[]
+  ingredients: IngredientForSuggestion[],
+  options?: { chefStyle?: string }
 ): Promise<ExtractedDishItem | null> {
   if (ingredients.length === 0) return null
   const list = ingredients
     .slice(0, 80)
     .map((i) => `${i.name} — ${i.price} ש"ח/${i.unit}${i.stock != null ? ` (מלאי: ${i.stock})` : ""}`)
     .join("\n")
+  const chefStyle = (options?.chefStyle || "").trim()
+  const chefPrompt = chefStyle && chefStyle !== "ללא העדפת שף"
+    ? `סגנון שף מועדף להצעה: ${chefStyle}. שמור על פרשנות קולינרית בסגנון זה, אך השתמש רק ברכיבים הזמינים ברשימה.`
+    : "אין העדפת שף ספציפי — בחר סגנון ישראלי מודרני מאוזן."
   const data = await callClaude({
     model: SUGGEST_DISH_MODEL,
     max_tokens: 4000,
@@ -753,7 +760,7 @@ export async function suggestDishFromIngredients(
         content: [
           {
             type: "text",
-            text: `רשימת הרכיבים במסעדה:\n${list}\n\nהצע מנה או משקה עם description, preparationSteps (מערך של לפחות 4 שלבים בעברית תקנית), ו-ingredients (שמות רכיבים זהים לרשימה).\nלפני סיום: קרא בקול את description וכל preparationSteps — תקן כל שגיאת דקדוק או מילה שגויה.\nהחזר **רק** JSON תקין — ללא הסבר לפני או אחרי.`,
+            text: `רשימת הרכיבים במסעדה:\n${list}\n\n${chefPrompt}\n\nהצע מנה או משקה עם description, preparationSteps (מערך של לפחות 4 שלבים בעברית תקנית), ו-ingredients (שמות רכיבים זהים לרשימה).\nהחזר גם שדה suggestedByChef עם שם השף/הסגנון שנבחר בפועל (או "ללא העדפת שף").\nלפני סיום: קרא בקול את description וכל preparationSteps — תקן כל שגיאת דקדוק או מילה שגויה.\nהחזר **רק** JSON תקין — ללא הסבר לפני או אחרי.`,
           },
         ],
       },
@@ -819,6 +826,10 @@ export async function suggestDishFromIngredients(
     category: normalizeDishCategoryToHebrew(
       typeof parsed.category === "string" && parsed.category.trim() ? parsed.category.trim() : undefined
     ),
+    suggestedByChef:
+      typeof (parsed as { suggestedByChef?: unknown }).suggestedByChef === "string"
+        ? ((parsed as { suggestedByChef?: string }).suggestedByChef || "").trim() || (chefStyle || "ללא העדפת שף")
+        : (chefStyle || "ללא העדפת שף"),
     description: typeof parsed.description === "string" ? parsed.description.trim() : undefined,
     preparation: preparation || undefined,
     ingredients: mappedIngredients,
