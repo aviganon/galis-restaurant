@@ -1507,7 +1507,12 @@ export function Ingredients() {
                     return (
                       <TableHead
                         key={key}
-                        className={cn(textAlign, densityCellClass, isSortable && "cursor-pointer hover:bg-muted/50 select-none")}
+                        className={cn(
+                          textAlign,
+                          densityCellClass,
+                          isSortable && "cursor-pointer hover:bg-muted/50 select-none",
+                          key === "name" && (isRtl ? "pr-0" : "pl-0")
+                        )}
                         draggable
                         title={t("pages.ingredients.dragToReorderColumns")}
                         onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(colIndex)); e.dataTransfer.effectAllowed = "move" }}
@@ -1527,7 +1532,13 @@ export function Ingredients() {
                           else setSortBy(sortKey)
                         }}
                       >
-                        <span className={cn("flex w-full min-w-0 items-center gap-1", justify)}>
+                        <span
+                          className={cn(
+                            "flex w-full min-w-0 items-center",
+                            key === "name" ? "gap-0.5" : "gap-1",
+                            justify
+                          )}
+                        >
                           <GripVertical className="w-3 h-3 text-muted-foreground/60 cursor-grab active:cursor-grabbing shrink-0" />
                           {labels[key] || key}
                           {key === "name" && (sortBy === "name" || sortBy === "name_desc") && (sortBy === "name" ? <TrendingDown className="w-3.5 h-3.5" /> : <TrendingUp className="w-3.5 h-3.5" />)}
@@ -1555,7 +1566,7 @@ export function Ingredients() {
                     const StatusIcon = stockStatus.icon
                     const colSpan = displayColumnOrder.length
                     const cellByKey: Record<string, React.ReactNode> = {
-                      name: <TableCell key="name" className={cn("font-medium", textAlign, densityCellClass)}>{isCompound && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded ml-1">🧪 מתכון</span>}{ingredient.name}</TableCell>,
+                      name: <TableCell key="name" className={cn("font-medium", textAlign, densityCellClass, isRtl ? "pr-0" : "pl-0")}>{isCompound && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded ml-1">🧪 מתכון</span>}{ingredient.name}</TableCell>,
                       price: <TableCell key="price" className={cn(textAlign, "font-semibold", densityCellClass)}>{isCompound ? "—" : `₪${Number(ingredient.price).toFixed(2)}`}</TableCell>,
                       source: <TableCell key="source" className={cn(textAlign, densityCellClass)}>{isCompound ? "—" : (ingredient.priceSource === "market" ? <Badge variant="secondary" className="text-xs whitespace-nowrap">מחיר שוק</Badge> : <Badge variant="outline" className="text-xs whitespace-nowrap">מחיר שלי</Badge>)}</TableCell>,
                       cheapest: <TableCell key="cheapest" className={cn(textAlign, densityCellClass)}>{isCompound ? "—" : (

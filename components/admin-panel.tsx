@@ -3610,7 +3610,12 @@ export function AdminPanel() {
                           return (
                             <TableHead
                               key={key}
-                              className={`${textAlign} ${densityCellClass} ${isSortable ? "cursor-pointer hover:bg-muted/50 select-none" : ""}`}
+                              className={cn(
+                                textAlign,
+                                densityCellClass,
+                                isSortable && "cursor-pointer hover:bg-muted/50 select-none",
+                                key === "name" && (isRtl ? "pr-0" : "pl-0")
+                              )}
                               draggable
                               title={t("pages.adminPanel.dragToReorderColumns")}
                               onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(colIndex)); e.dataTransfer.effectAllowed = "move" }}
@@ -3631,7 +3636,7 @@ export function AdminPanel() {
                                 }
                               }}
                             >
-                              <span className={`flex w-full min-w-0 items-center gap-1 ${justify}`}>
+                              <span className={`flex w-full min-w-0 items-center ${key === "name" ? "gap-0.5" : "gap-1"} ${justify}`}>
                                 <GripVertical className="w-3 h-3 text-muted-foreground/60 cursor-grab active:cursor-grabbing shrink-0" />
                                 {labels[key] || key}
                                 {ingredientsSortBy === key && (
@@ -3648,7 +3653,7 @@ export function AdminPanel() {
                     <TableBody>
                       {[...filteredAndSortedIngredients].reverse().map((ing) => {
                         const cellByKey: Record<string, React.ReactNode> = {
-                          name: <TableCell key="name" className={`font-medium ${textAlign} ${densityCellClass} truncate`} title={ing.name}>{ing.name}</TableCell>,
+                          name: <TableCell key="name" className={cn("font-medium", textAlign, densityCellClass, "truncate", isRtl ? "pr-0" : "pl-0")} title={ing.name}>{ing.name}</TableCell>,
                           price: <TableCell key="price" className={`${textAlign} ${densityCellClass}`}>₪{ing.price.toFixed(2)}</TableCell>,
                           cheapest: <TableCell key="cheapest" className={`${textAlign} ${densityCellClass} text-sm`}>
                             <AdminCheapestPopover
