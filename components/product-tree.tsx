@@ -162,6 +162,7 @@ export default function ProductTree() {
   const [aiSuggestLoading, setAiSuggestLoading] = useState(false)
   const [aiSuggestedDish, setAiSuggestedDish] = useState<ExtractedDishItem | null>(null)
   const [ingredientStock, setIngredientStock] = useState<Record<string, number>>({})
+  const [restaurantIngredientNames, setRestaurantIngredientNames] = useState<Set<string>>(new Set())
   const [importFile, setImportFile] = useState<File | null>(null)
   const [fpmOpen, setFpmOpen] = useState(false)
   /** סוג חילוץ ב-FilePreviewModal: p חשבונית, d מנות, s מכירות */
@@ -274,6 +275,7 @@ export default function ProductTree() {
 
         const newPrices: Record<string, SupplierPrice> = {}
         const newStock: Record<string, number> = {}
+        const restaurantNames = new Set<string>()
         const mergePrice = (name: string, data: { price?: number; unit?: string; supplier?: string; stock?: number }) => {
           const p = typeof data.price === "number" ? data.price : 0
           if (!newPrices[name]) newPrices[name] = { name, price: p, prev: p, unit: "קג", supplier: "" }
@@ -292,7 +294,10 @@ export default function ProductTree() {
             if (picked) mergePrice(d.id, { ...picked, stock: typeof data.stock === "number" ? data.stock : undefined })
           })
         }
-        restIngSnap.forEach((d) => mergePrice(d.id, d.data() as IngData))
+        restIngSnap.forEach((d) => {
+          restaurantNames.add(d.id.trim().toLowerCase())
+          mergePrice(d.id, d.data() as IngData)
+        })
 
         const imgs: Record<string,string> = {}
         Object.entries(newDishes).forEach(([n,d])=>{ if(d.imageUrl) imgs[n]=d.imageUrl })
@@ -311,6 +316,7 @@ export default function ProductTree() {
         })
         setSupplierPrices(newPrices)
         setIngredientStock(newStock)
+        setRestaurantIngredientNames(restaurantNames)
       } catch (e) {
         console.error("load recipes/ingredients:", e)
         toast.error("שגיאה בטעינת עץ מוצר")
@@ -320,6 +326,12 @@ export default function ProductTree() {
     }
     load()
   }, [currentRestaurantId, isOwner, refreshIngredientsKey])
+
+  const isIngredientInRestaurant = useCallback((name: string) => {
+    const key = String(name || "").trim().toLowerCase()
+    if (!key) return false
+    return restaurantIngredientNames.has(key)
+  }, [restaurantIngredientNames])
 
   const saveTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   useEffect(() => () => {
@@ -860,6 +872,41 @@ export default function ProductTree() {
     setIsAiSuggestOpen(false)
     toast.success(`המנה "${aiSuggestedDish.name}" נוספה — ניתן לערוך`)
   }, [aiSuggestedDish, saveDishToFirestore])
+
+  const handleAddMissingAiIngredients = useCallback(async () => {
+    if (!currentRestaurantId || !aiSuggestedDish?.ingredients?.length) return
+    const missing = aiSuggestedDish.ingredients.filter((ing) => !isIngredientInRestaurant(ing.name))
+    if (missing.length === 0) {
+      toast.success("כל הרכיבים כבר קיימים במסעדה")
+      return
+    }
+    try {
+      const now = new Date().toISOString()
+      const batch = writeBatch(db)
+      missing.forEach((ing) => {
+        const sp = supplierPrices[ing.name]
+        batch.set(
+          doc(db, "restaurants", currentRestaurantId, "ingredients", ing.name),
+          {
+            price: typeof sp?.price === "number" ? sp.price : 0,
+            unit: ing.unit || sp?.unit || "גרם",
+            supplier: sp?.supplier || "",
+            stock: typeof ingredientStock[ing.name] === "number" ? ingredientStock[ing.name] : 0,
+            minStock: 0,
+            waste: 0,
+            lastUpdated: now,
+            createdBy: "restaurant",
+          },
+          { merge: true },
+        )
+      })
+      await batch.commit()
+      refreshIngredients?.()
+      toast.success(`נוספו ${missing.length} רכיבים חדשים למסעדה`)
+    } catch (e) {
+      toast.error((e as Error)?.message || "שגיאה בהוספת רכיבים חדשים")
+    }
+  }, [aiSuggestedDish, currentRestaurantId, ingredientStock, isIngredientInRestaurant, refreshIngredients, supplierPrices])
 
   const handleConfirmDishes = useCallback(async (items: ExtractedDishItem[]) => {
     const next: Record<string, Dish> = { ...dishes }
@@ -1742,15 +1789,33 @@ export default function ProductTree() {
                     {(aiSuggestedDish.ingredients || []).length === 0 ? (
                       <p className="text-sm text-amber-700 dark:text-amber-400">{t("pages.productTree.aiSuggestNoMatchedIngredients")}</p>
                     ) : (
-                      <ul className="space-y-2.5 text-sm">
+                      <>
+                        <div className="mb-2 text-xs text-muted-foreground">
+                          קיימים במסעדה: {(aiSuggestedDish.ingredients || []).filter((ing) => isIngredientInRestaurant(ing.name)).length} ·
+                          חדשים להצעה: {(aiSuggestedDish.ingredients || []).filter((ing) => !isIngredientInRestaurant(ing.name)).length}
+                        </div>
+                        <ul className="space-y-2.5 text-sm">
                         {(aiSuggestedDish.ingredients || []).map((ing, i) => {
                           const sp = supplierPrices[ing.name]
+                          const existsInRestaurant = isIngredientInRestaurant(ing.name)
                           return (
                             <li
                               key={`${ing.name}-${i}`}
-                              className="rounded-md bg-background/80 border border-border/60 px-3 py-2"
+                              className={cn(
+                                "rounded-md border px-3 py-2",
+                                existsInRestaurant
+                                  ? "bg-emerald-50/60 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800/60"
+                                  : "bg-amber-50/70 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800/60"
+                              )}
                             >
-                              <div className="font-medium">{ing.name}</div>
+                              <div className="font-medium flex items-center gap-2">
+                                <span>{ing.name}</span>
+                                {existsInRestaurant ? (
+                                  <Badge variant="secondary" className="text-[10px]">קיים במסעדה</Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-[10px] border-amber-400 text-amber-700">רכיב חדש</Badge>
+                                )}
+                              </div>
                               <div className="text-muted-foreground text-xs sm:text-sm mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
                                 <span>
                                   {t("pages.productTree.quantity")}: {ing.qty} {ing.unit}
@@ -1783,7 +1848,8 @@ export default function ProductTree() {
                             </li>
                           )
                         })}
-                      </ul>
+                        </ul>
+                      </>
                     )}
                   </div>
                   <details className="text-sm border rounded-lg p-3 bg-muted/30">
@@ -1802,6 +1868,13 @@ export default function ProductTree() {
                   </details>
                   <div className="flex gap-2 justify-end">
                     <Button variant="outline" onClick={() => { setAiSuggestedDish(null); setIsAiSuggestOpen(false) }}>{t("pages.productTree.cancel")}</Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => void handleAddMissingAiIngredients()}
+                      disabled={(aiSuggestedDish.ingredients || []).filter((ing) => !isIngredientInRestaurant(ing.name)).length === 0}
+                    >
+                      הוסף רכיבים חדשים למסעדה
+                    </Button>
                     <Button onClick={handleAddAiSuggestedDish}>
                       <Plus className="w-4 h-4 ml-1" />
                       {t("pages.productTree.add")} {t("pages.dish")}
