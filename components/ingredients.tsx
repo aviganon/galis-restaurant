@@ -1507,7 +1507,7 @@ export function Ingredients() {
                     return (
                       <TableHead
                         key={key}
-                        className={cn(textAlign, densityCellClass, isRtl && "pr-0", isSortable && "cursor-pointer hover:bg-muted/50 select-none")}
+                        className={cn(textAlign, densityCellClass, isSortable && "cursor-pointer hover:bg-muted/50 select-none")}
                         draggable
                         title={t("pages.ingredients.dragToReorderColumns")}
                         onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(colIndex)); e.dataTransfer.effectAllowed = "move" }}
@@ -1527,7 +1527,7 @@ export function Ingredients() {
                           else setSortBy(sortKey)
                         }}
                       >
-                        <span className={cn("flex items-center gap-1", justify)}>
+                        <span className={cn("flex w-full min-w-0 items-center gap-1", justify)}>
                           <GripVertical className="w-3 h-3 text-muted-foreground/60 cursor-grab active:cursor-grabbing shrink-0" />
                           {labels[key] || key}
                           {key === "name" && (sortBy === "name" || sortBy === "name_desc") && (sortBy === "name" ? <TrendingDown className="w-3.5 h-3.5" /> : <TrendingUp className="w-3.5 h-3.5" />)}

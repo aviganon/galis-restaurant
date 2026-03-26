@@ -3587,7 +3587,7 @@ export function AdminPanel() {
                             return (
                               <TableHead
                                 key="cheapest"
-                                className={`${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""} select-none`}
+                                className={`${textAlign} ${densityCellClass} select-none`}
                                 draggable
                                 title={t("pages.adminPanel.dragToReorderColumns")}
                                 onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(colIndex)); e.dataTransfer.effectAllowed = "move" }}
@@ -3598,7 +3598,7 @@ export function AdminPanel() {
                                   if (!isNaN(from)) handleIngredientsColumnReorder(from, colIndex)
                                 }}
                               >
-                                <span className={`flex items-center gap-1 ${justify}`}>
+                                <span className={`flex w-full min-w-0 items-center gap-1 ${justify}`}>
                                   <GripVertical className="w-3 h-3 text-muted-foreground/60 cursor-grab active:cursor-grabbing shrink-0" />
                                   {t("pages.adminPanel.cheapest")}
                                 </span>
@@ -3610,7 +3610,7 @@ export function AdminPanel() {
                           return (
                             <TableHead
                               key={key}
-                              className={`${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""} ${isSortable ? "cursor-pointer hover:bg-muted/50 select-none" : ""}`}
+                              className={`${textAlign} ${densityCellClass} ${isSortable ? "cursor-pointer hover:bg-muted/50 select-none" : ""}`}
                               draggable
                               title={t("pages.adminPanel.dragToReorderColumns")}
                               onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(colIndex)); e.dataTransfer.effectAllowed = "move" }}
@@ -3631,7 +3631,7 @@ export function AdminPanel() {
                                 }
                               }}
                             >
-                              <span className={`flex items-center gap-1 ${justify}`}>
+                              <span className={`flex w-full min-w-0 items-center gap-1 ${justify}`}>
                                 <GripVertical className="w-3 h-3 text-muted-foreground/60 cursor-grab active:cursor-grabbing shrink-0" />
                                 {labels[key] || key}
                                 {ingredientsSortBy === key && (
@@ -3642,7 +3642,7 @@ export function AdminPanel() {
                             </TableHead>
                           )
                         })}
-                        <TableHead className={`${textAlign} ${densityCellClass} ${isRtl ? "pr-0" : ""} w-14`}>{t("pages.adminPanel.actions")}</TableHead>
+                        <TableHead className={`${textAlign} ${densityCellClass} w-14`}>{t("pages.adminPanel.actions")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
