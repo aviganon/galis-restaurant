@@ -384,7 +384,9 @@ export function LoginScreen(_props: LoginScreenProps) {
     try {
       await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence)
       const cred = await signInWithEmailAndPassword(auth, email, password)
-      const hasPasswordProvider = cred.user.providerData.some((p) => p?.providerId === "password")
+      const hasPasswordProvider =
+        cred.user.providerId === "password" ||
+        cred.user.providerData.some((p) => p?.providerId === "password")
       if (hasPasswordProvider && !cred.user.emailVerified) {
         try {
           const verifyUrl = typeof window !== "undefined" ? window.location.origin : "https://galis-6ebbc.web.app"

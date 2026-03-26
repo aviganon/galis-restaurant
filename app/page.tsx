@@ -148,6 +148,24 @@ export default function Home() {
         setIsSystemOwner(false)
         return
       }
+      /** כניסה עם אימייל+סיסמה דורשת אימות כתובת — גם אחרי רענון/מטמון persist (לא רק ב-handleLogin) */
+      const isPasswordAuthUser =
+        user.providerId === "password" ||
+        user.providerData.some((p) => p?.providerId === "password")
+      if (!user.emailVerified && isPasswordAuthUser) {
+        try {
+          await signOut(auth)
+        } catch {
+          /* */
+        }
+        authProfileGenRef.current += 1
+        stopRestaurantsListener()
+        setIsLoggedIn(false)
+        setRestaurants([])
+        setCurrentRestaurantId(null)
+        setIsSystemOwner(false)
+        return
+      }
       const authGen = ++authProfileGenRef.current
       const authStale = () => authGen !== authProfileGenRef.current
       try {
