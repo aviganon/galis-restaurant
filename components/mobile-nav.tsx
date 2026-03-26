@@ -96,8 +96,8 @@ export function MobileNav({ currentPage, setCurrentPage, userRole, isSystemOwner
           </button>
         </div>
       )}
-      <nav className="fixed bottom-0 inset-x-0 z-50 lg:hidden bg-primary/95 backdrop-blur-xl border-t border-primary-foreground/10 safe-area-pb">
-        <div className="flex items-stretch min-h-16 h-16">
+      <nav className="fixed bottom-0 inset-x-0 z-50 lg:hidden bg-primary/95 backdrop-blur-xl border-t border-primary-foreground/10 pb-[max(env(safe-area-inset-bottom),0px)]">
+        <div className="flex items-stretch min-h-[64px] h-[64px]">
           {mainItems(t, userRole, userPermissions, isSystemOwner, isImpersonating, moreList.length > 0).map((item) => {
             const isActive = item.id === "more" ? showMore : currentPage === item.id
             return (
@@ -120,7 +120,7 @@ export function MobileNav({ currentPage, setCurrentPage, userRole, isSystemOwner
                 />
                 <span
                   className={cn(
-                    "text-[10px] font-medium transition-colors leading-tight text-center max-w-full truncate px-0.5",
+                    "text-[11px] font-medium transition-colors leading-tight text-center max-w-full truncate px-0.5",
                     isActive ? "text-primary-foreground" : "text-primary-foreground/50"
                   )}
                 >
@@ -143,7 +143,7 @@ export function MobileNav({ currentPage, setCurrentPage, userRole, isSystemOwner
             role="dialog"
             aria-modal="true"
             aria-label={t("nav.moreOptions")}
-            className="fixed bottom-0 inset-x-0 z-50 lg:hidden bg-primary rounded-t-3xl animate-in slide-in-from-bottom duration-300 max-h-[85dvh] flex flex-col shadow-2xl"
+            className="fixed bottom-0 inset-x-0 z-50 lg:hidden bg-primary rounded-t-3xl animate-in slide-in-from-bottom duration-300 max-h-[calc(100dvh-0.5rem)] flex flex-col shadow-2xl"
           >
             <div className="w-12 h-1.5 bg-primary-foreground/20 rounded-full mx-auto mt-3" />
             <div className="p-4 pb-safe">
@@ -153,7 +153,7 @@ export function MobileNav({ currentPage, setCurrentPage, userRole, isSystemOwner
                 <button
                   onClick={() => setShowMore(false)}
                   aria-label={t("pages.close")}
-                  className="w-8 h-8 rounded-full bg-primary-foreground/10 flex items-center justify-center"
+                  className="w-11 h-11 rounded-full bg-primary-foreground/10 flex items-center justify-center"
                 >
                   <X className="w-4 h-4 text-primary-foreground" />
                 </button>

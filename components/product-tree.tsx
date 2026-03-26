@@ -2084,16 +2084,17 @@ export default function ProductTree() {
                       ))}
                     </ul>
                   </details>
-                  <div className="flex gap-2 justify-end">
-                    <Button variant="outline" onClick={() => { setAiSuggestedDish(null); setIsAiSuggestOpen(false) }}>{t("pages.productTree.cancel")}</Button>
+                  <div className="flex flex-wrap gap-2 justify-stretch sm:justify-end">
+                    <Button className="w-full sm:w-auto" variant="outline" onClick={() => { setAiSuggestedDish(null); setIsAiSuggestOpen(false) }}>{t("pages.productTree.cancel")}</Button>
                     <Button
+                      className="w-full sm:w-auto"
                       variant="outline"
                       onClick={() => void handleAddMissingAiIngredients()}
                       disabled={(aiSuggestedDish.ingredients || []).filter((ing) => !isIngredientInRestaurant(ing.name)).length === 0}
                     >
                       הוסף רכיבים חדשים למסעדה
                     </Button>
-                    <Button onClick={handleAddAiSuggestedDish}>
+                    <Button className="w-full sm:w-auto" onClick={handleAddAiSuggestedDish}>
                       <Plus className="w-4 h-4 ml-1" />
                       {t("pages.productTree.add")} {t("pages.dish")}
                     </Button>
@@ -2126,8 +2127,9 @@ export default function ProductTree() {
               />
             </div>
             
+            <div className="flex-1 sm:flex-none min-w-[140px]">
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger id="product-tree-category" aria-label={t("pages.productTree.category")} className="w-[140px]">
+              <SelectTrigger id="product-tree-category" aria-label={t("pages.productTree.category")} className="w-full sm:w-[140px]">
                 <Filter className="w-4 h-4 ml-2" />
                 <SelectValue placeholder={t("pages.productTree.allCategories")} />
               </SelectTrigger>
@@ -2138,9 +2140,11 @@ export default function ProductTree() {
                 ))}
               </SelectContent>
             </Select>
+            </div>
             
+            <div className="flex-1 sm:flex-none min-w-[140px]">
             <Select value={sortMode} onValueChange={v => setSortMode(v as typeof sortMode)}>
-              <SelectTrigger id="product-tree-sort" aria-label={t("pages.productTree.sort")} className="w-[140px]">
+              <SelectTrigger id="product-tree-sort" aria-label={t("pages.productTree.sort")} className="w-full sm:w-[140px]">
                 <SortAsc className="w-4 h-4 ml-2" />
                 <SelectValue />
               </SelectTrigger>
@@ -2151,6 +2155,7 @@ export default function ProductTree() {
                 <SelectItem value="price_desc">{t("pages.productTree.sortPriceDesc")}</SelectItem>
               </SelectContent>
             </Select>
+            </div>
           </div>
           
           {/* Dishes grid — כרטיסים גדולים ובולטים (לחזור: git checkout HEAD~1 -- components/product-tree.tsx) */}

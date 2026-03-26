@@ -765,11 +765,11 @@ export function FilePreviewModal({
           )}
         </div>
         {!loading && items.length > 0 && (
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <div className="flex flex-wrap justify-end gap-2 pt-4 border-t">
+            <Button className="w-full sm:w-auto" variant="outline" onClick={() => onOpenChange(false)}>
               {t("pages.productTree.cancel")}
             </Button>
-            <Button onClick={handleConfirm}>
+            <Button className="w-full sm:w-auto" onClick={handleConfirm}>
               {stockCountMode && type === "p"
                 ? t("pages.purchaseOrders.stockCountConfirm")
                 : isDeliveryNote

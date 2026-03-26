@@ -872,8 +872,8 @@ export default function Suppliers() {
                 </p>
                 <button onClick={()=>setGlobalReorderOpen(false)} className="text-muted-foreground hover:text-foreground"><XIcon className="w-4 h-4"/></button>
               </div>
-              <div className="rounded-md border overflow-hidden"><div className="overflow-y-auto" style={{maxHeight:"340px"}}>
-                <table className="w-full text-sm">
+              <div className="rounded-md border overflow-hidden"><div className="overflow-y-auto overflow-x-auto" style={{maxHeight:"340px"}}>
+                <table className="w-full min-w-[640px] text-sm">
                   <thead className="sticky top-0 bg-blue-50/90 dark:bg-blue-950/80 border-b z-10"><tr className="text-xs text-muted-foreground">
                     <th className="text-right py-2 px-3">ספק</th>
                     <th className="text-right py-2 px-3">רכיב</th>
@@ -1217,7 +1217,7 @@ export default function Suppliers() {
                                       <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                        className="h-10 w-10 sm:h-8 sm:w-8 text-muted-foreground hover:text-primary"
                                         onClick={(e) => { e.stopPropagation(); openEditIngredient(i) }}
                                         title="ערוך"
                                       >
@@ -1227,7 +1227,7 @@ export default function Suppliers() {
                                         <Button
                                           variant="ghost"
                                           size="icon"
-                                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                          className="h-10 w-10 sm:h-8 sm:w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                                           onClick={(e) => { e.stopPropagation(); handleDeleteIngredientFromSupplier(i.name) }}
                                           disabled={deletingIngredientName === i.name}
                                           title="מחק"
@@ -1358,7 +1358,7 @@ export default function Suppliers() {
       </Dialog>
 
       <Dialog open={addSupplierOpen} onOpenChange={(o) => { setAddSupplierOpen(o); if (!o) resetAddSupplierModal() }}>
-        <DialogContent style={{width:"92vw",maxWidth:"92vw",height:"88vh",maxHeight:"88vh",overflow:"hidden",display:"flex",flexDirection:"column"}}>
+        <DialogContent style={{width:"92vw",maxWidth:"92vw",height:"88dvh",maxHeight:"calc(100dvh - 1rem)",overflow:"hidden",display:"flex",flexDirection:"column"}}>
           <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <span className="text-2xl">🏭</span>
@@ -1383,7 +1383,7 @@ export default function Suppliers() {
                       {i.minStock != null ? ` | מינ׳ ${i.minStock}` : ""}
                       {i.sku ? ` | מק״ט ${i.sku}` : ""}
                     </span>
-                    <Button size="sm" variant="ghost" onClick={() => removeNsmItem(i.name)} className="text-destructive h-8 w-8 p-0 shrink-0">
+                    <Button size="sm" variant="ghost" onClick={() => removeNsmItem(i.name)} className="text-destructive h-10 w-10 sm:h-8 sm:w-8 p-0 shrink-0">
                       <XIcon className="w-3 h-3" />
                     </Button>
                   </div>
@@ -1448,8 +1448,8 @@ export default function Suppliers() {
       {showPurchaseOrdersPanel && (
         <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'center'}}>
           <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.5)'}} onClick={() => setShowPurchaseOrdersPanel(false)} />
-          <div style={{position:'relative',width:'92vw',height:'88vh',background:'var(--background)',borderRadius:'12px',boxShadow:'0 25px 50px rgba(0,0,0,0.3)',overflow:'visible',display:'flex',flexDirection:'column'}}>
-            <button onClick={() => setShowPurchaseOrdersPanel(false)} style={{position:'absolute',top:'12px',left:'12px',zIndex:10,width:'32px',height:'32px',borderRadius:'50%',border:'none',background:'var(--muted)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px'}}>✕</button>
+          <div style={{position:'relative',width:'92vw',height:'88dvh',maxHeight:'calc(100dvh - 1rem)',background:'var(--background)',borderRadius:'12px',boxShadow:'0 25px 50px rgba(0,0,0,0.3)',overflow:'visible',display:'flex',flexDirection:'column'}}>
+            <button onClick={() => setShowPurchaseOrdersPanel(false)} style={{position:'absolute',top:'12px',left:'12px',zIndex:10,width:'44px',height:'44px',borderRadius:'50%',border:'none',background:'var(--muted)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px'}}>✕</button>
             <div style={{overflowY:'auto',flex:1}}>
               <OrdersPanel />
             </div>

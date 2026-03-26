@@ -475,12 +475,12 @@ export function SystemOwnerDirectory({
                                   {r.emoji ? `${r.emoji} ` : ""}
                                   {r.name}
                                 </div>
-                                <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-start">
+                                <div className="flex items-center gap-2 shrink-0 flex-wrap justify-start">
                                   <Button
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    className="h-7 px-2 text-[11px] gap-1"
+                                    className="h-9 sm:h-7 px-2 text-[11px] gap-1"
                                     title="עריכת פרטי מסעדה"
                                     onClick={(e) => {
                                       e.stopPropagation()
@@ -512,7 +512,7 @@ export function SystemOwnerDirectory({
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    className="h-7 px-2 text-[11px] gap-1"
+                                    className="h-9 sm:h-7 px-2 text-[11px] gap-1"
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       ensureRestaurantSelected(r.id)
@@ -527,7 +527,7 @@ export function SystemOwnerDirectory({
                                     variant="outline"
                                     size="sm"
                                     className={cn(
-                                      "h-7 px-2 text-[11px] gap-0.5",
+                                      "h-9 sm:h-7 px-2 text-[11px] gap-0.5",
                                       pendingInboundReq > 0 &&
                                         "animate-pulse ring-2 ring-amber-500/70 ring-offset-1 ring-offset-background bg-amber-50/90 dark:bg-amber-950/50",
                                     )}

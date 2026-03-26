@@ -1259,8 +1259,8 @@ export function Settings() {
                 </div>
               ) : null}
 
-              <div className="rounded-xl border overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="rounded-xl border overflow-hidden overflow-x-auto">
+                <table className="w-full min-w-[560px] text-sm">
                   <thead className="bg-muted/50">
                     <tr>
                       <th className="text-start p-2 font-medium">אימייל</th>
@@ -1280,11 +1280,11 @@ export function Settings() {
                           <td className="p-2">{u.role === "manager" ? "מנהל" : "משתמש"}</td>
                           <td className="p-2">
                             <div className="flex items-center justify-end gap-1">
-                              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openEditUser(u)}>ערוך</Button>
+                              <Button size="sm" variant="ghost" className="h-9 sm:h-7 text-xs" onClick={() => openEditUser(u)}>ערוך</Button>
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-7 text-xs"
+                                className="h-9 sm:h-7 text-xs"
                                 onClick={() => {
                                   void postInviteEmail({
                                     email: u.email,

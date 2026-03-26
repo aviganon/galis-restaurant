@@ -498,7 +498,7 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
                   <kpi.icon className={em("w-4 h-4", "w-5 h-5")} />
                 </div>
                 <p className={em("text-sm font-bold leading-tight tabular-nums", "text-xl font-bold tabular-nums md:text-2xl")}>{kpi.value}</p>
-                <p className={em("mt-0.5 text-[9px] leading-snug text-muted-foreground line-clamp-2", "text-xs text-muted-foreground")}>{kpi.label}</p>
+                <p className={em("mt-0.5 text-[11px] leading-snug text-muted-foreground line-clamp-2", "text-xs text-muted-foreground")}>{kpi.label}</p>
               </CardContent>
             </Card>
           ))}
@@ -506,7 +506,7 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
 
         <p
           className={em(
-            "mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
+            "mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground",
             "mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
           )}
         >
@@ -603,7 +603,7 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
 
         <p
           className={em(
-            "mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
+            "mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground",
             "mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
           )}
         >
@@ -629,13 +629,13 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
                     >
                       <div className="min-w-0 flex-1">
                         <p className="font-medium leading-snug">{displayMessage}</p>
-                        <p className="mt-0.5 text-[10px] opacity-70">{t(alert.timeKey)}</p>
+                        <p className="mt-0.5 text-[11px] opacity-70">{t(alert.timeKey)}</p>
                       </div>
                       {alert.id && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="shrink-0 h-7 px-1.5 text-[10px]"
+                          className="shrink-0 h-9 sm:h-7 px-1.5 text-[11px]"
                           onClick={() => markNotificationRead(alert.id!)}
                         >
                           {t("pages.close")}
@@ -651,7 +651,7 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
 
         <p
           className={em(
-            "mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
+            "mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground",
             "mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
           )}
         >

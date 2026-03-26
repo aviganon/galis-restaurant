@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Mail, Loader2, Eye, Play } from "lucide-react"
 import { firebaseBearerHeaders } from "@/lib/api-auth-client"
 import { db } from "@/lib/firebase"
-import { collection, getDocs } from "firebase/firestore"
 import { FilePreviewModal } from "@/components/file-preview-modal"
 import type { ExtractType, ExtractedSupplierItem, SalesReportPeriod } from "@/lib/ai-extract"
 import { detectDocumentType } from "@/lib/ai-extract"
@@ -168,29 +167,38 @@ export function RestaurantInboundUploadsDialog({
       setLoadError(null)
       try {
         const headers = await firebaseBearerHeaders()
-        const [mailRes, manualSnap] = await Promise.all([
+        const [mailRes, uploadsRes] = await Promise.all([
           fetch("/api/inbound-jobs", {
             method: "POST",
             headers: { "Content-Type": "application/json", ...headers },
             body: JSON.stringify({ restaurantId }),
             cache: "no-store",
           }),
-          getDocs(collection(db, "restaurants", restaurantId, "uploads")),
+          fetch("/api/restaurant-uploads", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...headers },
+            body: JSON.stringify({ restaurantId }),
+            cache: "no-store",
+          }),
         ])
         const json = (await mailRes.json().catch(() => ({}))) as { jobs?: InboundJobRow[]; error?: string }
+        const uploadsJson = (await uploadsRes.json().catch(() => ({}))) as {
+          uploads?: Array<{ id: string; fileName?: unknown; supplier?: unknown; uploadedAt?: unknown; documentType?: unknown }>
+          error?: string
+        }
         if (!mailRes.ok) throw new Error(json.error || `HTTP ${mailRes.status}`)
+        if (!uploadsRes.ok) throw new Error(uploadsJson.error || `HTTP ${uploadsRes.status}`)
         const mailRows: InboundJobRow[] = (Array.isArray(json.jobs) ? json.jobs : []).map((r) => ({ ...r, source: "email" }))
-        const manualRows: InboundJobRow[] = manualSnap.docs.map((d) => {
-          const v = d.data() as Record<string, unknown>
+        const manualRows: InboundJobRow[] = (Array.isArray(uploadsJson.uploads) ? uploadsJson.uploads : []).map((v) => {
           return {
-            id: d.id,
+            id: String(v.id || ""),
             source: "manual",
-            fileName: String(v.fileName || d.id),
-            subject: String(v.fileName || d.id),
+            fileName: String(v.fileName || v.id || ""),
+            subject: String(v.fileName || v.id || ""),
             status: "uploaded",
-            receivedAt: (v.uploadedAt as string) || (v.createdAt as string) || "",
-            supplier: (v.supplier as string) || "",
-            detectedType: (v.documentType as string) || "other",
+            receivedAt: String(v.uploadedAt || ""),
+            supplier: String(v.supplier || ""),
+            detectedType: String(v.documentType || "other"),
             attachmentPaths: [],
           }
         })
@@ -337,7 +345,7 @@ export function RestaurantInboundUploadsDialog({
                           type="button"
                           size="sm"
                           variant="secondary"
-                          className="h-7 text-xs gap-1"
+                          className="h-9 sm:h-7 text-xs gap-1"
                           disabled={busyJobId === r.id || !r.attachmentPaths?.length}
                           onClick={() => void processNow(r)}
                         >
@@ -350,7 +358,7 @@ export function RestaurantInboundUploadsDialog({
                           type="button"
                           size="sm"
                           variant="outline"
-                          className="h-7 text-xs gap-1"
+                          className="h-9 sm:h-7 text-xs gap-1"
                           onClick={async () => {
                             try {
                               const headers = await firebaseBearerHeaders()

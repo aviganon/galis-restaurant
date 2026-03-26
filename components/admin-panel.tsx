@@ -3372,10 +3372,10 @@ export function AdminPanel() {
                                     <tr key={i.id} className="border-b last:border-0">
                                       <td className="py-2 px-2 text-right">
                                         <div className="flex gap-1 items-center">
-                                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={e=>{e.stopPropagation();openEditSupplierIng(i as {id:string;name:string;price:number;unit:string;waste:number;stock:number;minStock:number;sku:string;source:"global"|"restaurant"})}}>
+                                          <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-7 sm:w-7 text-muted-foreground hover:text-foreground" onClick={e=>{e.stopPropagation();openEditSupplierIng(i as {id:string;name:string;price:number;unit:string;waste:number;stock:number;minStock:number;sku:string;source:"global"|"restaurant"})}}>
                                             <Edit2 className="w-3.5 h-3.5"/>
                                           </Button>
-                                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={e=>{e.stopPropagation();handleDeleteIngredientFromSupplier(i,s.name,s.restaurantIds)}} disabled={deletingIngredientId===`${i.source}-${i.id}`}>
+                                          <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-7 sm:w-7 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={e=>{e.stopPropagation();handleDeleteIngredientFromSupplier(i,s.name,s.restaurantIds)}} disabled={deletingIngredientId===`${i.source}-${i.id}`}>
                                             {deletingIngredientId===`${i.source}-${i.id}`?<Loader2 className="w-4 h-4 animate-spin"/>:<Trash2 className="w-3.5 h-3.5"/>}
                                           </Button>
                                         </div>
