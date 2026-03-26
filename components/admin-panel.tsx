@@ -2586,22 +2586,6 @@ export function AdminPanel() {
                           >
                             <Edit2 className="w-3.5 h-3.5 text-white" />
                           </button>
-                          {isSystemOwner ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setAdminInboundDialogRestId(rest.id)
-                              }}
-                              className="h-7 max-w-[9rem] rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center gap-0.5 px-1.5 text-white text-[10px] font-medium leading-none transition-colors sm:px-2.5"
-                              title="✉ כתובת מייל — ייבוא ממייל"
-                            >
-                              <span className="opacity-90" aria-hidden>
-                                ✉
-                              </span>
-                              <span className="truncate hidden min-[400px]:inline">כתובת מייל</span>
-                            </button>
-                          ) : null}
                         </div>
                         <div className="absolute inset-0 flex flex-col justify-end p-3">
                           <p className="font-bold text-white text-sm leading-tight drop-shadow truncate text-start">

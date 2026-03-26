@@ -442,6 +442,11 @@ export function SystemOwnerDirectory({
                   filteredRestaurants.map((r) => {
                     const n = usersByRestaurant(r.id).length
                     const pendingInboundReq = pendingInboundRequestsByRest[r.id] ?? 0
+                    const inbound = inboundMap[r.id]
+                    const addr =
+                      inbound?.inboundEmailToken != null
+                        ? buildInboundAddress(inbound.inboundEmailToken)
+                        : null
                     const active = selectedRestId === r.id && panelTab === "restaurant"
                     return (
                       <div key={r.id} className="border-b border-border last:border-b-0">
@@ -541,6 +546,27 @@ export function SystemOwnerDirectory({
                                   </Badge>
                                 </div>
                               </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  ensureRestaurantSelected(r.id)
+                                  setInboundDialogRestId(r.id)
+                                }}
+                                className={cn(
+                                  "w-full text-start rounded-md px-2 py-1.5 -mx-1.5 text-[11px] transition-colors border",
+                                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                  addr
+                                    ? "font-mono text-sky-800 bg-sky-50 border-sky-200 hover:bg-sky-100 dark:text-sky-200 dark:bg-sky-950/35 dark:border-sky-800"
+                                    : "text-primary font-medium bg-primary/10 border-primary/30 hover:bg-primary/15",
+                                )}
+                                dir="ltr"
+                                title={addr || "הוסף כתובת ייבוא"}
+                              >
+                                <span className="inline-flex items-center gap-1.5">
+                                  <Mail className="w-3.5 h-3.5 shrink-0" />
+                                  <span>{addr || "— אין כתובת מייל —"}</span>
+                                </span>
+                              </button>
                           </div>
                         </div>
                         {active ? (
@@ -1548,30 +1574,18 @@ function RestaurantDetailPanel({
           </div>
         </div>
       ) : (
-        <div className="rounded-xl border bg-card p-4 space-y-3 text-start">
-          <h3 className="text-base font-semibold flex items-center gap-2 flex-wrap min-w-0">
-            {restaurant?.emoji ? <span aria-hidden>{restaurant.emoji}</span> : null}
-            <span>{restaurant?.name ?? "מסעדה"}</span>
-          </h3>
-          <p className="text-xs text-muted-foreground">{branchLabel}</p>
-          <div className="space-y-1">
-            <p className="text-[11px] font-medium text-muted-foreground">כתובת ייבוא ממייל</p>
-            <button
-              type="button"
-              onClick={onOpenInbound}
-              className={cn(
-                "w-full text-start rounded-lg border px-3 py-2 text-sm transition-colors",
-                "hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                inboundAddress ? "font-mono dir-ltr" : "text-primary border-dashed",
-              )}
-              dir={inboundAddress ? "ltr" : undefined}
-            >
-              {inboundAddress ?? "— אין כתובת מייל — (לחץ להוספה)"}
-            </button>
+        <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground text-center leading-relaxed space-y-3">
+          <div>
+            <strong className="text-foreground">{restaurant?.name ?? "מסעדה"}</strong>
+            <span className="mx-1">·</span>
+            {branchLabel}
+            <br />
+            <span className="text-xs">ייבוא ממייל, עריכה וניהול צוות — בכפתורים בשורת המסעדה למעלה.</span>
           </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            עריכה, העלאות, ניהול צוות ובקשות שינוי כתובת — בשורת המסעדה למעלה.
-          </p>
+          <Button type="button" variant="secondary" size="sm" className="gap-1.5" onClick={onOpenEdit}>
+            <Pencil className="h-3.5 w-3.5 shrink-0" />
+            עריכת פרטי מסעדה
+          </Button>
         </div>
       )}
     </div>
