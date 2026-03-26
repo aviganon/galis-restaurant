@@ -45,6 +45,18 @@ async function isSenderAllowed(restaurantId: string, fromEmail: string): Promise
 export const inboundWebhook = functions
   .region("europe-west1")
   .https.onRequest(async (req, res) => {
+    functions.logger.info("inboundWebhook request", {
+      method: req.method,
+      headers: req.headers,
+      hasBody: req.body != null,
+      bodyType: typeof req.body,
+      bodyPreview:
+        typeof req.body === "string"
+          ? req.body.slice(0, 500)
+          : req.body && typeof req.body === "object"
+            ? JSON.stringify(req.body).slice(0, 500)
+            : null,
+    })
     const secret = req.query.secret ?? req.headers["x-webhook-secret"]
     if (WEBHOOK_SECRET && secret !== WEBHOOK_SECRET) {
       res.status(401).send("Unauthorized")
@@ -98,22 +110,71 @@ interface ParsedForm {
   files: Record<string, { filename: string; mimetype: string; buffer: Buffer }>
 }
 
-function parseMultipart(req: IncomingMessage): Promise<ParsedForm> {
+type IncomingMessageWithRawBody = IncomingMessage & {
+  rawBody?: Buffer
+  headers: Record<string, string | string[] | undefined>
+}
+
+function parseMultipart(req: IncomingMessageWithRawBody): Promise<ParsedForm> {
   return new Promise((resolve, reject) => {
-    const bb = createBusboy({ headers: req.headers as Record<string, string> })
+    const contentType = String(req.headers["content-type"] ?? "")
+    if (!contentType.toLowerCase().startsWith("multipart/form-data")) {
+      reject(new Error(`Unsupported content-type: ${contentType || "(missing)"}`))
+      return
+    }
+
+    const normalizedHeaders: Record<string, string> = {}
+    for (const [k, v] of Object.entries(req.headers)) {
+      if (typeof v === "string") normalizedHeaders[k] = v
+      else if (Array.isArray(v)) normalizedHeaders[k] = v.join(", ")
+    }
+
+    const bb = createBusboy({ headers: normalizedHeaders })
     const fields: Record<string, string> = {}
     const files: Record<string, { filename: string; mimetype: string; buffer: Buffer }> = {}
+    let pendingFiles = 0
+    let finished = false
+    let settled = false
+
+    const done = (err?: Error) => {
+      if (settled) return
+      if (err) {
+        settled = true
+        reject(err)
+        return
+      }
+      if (finished && pendingFiles === 0) {
+        settled = true
+        resolve({ fields, files })
+      }
+    }
 
     bb.on("field", (name: string, val: string) => { fields[name] = val })
     bb.on("file",  (name: string, stream: NodeJS.ReadableStream, info: { filename: string; mimeType: string }) => {
+      pendingFiles++
       const chunks: Buffer[] = []
       stream.on("data", (chunk: Buffer) => chunks.push(chunk))
       stream.on("end",  () => {
         files[name] = { filename: info.filename, mimetype: info.mimeType, buffer: Buffer.concat(chunks) }
+        pendingFiles--
+        done()
       })
+      stream.on("error", (e: Error) => done(e))
     })
-    bb.on("finish", () => resolve({ fields, files }))
-    bb.on("error",  reject)
-    ;(req as NodeJS.ReadableStream).pipe(bb as unknown as NodeJS.WritableStream)
+    bb.on("finish", () => {
+      finished = true
+      done()
+    })
+    bb.on("error", (...args: unknown[]) => done((args[0] as Error) ?? new Error("busboy error")))
+
+    try {
+      if (req.rawBody && Buffer.isBuffer(req.rawBody) && req.rawBody.length > 0) {
+        ;(bb as unknown as { end: (buf: Buffer) => void }).end(req.rawBody)
+      } else {
+        ;(req as NodeJS.ReadableStream).pipe(bb as unknown as NodeJS.WritableStream)
+      }
+    } catch (e) {
+      done(e as Error)
+    }
   })
 }
