@@ -50,6 +50,46 @@ interface LoginScreenProps {}
 const GOOGLE_AUTH_INTENT_KEY = "google-auth-intent"
 const GOOGLE_REGISTER_DRAFT_KEY = "google-register-draft"
 
+function saveGoogleAuthDraft(intent: "login" | "register", draft?: { code: string; name: string; br: string }) {
+  if (typeof window === "undefined") return
+  sessionStorage.setItem(GOOGLE_AUTH_INTENT_KEY, intent)
+  localStorage.setItem(GOOGLE_AUTH_INTENT_KEY, intent)
+  if (draft) {
+    const raw = JSON.stringify(draft)
+    sessionStorage.setItem(GOOGLE_REGISTER_DRAFT_KEY, raw)
+    localStorage.setItem(GOOGLE_REGISTER_DRAFT_KEY, raw)
+  }
+}
+
+function clearGoogleAuthDraft() {
+  if (typeof window === "undefined") return
+  sessionStorage.removeItem(GOOGLE_AUTH_INTENT_KEY)
+  localStorage.removeItem(GOOGLE_AUTH_INTENT_KEY)
+  sessionStorage.removeItem(GOOGLE_REGISTER_DRAFT_KEY)
+  localStorage.removeItem(GOOGLE_REGISTER_DRAFT_KEY)
+}
+
+function readGoogleAuthIntent(): "login" | "register" | null {
+  if (typeof window === "undefined") return null
+  const v = sessionStorage.getItem(GOOGLE_AUTH_INTENT_KEY) || localStorage.getItem(GOOGLE_AUTH_INTENT_KEY)
+  return v === "login" || v === "register" ? v : null
+}
+
+function readGoogleRegisterDraft(): { code: string; name: string; br: string } {
+  if (typeof window === "undefined") return { code: "", name: "", br: "" }
+  const raw = sessionStorage.getItem(GOOGLE_REGISTER_DRAFT_KEY) || localStorage.getItem(GOOGLE_REGISTER_DRAFT_KEY) || ""
+  try {
+    const parsed = JSON.parse(raw) as { code?: string; name?: string; br?: string }
+    return {
+      code: (parsed.code || "").trim().toUpperCase().replace(/\s/g, ""),
+      name: (parsed.name || "").trim(),
+      br: (parsed.br || "").trim(),
+    }
+  } catch {
+    return { code: "", name: "", br: "" }
+  }
+}
+
 const authErrorToKey: Record<string, string> = {
   "auth/invalid-credential": "authErrors.invalidCredential",
   "auth/invalid-email": "authErrors.invalidEmail",
@@ -264,26 +304,28 @@ export function LoginScreen(_props: LoginScreenProps) {
   useEffect(() => {
     let cancelled = false
     void (async () => {
+      let shouldClearDraft = false
       try {
         const result = await getRedirectResult(auth)
         if (!result?.user || cancelled) return
-        const intent = sessionStorage.getItem(GOOGLE_AUTH_INTENT_KEY)
+        shouldClearDraft = true
+        const intent = readGoogleAuthIntent()
         if (intent === "register") {
-          const raw = sessionStorage.getItem(GOOGLE_REGISTER_DRAFT_KEY)
-          const parsed = raw ? (JSON.parse(raw) as { code?: string; name?: string; br?: string }) : {}
-          const code = (parsed.code || "").trim().toUpperCase().replace(/\s/g, "")
-          await completeGoogleRegister(result.user, { code, name: (parsed.name || "").trim(), br: (parsed.br || "").trim() })
+          await completeGoogleRegister(result.user, readGoogleRegisterDraft())
         } else {
           await completeGoogleLogin(result.user)
         }
       } catch (err) {
         if (!cancelled) {
           const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
-          setError(getAuthError(code) || (err instanceof Error ? err.message : t("authErrors.default")))
+          if (code === "auth/operation-not-allowed") {
+            setError("כניסה עם Google לא מופעלת כרגע בהגדרות Firebase Authentication.")
+          } else {
+            setError(getAuthError(code) || (err instanceof Error ? err.message : t("authErrors.default")))
+          }
         }
       } finally {
-        sessionStorage.removeItem(GOOGLE_AUTH_INTENT_KEY)
-        sessionStorage.removeItem(GOOGLE_REGISTER_DRAFT_KEY)
+        if (shouldClearDraft) clearGoogleAuthDraft()
       }
     })()
     return () => { cancelled = true }
@@ -429,8 +471,10 @@ export function LoginScreen(_props: LoginScreenProps) {
     } catch (err) {
       const code = err && typeof err === "object" && "code" in err ? String(err.code) : ""
       if (code === "auth/popup-blocked") {
-        sessionStorage.setItem(GOOGLE_AUTH_INTENT_KEY, "login")
+        saveGoogleAuthDraft("login")
         await signInWithRedirect(auth, new GoogleAuthProvider())
+      } else if (code === "auth/operation-not-allowed") {
+        setError("כניסה עם Google לא מופעלת כרגע בהגדרות Firebase Authentication.")
       } else if (code !== "auth/popup-closed-by-user") {
         setError(getAuthError(code) || (err instanceof Error ? err.message : t("authErrors.default")))
       }
@@ -454,17 +498,17 @@ export function LoginScreen(_props: LoginScreenProps) {
       if (codeData?.[inviteCodeFields.type] !== "manager") { setError(t("login.codeNoRestaurant")); return }
       if (!codeData?.[inviteCodeFields.restaurantId] && !name) { setError(t("login.enterRestaurantName")); return }
       const draft = { code, name, br }
-      sessionStorage.setItem(GOOGLE_AUTH_INTENT_KEY, "register")
-      sessionStorage.setItem(GOOGLE_REGISTER_DRAFT_KEY, JSON.stringify(draft))
+      saveGoogleAuthDraft("register", draft)
       const provider = new GoogleAuthProvider()
       const result = await signInWithPopup(auth, provider)
       await completeGoogleRegister(result.user, draft)
-      sessionStorage.removeItem(GOOGLE_AUTH_INTENT_KEY)
-      sessionStorage.removeItem(GOOGLE_REGISTER_DRAFT_KEY)
+      clearGoogleAuthDraft()
     } catch (err) {
       const authCode = err && typeof err === "object" && "code" in err ? String(err.code) : ""
       if (authCode === "auth/popup-blocked") {
         await signInWithRedirect(auth, new GoogleAuthProvider())
+      } else if (authCode === "auth/operation-not-allowed") {
+        setError("הרשמה עם Google לא מופעלת כרגע בהגדרות Firebase Authentication.")
       } else if (authCode !== "auth/popup-closed-by-user") {
         setError(err instanceof Error ? err.message : t("authErrors.default"))
       }
