@@ -109,12 +109,10 @@ export function RestaurantInboundUploadsDialog({
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const blob = await res.blob()
-      const inferredType = blob.type || "application/octet-stream"
-      const file = Object.assign(blob, {
-        name: nameFromPath,
-        lastModified: Date.now(),
-        type: inferredType,
-      }) as File
+      const fileLike = blob as Blob & { name?: string; lastModified?: number }
+      Object.defineProperty(fileLike, "name", { value: nameFromPath, configurable: true })
+      Object.defineProperty(fileLike, "lastModified", { value: Date.now(), configurable: true })
+      const file = fileLike as File
       let type: ExtractType = "p"
       let detectedType: "invoice" | "sales" | "other" = "invoice"
       const hasKey = await getClaudeApiKey()

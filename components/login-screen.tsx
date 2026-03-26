@@ -371,6 +371,25 @@ export function LoginScreen(_props: LoginScreenProps) {
     }
   }
 
+  const handleSetPasswordForGoogle = async () => {
+    if (!email.trim()) {
+      setError("כדי להגדיר סיסמה לחשבון Google, הזן קודם את האימייל בשדה הכניסה.")
+      return
+    }
+    setError("")
+    setIsLoading(true)
+    try {
+      const r = await sendPasswordResetReliable(email.trim())
+      if (r.ok) {
+        setError("נשלח מייל להגדרת סיסמה. לאחר הגדרה תוכל להיכנס גם עם אימייל וסיסמה.")
+      } else {
+        setError(r.error)
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
@@ -945,6 +964,9 @@ export function LoginScreen(_props: LoginScreenProps) {
 
                       <button type="button" onClick={handleForgotPassword} disabled={isLoading} className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors">
                         {t("login.forgotPassword")}
+                      </button>
+                      <button type="button" onClick={handleSetPasswordForGoogle} disabled={isLoading} className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors">
+                        יש לך חשבון Google ורוצה גם סיסמה? לחץ כאן
                       </button>
                       <div className="relative my-1">
                         <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>

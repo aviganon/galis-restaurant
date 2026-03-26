@@ -433,12 +433,11 @@ export function Upload() {
               })
               if (!res.ok) throw new Error(`HTTP ${res.status}`)
               const blob = await res.blob()
-              const inferredType = blob.type || "application/octet-stream"
-              const file = Object.assign(blob, {
-                name: nameFromPath ?? "inbound-file",
-                lastModified: Date.now(),
-                type: inferredType,
-              }) as File
+              const fileName = nameFromPath ?? "inbound-file"
+              const fileLike = blob as Blob & { name?: string; lastModified?: number }
+              Object.defineProperty(fileLike, "name", { value: fileName, configurable: true })
+              Object.defineProperty(fileLike, "lastModified", { value: Date.now(), configurable: true })
+              const file = fileLike as File
               const hasKey = await getClaudeApiKey()
               let forceType: "p" | "d" | "s" = "p"
               if (hasKey) {
