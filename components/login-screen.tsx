@@ -361,24 +361,42 @@ export function LoginScreen(_props: LoginScreenProps) {
   const handleGoogleRegister = async () => {
     setError("")
     const code = inviteCode.trim().toUpperCase().replace(/\s/g, "")
+    const name = restaurantName.trim()
+    const br = branch.trim()
     if (!code) { setError(t("login.enterInviteCode")); return }
     setIsLoading(true)
     try {
-      const { inviteCodesCollection, inviteCodeFields, usersCollection } = firestoreConfig
+      const { inviteCodesCollection, inviteCodeFields, usersCollection, restaurantsCollection, restaurantFields } = firestoreConfig
       const codeRef = doc(db, inviteCodesCollection, code)
       const codeSnap = await getDoc(codeRef)
       if (!codeSnap.exists()) { setError(t("login.invalidCode")); return }
       const codeData = codeSnap.data()
       if (codeData?.[inviteCodeFields.used]) { setError(t("login.codeUsed")); return }
       if (codeData?.[inviteCodeFields.type] !== "manager") { setError(t("login.codeNoRestaurant")); return }
-      const existingRestId = codeData?.[inviteCodeFields.restaurantId]
-      if (!existingRestId) { setError(t("login.enterRestaurantName")); return }
+      const existingRestId = codeData?.[inviteCodeFields.restaurantId] as string | undefined
+      let restId: string
+      if (existingRestId) {
+        restId = existingRestId
+      } else {
+        if (!name) { setError(t("login.enterRestaurantName")); return }
+        restId = `rest_${Date.now()}`
+      }
       const provider = new GoogleAuthProvider()
       const result = await signInWithPopup(auth, provider)
       const user = result.user
-      await setDoc(doc(db, usersCollection, user.uid), { restaurantId: existingRestId, role: "manager", email: user.email }, { merge: true })
+      if (!existingRestId) {
+        await setDoc(doc(db, restaurantsCollection, restId), {
+          [restaurantFields.name]: name,
+          [restaurantFields.branch]: br || "סניף ראשי",
+          target: 30,
+        })
+        await setDoc(codeRef, { [inviteCodeFields.restaurantId]: restId }, { merge: true })
+      }
+      await setDoc(doc(db, usersCollection, user.uid), { restaurantId: restId, role: "manager", email: user.email }, { merge: true })
       await setDoc(codeRef, { [inviteCodeFields.used]: true }, { merge: true })
       setInviteCode("")
+      setRestaurantName("")
+      setBranch("")
     } catch (err) {
       const authCode = err && typeof err === "object" && "code" in err ? String(err.code) : ""
       if (authCode !== "auth/popup-closed-by-user") setError(err instanceof Error ? err.message : t("authErrors.default"))
