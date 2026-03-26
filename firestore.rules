@@ -54,10 +54,10 @@ service cloud.firestore {
         || isSystemOwnerUser()
         || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && resource.data.restaurantId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId)
       );
-      // create: רישום עצמי (uid = מזהה המסמך), או בעל מערכת — יצירת משתמש משני (Auth) + setDoc עם הטוקן של המחובר הראשי
+      // create: רישום עצמי; או בעל מערכת/אדמין (כולל users.isSystemOwner בלי רשימת admins); או מנהל מסעדה — משתמשי צוות בלבד
       allow create: if request.auth != null && (
         request.auth.uid == userId
-        || isConfigAdmin()
+        || canManageAllRestaurants()
         || (
           exists(/databases/$(database)/documents/users/$(request.auth.uid))
           && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['manager', 'admin']
@@ -69,7 +69,7 @@ service cloud.firestore {
       );
       allow update: if request.auth != null && (
         request.auth.uid == userId
-        || isConfigAdmin()
+        || canManageAllRestaurants()
         || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && resource.data.restaurantId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['manager', 'admin'])
       );
       allow delete: if request.auth != null && (
