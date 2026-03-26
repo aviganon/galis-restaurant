@@ -12,6 +12,7 @@ import {
 import type { Firestore } from "firebase/firestore"
 import { toast } from "sonner"
 import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplier-ingredients"
+import { upsertRestaurantSupplierPrice } from "@/lib/restaurant-supplier-prices"
 import type { ExtractedSupplierItem } from "@/lib/ai-extract"
 import type { SalesReportPeriod } from "@/lib/ai-extract"
 import { safeFirestoreRecipeId } from "@/lib/recipe-id"
@@ -94,6 +95,23 @@ export async function confirmSupplierInvoiceImport(params: {
   })
   if (count > 0) {
     await batch.commit()
+    if (!toGlobal && supName?.trim()) {
+      await Promise.all(
+        items
+          .filter((item) => item.name?.trim() && item.price > 0)
+          .map((item) =>
+            upsertRestaurantSupplierPrice({
+              db,
+              restaurantId: restId,
+              ingredientName: item.name.trim(),
+              supplier: supName.trim(),
+              price: item.price,
+              unit: item.unit || "קג",
+              lastUpdated: now,
+            }),
+          ),
+      )
+    }
     if (toGlobal && supName?.trim()) {
       const toSync = items
         .filter((item) => item.name?.trim() && item.price > 0)

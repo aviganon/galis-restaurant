@@ -26,12 +26,21 @@ type InboundJobRow = {
   attachmentPaths?: string[]
 }
 
+const STALE_PENDING_MINUTES = 20
+
 function formatReceivedAt(v: InboundJobRow["receivedAt"]): string {
   if (!v) return "-"
   if (typeof v === "object" && typeof v?.toDate === "function") {
     return v.toDate().toLocaleString("he-IL")
   }
   return new Date(v as string | number).toLocaleString("he-IL")
+}
+
+function toMillis(v: InboundJobRow["receivedAt"]): number | null {
+  if (!v) return null
+  if (typeof v === "object" && typeof v?.toDate === "function") return v.toDate().getTime()
+  const ms = new Date(v as string | number).getTime()
+  return Number.isFinite(ms) ? ms : null
 }
 
 function statusBadgeVariant(status: InboundJobRow["status"]): "default" | "secondary" | "destructive" | "outline" {
@@ -149,9 +158,10 @@ export function RestaurantInboundUploadsDialog({
 
   useEffect(() => {
     if (!open || !restaurantId) return
-    setLoading(true)
-    setLoadError(null)
-    void (async () => {
+    let cancelled = false
+    const load = async (silent = false) => {
+      if (!silent) setLoading(true)
+      setLoadError(null)
       try {
         const headers = await firebaseBearerHeaders()
         const res = await fetch("/api/inbound-jobs", {
@@ -162,17 +172,36 @@ export function RestaurantInboundUploadsDialog({
         })
         const json = (await res.json().catch(() => ({}))) as { jobs?: InboundJobRow[]; error?: string }
         if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
-        setRows(Array.isArray(json.jobs) ? json.jobs : [])
+        if (!cancelled) setRows(Array.isArray(json.jobs) ? json.jobs : [])
       } catch (e) {
-        setRows([])
-        setLoadError((e as Error)?.message || "שגיאה בטעינת העלאות")
+        if (!cancelled) {
+          setRows([])
+          setLoadError((e as Error)?.message || "שגיאה בטעינת העלאות")
+        }
       } finally {
-        setLoading(false)
+        if (!silent && !cancelled) setLoading(false)
       }
-    })()
+    }
+    void load()
+    const id = window.setInterval(() => void load(true), 30_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
   }, [open, restaurantId])
 
   const title = useMemo(() => "העלאות ממייל למסעדה", [])
+  const stalePendingRows = useMemo(() => {
+    const now = Date.now()
+    return rows
+      .filter((r) => (r.status || "pending") === "pending")
+      .filter((r) => {
+        const ms = toMillis(r.receivedAt)
+        if (!ms) return false
+        return now - ms >= STALE_PENDING_MINUTES * 60 * 1000
+      })
+      .sort((a, b) => (toMillis(a.receivedAt) || 0) - (toMillis(b.receivedAt) || 0))
+  }, [rows])
   const filteredRows = useMemo(() => {
     return rows.filter((r) => {
       const resolvedType = (r.detectedType as "invoice" | "sales" | "other" | undefined) || classifyByHeuristic(r)
@@ -201,6 +230,27 @@ export function RestaurantInboundUploadsDialog({
         ) : (
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-2">
+              {stalePendingRows.length > 0 ? (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-2.5 flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs md:text-sm text-amber-900">
+                    {stalePendingRows.length} מיילים בהמתנה יותר מ־{STALE_PENDING_MINUTES} דקות
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => setStatusFilter("pending")}>
+                      הצג pending
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-7 text-xs"
+                      disabled={busyJobId !== null || stalePendingRows.length === 0}
+                      onClick={() => void processNow(stalePendingRows[0])}
+                    >
+                      עבד עכשיו (הישן ביותר)
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "pending" | "processing" | "done" | "error")}>
                   <SelectTrigger>

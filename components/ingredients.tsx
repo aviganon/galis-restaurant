@@ -5,6 +5,7 @@ import { collection, collectionGroup, getDocs, doc, getDoc, setDoc, deleteDoc, w
 import { firebaseBearerHeaders } from "@/lib/api-auth-client"
 import { db } from "@/lib/firebase"
 import { groupPriceSubdocsByIngredient, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
+import { upsertRestaurantSupplierPrice } from "@/lib/restaurant-supplier-prices"
 import { useApp } from "@/contexts/app-context"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -652,8 +653,10 @@ export function Ingredients() {
     }
     setAddIngSaving(true)
     try {
+      const now = new Date().toISOString()
+      const price = parseFloat(String(addIngPrice)) || 0
       await setDoc(doc(db, "restaurants", currentRestaurantId, "ingredients", name), {
-        price: parseFloat(String(addIngPrice)) || 0,
+        price,
         unit: addIngUnit,
         waste: parseFloat(String(addIngWaste)) || 0,
         supplier: addIngSupplier.trim() || "",
@@ -661,8 +664,19 @@ export function Ingredients() {
         minStock: parseFloat(String(addIngMinStock)) || 0,
         sku: addIngSku.trim() || "",
         category: addIngCategory,
-        lastUpdated: new Date().toISOString(),
+        lastUpdated: now,
       }, { merge: true })
+      if (addIngSupplier.trim() && price > 0) {
+        await upsertRestaurantSupplierPrice({
+          db,
+          restaurantId: currentRestaurantId,
+          ingredientName: name,
+          supplier: addIngSupplier.trim(),
+          price,
+          unit: addIngUnit,
+          lastUpdated: now,
+        })
+      }
       toast.success(t("pages.ingredients.ingredientAdded").replace("{name}", name))
       setIsAddDialogOpen(false)
       resetAddIngForm()
@@ -711,6 +725,7 @@ export function Ingredients() {
       const waste = parseFloat(String(editIngWaste)) || 0
       const stock = parseFloat(String(editIngStock)) || 0
       const minStock = parseFloat(String(editIngMinStock)) || 0
+      const now = new Date().toISOString()
       await setDoc(doc(db, "restaurants", currentRestaurantId, "ingredients", editIngredient.name), {
         price,
         unit: editIngUnit,
@@ -720,8 +735,19 @@ export function Ingredients() {
         sku: editIngSku.trim() || "",
         category: editIngCategory || "אחר",
         supplier: editIngSupplier.trim() || "",
-        lastUpdated: new Date().toISOString(),
+        lastUpdated: now,
       }, { merge: true })
+      if (editIngSupplier.trim() && price > 0) {
+        await upsertRestaurantSupplierPrice({
+          db,
+          restaurantId: currentRestaurantId,
+          ingredientName: editIngredient.name,
+          supplier: editIngSupplier.trim(),
+          price,
+          unit: editIngUnit,
+          lastUpdated: now,
+        })
+      }
       toast.success(t("pages.ingredients.ingredientUpdated").replace("{name}", editIngredient.name))
       setEditIngredientOpen(false)
       setEditIngredient(null)

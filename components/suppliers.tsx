@@ -1,9 +1,10 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
-import { collection, getDocs, doc, getDoc, setDoc, writeBatch, deleteDoc, addDoc } from "firebase/firestore"
+import { collection, getDocs, doc, getDoc, setDoc, writeBatch, deleteDoc, addDoc, collectionGroup, query, where } from "firebase/firestore"
 import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplier-ingredients"
 import { supplierFirestoreDocId } from "@/lib/supplier-firestore-id"
+import { upsertRestaurantSupplierPrice } from "@/lib/restaurant-supplier-prices"
 import {
   Table,
   TableBody,
@@ -131,6 +132,10 @@ export default function Suppliers() {
   const [editIngSaving, setEditIngSaving] = useState(false)
   const [deleteSupplierDialogOpen, setDeleteSupplierDialogOpen] = useState(false)
   const [deletingSupplierName, setDeletingSupplierName] = useState<string | null>(null)
+  const [priceCompareOpen, setPriceCompareOpen] = useState(false)
+  const [priceCompareIngredient, setPriceCompareIngredient] = useState("")
+  const [priceCompareRows, setPriceCompareRows] = useState<Array<{ supplier: string; price: number; unit: string; lastUpdated?: string }>>([])
+  const [priceCompareLoading, setPriceCompareLoading] = useState(false)
 
   const [showInvoiceUploadArea, setShowInvoiceUploadArea] = useState(false)
   const [InvoiceUploadComponent, setInvoiceUploadComponent] = useState<React.ComponentType<{
@@ -153,10 +158,11 @@ export default function Suppliers() {
     }
     setLoading(true)
     try {
-      const [restSnap, asDoc, globalSnap] = await Promise.all([
+      const [restSnap, asDoc, globalSnap, restPricesSnap] = await Promise.all([
         getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients")),
         getDoc(doc(db, "restaurants", currentRestaurantId, "appState", "assignedSuppliers")),
         getDocs(collection(db, "ingredients")),
+        getDocs(query(collectionGroup(db, "prices"), where("restaurantId", "==", currentRestaurantId))),
       ])
       const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
       /** התאמה לפי שם (לא ID) — נירמול רווחים כדי שיתאים ל-admin ול-ingredients */
@@ -201,6 +207,27 @@ export default function Suppliers() {
           source: isAssignedSupplierName(sup) ? "assigned" : existing.source,
         })
         const chips1 = chipsBySupplier.get(supKey) || []; chips1.push({ name: d.id, stock, minStock: typeof data.minStock === "number" ? data.minStock : 0, unit: (data.unit as string)||"יחידה", price: typeof data.price === "number" ? data.price : 0 }); chipsBySupplier.set(supKey, chips1)
+      })
+      // היסטוריית מחירים למסעדה: מאפשרת לראות אותו רכיב אצל יותר מספק אחד
+      const histCountBySupplier = new Map<string, Set<string>>()
+      restPricesSnap.forEach((d) => {
+        const data = d.data() as Record<string, unknown>
+        const sup = String(data.supplier || "").trim()
+        const ing = String(data.ingredientName || "").trim()
+        const price = typeof data.price === "number" ? data.price : 0
+        if (!sup || !ing || price <= 0) return
+        const set = histCountBySupplier.get(sup) ?? new Set<string>()
+        set.add(ing)
+        histCountBySupplier.set(sup, set)
+        if (!chipsBySupplier.has(sup)) chipsBySupplier.set(sup, [])
+      })
+      histCountBySupplier.forEach((set, sup) => {
+        const existing = bySupplier.get(sup) || { products: 0, totalValue: 0, source: "restaurant" as const }
+        bySupplier.set(sup, {
+          ...existing,
+          products: Math.max(existing.products, set.size),
+          source: existing.source === "assigned" ? "assigned" : (isAssignedSupplierName(sup) ? "assigned" : "restaurant"),
+        })
       })
       // ספקים ששויכו מבעלים בלי רכיבים גלובליים — עדיין להציג כרטיס (0 מוצרים)
       for (const raw of assignedList) {
@@ -322,6 +349,23 @@ export default function Suppliers() {
       })
       if (count > 0) {
         await batch.commit()
+        if (!toGlobal && supName?.trim()) {
+          await Promise.all(
+            items
+              .filter((item) => item.name?.trim() && item.price > 0)
+              .map((item) =>
+                upsertRestaurantSupplierPrice({
+                  db,
+                  restaurantId: restId,
+                  ingredientName: item.name.trim(),
+                  supplier: supName.trim(),
+                  price: item.price,
+                  unit: item.unit || "קג",
+                  lastUpdated: now,
+                }),
+              ),
+          )
+        }
         if (toGlobal && supName?.trim()) {
           const toSync = items
             .filter((item) => item.name?.trim() && item.price > 0)
@@ -453,6 +497,16 @@ export default function Suppliers() {
         },
         { merge: true }
       )
+      if (supplierDetailName.trim() && price > 0) {
+        await upsertRestaurantSupplierPrice({
+          db,
+          restaurantId: currentRestaurantId,
+          ingredientName: editingIngredient.name,
+          supplier: supplierDetailName.trim(),
+          price,
+          unit: editIngUnit,
+        })
+      }
       toast.success(t("pages.ingredients.ingredientUpdated").replace("{name}", editingIngredient.name))
       setSupplierDetailItems((prev) =>
         prev.map((i) =>
@@ -537,6 +591,35 @@ export default function Suppliers() {
       setSupplierDetailName("")
     }
   }, [selectedSupplierDetail, loadSupplierDetail])
+
+  const openIngredientPriceCompare = useCallback(async (ingredientName: string) => {
+    if (!currentRestaurantId) return
+    setPriceCompareIngredient(ingredientName)
+    setPriceCompareOpen(true)
+    setPriceCompareLoading(true)
+    setPriceCompareRows([])
+    try {
+      const snap = await getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients", ingredientName, "prices"))
+      const rows = snap.docs
+        .map((d) => {
+          const v = d.data()
+          return {
+            supplier: String(v.supplier || d.id).trim(),
+            price: typeof v.price === "number" ? v.price : 0,
+            unit: String(v.unit || "קג"),
+            lastUpdated: typeof v.lastUpdated === "string" ? v.lastUpdated : "",
+          }
+        })
+        .filter((r) => r.supplier && r.price > 0)
+        .sort((a, b) => (b.lastUpdated || "").localeCompare(a.lastUpdated || ""))
+      setPriceCompareRows(rows)
+    } catch (e) {
+      console.error("price compare:", e)
+      toast.error("שגיאה בטעינת השוואת מחירים")
+    } finally {
+      setPriceCompareLoading(false)
+    }
+  }, [currentRestaurantId])
 
   const addNsmItem = () => {
     const name = nsmItemName.trim()
@@ -1013,7 +1096,7 @@ export default function Suppliers() {
                               <TableHead className="text-right">מינ׳</TableHead>
                               <TableHead className="text-right">סטטוס</TableHead>
                               <TableHead className="text-right">מק״ט</TableHead>
-                              <TableHead className="text-right w-20">פעולות</TableHead>
+                              <TableHead className="text-right w-32">פעולות</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1041,6 +1124,15 @@ export default function Suppliers() {
                                 <TableCell className="text-right">{i.sku || "—"}</TableCell>
                                 <TableCell className="text-right">
                                     <div className="flex items-center justify-end gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 px-2 text-xs"
+                                        onClick={(e) => { e.stopPropagation(); void openIngredientPriceCompare(i.name) }}
+                                        title="השוואת מחירים בין ספקים"
+                                      >
+                                        השוואה
+                                      </Button>
                                       <Button
                                         variant="ghost"
                                         size="icon"
@@ -1100,6 +1192,37 @@ export default function Suppliers() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={priceCompareOpen} onOpenChange={setPriceCompareOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>השוואת ספקים לרכיב: {priceCompareIngredient}</DialogTitle>
+          </DialogHeader>
+          {priceCompareLoading ? (
+            <div className="py-8 flex items-center justify-center text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin ml-2" />
+              טוען מחירים...
+            </div>
+          ) : priceCompareRows.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">אין מחירי ספקים שמורים לרכיב זה</p>
+          ) : (
+            <div className="space-y-2 max-h-[55vh] overflow-y-auto">
+              {priceCompareRows.map((r) => (
+                <div key={`${r.supplier}-${r.lastUpdated || ""}`} className="border rounded-lg p-3 flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{r.supplier}</p>
+                    <p className="text-xs text-muted-foreground">{r.lastUpdated ? r.lastUpdated.split("T")[0] : ""}</p>
+                  </div>
+                  <div className="text-left">
+                    <p className="font-semibold">₪{r.price.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">{r.unit}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!editingIngredient} onOpenChange={(o) => { if (!o) setEditingIngredient(null) }}>
         <DialogContent className="max-w-md">

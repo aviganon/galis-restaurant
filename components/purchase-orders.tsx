@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
-import { collection, getDocs, query, where, addDoc, updateDoc, deleteDoc, doc, getDoc, writeBatch } from "firebase/firestore"
+import { collection, getDocs, query, where, addDoc, updateDoc, deleteDoc, doc, getDoc, writeBatch, collectionGroup } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
 import { Card, CardContent } from "@/components/ui/card"
@@ -53,6 +53,8 @@ interface UploadRecord {
   uploadedAt: string
   ingredientCount: number
   supplier: string
+  status?: string
+  source?: "manual" | "email"
 }
 
 const STOCK_COUNT_ACCEPT = ".xlsx,.xls,.csv,.pdf,.rtf,image/*"
@@ -105,15 +107,64 @@ export function PurchaseOrders() {
       setSuggestions(sugg)
       try {
         const asDoc = await getDoc(doc(db, "restaurants", currentRestaurantId, "appState", "assignedSuppliers"))
-        const ids: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
+        const assigned: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
+        const supplierNames = new Set<string>(assigned.map((s) => String(s || "").trim()).filter(Boolean))
+        ingSnap.forEach((d) => {
+          const sup = String(d.data()?.supplier || "").trim()
+          if (sup) supplierNames.add(sup)
+        })
         const supDocs = await Promise.all(
-          ids.map((name) => getDoc(doc(db, "suppliers", supplierFirestoreDocId(name))))
+          Array.from(supplierNames).map((name) => getDoc(doc(db, "suppliers", supplierFirestoreDocId(name))))
         )
-        setRestaurantSuppliers(supDocs.filter(d => d.exists()).map(d => ({ id: d.id, name: (d.data()?.name as string) || d.id, email: (d.data()?.email as string) || "", phone: (d.data()?.phone as string) || "" })))
+        const map = new Map<string, RestaurantSupplier>()
+        Array.from(supplierNames).forEach((name) => {
+          map.set(name, { id: name, name, email: "", phone: "" })
+        })
+        supDocs.forEach((d) => {
+          if (!d.exists()) return
+          const data = d.data()
+          const name = String(data?.name || "").trim() || d.id
+          map.set(name, {
+            id: name,
+            name,
+            email: (data?.email as string) || "",
+            phone: (data?.phone as string) || "",
+          })
+        })
+        setRestaurantSuppliers(Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, "he")))
       } catch(e) { console.error(e) }
       try {
-        const upSnap = await getDocs(collection(db, "restaurants", currentRestaurantId, "uploads"))
-        const ups: UploadRecord[] = upSnap.docs.map(d => { const v = d.data(); return { id: d.id, fileName: (v.fileName as string) || d.id, uploadedAt: (v.uploadedAt as string) || (v.createdAt as string) || "", ingredientCount: Number(v.ingredientCount) || 0, supplier: (v.supplier as string) || "" } })
+        const [upSnap, inboundSnap] = await Promise.all([
+          getDocs(collection(db, "restaurants", currentRestaurantId, "uploads")),
+          getDocs(query(collectionGroup(db, "inboundJobs"), where("restaurantId", "==", currentRestaurantId))),
+        ])
+        const manualUps: UploadRecord[] = upSnap.docs.map(d => {
+          const v = d.data()
+          return {
+            id: d.id,
+            fileName: (v.fileName as string) || d.id,
+            uploadedAt: (v.uploadedAt as string) || (v.createdAt as string) || "",
+            ingredientCount: Number(v.ingredientCount) || 0,
+            supplier: (v.supplier as string) || "",
+            source: "manual",
+          }
+        })
+        const inboundUps: UploadRecord[] = inboundSnap.docs.map((d) => {
+          const v = d.data()
+          const paths = Array.isArray(v.attachmentPaths) ? (v.attachmentPaths as string[]) : []
+          const first = paths[0] || ""
+          const fileName = first.split("/").pop() || (v.subject as string) || d.id
+          return {
+            id: d.id,
+            fileName,
+            uploadedAt: (v.receivedAt as string) || (v.createdAt as string) || "",
+            ingredientCount: 0,
+            supplier: (v.fromEmail as string) || "",
+            status: (v.status as string) || "pending",
+            source: "email",
+          }
+        })
+        const ups: UploadRecord[] = [...manualUps, ...inboundUps]
         ups.sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt))
         setUploads(ups)
       } catch(e) { console.error(e) }
@@ -211,6 +262,22 @@ export function PurchaseOrders() {
       .sort((a, b) => a[0].localeCompare(b[0], "he"))
       .map(([supplier, items]) => ({ supplier, items }))
   }, [suggestions])
+  const selectedSupplierName = (selSup?.name || "").trim()
+  const filteredSuggestionsForOrder = useMemo(() => {
+    if (!selectedSupplierName) return suggestionsBySupplier
+    return suggestionsBySupplier.filter(({ supplier }) => supplier.trim() === selectedSupplierName)
+  }, [suggestionsBySupplier, selectedSupplierName])
+
+  const addAllForSelectedSupplier = useCallback(() => {
+    if (!selectedSupplierName) return
+    const block = suggestionsBySupplier.find((s) => s.supplier.trim() === selectedSupplierName)
+    if (!block?.items?.length) {
+      toast.error("אין רכיבים מומלצים עבור הספק שנבחר")
+      return
+    }
+    block.items.forEach((i) => addItem(i.name, i.unit, i.price, Math.max(1, i.suggestedQty)))
+    toast.success(`נוספו ${block.items.length} רכיבים להזמנה`)
+  }, [selectedSupplierName, suggestionsBySupplier])
 
   if (loading) return <div className="p-4 md:p-6 flex items-center justify-center min-h-[40vh]"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>
   if (!currentRestaurantId) return <div className="p-4 md:p-6"><p className="text-muted-foreground">בחר מסעדה</p></div>
@@ -346,15 +413,18 @@ export function PurchaseOrders() {
               <label className="text-sm font-medium mb-1 block">ספק</label>
               <Select value={selSup?.id || ""} onValueChange={v => setSelSup(restaurantSuppliers.find(x => x.id === v) || null)}>
                               <SelectTrigger className="w-full"><SelectValue placeholder="בחר ספק מהמסעדה..." /></SelectTrigger>
-                                              <SelectContent position="popper" className="z-[9999] w-full">{restaurantSuppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+                                              <SelectContent position="popper" className="z-[9999] w-full">
+                                                {restaurantSuppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                                              </SelectContent>
                                                             </Select>
+              {restaurantSuppliers.length === 0 ? <p className="text-xs text-muted-foreground mt-1">לא נמצאו ספקים. הוסף ספק במסך ספקים או שיוך ספק לרכיב.</p> : null}
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">הוסף רכיב מהמלצות</label>
-<Select onValueChange={v => { const ing = suggestions.find(i => i.name === v); if (ing) addItem(ing.name, ing.unit, ing.price, ing.suggestedQty); }}>
+<Select onValueChange={v => { const ing = suggestions.find(i => i.name === v); if (ing) addItem(ing.name, ing.unit, ing.price, Math.max(1, ing.suggestedQty)); }}>
                 <SelectTrigger className="w-full"><SelectValue placeholder="בחר רכיב..." /></SelectTrigger>
                 <SelectContent position="popper" className="z-[9999] w-full max-h-[min(70vh,24rem)]">
-                  {suggestionsBySupplier.map(({ supplier, items }) => (
+                  {filteredSuggestionsForOrder.map(({ supplier, items }) => (
                     <SelectGroup key={supplier}>
                       <SelectLabel className="text-xs font-semibold px-2 py-1.5">
                         {supplier === "—" ? t("pages.purchaseOrders.suggestionsNoSupplier") : supplier}
@@ -368,6 +438,21 @@ export function PurchaseOrders() {
                   ))}
                 </SelectContent>
                                               </Select>
+              {selectedSupplierName ? (
+                <p className="text-xs text-muted-foreground mt-1">מוצגים רק רכיבים של הספק: {selectedSupplierName}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1">בחר ספק כדי לסנן אוטומטית רכיבים מהמלצות</p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={!selectedSupplierName}
+                onClick={addAllForSelectedSupplier}
+                className="px-3 py-2 text-sm border rounded-lg hover:bg-muted disabled:opacity-50"
+              >
+                הוסף את כל ההמלצות של הספק הנבחר
+              </button>
             </div>
             {orderItems.length > 0 && (
               <div className="border rounded-lg overflow-hidden">
@@ -380,7 +465,7 @@ export function PurchaseOrders() {
                     {orderItems.map((item, idx) => (
                       <tr key={idx} className="border-t">
                         <td className="px-3 py-2 font-medium">{item.name}</td>
-                        <td className="px-3 py-2"><Input type="number" value={item.quantity} min={1} className="w-20 h-8 text-center mx-auto" onChange={e => setOrderItems(p => p.map((i, j) => j === idx ? {...i, quantity: Number(e.target.value)} : i))} /></td>
+                        <td className="px-3 py-2"><Input type="number" value={item.quantity} min={1} className="w-20 h-8 text-center mx-auto" onChange={e => setOrderItems(p => p.map((i, j) => j === idx ? {...i, quantity: Math.max(1, Number(e.target.value) || 1)} : i))} /></td>
                         <td className="px-3 py-2 text-center">&#8362;{(item.quantity * item.price).toFixed(2)}</td>
                         <td className="px-3 py-2 text-center"><button onClick={() => setOrderItems(p => p.filter((_, j) => j !== idx))} className="text-red-500 font-bold">x</button></td>
                       </tr>
@@ -469,7 +554,7 @@ export function PurchaseOrders() {
               <div className="text-center py-12 text-muted-foreground">
                 <div className="text-5xl mb-3">📁</div>
                 <p className="font-medium">אין היסטוריית העלאות</p>
-                <p className="text-sm mt-1">העלאות קבצים יופיעו כאן</p>
+                <p className="text-sm mt-1">מוצגים כאן גם קבצים ידניים וגם קבצים שנקלטו ממייל למסעדה</p>
               </div>
             ) : uploads.map(up => (
               <div key={up.id} className="bg-card border rounded-xl p-4 flex items-center justify-between">
@@ -478,14 +563,15 @@ export function PurchaseOrders() {
                   <div>
                     <p className="font-medium text-sm">{up.fileName}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {up.supplier && <span className="ml-2">ספק: {up.supplier}</span>}
+                      {up.supplier && <span className="ml-2">{up.source === "email" ? "שולח: " : "ספק: "}{up.supplier}</span>}
                       {up.ingredientCount > 0 && <span>{up.ingredientCount} רכיבים</span>}
+                      {up.status && <span className="mr-2">סטטוס: {up.status}</span>}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
                   <p className="text-xs font-medium">{up.uploadedAt?.split("T")[0] || up.uploadedAt}</p>
-                  <p className="text-xs text-muted-foreground">העלאה</p>
+                  <p className="text-xs text-muted-foreground">{up.source === "email" ? "מייל נכנס" : "העלאה"}</p>
                 </div>
               </div>
             ))}
