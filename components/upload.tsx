@@ -11,6 +11,7 @@ import { FilePreviewModal } from "@/components/file-preview-modal"
 import type { ExtractedSupplierItem, ExtractedDishItem, SalesReportPeriod } from "@/lib/ai-extract"
 import { detectDocumentType, type DetectedDocType } from "@/lib/ai-extract"
 import { getClaudeApiKey } from "@/lib/claude"
+import { firebaseBearerHeaders } from "@/lib/api-auth-client"
 import { normalizeDishCategoryToHebrew } from "@/lib/dish-category-hebrew"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -424,8 +425,13 @@ export function Upload() {
             if (!path0) return
             try {
               await setInboundJobStatusSafe(jobId, "processing")
-              const url = await getDownloadURL(ref(storage, path0))
-              const res = await fetch(url)
+              const headers = await firebaseBearerHeaders()
+              const res = await fetch("/api/inbound-jobs/file", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...headers },
+                body: JSON.stringify({ restaurantId: currentRestaurantId, jobId, attachmentPath: path0 }),
+              })
+              if (!res.ok) throw new Error(`HTTP ${res.status}`)
               const blob = await res.blob()
               const inferredType = blob.type || "application/octet-stream"
               const file = Object.assign(blob, {
@@ -433,9 +439,6 @@ export function Upload() {
                 lastModified: Date.now(),
                 type: inferredType,
               }) as File
-              setUploads((prev) =>
-                prev.map((u) => (u.id === jobId ? { ...u, downloadUrl: url } : u))
-              )
               const hasKey = await getClaudeApiKey()
               let forceType: "p" | "d" | "s" = "p"
               if (hasKey) {

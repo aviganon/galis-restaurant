@@ -5,6 +5,7 @@
 import { cert, getApps, initializeApp, type App, type ServiceAccount } from "firebase-admin/app"
 import { getAuth } from "firebase-admin/auth"
 import { getFirestore, type Firestore } from "firebase-admin/firestore"
+import { getStorage } from "firebase-admin/storage"
 
 let app: App | null = null
 
@@ -40,4 +41,10 @@ export function getFirebaseAdminFirestore(): Firestore | null {
   const a = getFirebaseAdminApp()
   if (!a) return null
   return getFirestore(a)
+}
+
+export function getFirebaseAdminStorageBucket() {
+  const a = getFirebaseAdminApp()
+  if (!a) return null
+  return getStorage(a).bucket()
 }

@@ -22,6 +22,7 @@ type InboundJobRow = {
   subject?: string
   receivedAt?: string | number | { toDate?: () => Date }
   status?: "pending" | "processing" | "done" | "error" | string
+  detectedType?: "invoice" | "sales" | "other" | string
   attachmentPaths?: string[]
 }
 
@@ -38,6 +39,19 @@ function statusBadgeVariant(status: InboundJobRow["status"]): "default" | "secon
   if (status === "processing") return "secondary"
   if (status === "error") return "destructive"
   return "outline"
+}
+
+function classifyByHeuristic(row: InboundJobRow): "invoice" | "sales" | "other" {
+  const s = `${row.subject || ""} ${(row.attachmentPaths || []).join(" ")}`.toLowerCase()
+  if (/(חשבונית|invoice|tax[-_ ]?invoice|קבלה)/i.test(s)) return "invoice"
+  if (/(דוח\s*מכירות|sales|z\s*report|דו\"ח)/i.test(s)) return "sales"
+  return "other"
+}
+
+function typeLabel(t: "invoice" | "sales" | "other"): string {
+  if (t === "invoice") return "חשבונית ספק"
+  if (t === "sales") return "דוח מכירות"
+  return "אחר"
 }
 
 export function RestaurantInboundUploadsDialog({
@@ -85,8 +99,13 @@ export function RestaurantInboundUploadsDialog({
     setBusyJobId(row.id)
     await patchStatus(row.id, "processing")
     try {
-      const url = await getDownloadURL(ref(storage, path0))
-      const res = await fetch(url)
+      const headers = await firebaseBearerHeaders()
+      const res = await fetch("/api/inbound-jobs/file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ restaurantId, jobId: row.id, attachmentPath: path0 }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const blob = await res.blob()
       const inferredType = blob.type || "application/octet-stream"
       const file = Object.assign(blob, {
@@ -95,14 +114,26 @@ export function RestaurantInboundUploadsDialog({
         type: inferredType,
       }) as File
       let type: ExtractType = "p"
+      let detectedType: "invoice" | "sales" | "other" = "invoice"
       const hasKey = await getClaudeApiKey()
       if (hasKey) {
         try {
           const detected = await detectDocumentType(file)
           type = mapDetectedToType(detected)
+          detectedType = detected === "sales" ? "sales" : detected === "invoice" ? "invoice" : "other"
         } catch {
           type = "p"
         }
+      }
+      try {
+        await fetch("/api/inbound-jobs/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...headers },
+          body: JSON.stringify({ restaurantId, jobId: row.id, status: "processing", detectedType }),
+        })
+        setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, detectedType } : r)))
+      } catch {
+        // Non-blocking
       }
       setActiveJobId(row.id)
       setFpmType(type)
@@ -178,6 +209,11 @@ export function RestaurantInboundUploadsDialog({
                       <span dir="ltr">{r.fromEmail || "-"}</span>
                       <span>{formatReceivedAt(r.receivedAt)}</span>
                       <span>{(r.attachmentPaths?.length || 0).toString()} קבצים</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">
+                        {typeLabel((r.detectedType as "invoice" | "sales" | "other" | undefined) || classifyByHeuristic(r))}
+                      </Badge>
                     </div>
                     {Array.isArray(r.attachmentPaths) && r.attachmentPaths.length > 0 ? (
                       <div className="text-[11px] text-muted-foreground font-mono space-y-0.5">

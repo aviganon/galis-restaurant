@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireFirebaseUser } from "@/lib/api-verify-firebase"
-import { getFirebaseAdminFirestore } from "@/lib/firebase-admin-server"
+import { getFirebaseAdminFirestore, getFirebaseAdminStorageBucket } from "@/lib/firebase-admin-server"
 import { loadAdminEmailSet } from "@/lib/firebase-admin-permissions"
-
-type InboundStatus = "pending" | "processing" | "done" | "error"
-type InboundDetectedType = "invoice" | "sales" | "other"
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,28 +9,20 @@ export async function POST(req: NextRequest) {
     if (!auth.ok) return auth.response
 
     const db = getFirebaseAdminFirestore()
-    if (!db) {
+    const bucket = getFirebaseAdminStorageBucket()
+    if (!db || !bucket) {
       return NextResponse.json(
         { error: "השרת לא מוגדר לאדמין (הוסף FIREBASE_SERVICE_ACCOUNT_JSON)" },
         { status: 503 },
       )
     }
 
-    const body = await req.json().catch(() => ({} as {
-      restaurantId?: string
-      jobId?: string
-      status?: InboundStatus
-      detectedType?: InboundDetectedType
-    }))
+    const body = await req.json().catch(() => ({} as { restaurantId?: string; jobId?: string; attachmentPath?: string }))
     const restaurantId = body.restaurantId?.trim()
     const jobId = body.jobId?.trim()
-    const status = body.status
-    const detectedType = body.detectedType
-    if (!restaurantId || !jobId || !status) {
-      return NextResponse.json({ error: "חסר restaurantId/jobId/status" }, { status: 400 })
-    }
-    if (!["pending", "processing", "done", "error"].includes(status)) {
-      return NextResponse.json({ error: "status לא תקין" }, { status: 400 })
+    const attachmentPath = body.attachmentPath?.trim()
+    if (!restaurantId || !jobId || !attachmentPath) {
+      return NextResponse.json({ error: "חסר restaurantId/jobId/attachmentPath" }, { status: 400 })
     }
 
     const [callerSnap, adminEmailSet] = await Promise.all([
@@ -51,17 +40,30 @@ export async function POST(req: NextRequest) {
     const jobRef = db.collection("inboundJobs").doc(jobId)
     const jobSnap = await jobRef.get()
     if (!jobSnap.exists) return NextResponse.json({ error: "job לא נמצא" }, { status: 404 })
-    const rid = (jobSnap.data() as { restaurantId?: string } | undefined)?.restaurantId
-    if (rid !== restaurantId) return NextResponse.json({ error: "job לא שייך למסעדה" }, { status: 403 })
-
-    const payload: { status: InboundStatus; detectedType?: InboundDetectedType } = { status }
-    if (detectedType && ["invoice", "sales", "other"].includes(detectedType)) {
-      payload.detectedType = detectedType
+    const job = jobSnap.data() as { restaurantId?: string; attachmentPaths?: string[] } | undefined
+    if (job?.restaurantId !== restaurantId) {
+      return NextResponse.json({ error: "job לא שייך למסעדה" }, { status: 403 })
     }
-    await jobRef.set(payload, { merge: true })
-    return NextResponse.json({ ok: true })
+    if (!Array.isArray(job?.attachmentPaths) || !job.attachmentPaths.includes(attachmentPath)) {
+      return NextResponse.json({ error: "קובץ לא שייך ל-job" }, { status: 403 })
+    }
+
+    const f = bucket.file(attachmentPath)
+    const [exists] = await f.exists()
+    if (!exists) return NextResponse.json({ error: "קובץ לא נמצא ב-storage" }, { status: 404 })
+    const [buf] = await f.download()
+    const [meta] = await f.getMetadata()
+    const filename = attachmentPath.split("/").pop() || "inbound-file"
+    const contentType = meta.contentType || "application/octet-stream"
+    return new NextResponse(new Uint8Array(buf), {
+      headers: {
+        "Content-Type": contentType,
+        "Content-Disposition": `inline; filename="${filename}"`,
+        "Cache-Control": "private, no-store",
+      },
+    })
   } catch (e) {
-    console.error("[inbound-jobs/status] POST failed:", e)
+    console.error("[inbound-jobs/file] POST failed:", e)
     return NextResponse.json({ error: (e as Error)?.message || "שגיאה לא צפויה" }, { status: 500 })
   }
 }

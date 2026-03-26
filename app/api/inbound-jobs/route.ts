@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
         fromEmail: data.fromEmail ?? "",
         subject: data.subject ?? "",
         status: data.status ?? "pending",
+        detectedType: data.detectedType ?? "other",
         receivedAt: data.receivedAt ?? "",
         attachmentPaths: Array.isArray(data.attachmentPaths) ? data.attachmentPaths : [],
       }
