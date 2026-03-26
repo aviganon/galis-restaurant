@@ -42,6 +42,3 @@ yarn-error.log*
 # OS
 .DS_Store
 Thumbs.db
-
-# פרויקט עצמאי (ריפו נפרד) — תחזית BTC
-btc-forecast/
