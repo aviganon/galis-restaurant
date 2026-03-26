@@ -98,7 +98,7 @@ export function Settings() {
   const [aiCatalogRecipesByChef, setAiCatalogRecipesByChef] = useState<Record<string, string[]>>({})
   const [aiCatalogSelectedChef, setAiCatalogSelectedChef] = useState<string>(AI_CHEF_STYLES[0] || "")
   const [aiCatalogDialogOpen, setAiCatalogDialogOpen] = useState(false)
-  const [aiCatalogBulkInput, setAiCatalogBulkInput] = useState("")
+  const [aiCatalogSelectedRecipe, setAiCatalogSelectedRecipe] = useState("")
   const [loadingAiCatalog, setLoadingAiCatalog] = useState(false)
   const [savingAiCatalog, setSavingAiCatalog] = useState(false)
   const [usersData, setUsersData] = useState<
@@ -501,6 +501,17 @@ export function Settings() {
       setAiCatalogSelectedChef(aiCatalogChefs[0] || "")
     }
   }, [aiCatalogChefs, aiCatalogSelectedChef])
+
+  useEffect(() => {
+    const list = aiCatalogRecipes
+    if (list.length === 0) {
+      setAiCatalogSelectedRecipe("")
+      return
+    }
+    if (!list.includes(aiCatalogSelectedRecipe)) {
+      setAiCatalogSelectedRecipe(list[0])
+    }
+  }, [aiCatalogSelectedChef, aiCatalogRecipesByChef, aiCatalogRecipes, aiCatalogSelectedRecipe])
 
   const saveAiCatalogForRestaurant = async () => {
     if (!aiCatalogRestId) return
@@ -974,8 +985,15 @@ export function Settings() {
                           {aiCatalogChefs.map((chef) => (<option key={chef} value={chef}>{chef}</option>))}
                         </select>
                         <div className="border rounded-lg p-2 max-h-56 overflow-auto space-y-1">
-                          {(aiCatalogRecipesByChef[aiCatalogSelectedChef] || aiCatalogRecipes).map((r) => (
-                            <label key={`${aiCatalogSelectedChef}-${r}`} className="flex items-center gap-2 text-sm">
+                          {aiCatalogRecipes.map((r) => (
+                            <label
+                              key={`${aiCatalogSelectedChef}-${r}`}
+                              className={cn(
+                                "flex items-center gap-2 text-sm rounded px-1.5 py-1 cursor-pointer",
+                                aiCatalogSelectedRecipe === r ? "bg-primary/10" : "hover:bg-muted/60",
+                              )}
+                              onClick={() => setAiCatalogSelectedRecipe(r)}
+                            >
                               <input
                                 type="checkbox"
                                 checked={(aiCatalogRecipesByChef[aiCatalogSelectedChef] || aiCatalogRecipes).includes(r)}
@@ -991,31 +1009,29 @@ export function Settings() {
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <p className="text-sm font-medium">טעינת הרבה מתכונים (עד 1000+)</p>
-                        <textarea
-                          className="w-full min-h-40 rounded-md border px-3 py-2 text-sm bg-background"
-                          placeholder="הדבק כאן רשימת מתכונים, שורה לכל מתכון"
-                          value={aiCatalogBulkInput}
-                          onChange={(e) => setAiCatalogBulkInput(e.target.value)}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            const rows = aiCatalogBulkInput.split(/\r?\n/).map((x) => x.trim()).filter(Boolean)
-                            if (rows.length === 0) return
-                            setAiCatalogRecipes((prev) => Array.from(new Set([...prev, ...rows])))
-                            setAiCatalogRecipesByChef((prev) => ({
-                              ...prev,
-                              [aiCatalogSelectedChef]: Array.from(new Set([...(prev[aiCatalogSelectedChef] || aiCatalogRecipes), ...rows])),
-                            }))
-                            setAiCatalogBulkInput("")
-                            toast.success(`נטענו ${rows.length} מתכונים`)
-                          }}
-                        >
-                          הוסף לרשימה
-                        </Button>
+                        <p className="text-sm font-medium">פרטי מנה נבחרת</p>
+                        <div className="border rounded-lg p-3 space-y-2 min-h-40">
+                          {aiCatalogSelectedRecipe ? (
+                            <>
+                              <p className="font-medium">{aiCatalogSelectedRecipe}</p>
+                              <p className="text-xs text-muted-foreground">שפים שבהם המנה זמינה:</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {aiCatalogChefs
+                                  .filter((chef) => (aiCatalogRecipesByChef[chef] || aiCatalogRecipes).includes(aiCatalogSelectedRecipe))
+                                  .map((chef) => (
+                                    <Badge key={`${aiCatalogSelectedRecipe}-${chef}`} variant="secondary" className="text-[11px]">
+                                      {chef}
+                                    </Badge>
+                                  ))}
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">
+                                המערכת משתמשת במאגר מורחב (1000+) של רעיונות מתכון אוטומטיים, ואין צורך בטעינה ידנית.
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">בחר מנה מהרשימה כדי לראות למי היא משויכת.</p>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <Button size="sm" onClick={saveAiCatalogForRestaurant} disabled={savingAiCatalog || !aiCatalogRestId}>
