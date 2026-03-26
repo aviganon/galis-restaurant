@@ -274,21 +274,37 @@ export function LoginScreen(_props: LoginScreenProps) {
   const completeGoogleRegister = useCallback(async (
     user: User,
     draft: { code: string; name: string; br: string },
-  ) => {
+  ): Promise<boolean> => {
     const { code, name, br } = draft
     const { inviteCodesCollection, inviteCodeFields, usersCollection, restaurantsCollection, restaurantFields } = firestoreConfig
     const codeRef = doc(db, inviteCodesCollection, code)
     const codeSnap = await getDoc(codeRef)
-    if (!codeSnap.exists()) { setError(t("login.invalidCode")); return }
+    if (!codeSnap.exists()) {
+      setError(t("login.invalidCode"))
+      await auth.signOut().catch(() => {})
+      return false
+    }
     const codeData = codeSnap.data()
-    if (codeData?.[inviteCodeFields.used]) { setError(t("login.codeUsed")); return }
-    if (codeData?.[inviteCodeFields.type] !== "manager") { setError(t("login.codeNoRestaurant")); return }
+    if (codeData?.[inviteCodeFields.used]) {
+      setError(t("login.codeUsed"))
+      await auth.signOut().catch(() => {})
+      return false
+    }
+    if (codeData?.[inviteCodeFields.type] !== "manager") {
+      setError(t("login.codeNoRestaurant"))
+      await auth.signOut().catch(() => {})
+      return false
+    }
     const existingRestId = codeData?.[inviteCodeFields.restaurantId] as string | undefined
     let restId: string
     if (existingRestId) {
       restId = existingRestId
     } else {
-      if (!name) { setError(t("login.enterRestaurantName")); return }
+      if (!name) {
+        setError(t("login.enterRestaurantName"))
+        await auth.signOut().catch(() => {})
+        return false
+      }
       restId = `rest_${Date.now()}`
       await setDoc(doc(db, restaurantsCollection, restId), {
         [restaurantFields.name]: name,
@@ -303,6 +319,7 @@ export function LoginScreen(_props: LoginScreenProps) {
     setRestaurantName("")
     setBranch("")
     setError("")
+    return true
   }, [t])
 
   useEffect(() => {
@@ -315,7 +332,8 @@ export function LoginScreen(_props: LoginScreenProps) {
         shouldClearDraft = true
         const intent = readGoogleAuthIntent()
         if (intent === "register") {
-          await completeGoogleRegister(result.user, readGoogleRegisterDraft())
+          const ok = await completeGoogleRegister(result.user, readGoogleRegisterDraft())
+          if (!ok) return
         } else {
           await completeGoogleLogin(result.user)
         }
@@ -528,7 +546,8 @@ export function LoginScreen(_props: LoginScreenProps) {
       saveGoogleAuthDraft("register", draft)
       const provider = new GoogleAuthProvider()
       const result = await signInWithPopup(auth, provider)
-      await completeGoogleRegister(result.user, draft)
+      const ok = await completeGoogleRegister(result.user, draft)
+      if (!ok) return
       clearGoogleAuthDraft()
     } catch (err) {
       const authCode = err && typeof err === "object" && "code" in err ? String(err.code) : ""

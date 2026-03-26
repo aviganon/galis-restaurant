@@ -200,7 +200,7 @@ export default function Home() {
           isInAdminsList || roleRaw === "owner" ? "owner"
           : data?.[roleField] === "user" ? "user"
           : roleRaw === "manager" || roleRaw === "admin" ? "manager"
-          : "owner"
+          : "manager"
         const userRestaurantId = data?.[restaurantIdField] as string | null | undefined
         const perms = data?.[permissionsField] as UserPermissions | undefined
         const isSystemOwnerFromUsers = data?.isSystemOwner === true
@@ -301,7 +301,7 @@ export default function Home() {
               setCurrentRestaurant(userRestaurantId)
               setCurrentRestaurantId(userRestaurantId)
             }
-          } else if (user.email && !isInAdminsList) {
+          } else if (user.email && !isInAdminsList && role === "user") {
             const restsSnap = await getDocs(collection(db, restaurantsCollection))
             if (authStale()) return
             let foundRestId: string | null = null
