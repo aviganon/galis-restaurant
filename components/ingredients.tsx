@@ -156,7 +156,7 @@ function CheapestPricePopover({
           <ChevronDown className="w-3 h-3" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 p-4">
+      <PopoverContent align="start" className="w-80 p-4 z-[100]">
         <div className="space-y-4">
           {gc ? (
             <div className={cn("rounded-lg border p-3 text-sm", isCheaper && "bg-green-500/5 border-green-500/20 text-green-700 dark:text-green-400")}>
@@ -284,15 +284,26 @@ export function Ingredients() {
 
   const INGREDIENTS_COLUMN_ORDER_KEY = "ingredients-column-order"
   const defaultColumnOrder = ["name", "price", "source", "cheapest", "unit", "waste", "stock", "minStock", "supplier", "sku", "status", "actions"] as const
+
+  /** בעלים: עמודות «מקור» ו«הכי זול» תמיד זמינות — לא מסתירים בטעות דרך localStorage */
+  const columnIsEffectivelyVisible = useCallback(
+    (key: string, visibility: Record<string, boolean>, owner: boolean) => {
+      if (owner && (key === "cheapest" || key === "source")) return true
+      return visibility[key] !== false
+    },
+    []
+  )
+
   const [columnOrder, setColumnOrder] = useState<string[]>(() => {
     if (typeof window === "undefined") return [...defaultColumnOrder]
     try {
       const stored = localStorage.getItem(INGREDIENTS_COLUMN_ORDER_KEY)
       if (stored) {
         const parsed = JSON.parse(stored) as string[]
-        const valid = defaultColumnOrder.filter((c) => parsed.includes(c))
-        const missing = defaultColumnOrder.filter((c) => !parsed.includes(c))
-        if (valid.length + missing.length === defaultColumnOrder.length) return [...valid, ...missing]
+        const known = new Set<string>(defaultColumnOrder)
+        const ordered = parsed.filter((k) => known.has(k))
+        const missing = defaultColumnOrder.filter((c) => !ordered.includes(c))
+        return [...ordered, ...missing]
       }
     } catch (_) {}
     return [...defaultColumnOrder]
@@ -306,18 +317,28 @@ export function Ingredients() {
     } catch (_) {}
     return {}
   })
-  const visibleColumnOrder = columnOrder.filter((k) => columnVisibility[k] !== false)
-  const toggleColumnVisibility = useCallback((key: string) => {
-    setColumnVisibility((prev) => {
-      const next = { ...prev, [key]: prev[key] === false }
-      try { localStorage.setItem(INGREDIENTS_COLUMN_VISIBILITY_KEY, JSON.stringify(next)) } catch (_) {}
-      return next
-    })
-  }, [])
+  const visibleColumnOrder = columnOrder.filter((k) => columnIsEffectivelyVisible(k, columnVisibility, isOwner))
+  const toggleColumnVisibility = useCallback(
+    (key: string) => {
+      if (isOwner && (key === "cheapest" || key === "source")) return
+      setColumnVisibility((prev) => {
+        const next = { ...prev, [key]: prev[key] === false }
+        try {
+          localStorage.setItem(INGREDIENTS_COLUMN_VISIBILITY_KEY, JSON.stringify(next))
+        } catch (_) {}
+        return next
+      })
+    },
+    [isOwner]
+  )
   const displayColumnOrder = visibleColumnOrder.filter((k) => (k !== "source" && k !== "cheapest" && k !== "actions") || isOwner)
   const handleColumnReorder = useCallback((fromIndex: number, toIndex: number) => {
     setColumnOrder((prev) => {
-      const display = prev.filter((k) => columnVisibility[k] !== false && ((k !== "source" && k !== "cheapest" && k !== "actions") || isOwner))
+      const display = prev.filter(
+        (k) =>
+          columnIsEffectivelyVisible(k, columnVisibility, isOwner) &&
+          ((k !== "source" && k !== "cheapest" && k !== "actions") || isOwner)
+      )
       if (fromIndex < 0 || fromIndex >= display.length || toIndex < 0 || toIndex >= display.length) return prev
       const displayOrder = [...display]
       const [moved] = displayOrder.splice(fromIndex, 1)
@@ -327,7 +348,7 @@ export function Ingredients() {
       try { localStorage.setItem(INGREDIENTS_COLUMN_ORDER_KEY, JSON.stringify(next)) } catch (_) {}
       return next
     })
-  }, [columnVisibility, isOwner])
+  }, [columnVisibility, isOwner, columnIsEffectivelyVisible])
 
   const INGREDIENTS_ROW_DENSITY_KEY = "ingredients-row-density"
   type RowDensity = "compact" | "normal" | "expanded"
@@ -344,6 +365,20 @@ export function Ingredients() {
     try { localStorage.setItem(INGREDIENTS_ROW_DENSITY_KEY, d) } catch (_) {}
   }, [])
   const densityCellClass = rowDensity === "compact" ? "py-1 px-1.5" : rowDensity === "expanded" ? "py-3 px-3" : "py-2 px-2"
+
+  useEffect(() => {
+    if (!isOwner) return
+    setColumnVisibility((prev) => {
+      if (prev.cheapest !== false && prev.source !== false) return prev
+      const next = { ...prev }
+      delete next.cheapest
+      delete next.source
+      try {
+        localStorage.setItem(INGREDIENTS_COLUMN_VISIBILITY_KEY, JSON.stringify(next))
+      } catch (_) {}
+      return next
+    })
+  }, [isOwner])
 
   const loadIngredients = useCallback(async () => {
     if (!currentRestaurantId) {
@@ -1352,9 +1387,9 @@ export function Ingredients() {
                 ))}
                 <div className="border-t my-1" />
                 <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{t("pages.ingredients.showHideColumns")}</div>
-                {defaultColumnOrder.filter((k) => (k !== "source" && k !== "actions") || isOwner).map((k) => {
-                  const isVisible = columnVisibility[k] !== false
-                    const colLabels: Record<string, string> = {
+                {defaultColumnOrder.filter((k) => (k !== "source" && k !== "cheapest" && k !== "actions") || isOwner).map((k) => {
+                  const isVisible = columnIsEffectivelyVisible(k, columnVisibility, isOwner)
+                  const colLabels: Record<string, string> = {
                     name: t("pages.ingredients.ingredientName"),
                     price: t("pages.ingredients.price"),
                     source: t("pages.ingredients.source"),
@@ -1370,7 +1405,12 @@ export function Ingredients() {
                   }
                   const label = colLabels[k] || k
                   return (
-                    <DropdownMenuCheckboxItem key={k} checked={isVisible} onCheckedChange={() => toggleColumnVisibility(k)}>
+                    <DropdownMenuCheckboxItem
+                      key={k}
+                      checked={isVisible}
+                      disabled={isOwner && (k === "cheapest" || k === "source")}
+                      onCheckedChange={() => toggleColumnVisibility(k)}
+                    >
                       {label}
                     </DropdownMenuCheckboxItem>
                   )
