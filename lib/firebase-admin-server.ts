@@ -9,6 +9,15 @@ import { getStorage } from "firebase-admin/storage"
 
 let app: App | null = null
 
+function resolveStorageBucketName(): string | undefined {
+  const raw =
+    process.env.FIREBASE_STORAGE_BUCKET?.trim() ||
+    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim() ||
+    undefined
+  if (!raw) return undefined
+  return raw.replace(/^gs:\/\//, "").replace(/\/+$/, "")
+}
+
 export function getFirebaseAdminApp(): App | null {
   if (app) return app
   const existing = getApps()[0]
@@ -20,8 +29,10 @@ export function getFirebaseAdminApp(): App | null {
   if (!raw?.trim()) return null
   try {
     const sa = JSON.parse(raw) as ServiceAccount
+    const storageBucket = resolveStorageBucketName()
     app = initializeApp({
       credential: cert(sa),
+      ...(storageBucket ? { storageBucket } : {}),
     })
     return app
   } catch (e) {
@@ -46,5 +57,11 @@ export function getFirebaseAdminFirestore(): Firestore | null {
 export function getFirebaseAdminStorageBucket() {
   const a = getFirebaseAdminApp()
   if (!a) return null
-  return getStorage(a).bucket()
+  try {
+    const storageBucket = resolveStorageBucketName()
+    return storageBucket ? getStorage(a).bucket(storageBucket) : getStorage(a).bucket()
+  } catch (e) {
+    console.error("[firebase-admin-server] storage bucket init failed:", e)
+    return null
+  }
 }

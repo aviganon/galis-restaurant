@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     const bucket = getFirebaseAdminStorageBucket()
     if (!db || !bucket) {
       return NextResponse.json(
-        { error: "השרת לא מוגדר לאדמין (הוסף FIREBASE_SERVICE_ACCOUNT_JSON)" },
+        { error: "השרת לא מוגדר לאדמין/Storage (FIREBASE_SERVICE_ACCOUNT_JSON + NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET)" },
         { status: 503 },
       )
     }
