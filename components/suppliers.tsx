@@ -158,12 +158,19 @@ export default function Suppliers() {
     }
     setLoading(true)
     try {
-      const [restSnap, asDoc, globalSnap, restPricesSnap] = await Promise.all([
+      const [restSnap, asDoc, globalSnap] = await Promise.all([
         getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients")),
         getDoc(doc(db, "restaurants", currentRestaurantId, "appState", "assignedSuppliers")),
         getDocs(collection(db, "ingredients")),
-        getDocs(query(collectionGroup(db, "prices"), where("restaurantId", "==", currentRestaurantId))),
       ])
+      let restPricesDocs: Array<{ data: () => Record<string, unknown> }> = []
+      try {
+        const restPricesSnap = await getDocs(query(collectionGroup(db, "prices"), where("restaurantId", "==", currentRestaurantId)))
+        restPricesDocs = restPricesSnap.docs
+      } catch (e) {
+        // Do not block supplier list for users without collectionGroup permission.
+        console.warn("load suppliers restaurant price history skipped:", e)
+      }
       const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
       /** התאמה לפי שם (לא ID) — נירמול רווחים כדי שיתאים ל-admin ול-ingredients */
       const isAssignedSupplierName = (supplierField: string) => {
@@ -210,8 +217,8 @@ export default function Suppliers() {
       })
       // היסטוריית מחירים למסעדה: מאפשרת לראות אותו רכיב אצל יותר מספק אחד
       const histCountBySupplier = new Map<string, Set<string>>()
-      restPricesSnap.forEach((d) => {
-        const data = d.data() as Record<string, unknown>
+      restPricesDocs.forEach((d) => {
+        const data = d.data()
         const sup = String(data.supplier || "").trim()
         const ing = String(data.ingredientName || "").trim()
         const price = typeof data.price === "number" ? data.price : 0
