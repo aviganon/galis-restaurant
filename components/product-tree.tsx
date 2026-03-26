@@ -46,7 +46,7 @@ import { getClaudeApiKey } from "@/lib/claude"
 import { confirmSupplierInvoiceImport, confirmSalesReportImport } from "@/lib/restaurant-import-handlers"
 import { loadGlobalPriceSubdocsMap, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
 import { normalizeDishCategoryToHebrew } from "@/lib/dish-category-hebrew"
-import { AI_CHEF_STYLES, AI_KNOWN_RECIPE_IDEAS } from "@/lib/ai-chef-catalog"
+import { AI_KNOWN_RECIPE_IDEAS } from "@/lib/ai-chef-catalog"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
 import { useLanguage } from "@/contexts/language-context"
@@ -125,7 +125,6 @@ const CATEGORY_TO_KEY: Record<string, string> = {
   "אחר": "other",
 }
 export default function ProductTree() {
-  const CHEF_STYLE_OPTIONS = ["ללא העדפת שף", ...AI_CHEF_STYLES] as const
   const [ingredientsModalOpen, setIngredientsModalOpen] = useState(false)
   const [suppliersModalOpen, setSuppliersModalOpen] = useState(false)
   const [dishImages, setDishImages] = useState<Record<string,string>>({})
@@ -163,14 +162,10 @@ export default function ProductTree() {
   const [dashboardModalTab, setDashboardModalTab] = useState<"dashboard" | "reports">("dashboard")
   const [aiSuggestLoading, setAiSuggestLoading] = useState(false)
   const [aiSuggestedDish, setAiSuggestedDish] = useState<ExtractedDishItem | null>(null)
-  const [aiSuggestedOptions, setAiSuggestedOptions] = useState<ExtractedDishItem[]>([])
   const [aiIngredientModeFilter, setAiIngredientModeFilter] = useState<"all" | "new_only" | "existing_only">("all")
-  const [aiChefStyle, setAiChefStyle] = useState<(typeof CHEF_STYLE_OPTIONS)[number]>("ללא העדפת שף")
   const [ingredientStock, setIngredientStock] = useState<Record<string, number>>({})
   const [restaurantIngredientNames, setRestaurantIngredientNames] = useState<Set<string>>(new Set())
-  const [allowedChefStyles, setAllowedChefStyles] = useState<string[]>([...AI_CHEF_STYLES])
   const [allowedRecipeIdeas, setAllowedRecipeIdeas] = useState<string[]>([...AI_KNOWN_RECIPE_IDEAS])
-  const [allowedRecipesByChef, setAllowedRecipesByChef] = useState<Record<string, string[]>>({})
   const [importFile, setImportFile] = useState<File | null>(null)
   const [fpmOpen, setFpmOpen] = useState(false)
   /** סוג חילוץ ב-FilePreviewModal: p חשבונית, d מנות, s מכירות */
@@ -326,12 +321,9 @@ export default function ProductTree() {
         setSupplierPrices(newPrices)
         setIngredientStock(newStock)
         setRestaurantIngredientNames(restaurantNames)
-        const aiConf = aiCatalogDoc.data() as { chefs?: string[]; recipes?: string[]; recipesByChef?: Record<string, string[]> } | undefined
-        const chefs = Array.isArray(aiConf?.chefs) && aiConf!.chefs!.length > 0 ? aiConf!.chefs! : [...AI_CHEF_STYLES]
+        const aiConf = aiCatalogDoc.data() as { recipes?: string[] } | undefined
         const recipes = Array.isArray(aiConf?.recipes) && aiConf!.recipes!.length > 0 ? aiConf!.recipes! : [...AI_KNOWN_RECIPE_IDEAS]
-        setAllowedChefStyles(chefs)
         setAllowedRecipeIdeas(recipes)
-        setAllowedRecipesByChef(aiConf?.recipesByChef && typeof aiConf.recipesByChef === "object" ? aiConf.recipesByChef : {})
       } catch (e) {
         console.error("load recipes/ingredients:", e)
         toast.error("שגיאה בטעינת עץ מוצר")
@@ -347,13 +339,6 @@ export default function ProductTree() {
     if (!key) return false
     return restaurantIngredientNames.has(key)
   }, [restaurantIngredientNames])
-
-  useEffect(() => {
-    if (aiChefStyle === "ללא העדפת שף") return
-    if (!allowedChefStyles.includes(aiChefStyle)) {
-      setAiChefStyle(allowedChefStyles[0] ? (allowedChefStyles[0] as (typeof CHEF_STYLE_OPTIONS)[number]) : "ללא העדפת שף")
-    }
-  }, [aiChefStyle, allowedChefStyles])
 
   const saveTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   useEffect(() => () => {
@@ -837,7 +822,7 @@ export default function ProductTree() {
     [currentRestaurantId, refreshIngredients]
   )
 
-  const handleAiSuggest = useCallback(async (count = 1) => {
+  const handleAiSuggest = useCallback(async () => {
     const list = Object.entries(supplierPrices).map(([name, sp]) => ({
       name,
       price: sp.price,
@@ -851,32 +836,13 @@ export default function ProductTree() {
     }
     setAiSuggestLoading(true)
     setAiSuggestedDish(null)
-    setAiSuggestedOptions([])
     setIsAiSuggestOpen(true)
     try {
-      const variants = Array.from({ length: Math.max(1, count) }, (_, i) => i)
-      const results = await Promise.all(
-        variants.map((i) =>
-          suggestDishFromIngredients(list, {
-            chefStyle: aiChefStyle,
-            variantHint: count > 1 ? `וריאציה מספר ${i + 1}` : undefined,
-            allowedRecipeNames:
-              aiChefStyle !== "ללא העדפת שף" && Array.isArray(allowedRecipesByChef[aiChefStyle]) && allowedRecipesByChef[aiChefStyle].length > 0
-                ? allowedRecipesByChef[aiChefStyle]
-                : allowedRecipeIdeas,
-          }),
-        ),
-      )
-      const dedup = new Map<string, ExtractedDishItem>()
-      results.forEach((r) => {
-        if (!r?.name?.trim()) return
-        const key = r.name.trim().toLowerCase()
-        if (!dedup.has(key)) dedup.set(key, r)
+      const suggested = await suggestDishFromIngredients(list, {
+        allowedRecipeNames: allowedRecipeIdeas,
       })
-      const options = Array.from(dedup.values())
-      if (options.length > 0) {
-        setAiSuggestedOptions(options)
-        setAiSuggestedDish(options[0])
+      if (suggested) {
+        setAiSuggestedDish(suggested)
       } else {
         toast.error("לא הצלחתי להציע מתכון — נסה שוב")
         setIsAiSuggestOpen(false)
@@ -887,7 +853,7 @@ export default function ProductTree() {
     } finally {
       setAiSuggestLoading(false)
     }
-  }, [supplierPrices, ingredientStock, t, aiChefStyle, allowedRecipeIdeas, allowedRecipesByChef])
+  }, [supplierPrices, ingredientStock, t, allowedRecipeIdeas])
 
   const handleAddAiSuggestedDish = useCallback(() => {
     if (!aiSuggestedDish?.name?.trim()) return
@@ -1129,32 +1095,12 @@ export default function ProductTree() {
               size="sm"
               variant="outline"
               className="gap-1.5"
-              onClick={() => void handleAiSuggest(1)}
+              onClick={() => void handleAiSuggest()}
               disabled={aiSuggestLoading || Object.keys(supplierPrices).length === 0}
             >
               {aiSuggestLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
               <span className="hidden sm:inline">{t("pages.productTree.aiSuggest")}</span>
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1.5"
-              onClick={() => void handleAiSuggest(3)}
-              disabled={aiSuggestLoading || Object.keys(supplierPrices).length === 0}
-            >
-              {aiSuggestLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ListOrdered className="w-4 h-4" />}
-              <span className="hidden sm:inline">AI ×3</span>
-            </Button>
-            <Select value={aiChefStyle} onValueChange={(v) => setAiChefStyle(v as (typeof CHEF_STYLE_OPTIONS)[number])}>
-              <SelectTrigger className="h-8 w-[170px]">
-                <SelectValue placeholder="בחר שף להצעה" />
-              </SelectTrigger>
-              <SelectContent>
-                {CHEF_STYLE_OPTIONS.filter((chef) => chef === "ללא העדפת שף" || allowedChefStyles.includes(chef)).map((chef) => (
-                  <SelectItem key={chef} value={chef}>{chef}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <Button
               type="button"
               size="sm"
@@ -1823,7 +1769,7 @@ export default function ProductTree() {
             </div>
           )}
 
-          <Dialog open={isAiSuggestOpen} onOpenChange={(o) => { setIsAiSuggestOpen(o); if (!o) { setAiSuggestedDish(null); setAiSuggestedOptions([]); setAiIngredientModeFilter("all") } }}>
+          <Dialog open={isAiSuggestOpen} onOpenChange={(o) => { setIsAiSuggestOpen(o); if (!o) { setAiSuggestedDish(null); setAiIngredientModeFilter("all") } }}>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
@@ -1834,30 +1780,14 @@ export default function ProductTree() {
               </DialogHeader>
               {aiSuggestedDish ? (
                 <div className="space-y-4 py-2">
-                  {aiSuggestedOptions.length > 1 ? (
-                    <div className="rounded-lg border p-2.5 bg-muted/30">
-                      <p className="text-xs font-medium mb-2">בחר הצעה:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {aiSuggestedOptions.map((opt, idx) => (
-                          <Button
-                            key={`${opt.name}-${idx}`}
-                            size="sm"
-                            variant={aiSuggestedDish?.name === opt.name ? "default" : "outline"}
-                            className="h-7 text-xs"
-                            onClick={() => setAiSuggestedDish(opt)}
-                          >
-                            {idx + 1}. {opt.name}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
                   <div>
                     <p className="font-medium text-lg">{aiSuggestedDish.name}</p>
                     <p className="text-sm text-muted-foreground">{aiSuggestedDish.category} • ₪{(aiSuggestedDish.price || 0).toFixed(0)}</p>
-                    <div className="mt-1">
-                      <Badge variant="outline" className="text-[11px]">הצעה לפי שף: {aiSuggestedDish.suggestedByChef || aiChefStyle}</Badge>
-                    </div>
+                    {aiSuggestedDish.suggestedByChef ? (
+                      <div className="mt-1">
+                        <Badge variant="outline" className="text-[11px]">שף מתאים: {aiSuggestedDish.suggestedByChef}</Badge>
+                      </div>
+                    ) : null}
                     {aiSuggestedDish.description ? (
                       <p className="text-sm mt-2 text-muted-foreground leading-relaxed">{aiSuggestedDish.description}</p>
                     ) : null}

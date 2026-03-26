@@ -750,7 +750,7 @@ export async function suggestDishFromIngredients(
   const variantHint = (options?.variantHint || "").trim()
   const chefPrompt = chefStyle && chefStyle !== "ללא העדפת שף"
     ? `סגנון שף מועדף להצעה: ${chefStyle}. שמור על פרשנות קולינרית בסגנון זה, אך השתמש רק ברכיבים הזמינים ברשימה.`
-    : "אין העדפת שף ספציפי — בחר סגנון ישראלי מודרני מאוזן."
+    : "אין העדפת שף ספציפי — בחר סגנון ישראלי מודרני מאוזן, ואם רלוונטי ציין שף השראה מתאים; אם לא, השאר suggestedByChef ריק."
   const variationPrompt = variantHint
     ? `וריאציית יצירה: ${variantHint}. הקפד שהרעיון יהיה שונה מרעיונות בסיסיים נפוצים.`
     : ""
@@ -767,7 +767,7 @@ export async function suggestDishFromIngredients(
         content: [
           {
             type: "text",
-            text: `רשימת הרכיבים במסעדה:\n${list}\n\n${chefPrompt}\n${variationPrompt}\n${recipeScope}\n\nהצע מנה או משקה עם description, preparationSteps (מערך של לפחות 4 שלבים בעברית תקנית), ו-ingredients (שמות רכיבים זהים לרשימה).\nהחזר גם שדה suggestedByChef עם שם השף/הסגנון שנבחר בפועל (או "ללא העדפת שף").\nלפני סיום: קרא בקול את description וכל preparationSteps — תקן כל שגיאת דקדוק או מילה שגויה.\nהחזר **רק** JSON תקין — ללא הסבר לפני או אחרי.`,
+            text: `רשימת הרכיבים במסעדה:\n${list}\n\n${chefPrompt}\n${variationPrompt}\n${recipeScope}\n\nהצע מנה או משקה עם description, preparationSteps (מערך של לפחות 4 שלבים בעברית תקנית), ו-ingredients (שמות רכיבים זהים לרשימה).\nהחזר גם שדה suggestedByChef: שם שף מתאים אם יש התאמה טובה; אם אין התאמה טובה, החזר suggestedByChef כמחרוזת ריקה.\nלפני סיום: קרא בקול את description וכל preparationSteps — תקן כל שגיאת דקדוק או מילה שגויה.\nהחזר **רק** JSON תקין — ללא הסבר לפני או אחרי.`,
           },
         ],
       },
@@ -835,8 +835,8 @@ export async function suggestDishFromIngredients(
     ),
     suggestedByChef:
       typeof (parsed as { suggestedByChef?: unknown }).suggestedByChef === "string"
-        ? ((parsed as { suggestedByChef?: string }).suggestedByChef || "").trim() || (chefStyle || "ללא העדפת שף")
-        : (chefStyle || "ללא העדפת שף"),
+        ? ((parsed as { suggestedByChef?: string }).suggestedByChef || "").trim() || undefined
+        : (chefStyle && chefStyle !== "ללא העדפת שף" ? chefStyle : undefined),
     description: typeof parsed.description === "string" ? parsed.description.trim() : undefined,
     preparation: preparation || undefined,
     ingredients: mappedIngredients,

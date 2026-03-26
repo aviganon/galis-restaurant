@@ -908,18 +908,21 @@ export function Settings() {
                 savingAssign2={savingAssign2}
               />
             }
-            userTabHeaderActions={
+            restaurantRowActions={(restaurant) => (
               <Button
                 type="button"
-                size="sm"
                 variant="outline"
-                className="h-10 gap-1.5"
-                onClick={() => setAiCatalogDialogOpen(true)}
+                size="sm"
+                className="h-7 px-2 text-[11px] gap-1"
+                onClick={() => {
+                  setAiCatalogRestId(restaurant.id)
+                  setAiCatalogDialogOpen(true)
+                }}
               >
-                <User className="w-4 h-4" />
+                <User className="h-3 w-3 shrink-0" />
                 שפים ומתכוני AI
               </Button>
-            }
+            )}
           />
           <Card
             className="mt-2 border border-primary/15 bg-gradient-to-br from-primary/[0.04] to-transparent shadow-sm"
@@ -961,9 +964,9 @@ export function Settings() {
               <div className="space-y-3">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">מסעדה</label>
-                  <select className="w-full h-10 rounded-md border px-3 text-sm bg-background" value={aiCatalogRestId} onChange={(e) => setAiCatalogRestId(e.target.value)}>
-                    {(restaurants || []).map((r) => (<option key={r.id} value={r.id}>{r.name}</option>))}
-                  </select>
+                  <div className="w-full h-10 rounded-md border px-3 text-sm bg-muted/30 flex items-center">
+                    {(restaurants || []).find((r) => r.id === aiCatalogRestId)?.name || "—"}
+                  </div>
                 </div>
                 {loadingAiCatalog ? <p className="text-sm text-muted-foreground">טוען...</p> : (
                   <>

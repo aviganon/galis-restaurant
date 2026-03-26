@@ -103,6 +103,10 @@ type Props = {
   userTabBulk?: ReactNode
   /** פעולות ליד טאבי "לפי מסעדה/לפי משתמש" */
   userTabHeaderActions?: ReactNode
+  /** פעולות ליד הטאבים כשנמצאים בלשונית "לפי מסעדה" */
+  restaurantTabHeaderActions?: ReactNode
+  /** פעולות נוספות ליד כפתור "העלאות" בכל שורת מסעדה */
+  restaurantRowActions?: (restaurant: Restaurant) => ReactNode
   /** אחרי שמירת פרטי מסעדה — רענון רשימת מסעדות מה־context */
   onRestaurantSaved?: () => void
   /** אחרי מחיקת מסעדה (למשל עדכון בחירה בהגדרות) */
@@ -125,6 +129,8 @@ export function SystemOwnerDirectory({
   userTabToolbar,
   userTabBulk,
   userTabHeaderActions,
+  restaurantTabHeaderActions,
+  restaurantRowActions,
   onRestaurantSaved,
   onRestaurantDeleted,
   hideCardHeader = false,
@@ -419,7 +425,7 @@ export function SystemOwnerDirectory({
             לפי משתמש
             </button>
           </div>
-          {userTabHeaderActions}
+          {panelTab === "restaurant" ? restaurantTabHeaderActions : userTabHeaderActions}
         </div>
 
         {panelTab === "restaurant" ? (
@@ -494,6 +500,14 @@ export function SystemOwnerDirectory({
                                       triggerLabel="העלאות"
                                     />
                                   </span>
+                                  {restaurantRowActions ? (
+                                    <span
+                                      onClick={(e) => e.stopPropagation()}
+                                      onMouseDown={(e) => e.stopPropagation()}
+                                    >
+                                      {restaurantRowActions(r)}
+                                    </span>
+                                  ) : null}
                                   <Button
                                     type="button"
                                     variant="outline"
