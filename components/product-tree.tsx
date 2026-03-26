@@ -25,7 +25,7 @@ import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
-import { doc, collection, getDocs, getDoc, setDoc, deleteDoc, writeBatch } from "firebase/firestore"
+import { doc, collection, getDocs, getDoc, setDoc, deleteDoc, writeBatch, query, where } from "firebase/firestore"
 import { db, storage } from "@/lib/firebase"
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage"
 import { useApp } from "@/contexts/app-context"
@@ -865,7 +865,7 @@ export default function ProductTree() {
     try {
       const [manualSnap, inboundSnap] = await Promise.all([
         getDocs(collection(db, "restaurants", currentRestaurantId, "uploads")),
-        getDocs(collection(db, "restaurants", currentRestaurantId, "inboundJobs")),
+        getDocs(query(collection(db, "inboundJobs"), where("restaurantId", "==", currentRestaurantId))),
       ])
       const manualRows: ImportHistoryRow[] = manualSnap.docs.map((d) => {
         const v = d.data()
@@ -910,7 +910,7 @@ export default function ProductTree() {
       if (row.source === "manual") {
         await deleteDoc(doc(db, "restaurants", currentRestaurantId, "uploads", row.id.replace("manual:", "")))
       } else {
-        await deleteDoc(doc(db, "restaurants", currentRestaurantId, "inboundJobs", row.id.replace("email:", "")))
+        await deleteDoc(doc(db, "inboundJobs", row.id.replace("email:", "")))
       }
       setImportHistory((prev) => prev.filter((x) => x.id !== row.id))
       toast.success("הרשומה נמחקה")

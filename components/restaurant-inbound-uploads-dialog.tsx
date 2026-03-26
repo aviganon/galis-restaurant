@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Mail, Loader2, Eye, Play } from "lucide-react"
 import { firebaseBearerHeaders } from "@/lib/api-auth-client"
 import { db } from "@/lib/firebase"
+import { collection, getDocs } from "firebase/firestore"
 import { FilePreviewModal } from "@/components/file-preview-modal"
 import type { ExtractType, ExtractedSupplierItem, SalesReportPeriod } from "@/lib/ai-extract"
 import { detectDocumentType } from "@/lib/ai-extract"
@@ -24,6 +25,9 @@ type InboundJobRow = {
   status?: "pending" | "processing" | "done" | "error" | string
   detectedType?: "invoice" | "sales" | "other" | string
   attachmentPaths?: string[]
+  source?: "email" | "manual"
+  fileName?: string
+  supplier?: string
 }
 
 const STALE_PENDING_MINUTES = 20
@@ -81,7 +85,7 @@ export function RestaurantInboundUploadsDialog({
   const [fpmType, setFpmType] = useState<ExtractType>("p")
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [busyJobId, setBusyJobId] = useState<string | null>(null)
-  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "processing" | "done" | "error">("all")
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "processing" | "done" | "error" | "uploaded">("all")
   const [typeFilter, setTypeFilter] = useState<"all" | "invoice" | "sales" | "other">("all")
 
   const mapDetectedToType = (detected: "menu" | "sales" | "invoice" | "unknown"): ExtractType =>
@@ -164,15 +168,34 @@ export function RestaurantInboundUploadsDialog({
       setLoadError(null)
       try {
         const headers = await firebaseBearerHeaders()
-        const res = await fetch("/api/inbound-jobs", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...headers },
-          body: JSON.stringify({ restaurantId }),
-          cache: "no-store",
+        const [mailRes, manualSnap] = await Promise.all([
+          fetch("/api/inbound-jobs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...headers },
+            body: JSON.stringify({ restaurantId }),
+            cache: "no-store",
+          }),
+          getDocs(collection(db, "restaurants", restaurantId, "uploads")),
+        ])
+        const json = (await mailRes.json().catch(() => ({}))) as { jobs?: InboundJobRow[]; error?: string }
+        if (!mailRes.ok) throw new Error(json.error || `HTTP ${mailRes.status}`)
+        const mailRows: InboundJobRow[] = (Array.isArray(json.jobs) ? json.jobs : []).map((r) => ({ ...r, source: "email" }))
+        const manualRows: InboundJobRow[] = manualSnap.docs.map((d) => {
+          const v = d.data() as Record<string, unknown>
+          return {
+            id: d.id,
+            source: "manual",
+            fileName: String(v.fileName || d.id),
+            subject: String(v.fileName || d.id),
+            status: "uploaded",
+            receivedAt: (v.uploadedAt as string) || (v.createdAt as string) || "",
+            supplier: (v.supplier as string) || "",
+            detectedType: (v.documentType as string) || "other",
+            attachmentPaths: [],
+          }
         })
-        const json = (await res.json().catch(() => ({}))) as { jobs?: InboundJobRow[]; error?: string }
-        if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
-        if (!cancelled) setRows(Array.isArray(json.jobs) ? json.jobs : [])
+        const allRows = [...mailRows, ...manualRows].sort((a, b) => String(b.receivedAt || "").localeCompare(String(a.receivedAt || "")))
+        if (!cancelled) setRows(allRows)
       } catch (e) {
         if (!cancelled) {
           setRows([])
@@ -190,7 +213,7 @@ export function RestaurantInboundUploadsDialog({
     }
   }, [open, restaurantId])
 
-  const title = useMemo(() => "העלאות ממייל למסעדה", [])
+  const title = useMemo(() => "העלאות למסעדה (מייל + קבצים)", [])
   const stalePendingRows = useMemo(() => {
     const now = Date.now()
     return rows
@@ -205,7 +228,8 @@ export function RestaurantInboundUploadsDialog({
   const filteredRows = useMemo(() => {
     return rows.filter((r) => {
       const resolvedType = (r.detectedType as "invoice" | "sales" | "other" | undefined) || classifyByHeuristic(r)
-      const statusOk = statusFilter === "all" || (r.status || "pending") === statusFilter
+      const rowStatus = (r.status || (r.source === "manual" ? "uploaded" : "pending")) as "pending" | "processing" | "done" | "error" | "uploaded"
+      const statusOk = statusFilter === "all" || rowStatus === statusFilter
       const typeOk = typeFilter === "all" || resolvedType === typeFilter
       return statusOk && typeOk
     })
@@ -252,7 +276,7 @@ export function RestaurantInboundUploadsDialog({
                 </div>
               ) : null}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "pending" | "processing" | "done" | "error")}>
+                    <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "pending" | "processing" | "done" | "error" | "uploaded")}>
                   <SelectTrigger>
                     <SelectValue placeholder="סינון לפי סטטוס" />
                   </SelectTrigger>
@@ -262,6 +286,7 @@ export function RestaurantInboundUploadsDialog({
                     <SelectItem value="processing">processing</SelectItem>
                     <SelectItem value="done">done</SelectItem>
                     <SelectItem value="error">error</SelectItem>
+                      <SelectItem value="uploaded">uploaded</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as "all" | "invoice" | "sales" | "other")}>
@@ -280,25 +305,26 @@ export function RestaurantInboundUploadsDialog({
                 <div className="text-sm text-destructive py-3 text-center">{loadError}</div>
               ) : null}
               {filteredRows.length === 0 ? (
-                <div className="text-sm text-muted-foreground py-8 text-center">אין העלאות ממייל למסעדה זו</div>
+                <div className="text-sm text-muted-foreground py-8 text-center">אין העלאות למסעדה זו</div>
               ) : (
                 filteredRows.map((r) => (
                   <div key={r.id} className="border rounded-lg p-3 space-y-1.5">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium truncate">{r.subject || "(ללא נושא)"}</p>
-                      <Badge variant={statusBadgeVariant(r.status)}>{r.status || "pending"}</Badge>
+                      <p className="text-sm font-medium truncate">{r.fileName || r.subject || "(ללא נושא)"}</p>
+                      <Badge variant={statusBadgeVariant(r.status)}>{r.status || (r.source === "manual" ? "uploaded" : "pending")}</Badge>
                     </div>
                     <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
-                      <span dir="ltr">{r.fromEmail || "-"}</span>
+                      <span dir="ltr">{r.source === "manual" ? (r.supplier || "-") : (r.fromEmail || "-")}</span>
                       <span>{formatReceivedAt(r.receivedAt)}</span>
-                      <span>{(r.attachmentPaths?.length || 0).toString()} קבצים</span>
+                      <span>{r.source === "manual" ? "קובץ ידני" : `${(r.attachmentPaths?.length || 0).toString()} קבצים`}</span>
                     </div>
                     <div className="flex items-center gap-2">
+                      <Badge variant="outline">{r.source === "manual" ? "קובץ" : "מייל"}</Badge>
                       <Badge variant="secondary">
                         {typeLabel((r.detectedType as "invoice" | "sales" | "other" | undefined) || classifyByHeuristic(r))}
                       </Badge>
                     </div>
-                    {Array.isArray(r.attachmentPaths) && r.attachmentPaths.length > 0 ? (
+                    {r.source === "email" && Array.isArray(r.attachmentPaths) && r.attachmentPaths.length > 0 ? (
                       <div className="text-[11px] text-muted-foreground font-mono space-y-0.5">
                         {r.attachmentPaths.slice(0, 3).map((p) => (
                           <div key={p} dir="ltr" className="truncate">• {p.split("/").pop()}</div>
@@ -306,18 +332,20 @@ export function RestaurantInboundUploadsDialog({
                       </div>
                     ) : null}
                     <div className="flex items-center gap-2 pt-1">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        className="h-7 text-xs gap-1"
-                        disabled={busyJobId === r.id || !r.attachmentPaths?.length}
-                        onClick={() => void processNow(r)}
-                      >
-                        {busyJobId === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                        עבד עכשיו
-                      </Button>
-                      {r.attachmentPaths?.[0] ? (
+                      {r.source === "email" ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          className="h-7 text-xs gap-1"
+                          disabled={busyJobId === r.id || !r.attachmentPaths?.length}
+                          onClick={() => void processNow(r)}
+                        >
+                          {busyJobId === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                          עבד עכשיו
+                        </Button>
+                      ) : null}
+                      {r.source === "email" && r.attachmentPaths?.[0] ? (
                         <Button
                           type="button"
                           size="sm"
