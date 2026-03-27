@@ -3,6 +3,7 @@ import { Heebo } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
 import { LanguageProvider } from '@/contexts/language-context'
 import { Toaster } from '@/components/ui/sonner'
+import { ErrorReportingInit } from '@/components/error-reporting-init'
 import './globals.css'
 
 const heebo = Heebo({ 
@@ -59,6 +60,7 @@ export default function RootLayout({
       <body className={`${heebo.variable} font-sans antialiased min-h-dvh max-lg:overscroll-y-none`}>
         <ThemeProvider>
           <LanguageProvider>
+            <ErrorReportingInit />
             {children}
             <Toaster position="top-center" richColors closeButton />
           </LanguageProvider>

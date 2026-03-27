@@ -25,6 +25,21 @@ service cloud.firestore {
       return isConfigAdmin() || isSystemOwnerUser();
     }
 
+    // מנהל/אדמין/בעלים עם מסעדה — יצירת קודי הזמנה לצוות
+    function restaurantStaffForInvite() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['manager', 'admin', 'owner'];
+    }
+
+    // יצירת מסמך מסעדה חדש (הרשמה / הקמה) — שדות מינימליים נגד ספאם
+    function newRestaurantDocShape() {
+      return request.resource.data.keys().hasAll(['name', 'branch', 'target'])
+        && request.resource.data.name is string
+        && request.resource.data.branch is string;
+    }
+
     // config — admins / adminEmails: קריאה לכל מחובר (זיהוי בעלים באפליקציה); כתיבה רק לבעל מערכת או אדמין
     match /config/admins {
       allow read: if request.auth != null;
@@ -87,7 +102,26 @@ service cloud.firestore {
     // restaurants — מסעדות (get מותר ללא auth — לאימות בהרשמה עם קוד קיים)
     match /restaurants/{restaurantId} {
       allow get: if true;
-      allow list, create, update, delete: if request.auth != null;
+      allow list: if request.auth != null;
+      allow create: if request.auth != null && (
+        canManageAllRestaurants()
+        || newRestaurantDocShape()
+      );
+      allow update: if request.auth != null && (
+        canManageAllRestaurants()
+        || (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId == restaurantId
+        )
+      );
+      allow delete: if request.auth != null && (
+        canManageAllRestaurants()
+        || (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantId == restaurantId
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['manager', 'admin', 'owner']
+        )
+      );
 
       // appState — invitedEmails וכו' (משתמש מוזמן יכול לקרוא אם האימייל שלו ברשימה)
       // inboundSettings — רק בעל מערכת/אדמין (כתובת ייבוא); שאר appState — גם מנהל/משתמש במסעדה
@@ -114,9 +148,13 @@ service cloud.firestore {
     }
 
     // inviteCodes — קודי הזמנה (get מותר גם ללא התחברות — לאימות בהרשמה)
+    // list/create: לא כל משתמש מחובר; update: נשאר רחב לזרימות הרשמה (סימון used לפני users doc)
     match /inviteCodes/{codeId} {
       allow get: if true;
-      allow list, create, update, delete: if request.auth != null;
+      allow list: if request.auth != null && (canManageAllRestaurants() || restaurantStaffForInvite());
+      allow create: if request.auth != null && (canManageAllRestaurants() || restaurantStaffForInvite());
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null && canManageAllRestaurants();
     }
 
     // ingredients — רכיבים גלובליים

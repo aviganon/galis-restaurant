@@ -5,6 +5,8 @@ node_modules
 
 # Build
 .next
+# כפילויות iCloud/סנכרון (למשל routes.d 2.ts) — לא לדחוף
+.next/**/* 2.*
 out
 out 2
 build
@@ -28,6 +30,10 @@ scripts/galis-sa.json
 .env.test.local
 .env.production.local
 
+# Playwright
+test-results/
+playwright-report/
+
 # Debug
 npm-debug.log*
 yarn-debug.log*
@@ -42,3 +48,6 @@ yarn-error.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# פרויקט נפרד (ריפו משלו) — Genesis Node
+genesis-node/
