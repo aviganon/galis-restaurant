@@ -62,7 +62,7 @@ interface FilePreviewModalProps {
   currentRestaurantId?: string | null
   /** מצב ספירת מלאי — ללא חובת ספק, ללא השוואת מחירים */
   stockCountMode?: boolean
-  onConfirmSupplier?: (items: ExtractedSupplierItem[], supplierName: string, saveToGlobal?: boolean) => void
+  onConfirmSupplier?: (items: ExtractedSupplierItem[], supplierName: string, saveToGlobal?: boolean, sourceFileName?: string) => void
   onConfirmStockCount?: (items: Array<{ name: string; qty: number; unit?: string }>) => void
   onConfirmDishes?: (items: ExtractedDishItem[]) => void
   onConfirmSales?: (
@@ -296,7 +296,12 @@ export function FilePreviewModal({
         toast.error(t("pages.filePreview.toastSupplierRequired"))
         return
       }
-      onConfirmSupplier?.(items as ExtractedSupplierItem[], supplierName.trim(), forceSaveToGlobal ? true : (canSaveToGlobal ? saveToGlobal : undefined))
+      onConfirmSupplier?.(
+        items as ExtractedSupplierItem[],
+        supplierName.trim(),
+        forceSaveToGlobal ? true : (canSaveToGlobal ? saveToGlobal : undefined),
+        file?.name,
+      )
     } else if (type === "d") {
       onConfirmDishes?.(items as ExtractedDishItem[])
     } else {
@@ -314,6 +319,7 @@ export function FilePreviewModal({
     saveToGlobal,
     canSaveToGlobal,
     forceSaveToGlobal,
+    file?.name,
     stockCountMode,
     onConfirmSupplier,
     onConfirmStockCount,

@@ -71,6 +71,8 @@ import {
   deleteDoc,
   writeBatch,
   limit,
+  orderBy,
+  addDoc,
   type DocumentData,
   type QueryDocumentSnapshot,
 } from "firebase/firestore"
@@ -462,6 +464,11 @@ export function AdminPanel() {
   const [fpmFile, setFpmFile] = useState<File | null>(null)
   const [isInvoiceDragging, setIsInvoiceDragging] = useState(false)
   const [showInvoiceUploadArea, setShowInvoiceUploadArea] = useState(false)
+  /** היסטוריית העלאות חשבונית לקטלוג גלובלי (בעל מערכת) */
+  const [ownerGlobalUploads, setOwnerGlobalUploads] = useState<
+    Array<{ id: string; fileName: string; supplier: string; uploadedAt: string; ingredientCount: number }>
+  >([])
+  const [ownerUploadsLoading, setOwnerUploadsLoading] = useState(false)
   const adminInvoiceFileRef = useRef<HTMLInputElement>(null)
   const INVOICE_ACCEPT = ".xlsx,.xls,.csv,.pdf,.rtf,image/*"
   const [selectedSupplierDetail, setSelectedSupplierDetail] = useState<string | null>(null)
@@ -1198,8 +1205,33 @@ export function AdminPanel() {
     }
   }
 
+  const loadOwnerGlobalUploads = useCallback(async () => {
+    setOwnerUploadsLoading(true)
+    try {
+      const q = query(collection(db, "ownerGlobalInvoiceUploads"), orderBy("uploadedAt", "desc"), limit(150))
+      const snap = await getDocs(q)
+      setOwnerGlobalUploads(
+        snap.docs.map((d) => {
+          const v = d.data() as Record<string, unknown>
+          return {
+            id: d.id,
+            fileName: typeof v.fileName === "string" ? v.fileName : d.id,
+            supplier: typeof v.supplier === "string" ? v.supplier : "",
+            uploadedAt: typeof v.uploadedAt === "string" ? v.uploadedAt : "",
+            ingredientCount: typeof v.ingredientCount === "number" ? v.ingredientCount : 0,
+          }
+        }),
+      )
+    } catch (e) {
+      console.error("loadOwnerGlobalUploads:", e)
+      toast.error("לא ניתן לטעון היסטוריית העלאות")
+    } finally {
+      setOwnerUploadsLoading(false)
+    }
+  }, [])
+
   const handleConfirmAdminSupplier = useCallback(
-    async (items: ExtractedSupplierItem[], supName: string) => {
+    async (items: ExtractedSupplierItem[], supName: string, _saveToGlobal?: boolean, sourceFileName?: string) => {
       const supTrim = supName.trim()
       if (!supTrim) {
         toast.error("יש להזין שם ספק")
@@ -1244,6 +1276,18 @@ export function AdminPanel() {
         await batch.commit()
         const supplierId = supplierFirestoreDocId(supTrim)
         await setDoc(doc(db, "suppliers", supplierId), { name: supTrim, lastUpdated: now, createdBy: "owner" }, { merge: true })
+        try {
+          await addDoc(collection(db, "ownerGlobalInvoiceUploads"), {
+            fileName: (sourceFileName && sourceFileName.trim()) || "קובץ",
+            supplier: supTrim,
+            uploadedAt: now,
+            ingredientCount: count,
+            documentType: "invoice",
+          })
+        } catch (logErr) {
+          console.error("ownerGlobalInvoiceUploads log failed:", logErr)
+        }
+        void loadOwnerGlobalUploads()
         const toSync = items.filter((i) => i.name?.trim() && i.price > 0).map((i) => ({ name: i.name!.trim(), price: i.price, unit: i.unit || "קג", supplier: supTrim, waste: 0, sku: i.sku ?? "", ...(typeof i.qty === "number" && i.qty > 0 ? { qty: i.qty } : {}) }))
         if (toSync.length > 0) {
           const synced = await syncSupplierIngredientsToAssignedRestaurants(supTrim, toSync)
@@ -1259,8 +1303,12 @@ export function AdminPanel() {
       setFpmFile(null)
       setFpmOpen(false)
     },
-    [loadSystemOwnerData]
+    [loadSystemOwnerData, loadOwnerGlobalUploads]
   )
+
+  useEffect(() => {
+    if (showInvoiceUploadArea) void loadOwnerGlobalUploads()
+  }, [showInvoiceUploadArea, loadOwnerGlobalUploads])
 
   useEffect(() => {
     const prevent = (e: DragEvent) => {
@@ -3083,6 +3131,72 @@ export function AdminPanel() {
                           </div>
                         </CardContent>
                       </Card>
+
+                      <div className="mt-4 rounded-xl border bg-muted/30 p-4 text-start">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <h4 className="text-sm font-semibold">העלאות שביצעת לקטלוג הגלובלי</h4>
+                            <p className="text-xs text-muted-foreground">מוצגות לאחר שמירת חשבונית מוצלחת (שם קובץ, ספק, תאריך ומספר שורות)</p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0"
+                            disabled={ownerUploadsLoading}
+                            onClick={() => void loadOwnerGlobalUploads()}
+                          >
+                            <RefreshCw className={`h-4 w-4 ml-1 ${ownerUploadsLoading ? "animate-spin" : ""}`} />
+                            רענון
+                          </Button>
+                        </div>
+                        {ownerUploadsLoading && ownerGlobalUploads.length === 0 ? (
+                          <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            טוען…
+                          </div>
+                        ) : ownerGlobalUploads.length === 0 ? (
+                          <p className="py-4 text-center text-sm text-muted-foreground">עדיין אין רשומות — לאחר שמירה ראשונה תופיע כאן ההיסטוריה</p>
+                        ) : (
+                          <div className="max-h-[min(50vh,320px)] overflow-auto rounded-md border bg-background">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="text-right">תאריך</TableHead>
+                                  <TableHead className="text-right">קובץ</TableHead>
+                                  <TableHead className="text-right">ספק</TableHead>
+                                  <TableHead className="text-right w-[72px]">שורות</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {ownerGlobalUploads.map((row) => (
+                                  <TableRow key={row.id}>
+                                    <TableCell className="text-right text-xs whitespace-nowrap">
+                                      {row.uploadedAt
+                                        ? (() => {
+                                            try {
+                                              return new Date(row.uploadedAt).toLocaleString("he-IL", {
+                                                dateStyle: "short",
+                                                timeStyle: "short",
+                                              })
+                                            } catch {
+                                              return row.uploadedAt
+                                            }
+                                          })()
+                                        : "—"}
+                                    </TableCell>
+                                    <TableCell className="max-w-[200px] truncate text-right text-sm" title={row.fileName}>
+                                      {row.fileName}
+                                    </TableCell>
+                                    <TableCell className="text-right text-sm">{row.supplier || "—"}</TableCell>
+                                    <TableCell className="text-right tabular-nums">{row.ingredientCount}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
+                      </div>
                     </motion.div>
                   )}
 

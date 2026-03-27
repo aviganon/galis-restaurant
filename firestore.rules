@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // Restaurant Pro — מערכת חדשה (פרויקט Firebase נפרד)
-// Collections: config, users, restaurants, inviteCodes, ingredients, invoiceLog
+// Collections: config, users, restaurants, inviteCodes, ingredients, invoiceLog, ownerGlobalInvoiceUploads
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -174,6 +174,11 @@ service cloud.firestore {
     // invoiceLog — לוג חשבוניות
     match /invoiceLog/{docId} {
       allow read, write: if request.auth != null;
+    }
+
+    // העלאות חשבונית לקטלוג גלובלי — רק בעל מערכת / אדמין מערכת
+    match /ownerGlobalInvoiceUploads/{docId} {
+      allow read, write: if canManageAllRestaurants();
     }
 
     // webPriceCache — מטמון מחירי אינטרנט לרכיבים (חוסך בדיקות API)
