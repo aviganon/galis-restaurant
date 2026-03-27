@@ -1,20 +1,38 @@
 ---
-description: העלאת שינויים ל-GitHub בסוף כל שיחה
+description: עדכון GitHub בכל סיום שיחה — ריפו ראשי + genesis-node
 alwaysApply: true
 ---
 
-# Git Push - העלאה ל-GitHub
+# Git Push — חובה בסוף כל שיחה
 
-בכל שיחה שבה בוצעו שינויים בקוד:
+**בסיום כל שיחה** (גם אם המשתמש לא ביקש במפורש): לוודא שהשינויים בקוד עלו ל-GitHub. המשתמש מעדיף עדכון אוטומטי — **אין לשאול** אם לדחוף.
 
-1. **בסיום השיחה** — אם יש שינויים שלא הועלו, לבצע:
-   - `git add` על קבצי הקוד (לא .cursor, .firebase, tsconfig.tsbuildinfo)
-   - `git commit` עם הודעת commit תיאורית בעברית
+## 1. ריפו הראשי (`cursor` / Galis)
+
+1. `git status`
+2. אם יש שינויים רלוונטיים:
+   - `git add` על קבצי קוד (לא קבצי מטמון/זבל)
+   - `git commit -m "..."` — הודעה תיאורית **בעברית**
    - `git push origin main`
 
-2. **לא לכלול** בסטייג'ינג:
-   - `.cursor/rules/`
-   - `.firebase/`
-   - `tsconfig.tsbuildinfo`
+## 2. Genesis Node (פרויקט נפרד)
 
-3. המשתמש מעדיף שהשינויים יועלו אוטומטית — אין צורך לשאול.
+אם בתיקייה `genesis-node/` בוצעו שינויים (היא מוחרגת מ-git של הריפו הראשי אבל היא **ריפו משלה**):
+
+1. `cd genesis-node && git status`
+2. אם יש שינויים: `git add` → `commit` בעברית → `git push origin main`
+
+## 3. לא לכלול ב־commit (לרוב)
+
+- `.firebase/`
+- `tsconfig.tsbuildinfo`
+- לוגים: `firebase-debug*.log`
+- קבצי iCloud כפולים (`* 2.*`)
+
+## 4. כללי `.cursor/rules`
+
+כללי Cursor **עוקבים** אחרי git בריפו הראשי. עדכון כללים (כמו הקובץ הזה) — **לכלול ב-commit** כשמשנים אותם, כדי שההתנהגות תישמר ב-GitHub.
+
+## 5. אין שינויים
+
+אם אין שינויים לאחר בדיקה — אין צורך ב-commit ריק.
