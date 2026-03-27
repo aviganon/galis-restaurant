@@ -42,5 +42,7 @@ export const firestoreConfig = {
     restaurantId: "restaurantId",
     used: "used",
     createdAt: "createdAt",
+    /** אימייל שחייב להתאים (הרשמה או השלמת הקמה אחרי יצירת משתמש על ידי בעלים) */
+    allowedEmail: "allowedEmail",
   },
 } as const

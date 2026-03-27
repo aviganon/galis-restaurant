@@ -11,6 +11,8 @@ export async function postInviteEmail(payload: {
   emailVerificationLink?: string | null
   /** קוד הזמנה שנוצר ב־Firestore (אוטומטי אחרי יצירת משתמש) */
   inviteCode?: string | null
+  /** מנהל בלי מסעדה — המייל מסביר להתחבר ולהשלים הקמה עם הקוד */
+  pendingRestaurantSetup?: boolean
 }): Promise<void> {
   const res = await fetch("/api/invite", {
     method: "POST",

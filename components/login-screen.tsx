@@ -299,6 +299,17 @@ export function LoginScreen(_props: LoginScreenProps) {
       await auth.signOut().catch(() => {})
       return false
     }
+    const allowedEmail = codeData?.[inviteCodeFields.allowedEmail]
+    const signedEm = (user.email || "").trim().toLowerCase()
+    if (
+      allowedEmail &&
+      typeof allowedEmail === "string" &&
+      allowedEmail.trim().toLowerCase() !== signedEm
+    ) {
+      setError(t("login.codeWrongEmail"))
+      await auth.signOut().catch(() => {})
+      return false
+    }
     const existingRestId = codeData?.[inviteCodeFields.restaurantId] as string | undefined
     let restId: string
     if (existingRestId) {
@@ -492,6 +503,16 @@ export function LoginScreen(_props: LoginScreenProps) {
       }
       if (codeType !== "manager") {
         setError(t("login.codeNoRestaurant"))
+        setIsLoading(false)
+        return
+      }
+      const allowedEmail = codeData?.[inviteCodeFields.allowedEmail]
+      if (
+        allowedEmail &&
+        typeof allowedEmail === "string" &&
+        allowedEmail.trim().toLowerCase() !== em.trim().toLowerCase()
+      ) {
+        setError(t("login.codeWrongEmail"))
         setIsLoading(false)
         return
       }

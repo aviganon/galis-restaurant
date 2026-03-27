@@ -653,7 +653,12 @@ export function Settings() {
     }
     const creatingSystemOwner = cRole === "system_owner"
     const effectiveRestId = creatingSystemOwner ? null : (canManageTeamInOwnRestaurant ? currentRestaurantId || "" : cRest)
-    if (!creatingSystemOwner && !effectiveRestId) {
+    const managerWithoutRestaurant =
+      !creatingSystemOwner &&
+      !canManageTeamInOwnRestaurant &&
+      cRole === "manager" &&
+      !String(effectiveRestId || "").trim()
+    if (!creatingSystemOwner && !String(effectiveRestId || "").trim() && cRole !== "manager") {
       setCErr("נא לבחור מסעדה")
       return
     }
@@ -668,11 +673,13 @@ export function Settings() {
 
       const completeUserCreation = async (cr: Awaited<ReturnType<typeof createUserWithEmailAndPassword>>) => {
         const roleToSave = creatingSystemOwner ? "user" : cRole
+        const restIdForUser =
+          creatingSystemOwner ? null : managerWithoutRestaurant ? null : String(effectiveRestId).trim() || null
         await setDoc(doc(db, "users", cr.user.uid), {
           email: cEmail.trim(),
           role: roleToSave,
           isSystemOwner: creatingSystemOwner,
-          restaurantId: effectiveRestId,
+          restaurantId: restIdForUser,
           name: cName.trim() || null,
           phone: cPhone.trim() || null,
           address: cAddress.trim() || null,
@@ -711,18 +718,26 @@ export function Settings() {
             email: cEmail.trim(),
             role: roleToSave,
             isSystemOwner: creatingSystemOwner,
-            restaurantId: effectiveRestId,
-            restaurantName: (restaurants || []).find((r) => r.id === effectiveRestId)?.name,
+            restaurantId: restIdForUser,
+            restaurantName: restIdForUser ? (restaurants || []).find((r) => r.id === restIdForUser)?.name : undefined,
           },
         ])
-        const restName = effectiveRestId ? (restaurants || []).find((r) => r.id === effectiveRestId)?.name : null
+        const restName = restIdForUser ? (restaurants || []).find((r) => r.id === restIdForUser)?.name : null
         let inviteCode: string | undefined
         if (!creatingSystemOwner) {
           try {
-            inviteCode = await createUniqueInviteCode({
-              restaurantId: effectiveRestId,
-              role: cRole,
-            })
+            if (managerWithoutRestaurant) {
+              inviteCode = await createUniqueInviteCode({
+                restaurantId: null,
+                role: "manager",
+                allowedEmail: cEmail.trim().toLowerCase(),
+              })
+            } else {
+              inviteCode = await createUniqueInviteCode({
+                restaurantId: restIdForUser,
+                role: cRole,
+              })
+            }
           } catch {
             toast.warning("לא נוצר קוד הזמנה — המייל יישלח בלי קוד")
           }
@@ -735,6 +750,7 @@ export function Settings() {
             accountCreated: true,
             inviteCode: inviteCode ?? null,
             emailVerificationLink: creatingSystemOwner ? emailVerificationLink : null,
+            pendingRestaurantSetup: managerWithoutRestaurant,
           })
           toast.success(
             inviteCode

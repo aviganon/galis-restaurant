@@ -30,6 +30,7 @@ import { PurchaseOrders } from "@/components/purchase-orders"
 import { MobileNav } from "@/components/mobile-nav"
 import { DesktopNav } from "@/components/desktop-nav"
 import { AdminPanel } from "@/components/admin-panel"
+import { ManagerRestaurantSetup } from "@/components/manager-restaurant-setup"
 import { AppProvider, type UserPermissions } from "@/contexts/app-context"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -532,6 +533,9 @@ export default function Home() {
   }
 
   if (!currentRestaurantId && !isSystemOwner) {
+    if (userRole === "manager") {
+      return <ManagerRestaurantSetup onLogout={handleLogout} />
+    }
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
         <div className="max-w-md text-center space-y-6">

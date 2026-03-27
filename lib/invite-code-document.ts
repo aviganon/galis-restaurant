@@ -17,13 +17,20 @@ export async function saveInviteCodeDocument(params: {
   restaurantId: string | null
   /** manager → type manager; user → type user (הרשמה דרך קוד במסך הכניסה כרגע תומכת ב־manager בלבד) */
   role: "manager" | "user"
+  /** אם מוגדר — רק אימייל זה יכול להשתמש בקוד (הרשמה או השלמת הקמה) */
+  allowedEmail?: string | null
 }): Promise<void> {
   const type = params.role === "manager" ? "manager" : "user"
+  const emailNorm =
+    typeof params.allowedEmail === "string" && params.allowedEmail.trim()
+      ? params.allowedEmail.trim().toLowerCase()
+      : null
   await setDoc(doc(db, inviteCodesCollection, params.code), {
     [inviteCodeFields.createdAt]: new Date().toISOString(),
     [inviteCodeFields.used]: false,
     [inviteCodeFields.restaurantId]: params.restaurantId,
     [inviteCodeFields.type]: type,
+    ...(emailNorm ? { [inviteCodeFields.allowedEmail]: emailNorm } : {}),
   })
 }
 
@@ -31,6 +38,7 @@ export async function saveInviteCodeDocument(params: {
 export async function createUniqueInviteCode(params: {
   restaurantId: string | null
   role: "manager" | "user"
+  allowedEmail?: string | null
 }): Promise<string> {
   const maxAttempts = 12
   for (let i = 0; i < maxAttempts; i++) {
@@ -38,7 +46,12 @@ export async function createUniqueInviteCode(params: {
     const ref = doc(db, inviteCodesCollection, code)
     const snap = await getDoc(ref)
     if (!snap.exists()) {
-      await saveInviteCodeDocument({ code, restaurantId: params.restaurantId, role: params.role })
+      await saveInviteCodeDocument({
+        code,
+        restaurantId: params.restaurantId,
+        role: params.role,
+        allowedEmail: params.allowedEmail ?? null,
+      })
       return code
     }
   }

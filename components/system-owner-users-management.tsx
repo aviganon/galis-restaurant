@@ -308,6 +308,11 @@ export function SystemOwnerUserTabToolbar({
                     </option>
                   ))}
                 </select>
+                {cRole === "manager" && !cRest ? (
+                  <p className="text-[11px] text-muted-foreground leading-snug mt-1.5">
+                    מנהל בלי מסעדה: ייווצר קוד הזמנה אישי לאימייל — אחרי התחברות יופיע מסך להקמת המסעדה.
+                  </p>
+                ) : null}
               </div>
             )}
             <div className="sm:col-span-2">

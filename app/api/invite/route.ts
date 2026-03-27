@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
       typeof body.inviteCode === "string" && body.inviteCode.trim() ? body.inviteCode.trim().toUpperCase() : undefined
     const emailVerificationLink =
       typeof body.emailVerificationLink === "string" && body.emailVerificationLink.trim() ? body.emailVerificationLink.trim() : undefined
+    const pendingRestaurantSetup = body.pendingRestaurantSetup === true
 
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "חסר אימייל" }, { status: 400 })
@@ -93,7 +94,15 @@ export async function POST(req: NextRequest) {
 
     const codeBlockHtml =
       inviteCode && accountCreated
-        ? `
+        ? pendingRestaurantSetup
+          ? `
+  <div style="margin: 1rem 0; padding: 12px 16px; background: #f4f4f5; border-radius: 8px; border: 1px solid #e4e4e7;">
+    <p style="margin: 0 0 6px 0; font-size: 13px; color: #52525b;"><strong>קוד הזמנה אישי</strong> (מקושר לאימייל שלך)</p>
+    <p style="margin: 0; font-size: 22px; font-family: ui-monospace, monospace; letter-spacing: 0.08em; font-weight: 700;">${escapeHtml(inviteCode)}</p>
+  </div>
+  <p style="font-size: 13px; color: #666;"><strong>איך מקימים מסעדה:</strong> היכנסו לאתר עם <strong>התחברות</strong> (אימייל + הסיסמה שהוגדרה לכם). אחרי הכניסה תופיע מסך השלמה — הזינו שם את הקוד לעיל, שם מסעדה וסניף.</p>
+`
+          : `
   <div style="margin: 1rem 0; padding: 12px 16px; background: #f4f4f5; border-radius: 8px; border: 1px solid #e4e4e7;">
     <p style="margin: 0 0 6px 0; font-size: 13px; color: #52525b;"><strong>קוד הזמנה</strong> (מסומן במערכת)</p>
     <p style="margin: 0; font-size: 22px; font-family: ui-monospace, monospace; letter-spacing: 0.08em; font-weight: 700;">${escapeHtml(inviteCode)}</p>
