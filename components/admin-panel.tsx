@@ -469,6 +469,7 @@ export function AdminPanel() {
     Array<{ id: string; fileName: string; supplier: string; uploadedAt: string; ingredientCount: number }>
   >([])
   const [ownerUploadsLoading, setOwnerUploadsLoading] = useState(false)
+  const [deletingOwnerUploadId, setDeletingOwnerUploadId] = useState<string | null>(null)
   const adminInvoiceFileRef = useRef<HTMLInputElement>(null)
   const INVOICE_ACCEPT = ".xlsx,.xls,.csv,.pdf,.rtf,image/*"
   const [selectedSupplierDetail, setSelectedSupplierDetail] = useState<string | null>(null)
@@ -1227,6 +1228,25 @@ export function AdminPanel() {
       toast.error("לא ניתן לטעון היסטוריית העלאות")
     } finally {
       setOwnerUploadsLoading(false)
+    }
+  }, [])
+
+  const deleteOwnerGlobalUpload = useCallback(async (id: string, fileLabel: string) => {
+    if (
+      !window.confirm(
+        `למחוק את הרשומה "${fileLabel}" מההיסטוריה?\n(רכיבי הקטלוג הגלובלי שנשמרו מהחשבונית לא יימחקו.)`,
+      )
+    )
+      return
+    setDeletingOwnerUploadId(id)
+    try {
+      await deleteDoc(doc(db, "ownerGlobalInvoiceUploads", id))
+      setOwnerGlobalUploads((prev) => prev.filter((r) => r.id !== id))
+      toast.success("הרשומה נמחקה מההיסטוריה")
+    } catch (e) {
+      toast.error((e as Error)?.message || "מחיקה נכשלה")
+    } finally {
+      setDeletingOwnerUploadId(null)
     }
   }, [])
 
@@ -3166,6 +3186,9 @@ export function AdminPanel() {
                                   <TableHead className="text-right">קובץ</TableHead>
                                   <TableHead className="text-right">ספק</TableHead>
                                   <TableHead className="text-right w-[72px]">שורות</TableHead>
+                                  <TableHead className="w-12 p-2 text-center">
+                                    <span className="sr-only">מחיקה</span>
+                                  </TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -3190,6 +3213,23 @@ export function AdminPanel() {
                                     </TableCell>
                                     <TableCell className="text-right text-sm">{row.supplier || "—"}</TableCell>
                                     <TableCell className="text-right tabular-nums">{row.ingredientCount}</TableCell>
+                                    <TableCell className="p-1 text-center">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                        disabled={deletingOwnerUploadId === row.id}
+                                        aria-label={`מחיקת רשומה ${row.fileName}`}
+                                        onClick={() => void deleteOwnerGlobalUpload(row.id, row.fileName)}
+                                      >
+                                        {deletingOwnerUploadId === row.id ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Trash2 className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    </TableCell>
                                   </TableRow>
                                 ))}
                               </TableBody>
