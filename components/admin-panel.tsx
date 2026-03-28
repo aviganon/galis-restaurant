@@ -58,6 +58,7 @@ import { getTranslation, type Locale } from "@/lib/translations"
 import { useLanguage } from "@/contexts/language-context"
 import { LanguageSwitcher } from "@/components/language-switcher"
 import { signOut } from "firebase/auth"
+import { signOutWithPresence } from "@/lib/sign-out-with-presence"
 import {
   doc,
   setDoc,
@@ -2373,7 +2374,12 @@ export function AdminPanel() {
                 <Button variant="ghost" size="sm" onClick={()=>setCurrentPage?.("settings")} className="gap-1.5 text-muted-foreground hover:text-foreground h-8">
                   <Settings2 className="w-4 h-4"/><span className="text-xs hidden sm:inline">הגדרות</span>
                 </Button>
-                <Button variant="ghost" size="sm" onClick={()=>signOut(auth)} className="gap-1.5 text-muted-foreground hover:text-destructive h-8">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void signOutWithPresence(auth, db)}
+                  className="gap-1.5 text-muted-foreground hover:text-destructive h-8"
+                >
                   <LogOut className="w-4 h-4"/><span className="text-xs hidden sm:inline">יציאה</span>
                 </Button>
               </div>

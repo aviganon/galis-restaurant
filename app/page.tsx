@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils"
 import { useTranslations } from "@/lib/use-translations"
 import { useLanguage } from "@/contexts/language-context"
 import { getTranslation } from "@/lib/translations"
+import { signOutWithPresence } from "@/lib/sign-out-with-presence"
 import { RestaurantTopBar } from "@/components/restaurant-top-bar"
 import { ManagerOnboardingChecklist } from "@/components/manager-onboarding-checklist"
 import { useRestaurantOnboardingStatus } from "@/lib/use-restaurant-onboarding-status"
@@ -441,16 +442,10 @@ export default function Home() {
   }, [isSystemOwner, impersonatingRestaurant, currentPage])
 
   const handleLogout = () => {
-    const uid = auth.currentUser?.uid
-    if (uid) {
-      void setDoc(
-        doc(db, firestoreConfig.usersCollection, uid),
-        { isOnline: false, lastSeenAt: serverTimestamp() },
-        { merge: true },
-      ).catch(() => {})
-    }
-    signOut(auth)
-    setIsLoggedIn(false)
+    void (async () => {
+      await signOutWithPresence(auth, db)
+      setIsLoggedIn(false)
+    })()
   }
 
   useEffect(() => {
@@ -476,23 +471,29 @@ export default function Home() {
     }
 
     void writePresence(true)
+    // heartbeat: שומרים מחובר + מרעננים lastSeen — לא מסמנים offline בטאב ברקע (מבלבל בעלים)
     const tick = window.setInterval(() => {
-      void writePresence(document.visibilityState === "visible")
+      void writePresence(true)
     }, 30000)
 
     const onVisibility = () => {
-      void writePresence(document.visibilityState === "visible")
+      if (document.visibilityState === "visible") void writePresence(true)
     }
     const onBeforeUnload = () => {
       void writePresence(false)
     }
+    const onPageHide = () => {
+      void writePresence(false)
+    }
     document.addEventListener("visibilitychange", onVisibility)
     window.addEventListener("beforeunload", onBeforeUnload)
+    window.addEventListener("pagehide", onPageHide)
     return () => {
       stopped = true
       window.clearInterval(tick)
       document.removeEventListener("visibilitychange", onVisibility)
       window.removeEventListener("beforeunload", onBeforeUnload)
+      window.removeEventListener("pagehide", onPageHide)
       void writePresence(false)
     }
   }, [isLoggedIn])

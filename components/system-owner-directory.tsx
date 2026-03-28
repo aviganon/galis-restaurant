@@ -68,6 +68,7 @@ import { setUserPasswordAsAdmin } from "@/lib/set-user-password-client"
 import { createUniqueInviteCode } from "@/lib/invite-code-document"
 import { deleteOrphanAuthUserIfAllowed } from "@/lib/delete-orphan-auth-user-client"
 import { directoryUserRoleLabel, directoryUserRoleSearchText } from "@/lib/directory-user-role-label"
+import { shouldShowUserOnline } from "@/lib/user-presence-display"
 
 export type DirectoryUserRow = {
   uid: string
@@ -642,6 +643,7 @@ export function SystemOwnerDirectory({
                 ) : (
                   filteredUsers.map((u) => {
                     const active = selectedUserId === u.uid && panelTab === "user"
+                    const looksOnline = shouldShowUserOnline(u.isOnline, u.lastSeenAt)
                     const restForUser = u.restaurantId
                       ? restaurants.find((r) => r.id === u.restaurantId)
                       : undefined
@@ -670,9 +672,9 @@ export function SystemOwnerDirectory({
                                 {u.restaurantName || "ללא מסעדה"} · {directoryUserRoleLabel(u)}
                               </div>
                               <div className="text-[11px] mt-1 flex items-center gap-2">
-                                <span className={cn("inline-flex items-center gap-1", u.isOnline ? "text-emerald-600" : "text-muted-foreground")}>
-                                  <span className={cn("inline-block h-2 w-2 rounded-full", u.isOnline ? "bg-emerald-500" : "bg-muted-foreground/50")} />
-                                  {u.isOnline ? "מחובר עכשיו" : "לא מחובר"}
+                                <span className={cn("inline-flex items-center gap-1", looksOnline ? "text-emerald-600" : "text-muted-foreground")}>
+                                  <span className={cn("inline-block h-2 w-2 rounded-full", looksOnline ? "bg-emerald-500" : "bg-muted-foreground/50")} />
+                                  {looksOnline ? "מחובר עכשיו" : "לא מחובר"}
                                 </span>
                                 <span className="text-muted-foreground">נראה לאחרונה: {formatLastSeen(u.lastSeenAt)}</span>
                               </div>
@@ -704,8 +706,8 @@ export function SystemOwnerDirectory({
                                 </p>
                                 <p>
                                   סטטוס:{" "}
-                                  <strong className={cn(u.isOnline ? "text-emerald-600" : "text-foreground")}>
-                                    {u.isOnline ? "מחובר עכשיו" : "לא מחובר"}
+                                  <strong className={cn(looksOnline ? "text-emerald-600" : "text-foreground")}>
+                                    {looksOnline ? "מחובר עכשיו" : "לא מחובר"}
                                   </strong>
                                 </p>
                                 <p>
