@@ -293,6 +293,62 @@ function finishExtractResult(type: ExtractType, parsed: unknown): ExtractResult 
   return parsed as ExtractResult
 }
 
+/** אותו אובייקט File בזרימת העלאה → זיהוי ואז מודאל; מונע קריאת XLSX/CSV כפולה */
+const spreadsheetRowsCache = new WeakMap<File, Promise<Record<string, unknown>[]>>()
+
+function loadSpreadsheetRowsCached(file: File, ext: string): Promise<Record<string, unknown>[]> {
+  let p = spreadsheetRowsCache.get(file)
+  if (!p) {
+    p = parseSpreadsheet(file, ext)
+    spreadsheetRowsCache.set(file, p)
+  }
+  return p
+}
+
+/**
+ * זיהוי מקומי מהיר לגיליונות — רק כשהכותרות ברורות; אחרת null → Haiku כמו קודם.
+ * ממוקד בחשבוניות ספק (המקרה הנפוץ) כדי לחסוך קריאת API בלי לסכן תפריט/דוח מכירות.
+ */
+function quickDetectSheetDocType(rows: Record<string, unknown>[]): DetectedDocType | null {
+  if (rows.length < 1) return null
+  const keySet = new Set<string>()
+  for (let i = 0; i < Math.min(5, rows.length); i++) {
+    for (const k of Object.keys(rows[i] || {})) keySet.add(String(k).toLowerCase())
+  }
+  const keysStr = [...keySet].join(" ")
+
+  const hasSkuCol = /מק״ט|מק"ט|מקט|ברקוד|barcode|קוד\s*פריט|item\s*code|sku\b/i.test(keysStr)
+  const hasDescCol = /תיאור|תאור|שם\s*פריט|תיאור\s*מוצר|description|פירוט|פריט|item\s*name|product/i.test(
+    keysStr
+  )
+  const hasQtyCol = /כמות|qty|quantity/i.test(keysStr)
+  const hasPriceCol = /מחיר|price|נטו|net|הנחה|discount|מחירון/i.test(keysStr)
+  const hasTotalCol = /סה״כ|סה"כ|total|line\s*total/i.test(keysStr)
+
+  let invoiceSignals = 0
+  if (hasSkuCol) invoiceSignals++
+  if (hasDescCol) invoiceSignals++
+  if (hasQtyCol) invoiceSignals++
+  if (hasPriceCol) invoiceSignals++
+  if (hasTotalCol) invoiceSignals++
+
+  if (hasSkuCol && hasDescCol && invoiceSignals >= 4) return "invoice"
+  if (hasSkuCol && hasDescCol && hasQtyCol && invoiceSignals >= 3) return "invoice"
+
+  const salesStrong =
+    /דוח\s*מכיר|מכירות\s*לפי|revenue|יומן\s*מכיר|pos\s*summary|סיכום\s*מכיר|כמות\s*נמכר|qty\s*sold/i.test(
+      keysStr
+    )
+  if (salesStrong && invoiceSignals <= 2) return "sales"
+
+  const menuStrong =
+    /(^|\s)(קטגוריה|קטגוריות|category)(\s|$)/i.test(keysStr) &&
+    /מנה|dish|תפריט|menu|מחיר\s*לצרכן|מחיר\s*למנה/i.test(keysStr)
+  if (menuStrong && !hasSkuCol) return "menu"
+
+  return null
+}
+
 async function rtfToPlainText(file: File): Promise<string> {
   const raw = await file.text()
   let out = raw
@@ -356,7 +412,9 @@ export async function detectDocumentType(file: File): Promise<DetectedDocType> {
   }
 
   if (isSheet) {
-    const rows = await parseSpreadsheet(file, ext)
+    const rows = await loadSpreadsheetRowsCached(file, ext)
+    const quick = quickDetectSheetDocType(rows)
+    if (quick) return quick
     const preview = JSON.stringify(rows.slice(0, 15))
     const data = await callClaude({
       model: "claude-haiku-4-5-20251001",
@@ -389,7 +447,13 @@ export async function parseSpreadsheet(file: File, ext: string): Promise<Record<
     })
   }
   const buf = await file.arrayBuffer()
-  const wb = XLSX.read(buf, { type: "array", cellFormula: false, cellNF: false })
+  const wb = XLSX.read(buf, {
+    type: "array",
+    cellFormula: false,
+    cellNF: false,
+    cellStyles: false,
+    sheetStubs: true,
+  })
   const ws = wb.Sheets[wb.SheetNames[0]] || {}
   const raw = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null })
   let headerRowIdx = 0
@@ -558,7 +622,7 @@ export async function extractWithAI(
   }
 
   if (isSheet) {
-    const rows = await parseSpreadsheet(file, ext)
+    const rows = await loadSpreadsheetRowsCached(file, ext)
     const menuSalesPreview = JSON.stringify(rows.slice(0, 30))
     const supplierPreview =
       type === "p" ? sliceRowsForSupplierSheetPreview(rows) : { json: menuSalesPreview, used: 0, total: rows.length }
