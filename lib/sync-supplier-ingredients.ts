@@ -4,6 +4,8 @@
  */
 import { db } from "@/lib/firebase"
 import { collection, getDocs, getDoc, doc, writeBatch } from "firebase/firestore"
+import { ingredientFirestoreDocId } from "@/lib/supplier-firestore-id"
+import { FIRESTORE_SET_CHUNK_SIZE } from "@/lib/firestore-batch"
 
 export type IngredientPayload = {
   name: string
@@ -41,9 +43,14 @@ export async function syncSupplierIngredientsToAssignedRestaurants(
   let totalUpdated = 0
 
   for (const restId of assignedRestIds) {
-    const batch = writeBatch(db)
-    for (const item of ingredients) {
-      const syncPayload: Record<string, unknown> = {
+    const chunkSize = FIRESTORE_SET_CHUNK_SIZE
+    for (let offset = 0; offset < ingredients.length; offset += chunkSize) {
+      const slice = ingredients.slice(offset, offset + chunkSize)
+      if (slice.length === 0) continue
+      const batch = writeBatch(db)
+      for (const item of slice) {
+        const ingId = ingredientFirestoreDocId(item.name)
+        const syncPayload: Record<string, unknown> = {
           price: item.price,
           unit: item.unit,
           waste: item.waste ?? 0,
@@ -54,14 +61,11 @@ export async function syncSupplierIngredientsToAssignedRestaurants(
         if (typeof item.qty === "number" && item.qty > 0) {
           syncPayload.stock = item.qty
         }
-        batch.set(
-          doc(db, "restaurants", restId, "ingredients", item.name),
-          syncPayload,
-          { merge: true }
-        )
-      totalUpdated++
+        batch.set(doc(db, "restaurants", restId, "ingredients", ingId), syncPayload, { merge: true })
+        totalUpdated++
+      }
+      await batch.commit()
     }
-    await batch.commit()
   }
 
   return totalUpdated

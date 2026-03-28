@@ -107,6 +107,7 @@ export function FilePreviewModal({
   const [salesReportDateFrom, setSalesReportDateFrom] = useState<string | undefined>(undefined)
   const [salesReportDateTo, setSalesReportDateTo] = useState<string | undefined>(undefined)
   const [menuDishLanguage, setMenuDishLanguage] = useState<MenuDishNameLanguage>("he")
+  const [confirming, setConfirming] = useState(false)
 
   useEffect(() => {
     setMenuDishLanguage(readMenuDishLanguage())
@@ -274,7 +275,7 @@ export function FilePreviewModal({
     }
   }, [type, items, stockCountMode, t])
 
-  const handleConfirm = useCallback(() => {
+  const handleConfirm = useCallback(async () => {
     if (type === "p" && stockCountMode) {
       const rows = (items as ExtractedSupplierItem[])
         .map((i) => ({
@@ -287,8 +288,15 @@ export function FilePreviewModal({
         toast.error(t("pages.purchaseOrders.stockCountNoRows"))
         return
       }
-      onConfirmStockCount?.(rows)
-      onOpenChange(false)
+      try {
+        setConfirming(true)
+        await Promise.resolve(onConfirmStockCount?.(rows))
+        onOpenChange(false)
+      } catch (e) {
+        toast.error((e as Error)?.message || t("pages.filePreview.errParse"))
+      } finally {
+        setConfirming(false)
+      }
       return
     }
     if (type === "p") {
@@ -296,22 +304,43 @@ export function FilePreviewModal({
         toast.error(t("pages.filePreview.toastSupplierRequired"))
         return
       }
-      onConfirmSupplier?.(
-        items as ExtractedSupplierItem[],
-        supplierName.trim(),
-        forceSaveToGlobal ? true : (canSaveToGlobal ? saveToGlobal : undefined),
-        file?.name,
-      )
-    } else if (type === "d") {
-      onConfirmDishes?.(items as ExtractedDishItem[])
-    } else {
-      onConfirmSales?.(items as Array<{ name: string; qty: number; price: number }>, {
-        salesReportPeriod,
-        salesReportDateFrom,
-        salesReportDateTo,
-      })
+      try {
+        setConfirming(true)
+        await Promise.resolve(
+          onConfirmSupplier?.(
+            items as ExtractedSupplierItem[],
+            supplierName.trim(),
+            forceSaveToGlobal ? true : (canSaveToGlobal ? saveToGlobal : undefined),
+            file?.name,
+          ),
+        )
+        onOpenChange(false)
+      } catch (e) {
+        toast.error((e as Error)?.message || t("pages.filePreview.errParse"))
+      } finally {
+        setConfirming(false)
+      }
+      return
     }
-    onOpenChange(false)
+    try {
+      setConfirming(true)
+      if (type === "d") {
+        await Promise.resolve(onConfirmDishes?.(items as ExtractedDishItem[]))
+      } else {
+        await Promise.resolve(
+          onConfirmSales?.(items as Array<{ name: string; qty: number; price: number }>, {
+            salesReportPeriod,
+            salesReportDateFrom,
+            salesReportDateTo,
+          }),
+        )
+      }
+      onOpenChange(false)
+    } catch (e) {
+      toast.error((e as Error)?.message || t("pages.filePreview.errParse"))
+    } finally {
+      setConfirming(false)
+    }
   }, [
     type,
     items,
@@ -772,10 +801,15 @@ export function FilePreviewModal({
         </div>
         {!loading && items.length > 0 && (
           <div className="flex flex-wrap justify-end gap-2 pt-4 border-t">
-            <Button className="w-full sm:w-auto" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button className="w-full sm:w-auto" variant="outline" onClick={() => onOpenChange(false)} disabled={confirming}>
               {t("pages.productTree.cancel")}
             </Button>
-            <Button className="w-full sm:w-auto" onClick={handleConfirm}>
+            <Button
+              className="w-full sm:w-auto inline-flex items-center gap-2"
+              onClick={() => void handleConfirm()}
+              disabled={confirming}
+            >
+              {confirming ? <Loader2 className="w-4 h-4 animate-spin shrink-0" aria-hidden /> : null}
               {stockCountMode && type === "p"
                 ? t("pages.purchaseOrders.stockCountConfirm")
                 : isDeliveryNote

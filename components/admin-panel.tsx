@@ -48,7 +48,8 @@ import {
   DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu"
 import { getClaudeApiKey, setClaudeApiKey, testClaudeConnection } from "@/lib/claude"
-import { supplierFirestoreDocId } from "@/lib/supplier-firestore-id"
+import { supplierFirestoreDocId, ingredientFirestoreDocId } from "@/lib/supplier-firestore-id"
+import { commitSetWritesInChunks } from "@/lib/firestore-batch"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
 import { Dashboard } from "@/components/dashboard"
@@ -1230,72 +1231,109 @@ export function AdminPanel() {
         return
       }
       const now = new Date().toISOString()
-      const batch = writeBatch(db)
-      let count = 0
-      // Smart upsert — check existing ingredients to avoid duplicates
-      const existingSnap = await getDocs(collection(db, "ingredients"))
-      const existingMap = new Map(existingSnap.docs.map(d=>[d.id.toLowerCase().trim(), d.id]))
-      let updatedCount = 0, newCount = 0
+      try {
+        const existingSnap = await getDocs(collection(db, "ingredients"))
+        const existingMap = new Map<string, string>()
+        for (const d of existingSnap.docs) {
+          const id = d.id
+          existingMap.set(id.toLowerCase().trim(), id)
+          existingMap.set(ingredientFirestoreDocId(id).toLowerCase().trim(), id)
+        }
 
-      items.forEach((item) => {
-        if (!item.name?.trim()) return
-        const nameTrimmed = item.name.trim()
-        const nameKey = nameTrimmed.toLowerCase().trim()
-        const isDeliveryNoteItem = item.price === 0 && typeof item.qty === "number" && item.qty > 0
-        if (item.price <= 0 && !isDeliveryNoteItem) return
-        const alreadyExists = existingMap.has(nameKey)
-        const docId = existingMap.get(nameKey) || nameTrimmed
-        // Always update price, unit AND supplier — new/orphaned/different supplier all get updated
-        const payload: Record<string, unknown> = {
-          ...(item.price > 0 ? { price: item.price } : {}),
-          unit: item.unit || "קג",
-          supplier: supTrim,
-          lastUpdated: now,
-          createdBy: "global" as const,
-          sku: item.sku ?? "",
-        }
-        batch.set(doc(db, "ingredients", docId), payload, { merge: true })
-        const priceId = supplierFirestoreDocId(supTrim) || "default"
-        if (item.price > 0) {
-          batch.set(doc(db, "ingredients", docId, "prices", priceId), {
-            price: item.price, unit: item.unit || "קג", supplier: supTrim, lastUpdated: now,
-          }, { merge: true })
-        }
-        alreadyExists ? updatedCount++ : newCount++
-        count++
-      })
-      if (count > 0) {
-        await batch.commit()
-        const supplierId = supplierFirestoreDocId(supTrim)
-        await setDoc(doc(db, "suppliers", supplierId), { name: supTrim, lastUpdated: now, createdBy: "owner" }, { merge: true })
-        try {
-          await addDoc(collection(db, "ownerGlobalInvoiceUploads"), {
-            fileName: (sourceFileName && sourceFileName.trim()) || "קובץ",
+        const writes: Array<{ ref: ReturnType<typeof doc>; data: Record<string, unknown>; merge?: boolean }> = []
+        let updatedCount = 0
+        let newCount = 0
+        let count = 0
+
+        for (const item of items) {
+          if (!item.name?.trim()) continue
+          const nameTrimmed = item.name.trim()
+          const nameKey = nameTrimmed.toLowerCase().trim()
+          const nameKeyCanon = ingredientFirestoreDocId(nameTrimmed).toLowerCase().trim()
+          const isDeliveryNoteItem = item.price === 0 && typeof item.qty === "number" && item.qty > 0
+          if (item.price <= 0 && !isDeliveryNoteItem) continue
+          const existingId = existingMap.get(nameKey) ?? existingMap.get(nameKeyCanon)
+          const docId = existingId ?? ingredientFirestoreDocId(nameTrimmed)
+          const alreadyExists = !!existingId
+          const payload: Record<string, unknown> = {
+            ...(item.price > 0 ? { price: item.price } : {}),
+            unit: item.unit || "קג",
             supplier: supTrim,
-            uploadedAt: now,
-            ingredientCount: count,
-            documentType: "invoice",
-          })
-        } catch (logErr) {
-          console.error("ownerGlobalInvoiceUploads log failed:", logErr)
+            lastUpdated: now,
+            createdBy: "global" as const,
+            sku: item.sku ?? "",
+          }
+          writes.push({ ref: doc(db, "ingredients", docId), data: payload, merge: true })
+          const priceId = supplierFirestoreDocId(supTrim) || "default"
+          if (item.price > 0) {
+            writes.push({
+              ref: doc(db, "ingredients", docId, "prices", priceId),
+              data: {
+                price: item.price,
+                unit: item.unit || "קג",
+                supplier: supTrim,
+                lastUpdated: now,
+              },
+              merge: true,
+            })
+          }
+          if (alreadyExists) updatedCount++
+          else newCount++
+          count++
         }
-        void loadOwnerGlobalUploads()
-        const toSync = items.filter((i) => i.name?.trim() && i.price > 0).map((i) => ({ name: i.name!.trim(), price: i.price, unit: i.unit || "קג", supplier: supTrim, waste: 0, sku: i.sku ?? "", ...(typeof i.qty === "number" && i.qty > 0 ? { qty: i.qty } : {}) }))
-        if (toSync.length > 0) {
-          const synced = await syncSupplierIngredientsToAssignedRestaurants(supTrim, toSync)
-          const restCount = synced > 0 ? Math.ceil(synced / toSync.length) : 0
-          toast.success(`ספק "${supTrim}" — ${newCount} חדשים, ${updatedCount} עודכנו${restCount > 0 ? ` — סונכרן ל-${restCount} מסעדות` : ""}`)
+
+        if (count > 0) {
+          await commitSetWritesInChunks(db, writes)
+          const supplierId = supplierFirestoreDocId(supTrim)
+          await setDoc(doc(db, "suppliers", supplierId), { name: supTrim, lastUpdated: now, createdBy: "owner" }, { merge: true })
+          try {
+            await addDoc(collection(db, "ownerGlobalInvoiceUploads"), {
+              fileName: (sourceFileName && sourceFileName.trim()) || "קובץ",
+              supplier: supTrim,
+              uploadedAt: now,
+              ingredientCount: count,
+              documentType: "invoice",
+            })
+          } catch (logErr) {
+            console.error("ownerGlobalInvoiceUploads log failed:", logErr)
+          }
+          void loadOwnerGlobalUploads()
+          const toSync = items
+            .filter((i) => i.name?.trim() && i.price > 0)
+            .map((i) => ({
+              name: i.name!.trim(),
+              price: i.price,
+              unit: i.unit || "קג",
+              supplier: supTrim,
+              waste: 0,
+              sku: i.sku ?? "",
+              ...(typeof i.qty === "number" && i.qty > 0 ? { qty: i.qty } : {}),
+            }))
+          if (toSync.length > 0) {
+            const synced = await syncSupplierIngredientsToAssignedRestaurants(supTrim, toSync)
+            const restCount = synced > 0 ? Math.ceil(synced / toSync.length) : 0
+            toast.success(
+              `ספק "${supTrim}" — ${newCount} חדשים, ${updatedCount} עודכנו${restCount > 0 ? ` — סונכרן ל-${restCount} מסעדות` : ""}`,
+            )
+          } else {
+            toast.success(`ספק "${supTrim}" — ${newCount} חדשים, ${updatedCount} עודכנו`)
+          }
+          loadSystemOwnerData()
         } else {
-          toast.success(`ספק "${supTrim}" — ${newCount} חדשים, ${updatedCount} עודכנו`)
+          toast.warning("אין רכיבים תקינים לשמירה (שם ריק או מחיר 0)")
         }
-        loadSystemOwnerData()
-      } else {
-        toast.warning("אין רכיבים תקינים לשמירה (שם ריק או מחיר 0)")
+      } catch (e) {
+        const msg = (e as Error)?.message || String(e)
+        console.error("handleConfirmAdminSupplier:", e)
+        toast.error(
+          msg.includes("limit") || msg.includes("500")
+            ? "יותר מדי שורות לשמירה בבת אחת. פצל את הקובץ או צור קשר לתמיכה."
+            : msg || "שגיאה בשמירת החשבונית",
+        )
+        throw e
       }
-      setFpmFile(null)
-      setFpmOpen(false)
     },
-    [loadSystemOwnerData, loadOwnerGlobalUploads]
+    [loadSystemOwnerData, loadOwnerGlobalUploads],
   )
 
   useEffect(() => {

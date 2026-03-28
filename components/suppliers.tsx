@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { collection, getDocs, doc, getDoc, setDoc, writeBatch, deleteDoc, addDoc, collectionGroup, query, where } from "firebase/firestore"
 import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplier-ingredients"
-import { supplierFirestoreDocId } from "@/lib/supplier-firestore-id"
+import { supplierFirestoreDocId, ingredientFirestoreDocId } from "@/lib/supplier-firestore-id"
+import { commitSetWritesInChunks } from "@/lib/firestore-batch"
 import { upsertRestaurantSupplierPrice } from "@/lib/restaurant-supplier-prices"
 import {
   Table,
@@ -318,46 +319,59 @@ export default function Suppliers() {
         })
       }
 
-      const batch = writeBatch(db)
+      const writes: Array<{ ref: ReturnType<typeof doc>; data: Record<string, unknown>; merge?: boolean }> = []
       let count = 0
-      items.forEach((item) => {
-        if (!item.name?.trim()) return
-        // תעודת משלוח: price=0 מותר אם יש qty
+      for (const item of items) {
+        if (!item.name?.trim()) continue
         const isDeliveryNoteItem = item.price === 0 && typeof item.qty === "number" && item.qty > 0
-        if (item.price <= 0 && !isDeliveryNoteItem) return
+        if (item.price <= 0 && !isDeliveryNoteItem) continue
         const qty = typeof item.qty === "number" && item.qty > 0 ? item.qty : 0
+        const ingId = ingredientFirestoreDocId(item.name.trim())
         const payload: Record<string, unknown> = {
-          ...(item.price > 0 ? { price: item.price } : {}),  // לא דורסים מחיר קיים בתעודת משלוח
+          ...(item.price > 0 ? { price: item.price } : {}),
           unit: item.unit || "קג",
           supplier: supName,
           lastUpdated: now,
           createdBy: toGlobal ? "global" : "restaurant",
-          // לא מאפסים waste/minStock — הם מוגדרים ידנית
           sku: item.sku ?? "",
         }
         if (!toGlobal) {
-          payload.stock = qty > 0 ? (currentStocks[item.name.trim()] ?? 0) + qty : (currentStocks[item.name.trim()] ?? 0)
+          const prevStock = currentStocks[ingId] ?? currentStocks[item.name.trim()] ?? 0
+          payload.stock = qty > 0 ? prevStock + qty : prevStock
         }
         if (toGlobal) {
-          batch.set(doc(db, "ingredients", item.name.trim()), { ...payload }, { merge: true })
-          const priceId = (supName || "").replace(/\//g, "_").replace(/\./g, "_").trim() || "default"
-          batch.set(doc(db, "ingredients", item.name.trim(), "prices", priceId), {
-            price: item.price,
-            unit: item.unit || "קג",
-            supplier: supName,
-            lastUpdated: now,
-          }, { merge: true })
+          writes.push({ ref: doc(db, "ingredients", ingId), data: { ...payload }, merge: true })
+          const priceId = supplierFirestoreDocId(supTrim) || "default"
+          if (item.price > 0) {
+            writes.push({
+              ref: doc(db, "ingredients", ingId, "prices", priceId),
+              data: {
+                price: item.price,
+                unit: item.unit || "קג",
+                supplier: supName,
+                lastUpdated: now,
+              },
+              merge: true,
+            })
+          }
         } else {
-          batch.set(
-            doc(db, "restaurants", restId, "ingredients", item.name.trim()),
-            { ...payload },
-            { merge: true }
-          )
+          writes.push({ ref: doc(db, "restaurants", restId, "ingredients", ingId), data: { ...payload }, merge: true })
         }
         count++
-      })
+      }
       if (count > 0) {
-        await batch.commit()
+        try {
+          await commitSetWritesInChunks(db, writes)
+        } catch (e) {
+          const msg = (e as Error)?.message || String(e)
+          console.error("handleConfirmSupplier:", e)
+          toast.error(
+            msg.includes("limit") || msg.includes("500")
+              ? "יותר מדי שורות לשמירה בבת אחת — פצל את החשבונית."
+              : msg || "שגיאה בשמירה",
+          )
+          throw e
+        }
         if (!toGlobal && supName?.trim()) {
           await Promise.all(
             items
