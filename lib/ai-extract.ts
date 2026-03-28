@@ -412,6 +412,32 @@ export async function parseSpreadsheet(file: File, ext: string): Promise<Record<
   return rows.filter((row) => Object.values(row).some((v) => v !== "" && v != null))
 }
 
+/** חשבונית מ־Excel/CSV: לא לחתוך ל־30 שורות — עד תקרת תווים לבקשה אחת ל־Claude */
+const SUPPLIER_SHEET_JSON_CHAR_BUDGET = 95_000
+
+function sliceRowsForSupplierSheetPreview(rows: Record<string, unknown>[]): {
+  json: string
+  used: number
+  total: number
+} {
+  const total = rows.length
+  if (total === 0) return { json: "[]", used: 0, total: 0 }
+  let lo = 1
+  let hi = total
+  let best = 1
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2)
+    const j = JSON.stringify(rows.slice(0, mid))
+    if (j.length <= SUPPLIER_SHEET_JSON_CHAR_BUDGET) {
+      best = mid
+      lo = mid + 1
+    } else {
+      hi = mid - 1
+    }
+  }
+  return { json: JSON.stringify(rows.slice(0, best)), used: best, total }
+}
+
 export async function extractWithAI(
   file: File,
   type: ExtractType,
@@ -533,10 +559,13 @@ export async function extractWithAI(
 
   if (isSheet) {
     const rows = await parseSpreadsheet(file, ext)
-    const preview = JSON.stringify(rows.slice(0, 30))
+    const menuSalesPreview = JSON.stringify(rows.slice(0, 30))
+    const supplierPreview =
+      type === "p" ? sliceRowsForSupplierSheetPreview(rows) : { json: menuSalesPreview, used: 0, total: rows.length }
+    const preview = type === "p" ? supplierPreview.json : menuSalesPreview
     const system =
       type === "p"
-        ? SUPPLIER_SYSTEM
+        ? SUPPLIER_SYSTEM + (supplierName ? ` שם הספק: "${supplierName}".` : "")
         : type === "d"
           ? dishSystem
           : SALES_SYSTEM
@@ -544,11 +573,13 @@ export async function extractWithAI(
       type === "d"
         ? `הנתונים:\n${preview}\n\nחלץ מנות ומחירים. לכל מנה ישייך רכיבים וכמויות לפי הבנתך. עקוב אחרי כללי שפת שמות המנות בהוראות המערכת. JSON בלבד.`
         : type === "p"
-          ? `הנתונים מהגיליון (שורות כטבלה):\n${preview}\n\n${SUPPLIER_EXTRACT_USER_MESSAGE}`
+          ? `הנתונים מהגיליון (שורות כטבלה)${supplierPreview.used < supplierPreview.total ? ` — ${supplierPreview.used} שורות מתוך ${supplierPreview.total} (גיליון ראשון בלבד; חלץ הכל ממה שנשלח)` : ""}:\n${preview}\n\n${SUPPLIER_EXTRACT_USER_MESSAGE}`
           : `הנתונים:\n${preview}\n\nחלץ דוח מכירות לפי SALES_SYSTEM — כולל sales_report_period, sales_report_date_from, sales_report_date_to. JSON בלבד.`
+    const supplierRowCount = type === "p" ? supplierPreview.used : 0
     const data = await callClaude({
       model: type === "p" ? CLAUDE_SUPPLIER_EXTRACT_MODEL : CLAUDE_DEFAULT_EXTRACT_MODEL,
-      max_tokens: type === "p" ? 8000 : 2000,
+      max_tokens:
+        type === "p" ? (supplierRowCount > 45 ? 12_000 : 8000) : type === "s" ? 4000 : 2000,
       system,
       messages: [{ role: "user", content: [{ type: "text", text: sheetUserText }] }],
     })
