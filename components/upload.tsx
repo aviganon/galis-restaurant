@@ -802,12 +802,13 @@ export function Upload() {
               variant="outline"
               className="h-auto py-4 flex-col gap-2"
               onClick={() => {
-                downloadExcelFromArrays(
+                void downloadExcelFromArrays(
                   [["שם הרכיב", "מחיר", "יחידה", "פחת %", "ספק", "מק\"ט"]],
                   "תבנית_מחירון",
                   "מחירון"
                 )
-                toast.success("התבנית הורדה")
+                  .then(() => toast.success("התבנית הורדה"))
+                  .catch(() => toast.error("שגיאה בהורדה"))
               }}
             >
               <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
@@ -818,12 +819,13 @@ export function Upload() {
               variant="outline"
               className="h-auto py-4 flex-col gap-2"
               onClick={() => {
-                downloadExcelFromArrays(
+                void downloadExcelFromArrays(
                   [["שם הרכיב", "מחיר", "יחידה", "פחת %", "מלאי", "מינימום", "ספק", "מק\"ט"]],
                   "תבנית_רכיבים",
                   "רכיבים"
                 )
-                toast.success("התבנית הורדה")
+                  .then(() => toast.success("התבנית הורדה"))
+                  .catch(() => toast.error("שגיאה בהורדה"))
               }}
             >
               <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
@@ -834,12 +836,13 @@ export function Upload() {
               variant="outline"
               className="h-auto py-4 flex-col gap-2"
               onClick={() => {
-                downloadExcelFromArrays(
+                void downloadExcelFromArrays(
                   [["שם הרכיב", "כמות"]],
                   "תבנית_מלאי",
                   "מלאי"
                 )
-                toast.success("התבנית הורדה")
+                  .then(() => toast.success("התבנית הורדה"))
+                  .catch(() => toast.error("שגיאה בהורדה"))
               }}
             >
               <FileSpreadsheet className="w-6 h-6 text-emerald-600" />

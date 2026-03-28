@@ -7,6 +7,7 @@ const nextConfig = {
   },
   images: {
     unoptimized: true,
+    qualities: [75, 95],
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "videos.pexels.com" },

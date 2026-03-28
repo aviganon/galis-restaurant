@@ -1,6 +1,7 @@
 "use client"
 
 import Papa from "papaparse"
+import readXlsxFile from "read-excel-file/universal"
 import * as XLSX from "xlsx"
 import { fileToBase64, callClaude } from "./claude"
 import { normalizeDishCategoryToHebrew } from "./dish-category-hebrew"
@@ -435,27 +436,7 @@ export async function detectDocumentType(file: File): Promise<DetectedDocType> {
   return "unknown"
 }
 
-export async function parseSpreadsheet(file: File, ext: string): Promise<Record<string, unknown>[]> {
-  if (ext === "csv") {
-    return new Promise((resolve) => {
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (r: { data: unknown }) =>
-          resolve(Array.isArray(r.data) ? (r.data as Record<string, unknown>[]) : []),
-      })
-    })
-  }
-  const buf = await file.arrayBuffer()
-  const wb = XLSX.read(buf, {
-    type: "array",
-    cellFormula: false,
-    cellNF: false,
-    cellStyles: false,
-    sheetStubs: true,
-  })
-  const ws = wb.Sheets[wb.SheetNames[0]] || {}
-  const raw = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null })
+function sheetRowsFromAoA(raw: unknown[][]): Record<string, unknown>[] {
   let headerRowIdx = 0
   for (let i = 0; i < Math.min(raw.length, 5); i++) {
     const row = raw[i] || []
@@ -474,6 +455,38 @@ export async function parseSpreadsheet(file: File, ext: string): Promise<Record<
     return o
   })
   return rows.filter((row) => Object.values(row).some((v) => v !== "" && v != null))
+}
+
+export async function parseSpreadsheet(file: File, ext: string): Promise<Record<string, unknown>[]> {
+  if (ext === "csv") {
+    return new Promise((resolve) => {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (r: { data: unknown }) =>
+          resolve(Array.isArray(r.data) ? (r.data as Record<string, unknown>[]) : []),
+      })
+    })
+  }
+  if (ext === "xlsx") {
+    const parsed = await readXlsxFile(file)
+    const raw: unknown[][] = parsed.map((row) =>
+      row.map((cell) => (cell === undefined ? null : cell)) as unknown[]
+    )
+    return sheetRowsFromAoA(raw)
+  }
+  // .xls בלבד — ספריית xlsx (פחות מומלץ מבחינת אבטחה; העדף ייצוא מחדש כ־xlsx)
+  const buf = await file.arrayBuffer()
+  const wb = XLSX.read(buf, {
+    type: "array",
+    cellFormula: false,
+    cellNF: false,
+    cellStyles: false,
+    sheetStubs: true,
+  })
+  const ws = wb.Sheets[wb.SheetNames[0]] || {}
+  const raw = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null }) as unknown[][]
+  return sheetRowsFromAoA(raw)
 }
 
 /** חשבונית מ־Excel/CSV: לא לחתוך ל־30 שורות — עד תקרת תווים לבקשה אחת ל־Claude */

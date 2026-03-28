@@ -1291,8 +1291,9 @@ export function Ingredients() {
                     "מק\"ט": i.sku,
                     "סטטוס": "isCompound" in i && i.isCompound ? "מתכון" : i.stock === 0 ? "אזל" : i.minStock > 0 && i.stock < i.minStock ? "נמוך" : "תקין",
                   }))
-                  downloadExcel(rows, `רכיבים_${new Date().toISOString().slice(0, 10)}`, "רכיבים")
-                  toast.success(t("pages.ingredients.fileDownloaded"))
+                  void downloadExcel(rows, `רכיבים_${new Date().toISOString().slice(0, 10)}`, "רכיבים")
+                    .then(() => toast.success(t("pages.ingredients.fileDownloaded")))
+                    .catch(() => toast.error("שגיאה בהורדת הקובץ"))
                 }}
               >
                 <Download className="w-4 h-4 ml-2" />

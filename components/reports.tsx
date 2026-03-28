@@ -145,8 +145,9 @@ export function Reports() {
                 { [t("pages.purchaseOrders.date")]: new Date().toLocaleDateString("he-IL"), [t("pages.reports.revenue")]: totalRevenue, [t("pages.reports.foodCost")]: totalCost, [t("pages.reports.margin")]: margin.toFixed(1) },
                 ...topDishes.map((d) => ({ [t("pages.menuCosts.dish")]: d.name, [t("pages.reports.revenue")]: d.revenue, [t("pages.reports.growth")]: d.growth })),
               ]
-              downloadExcel(rows, `report_${new Date().toISOString().slice(0, 10)}`, "report")
-              toast.success(t("pages.ingredients.fileDownloaded"))
+              void downloadExcel(rows, `report_${new Date().toISOString().slice(0, 10)}`, "report")
+                .then(() => toast.success(t("pages.ingredients.fileDownloaded")))
+                .catch(() => toast.error("שגיאה בהורדת הקובץ"))
             }}
           >
             <Download className="w-4 h-4 ml-2" />
