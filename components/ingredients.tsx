@@ -52,7 +52,6 @@ import {
   ChefHat,
   Globe,
   ChevronDown,
-  GripVertical,
   Columns3,
   Check,
 } from "lucide-react"
@@ -287,8 +286,9 @@ export function Ingredients() {
   const [webPriceByIngredient, setWebPriceByIngredient] = useState<Record<string, { price: number; store: string; unit: string; source: string }>>({})
   const [webPriceLoading, setWebPriceLoading] = useState<string | null>(null)
 
-  const INGREDIENTS_COLUMN_ORDER_KEY = "ingredients-column-order"
   const defaultColumnOrder = ["name", "price", "source", "cheapest", "unit", "waste", "stock", "minStock", "supplier", "sku", "status", "actions"] as const
+  /** סדר עמודות קבוע — גרירה הוסרה כי table-fixed+colgroup לא מסתנכרנים עם סדר דינמי */
+  const columnOrder = [...defaultColumnOrder]
 
   /** עמודות «מקור» ו«הכי זול» תמיד זמינות כשיש השוואת מחירים — לא מסתירים בטעות דרך localStorage */
   const columnIsEffectivelyVisible = useCallback(
@@ -309,20 +309,6 @@ export function Ingredients() {
     [canSeePriceCompare, isOwner]
   )
 
-  const [columnOrder, setColumnOrder] = useState<string[]>(() => {
-    if (typeof window === "undefined") return [...defaultColumnOrder]
-    try {
-      const stored = localStorage.getItem(INGREDIENTS_COLUMN_ORDER_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored) as string[]
-        const known = new Set<string>(defaultColumnOrder)
-        const ordered = parsed.filter((k) => known.has(k))
-        const missing = defaultColumnOrder.filter((c) => !ordered.includes(c))
-        return [...ordered, ...missing]
-      }
-    } catch (_) {}
-    return [...defaultColumnOrder]
-  })
   const INGREDIENTS_COLUMN_VISIBILITY_KEY = "ingredients-column-visibility"
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>(() => {
     if (typeof window === "undefined") return {}
@@ -347,21 +333,6 @@ export function Ingredients() {
     [canSeePriceCompare]
   )
   const displayColumnOrder = visibleColumnOrder.filter(columnShownInTable)
-  const handleColumnReorder = useCallback((fromIndex: number, toIndex: number) => {
-    setColumnOrder((prev) => {
-      const display = prev.filter(
-        (k) => columnIsEffectivelyVisible(k, columnVisibility, canSeePriceCompare) && columnShownInTable(k)
-      )
-      if (fromIndex < 0 || fromIndex >= display.length || toIndex < 0 || toIndex >= display.length) return prev
-      const displayOrder = [...display]
-      const [moved] = displayOrder.splice(fromIndex, 1)
-      displayOrder.splice(toIndex, 0, moved)
-      const rest = prev.filter((k) => !displayOrder.includes(k))
-      const next = [...displayOrder, ...rest]
-      try { localStorage.setItem(INGREDIENTS_COLUMN_ORDER_KEY, JSON.stringify(next)) } catch (_) {}
-      return next
-    })
-  }, [columnVisibility, canSeePriceCompare, columnIsEffectivelyVisible, columnShownInTable])
 
   const INGREDIENTS_ROW_DENSITY_KEY = "ingredients-row-density"
   type RowDensity = "compact" | "normal" | "expanded"
@@ -1476,7 +1447,7 @@ export function Ingredients() {
                         onChange={e=>{if(e.target.checked)setSelectedIngIds(new Set(filteredIngredients.filter(i=>!("isCompound" in i&&i.isCompound)).map(i=>i.id)));else setSelectedIngIds(new Set())}}/>
                     </div>
                   </TableHead>
-                  {displayColumnOrder.map((key, colIndex) => {
+                  {displayColumnOrder.map((key) => {
                     const labels: Record<string, string> = {
                       name: t("pages.ingredients.ingredientName"),
                       price: t("pages.ingredients.price"),
@@ -1513,15 +1484,6 @@ export function Ingredients() {
                           isSortable && "cursor-pointer hover:bg-muted/50 select-none",
                           key === "name" && (isRtl ? "pr-0" : "pl-0")
                         )}
-                        draggable
-                        title={t("pages.ingredients.dragToReorderColumns")}
-                        onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(colIndex)); e.dataTransfer.effectAllowed = "move" }}
-                        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move" }}
-                        onDrop={(e) => {
-                          e.preventDefault()
-                          const from = parseInt(e.dataTransfer.getData("text/plain"), 10)
-                          if (!isNaN(from)) handleColumnReorder(from, colIndex)
-                        }}
                         onClick={() => {
                           if (!isSortable) return
                           if (key === "name") setSortBy((s) => (s === "name" ? "name_desc" : "name"))
@@ -1539,7 +1501,6 @@ export function Ingredients() {
                             justify
                           )}
                         >
-                          <GripVertical className="w-3 h-3 text-muted-foreground/60 cursor-grab active:cursor-grabbing shrink-0" />
                           {labels[key] || key}
                           {key === "name" && (sortBy === "name" || sortBy === "name_desc") && (sortBy === "name" ? <TrendingDown className="w-3.5 h-3.5" /> : <TrendingUp className="w-3.5 h-3.5" />)}
                           {key === "price" && (sortBy === "price_asc" || sortBy === "price_desc") && (sortBy === "price_desc" ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />)}
