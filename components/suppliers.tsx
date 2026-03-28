@@ -15,7 +15,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
-import { db, storage } from "@/lib/firebase"
+import { db, storage, auth } from "@/lib/firebase"
+import { appendRestaurantAuditLog } from "@/lib/restaurant-operations"
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage"
 import { useApp } from "@/contexts/app-context"
 import { Card, CardContent } from "@/components/ui/card"
@@ -334,6 +335,13 @@ export default function Suppliers() {
             lastUpdated: now,
             createdBy: "restaurant",
           }, { merge: true })
+          void appendRestaurantAuditLog(db, restId, {
+            action: "supplier_assigned",
+            summary: `ספק חדש שויך למסעדה: ${supTrim}`,
+            meta: { supplierName: supTrim },
+            actorUid: auth.currentUser?.uid ?? null,
+            actorEmail: auth.currentUser?.email ?? null,
+          })
         }
       }
 

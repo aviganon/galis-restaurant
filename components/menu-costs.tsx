@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { collection, getDocs, getDoc, doc, setDoc, writeBatch, type DocumentReference } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
@@ -33,6 +33,7 @@ import { loadRestaurantPantryForAi } from "@/lib/restaurant-pantry"
 import { loadGlobalPriceSubdocsMap, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { Slider } from "@/components/ui/slider"
 import { recipeCountsAsMenuDish } from "@/lib/recipe-menu-visibility"
 
 const VAT_RATE = 1.17
@@ -143,6 +144,8 @@ export function MenuCosts({ embeddedInProductTree = false }: MenuCostsProps) {
   const [categoryFilter, setCategoryFilter] = useState("הכל")
   const [statusFilter, setStatusFilter] = useState("all")
   const [sortBy, setSortBy] = useState("name")
+  /** סימולטור: אחוז שינוי לעלות המזון (כל הרכיבים) — לא נשמר ב-DB */
+  const [costSimPct, setCostSimPct] = useState(0)
 
   const [isDragging, setIsDragging] = useState(false)
   const [isParsingFile, setIsParsingFile] = useState(false)
@@ -285,6 +288,35 @@ export function MenuCosts({ embeddedInProductTree = false }: MenuCostsProps) {
   useEffect(() => {
     void loadMenuCosts()
   }, [loadMenuCosts, refreshIngredientsKey])
+
+  const displayItems = useMemo(() => {
+    const m = 1 + costSimPct / 100
+    return items.map((item) => {
+      const foodCost = item.foodCost * m
+      const foodCostPercent = item.salePrice > 0 ? (foodCost / item.salePrice) * 100 : 0
+      const profit = item.salePrice - foodCost
+      const profitMargin = item.salePrice > 0 ? (profit / item.salePrice) * 100 : 0
+      let status: MenuItem["status"] = "good"
+      if (foodCostPercent <= 25) status = "excellent"
+      else if (foodCostPercent <= 30) status = "good"
+      else if (foodCostPercent <= 35) status = "warning"
+      else status = "critical"
+      return { ...item, foodCost, foodCostPercent, profit, profitMargin, status }
+    })
+  }, [items, costSimPct])
+
+  const categoryAvgRows = useMemo(() => {
+    const map = new Map<string, { sum: number; n: number }>()
+    for (const i of displayItems) {
+      const cur = map.get(i.category) ?? { sum: 0, n: 0 }
+      cur.sum += i.foodCostPercent
+      cur.n += 1
+      map.set(i.category, cur)
+    }
+    return Array.from(map.entries())
+      .map(([category, { sum, n }]) => ({ category, avgPct: sum / n, count: n }))
+      .sort((a, b) => b.avgPct - a.avgPct)
+  }, [displayItems])
 
   const processFile = useCallback(
     async (file: File) => {
@@ -458,7 +490,7 @@ export function MenuCosts({ embeddedInProductTree = false }: MenuCostsProps) {
     }
   }
 
-  const filteredItems = items
+  const filteredItems = displayItems
     .filter((item) => {
       const matchesSearch = item.name.includes(searchTerm)
       const matchesCategory = categoryFilter === "הכל" || item.category === categoryFilter
@@ -477,11 +509,14 @@ export function MenuCosts({ embeddedInProductTree = false }: MenuCostsProps) {
     })
 
   const stats = {
-    totalItems: items.length,
-    avgFoodCost: items.length > 0 ? items.reduce((s, i) => s + i.foodCostPercent, 0) / items.length : 0,
-    totalRevenue: items.reduce((s, i) => s + i.salePrice * i.salesCount, 0),
-    totalProfit: items.reduce((s, i) => s + i.profit * i.salesCount, 0),
-    criticalItems: items.filter((i) => i.status === "critical" || i.status === "warning").length,
+    totalItems: displayItems.length,
+    avgFoodCost:
+      displayItems.length > 0
+        ? displayItems.reduce((s, i) => s + i.foodCostPercent, 0) / displayItems.length
+        : 0,
+    totalRevenue: displayItems.reduce((s, i) => s + i.salePrice * i.salesCount, 0),
+    totalProfit: displayItems.reduce((s, i) => s + i.profit * i.salesCount, 0),
+    criticalItems: displayItems.filter((i) => i.status === "critical" || i.status === "warning").length,
   }
 
   if (loading) {
@@ -697,9 +732,80 @@ export function MenuCosts({ embeddedInProductTree = false }: MenuCostsProps) {
             </SelectContent>
           </Select>
         </div>
+        <div
+          className={cn(
+            "mt-4 space-y-2 rounded-lg border border-dashed border-primary/25 bg-primary/5 p-3",
+            embeddedInProductTree && "mt-2 p-2",
+          )}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Label className={cn("font-semibold", embeddedInProductTree ? "text-xs" : "text-sm")}>
+              {t("pages.menuCosts.costSimulatorLabel")}
+            </Label>
+            <span className="tabular-nums text-sm font-bold text-primary">
+              {costSimPct > 0 ? "+" : ""}
+              {costSimPct}%
+            </span>
+          </div>
+          <Slider
+            min={-30}
+            max={50}
+            step={1}
+            value={[costSimPct]}
+            onValueChange={(v) => setCostSimPct(v[0] ?? 0)}
+            className={cn("py-1", embeddedInProductTree && "max-w-full")}
+          />
+          <p className="text-[11px] text-muted-foreground leading-snug">
+            {t("pages.menuCosts.costSimulatorHint")}
+          </p>
+        </div>
       </CardContent>
       </Card>
   )
+
+  const categoryBreakdownCard = !embeddedInProductTree ? (
+    <Card>
+      <CardContent className="p-4">
+        <h3 className="font-semibold text-sm mb-3">{t("pages.menuCosts.categoryAvgTitle")}</h3>
+        {categoryAvgRows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t("pages.menuCosts.noItems")}</p>
+        ) : (
+          <div className="overflow-x-auto rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-right">{t("pages.menuCosts.categoryCol")}</TableHead>
+                  <TableHead className="text-center">{t("pages.menuCosts.dishCountCol")}</TableHead>
+                  <TableHead className="text-center">{t("pages.menuCosts.avgFoodCostCol")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {categoryAvgRows.map((row) => (
+                  <TableRow key={row.category}>
+                    <TableCell className="font-medium">{row.category}</TableCell>
+                    <TableCell className="text-center tabular-nums">{row.count}</TableCell>
+                    <TableCell
+                      className={cn(
+                        "text-center font-bold tabular-nums",
+                        row.avgPct > 35
+                          ? "text-red-600"
+                          : row.avgPct > 30
+                            ? "text-amber-600"
+                            : "text-emerald-600",
+                      )}
+                    >
+                      {row.avgPct.toFixed(1)}%
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground mt-2">{t("pages.menuCosts.categoryAvgFootnote")}</p>
+      </CardContent>
+    </Card>
+  ) : null
 
   const dataTableCard = (
       <Card className={cn(embeddedInProductTree && "flex min-h-0 flex-1 flex-col overflow-hidden")}>
@@ -770,6 +876,7 @@ export function MenuCosts({ embeddedInProductTree = false }: MenuCostsProps) {
           {savedDatesLine}
           {bigStatsGrid}
           {toolbarCard}
+          {categoryBreakdownCard}
           {dataTableCard}
         </div>
       )}

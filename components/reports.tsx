@@ -35,6 +35,7 @@ export function Reports() {
   const isOwner = isOwnerRole(userRole, isSystemOwner)
   const [loading, setLoading] = useState(true)
   const [topDishes, setTopDishes] = useState<{ name: string; revenue: number; growth: number }[]>([])
+  const [allDishes, setAllDishes] = useState<{ name: string; revenue: number; growth: number }[]>([])
   const [totalRevenue, setTotalRevenue] = useState(0)
   const [totalCost, setTotalCost] = useState(0)
   const [margin, setMargin] = useState(0)
@@ -96,6 +97,7 @@ export function Reports() {
         })
 
         list.sort((a, b) => b.revenue - a.revenue)
+        setAllDishes(list)
         setTopDishes(list.slice(0, 5))
         setTotalRevenue(rev)
         setTotalCost(cost)
@@ -136,7 +138,7 @@ export function Reports() {
           <h1 className="text-2xl md:text-3xl font-bold mb-1">{t("pages.reports.title")}</h1>
           <p className="text-muted-foreground">{t("pages.reports.subtitle")}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             className="rounded-xl"
@@ -152,6 +154,24 @@ export function Reports() {
           >
             <Download className="w-4 h-4 ml-2" />
             {t("pages.reports.exportExcel")}
+          </Button>
+          <Button
+            variant="secondary"
+            className="rounded-xl"
+            disabled={allDishes.length === 0}
+            onClick={() => {
+              const dishRows = allDishes.map((d) => ({
+                [t("pages.menuCosts.dish")]: d.name,
+                [t("pages.reports.revenue")]: d.revenue,
+                [t("pages.reports.growth")]: d.growth,
+              }))
+              void downloadExcel(dishRows, `report_all_dishes_${new Date().toISOString().slice(0, 10)}`, "dishes")
+                .then(() => toast.success(t("pages.ingredients.fileDownloaded")))
+                .catch(() => toast.error("שגיאה בהורדת הקובץ"))
+            }}
+          >
+            <Download className="w-4 h-4 ml-2" />
+            {t("pages.reports.exportAllDishes")}
           </Button>
         </div>
       </div>

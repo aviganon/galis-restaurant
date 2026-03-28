@@ -14,14 +14,20 @@ import {
 import { db, auth } from "@/lib/firebase"
 import { useApp } from "@/contexts/app-context"
 import { createOperationalTask } from "@/lib/restaurant-operations"
+import { downloadExcelMultiSheet } from "@/lib/export-excel"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Loader2, ClipboardList, History, LineChart } from "lucide-react"
+import { Loader2, ClipboardList, History, LineChart, Download } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+
+const LS_EXPORT_REMINDER = "galis_ops_weekly_export_reminder"
+const LS_LAST_EXPORT = "galis_ops_last_export_at"
 
 type TaskRow = {
   id: string
@@ -59,6 +65,19 @@ export function OperationsHub() {
   const [newNotes, setNewNotes] = useState("")
   const [newDue, setNewDue] = useState("")
   const [savingTask, setSavingTask] = useState(false)
+  const [weeklyExportReminder, setWeeklyExportReminder] = useState(false)
+  const [lastExportAt, setLastExportAt] = useState<string | null>(null)
+  const [exportingPack, setExportingPack] = useState(false)
+
+  useEffect(() => {
+    try {
+      setWeeklyExportReminder(localStorage.getItem(LS_EXPORT_REMINDER) === "1")
+      setLastExportAt(localStorage.getItem(LS_LAST_EXPORT))
+    } catch {
+      setWeeklyExportReminder(false)
+      setLastExportAt(null)
+    }
+  }, [])
 
   const loadAll = useCallback(async () => {
     if (!currentRestaurantId) {
@@ -153,6 +172,62 @@ export function OperationsHub() {
     }
   }
 
+  const persistLastExport = () => {
+    const iso = new Date().toISOString()
+    try {
+      localStorage.setItem(LS_LAST_EXPORT, iso)
+    } catch {
+      /* */
+    }
+    setLastExportAt(iso)
+  }
+
+  const handleExportDataPack = async () => {
+    setExportingPack(true)
+    try {
+      await downloadExcelMultiSheet(
+        [
+          {
+            name: "משימות",
+            data: tasks.map((r) => ({
+              כותרת: r.title,
+              הערות: r.notes,
+              יעד: r.dueAt ?? "",
+              בוצע: r.done ? "כן" : "לא",
+              נוצר: r.createdAt,
+            })),
+          },
+          {
+            name: "יומן",
+            data: audit.map((a) => ({
+              פעולה: a.action,
+              תיאור: a.summary,
+              זמן: a.createdAt,
+            })),
+          },
+          {
+            name: "היסטוריית מחירים",
+            data: priceHist.map((p) => ({
+              רכיב: p.ingredientName,
+              "מחיר קודם": p.oldPrice,
+              "מחיר חדש": p.newPrice,
+              יחידה: p.unit,
+              מתי: p.at,
+            })),
+          },
+        ],
+        `תפעול_${currentRestaurantId}_${new Date().toISOString().slice(0, 10)}`
+      )
+      persistLastExport()
+      toast.success(t("pages.operationsHub.exportPackSuccess"))
+    } catch (e) {
+      console.error(e)
+      toast.error(t("pages.operationsHub.exportPackError"))
+    } finally {
+      setExportingPack(false)
+    }
+  }
+
   const toggleTask = async (row: TaskRow) => {
     if (!currentRestaurantId) return
     try {
@@ -183,6 +258,12 @@ export function OperationsHub() {
   }
 
   const openTasks = tasks.filter((x) => !x.done).length
+  const lastExportMs = lastExportAt ? new Date(lastExportAt).getTime() : NaN
+  const exportNudge =
+    weeklyExportReminder &&
+    (!lastExportAt ||
+      Number.isNaN(lastExportMs) ||
+      (Date.now() - lastExportMs) / 86_400_000 >= 7)
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-6 space-y-4" dir="rtl">
@@ -190,6 +271,50 @@ export function OperationsHub() {
         <h1 className="text-2xl font-bold tracking-tight">{t("pages.operationsHub.title")}</h1>
         <p className="text-sm text-muted-foreground mt-1">{t("pages.operationsHub.subtitle")}</p>
       </div>
+
+      <Card className="border-primary/20 bg-muted/30">
+        <CardContent className="p-4 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="space-y-1">
+              <p className="font-medium text-sm">{t("pages.operationsHub.exportPackTitle")}</p>
+              <p className="text-xs text-muted-foreground">{t("pages.operationsHub.exportPackDesc")}</p>
+            </div>
+            <Button
+              type="button"
+              variant="default"
+              className="shrink-0 gap-2"
+              disabled={exportingPack}
+              onClick={() => void handleExportDataPack()}
+            >
+              {exportingPack ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              {t("pages.operationsHub.exportPackButton")}
+            </Button>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-border/60">
+            <Switch
+              id="weekly-export-reminder"
+              checked={weeklyExportReminder}
+              onCheckedChange={(on) => {
+                setWeeklyExportReminder(on)
+                try {
+                  if (on) localStorage.setItem(LS_EXPORT_REMINDER, "1")
+                  else localStorage.removeItem(LS_EXPORT_REMINDER)
+                } catch {
+                  /* */
+                }
+              }}
+            />
+            <Label htmlFor="weekly-export-reminder" className="text-sm cursor-pointer">
+              {t("pages.operationsHub.weeklyExportReminder")}
+            </Label>
+          </div>
+          {exportNudge ? (
+            <p className="text-xs text-amber-800 dark:text-amber-200 bg-amber-500/15 rounded-md px-2 py-1.5">
+              {t("pages.operationsHub.exportNudge")}
+            </p>
+          ) : null}
+        </CardContent>
+      </Card>
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="grid w-full grid-cols-3 h-auto flex-wrap gap-1">

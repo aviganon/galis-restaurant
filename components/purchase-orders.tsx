@@ -566,7 +566,23 @@ export function PurchaseOrders() {
                       />
                     </div>
                     <div className="flex gap-2">
-                      <select className="text-xs border rounded px-2 py-1 bg-background" value={order.status} onChange={e => updateDoc(doc(db, "purchaseOrders", order.id), {status: e.target.value}).then(() => setOrders(prev => prev.map(o => o.id === order.id ? {...o, status: e.target.value} : o)))}>
+                      <select className="text-xs border rounded px-2 py-1 bg-background" value={order.status} onChange={(e) => {
+                        const next = e.target.value
+                        const prev = order.status
+                        if (next === prev || !currentRestaurantId) return
+                        void updateDoc(doc(db, "purchaseOrders", order.id), { status: next })
+                          .then(() => {
+                            setOrders((p) => p.map((o) => (o.id === order.id ? { ...o, status: next } : o)))
+                            void appendRestaurantAuditLog(db, currentRestaurantId, {
+                              action: "purchase_order_status",
+                              summary: `הזמנה ${order.orderNumber}: ${prev} → ${next}`,
+                              meta: { orderId: order.id, orderNumber: order.orderNumber, from: prev, to: next },
+                              actorUid: auth.currentUser?.uid ?? null,
+                              actorEmail: auth.currentUser?.email ?? null,
+                            })
+                          })
+                          .catch((err) => console.error(err))
+                      }}>
                         <option value="draft">טיוטה</option>
                         <option value="sent">נשלחה</option>
                         <option value="confirmed">אושרה</option>
