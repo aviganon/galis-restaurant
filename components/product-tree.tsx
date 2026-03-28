@@ -26,7 +26,7 @@ import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
-import { doc, collection, getDocs, getDoc, setDoc, deleteDoc, writeBatch, query, where } from "firebase/firestore"
+import { doc, collection, getDocs, getDoc, setDoc, deleteDoc, writeBatch, query, where, onSnapshot } from "firebase/firestore"
 import { db, storage } from "@/lib/firebase"
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage"
 import { useApp } from "@/contexts/app-context"
@@ -46,6 +46,12 @@ import { getClaudeApiKey } from "@/lib/claude"
 import { confirmSupplierInvoiceImport, confirmSalesReportImport } from "@/lib/restaurant-import-handlers"
 import { loadGlobalPriceSubdocsMap, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
 import { normalizeDishCategoryToHebrew } from "@/lib/dish-category-hebrew"
+import {
+  parseFoodCostTargets,
+  resolveFoodCostTargetPercent,
+  type FoodCostTargetsState,
+  DEFAULT_FOOD_COST_TARGET_PCT,
+} from "@/lib/category-food-cost-targets"
 import { AI_KNOWN_RECIPE_IDEAS } from "@/lib/ai-chef-catalog"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
@@ -179,7 +185,11 @@ export default function ProductTree() {
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [sortMode, setSortMode] = useState<"name" | "cost_asc" | "cost_desc" | "price_desc">("name")
-  const [targetFoodCost, setTargetFoodCost] = useState(30)
+  const restaurantTargetRef = useRef<number | undefined>(undefined)
+  const [foodCostTargets, setFoodCostTargets] = useState<FoodCostTargetsState>({
+    defaultPercent: DEFAULT_FOOD_COST_TARGET_PCT,
+    byCategory: {},
+  })
   const [isAddDishModalOpen, setIsAddDishModalOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [isAiSuggestOpen, setIsAiSuggestOpen] = useState(false)
@@ -221,6 +231,34 @@ export default function ProductTree() {
   useEffect(() => {
     if (!menuVisibilityOpen) setMenuSwapPick(null)
   }, [menuVisibilityOpen])
+
+  useEffect(() => {
+    if (!currentRestaurantId) {
+      setFoodCostTargets({ defaultPercent: DEFAULT_FOOD_COST_TARGET_PCT, byCategory: {} })
+      restaurantTargetRef.current = undefined
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const restSnap = await getDoc(doc(db, "restaurants", currentRestaurantId))
+      if (cancelled) return
+      const t = restSnap.data()?.target
+      restaurantTargetRef.current = typeof t === "number" && t > 0 ? t : undefined
+      const ctSnap = await getDoc(
+        doc(db, "restaurants", currentRestaurantId, "appState", "categoryFoodCostTargets")
+      )
+      if (cancelled) return
+      setFoodCostTargets(parseFoodCostTargets(ctSnap.data(), restaurantTargetRef.current ?? null))
+    })()
+    const targetsRef = doc(db, "restaurants", currentRestaurantId, "appState", "categoryFoodCostTargets")
+    const unsub = onSnapshot(targetsRef, (snap) => {
+      setFoodCostTargets(parseFoodCostTargets(snap.data(), restaurantTargetRef.current ?? null))
+    })
+    return () => {
+      cancelled = true
+      unsub()
+    }
+  }, [currentRestaurantId])
 
   useEffect(() => {
     try {
@@ -543,11 +581,11 @@ export default function ProductTree() {
     return price > 0 ? (cost / price * 100) : 0
   }, [dishes, calcDishCost])
 
-  // Get status color based on food cost
-  const getStatusColor = (pct: number) => {
+  // Get status color based on food cost vs יעד קטגוריה (או ברירת מחדל)
+  const getStatusColor = (pct: number, targetPct: number) => {
     if (pct === 0) return { bg: "bg-muted", text: "text-muted-foreground", border: "border-border" }
-    if (pct <= targetFoodCost) return { bg: "bg-emerald-500/10", text: "text-emerald-600", border: "border-emerald-500/30" }
-    if (pct <= targetFoodCost * 1.27) return { bg: "bg-amber-500/10", text: "text-amber-600", border: "border-amber-500/30" }
+    if (pct <= targetPct) return { bg: "bg-emerald-500/10", text: "text-emerald-600", border: "border-emerald-500/30" }
+    if (pct <= targetPct * 1.27) return { bg: "bg-amber-500/10", text: "text-amber-600", border: "border-amber-500/30" }
     return { bg: "bg-red-500/10", text: "text-red-600", border: "border-red-500/30" }
   }
 
@@ -615,6 +653,9 @@ export default function ProductTree() {
   const currentPriceBeforeVat = currentDish ? currentDish.sellingPrice / VAT_RATE : 0
   const currentProfit = currentPriceBeforeVat - currentCost
   const currentMargin = currentPriceBeforeVat > 0 ? (currentProfit / currentPriceBeforeVat * 100) : 0
+  const effectiveFoodCostTarget = currentDish
+    ? resolveFoodCostTargetPercent(currentDish.category, foodCostTargets)
+    : foodCostTargets.defaultPercent
   const dishIngredientRows = useMemo(() => {
     if (!currentDish) return [] as Array<{ ing: Ingredient; idx: number; key: string; cost: number }>
     const q = dishIngredientSearch.trim().toLowerCase()
@@ -2234,7 +2275,8 @@ export default function ProductTree() {
                 filteredDishes.map((name) => {
                   const dish = dishes[name]
                   const pct = calcFoodCostPct(name)
-                  const status = getStatusColor(pct)
+                  const dishTgt = resolveFoodCostTargetPercent(dish.category, foodCostTargets)
+                  const status = getStatusColor(pct, dishTgt)
                   const isActive = name === selectedDish
                   const hasImg = !!(dishImages[name] && loadedDishImages.has(name))
 
@@ -2417,8 +2459,8 @@ export default function ProductTree() {
                   variant="secondary"
                   className={cn(
                     "font-bold",
-                    getStatusColor(currentPct).bg,
-                    getStatusColor(currentPct).text
+                    getStatusColor(currentPct, effectiveFoodCostTarget).bg,
+                    getStatusColor(currentPct, effectiveFoodCostTarget).text
                   )}
                 >
                   {currentPct.toFixed(1)}%
@@ -2471,7 +2513,7 @@ export default function ProductTree() {
                         <span className="text-sm font-medium">{t("pages.productTree.foodCostPct")}</span>
                         <span className={cn(
                           "font-bold text-lg",
-                          getStatusColor(currentPct).text
+                          getStatusColor(currentPct, effectiveFoodCostTarget).text
                         )}>
                           {currentPct.toFixed(1)}%
                         </span>
@@ -2481,8 +2523,8 @@ export default function ProductTree() {
                         <motion.div
                           className={cn(
                             "h-full rounded-full transition-colors",
-                            currentPct <= targetFoodCost ? "bg-emerald-500" :
-                            currentPct <= targetFoodCost * 1.27 ? "bg-amber-500" : "bg-red-500"
+                            currentPct <= effectiveFoodCostTarget ? "bg-emerald-500" :
+                            currentPct <= effectiveFoodCostTarget * 1.27 ? "bg-amber-500" : "bg-red-500"
                           )}
                           initial={{ width: 0 }}
                           animate={{ width: `${Math.min(currentPct / 50 * 100, 100)}%` }}
@@ -2491,27 +2533,56 @@ export default function ProductTree() {
                         {/* Target marker */}
                         <div 
                           className="absolute top-0 bottom-0 w-0.5 bg-foreground/50"
-                          style={{ left: `${targetFoodCost / 50 * 100}%` }}
+                          style={{ left: `${Math.min(effectiveFoodCostTarget / 50 * 100, 100)}%` }}
                         />
                       </div>
                       
                       {/* Target adjuster */}
                       <div className="flex items-center justify-center gap-2 text-sm">
-                        <span className="text-muted-foreground">יעד:</span>
+                        <span className="text-muted-foreground">{t("pages.productTree.targetFoodCost")}:</span>
                         <Button
                           variant="outline"
                           size="icon"
                           className="w-6 h-6"
-                          onClick={() => setTargetFoodCost(prev => Math.max(10, prev - 1))}
+                          disabled={!currentRestaurantId}
+                          onClick={() => {
+                            if (!currentRestaurantId) return
+                            setFoodCostTargets((prev) => {
+                              const next = Math.max(10, Math.round((prev.defaultPercent - 1) * 10) / 10)
+                              void setDoc(
+                                doc(db, "restaurants", currentRestaurantId, "appState", "categoryFoodCostTargets"),
+                                { defaultPercent: next, byCategory: prev.byCategory },
+                                { merge: true }
+                              )
+                              return { ...prev, defaultPercent: next }
+                            })
+                          }}
                         >
                           <span className="text-lg leading-none">-</span>
                         </Button>
-                        <span className="font-bold w-10 text-center">{targetFoodCost}%</span>
+                        <div className="flex flex-col items-center min-w-[4.5rem]">
+                          <span className="font-bold text-center leading-tight">{effectiveFoodCostTarget}%</span>
+                          <span className="text-[10px] text-muted-foreground text-center leading-tight">
+                            {t("pages.productTree.defaultTargetShort")} {foodCostTargets.defaultPercent}%
+                          </span>
+                        </div>
                         <Button
                           variant="outline"
                           size="icon"
                           className="w-6 h-6"
-                          onClick={() => setTargetFoodCost(prev => Math.min(50, prev + 1))}
+                          disabled={!currentRestaurantId}
+                          onClick={() => {
+                            if (!currentRestaurantId) return
+                            setFoodCostTargets((prev) => {
+                              const next = Math.min(50, Math.round((prev.defaultPercent + 1) * 10) / 10)
+                              void setDoc(
+                                doc(db, "restaurants", currentRestaurantId, "appState", "categoryFoodCostTargets"),
+                                { defaultPercent: next, byCategory: prev.byCategory },
+                                { merge: true }
+                              )
+                              return { ...prev, defaultPercent: next }
+                            })
+                          }}
                         >
                           <span className="text-lg leading-none">+</span>
                         </Button>
@@ -2521,27 +2592,27 @@ export default function ProductTree() {
                     {/* Status */}
                     <div className={cn(
                       "p-3 rounded-lg flex items-center gap-3",
-                      getStatusColor(currentPct).bg,
-                      getStatusColor(currentPct).border,
+                      getStatusColor(currentPct, effectiveFoodCostTarget).bg,
+                      getStatusColor(currentPct, effectiveFoodCostTarget).border,
                       "border"
                     )}>
-                      {currentPct <= targetFoodCost ? (
+                      {currentPct <= effectiveFoodCostTarget ? (
                         <>
                           <CheckCircle2 className="w-6 h-6 text-emerald-600" />
                           <div>
                             <p className="font-bold text-emerald-600">{t("pages.productTree.withinTarget")}</p>
                             <p className="text-xs text-emerald-600/80">
-                              {currentPct.toFixed(1)}% מתוך {targetFoodCost}%
+                              {currentPct.toFixed(1)}% {t("pages.productTree.vsTarget")} {effectiveFoodCostTarget}%
                             </p>
                           </div>
                         </>
-                      ) : currentPct <= targetFoodCost * 1.27 ? (
+                      ) : currentPct <= effectiveFoodCostTarget * 1.27 ? (
                         <>
                           <AlertTriangle className="w-6 h-6 text-amber-600" />
                           <div>
                             <p className="font-bold text-amber-600">{t("pages.productTree.overTarget")}</p>
                             <p className="text-xs text-amber-600/80">
-                              {t("pages.productTree.overTargetDeviation")} {(currentPct - targetFoodCost).toFixed(1)}% - {t("pages.productTree.checkSuppliers")}
+                              {t("pages.productTree.overTargetDeviation")} {(currentPct - effectiveFoodCostTarget).toFixed(1)}% - {t("pages.productTree.checkSuppliers")}
                             </p>
                           </div>
                         </>

@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { collection, getDocs, getDoc, doc, setDoc, writeBatch, type DocumentReference } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { db, auth } from "@/lib/firebase"
+import { appendRestaurantAuditLog } from "@/lib/restaurant-operations"
 import { useApp } from "@/contexts/app-context"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -35,6 +36,13 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { recipeCountsAsMenuDish } from "@/lib/recipe-menu-visibility"
+import {
+  parseFoodCostTargets,
+  resolveFoodCostTargetPercent,
+  foodCostStatusForTarget,
+  type FoodCostTargetsState,
+  DEFAULT_FOOD_COST_TARGET_PCT,
+} from "@/lib/category-food-cost-targets"
 
 const VAT_RATE = 1.17
 
@@ -168,6 +176,11 @@ export function MenuCosts({ embeddedInProductTree = false }: MenuCostsProps) {
   const [showDropZone, setShowDropZone] = useState(!embeddedInProductTree)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dropRef = useRef<HTMLDivElement>(null)
+  const [foodTargetCfg, setFoodTargetCfg] = useState<FoodCostTargetsState>({
+    defaultPercent: DEFAULT_FOOD_COST_TARGET_PCT,
+    byCategory: {},
+  })
+  const [savingTargets, setSavingTargets] = useState(false)
 
   const loadMenuCosts = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -177,12 +190,20 @@ export function MenuCosts({ embeddedInProductTree = false }: MenuCostsProps) {
       }
       if (!opts?.silent) setLoading(true)
       try {
-        const [recSnap, restIngSnap, asDoc, salesDoc] = await Promise.all([
+        const [recSnap, restIngSnap, asDoc, salesDoc, restDoc, targetsDoc] = await Promise.all([
           getDocs(collection(db, "restaurants", currentRestaurantId, "recipes")),
           getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients")),
           getDoc(doc(db, "restaurants", currentRestaurantId, "appState", "assignedSuppliers")),
           getDoc(doc(db, "restaurants", currentRestaurantId, "appState", `salesReport_${currentRestaurantId}`)),
+          getDoc(doc(db, "restaurants", currentRestaurantId)),
+          getDoc(doc(db, "restaurants", currentRestaurantId, "appState", "categoryFoodCostTargets")),
         ])
+
+        const restTargetRaw = restDoc.data()?.target
+        const restTarget =
+          typeof restTargetRaw === "number" && restTargetRaw > 0 ? restTargetRaw : null
+        const targetCfgForRows = parseFoodCostTargets(targetsDoc.data(), restTarget)
+        setFoodTargetCfg(targetCfgForRows)
 
         const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
         const globalIngSnap = isOwner ? await getDocs(collection(db, "ingredients")) : null
@@ -255,14 +276,11 @@ export function MenuCosts({ embeddedInProductTree = false }: MenuCostsProps) {
           const profit = sellingPrice - cost
           const profitMargin = sellingPrice > 0 ? (profit / sellingPrice) * 100 : 0
           const sales = dailySales[r.id]?.avg ?? 0
-          let status: "excellent" | "good" | "warning" | "critical" = "good"
-          if (foodCostPct <= 25) status = "excellent"
-          else if (foodCostPct <= 30) status = "good"
-          else if (foodCostPct <= 35) status = "warning"
-          else status = "critical"
           const normCat = normalizeDishCategoryToHebrew(
             typeof data.category === "string" ? data.category : "עיקריות"
           )
+          const tgt = resolveFoodCostTargetPercent(normCat, targetCfgForRows)
+          const status = foodCostStatusForTarget(foodCostPct, tgt)
           catSet.add(normCat)
           list.push({
             id: r.id, name: r.id,
@@ -296,14 +314,11 @@ export function MenuCosts({ embeddedInProductTree = false }: MenuCostsProps) {
       const foodCostPercent = item.salePrice > 0 ? (foodCost / item.salePrice) * 100 : 0
       const profit = item.salePrice - foodCost
       const profitMargin = item.salePrice > 0 ? (profit / item.salePrice) * 100 : 0
-      let status: MenuItem["status"] = "good"
-      if (foodCostPercent <= 25) status = "excellent"
-      else if (foodCostPercent <= 30) status = "good"
-      else if (foodCostPercent <= 35) status = "warning"
-      else status = "critical"
+      const tgt = resolveFoodCostTargetPercent(item.category, foodTargetCfg)
+      const status = foodCostStatusForTarget(foodCostPercent, tgt)
       return { ...item, foodCost, foodCostPercent, profit, profitMargin, status }
     })
-  }, [items, costSimPct])
+  }, [items, costSimPct, foodTargetCfg])
 
   const categoryAvgRows = useMemo(() => {
     const map = new Map<string, { sum: number; n: number }>()
@@ -314,9 +329,49 @@ export function MenuCosts({ embeddedInProductTree = false }: MenuCostsProps) {
       map.set(i.category, cur)
     }
     return Array.from(map.entries())
-      .map(([category, { sum, n }]) => ({ category, avgPct: sum / n, count: n }))
+      .map(([category, { sum, n }]) => {
+        const targetPct = resolveFoodCostTargetPercent(category, foodTargetCfg)
+        return {
+          category,
+          avgPct: sum / n,
+          count: n,
+          targetPct,
+          overTarget: sum / n > targetPct,
+        }
+      })
       .sort((a, b) => b.avgPct - a.avgPct)
-  }, [displayItems])
+  }, [displayItems, foodTargetCfg])
+
+  const saveFoodTargets = useCallback(async () => {
+    if (!currentRestaurantId) return
+    setSavingTargets(true)
+    try {
+      const byCategory = { ...foodTargetCfg.byCategory }
+      await setDoc(
+        doc(db, "restaurants", currentRestaurantId, "appState", "categoryFoodCostTargets"),
+        {
+          defaultPercent: foodTargetCfg.defaultPercent,
+          byCategory,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      )
+      void appendRestaurantAuditLog(db, currentRestaurantId, {
+        action: "food_cost_targets_updated",
+        summary: `עודכנו יעדי עלות מזון (ברירת מחדל ${foodTargetCfg.defaultPercent}%)`,
+        meta: { defaultPercent: foodTargetCfg.defaultPercent, categories: Object.keys(byCategory).length },
+        actorUid: auth.currentUser?.uid ?? null,
+        actorEmail: auth.currentUser?.email ?? null,
+      })
+      toast.success(t("pages.menuCosts.targetsSaved"))
+      await loadMenuCosts({ silent: true })
+    } catch (e) {
+      console.error(e)
+      toast.error(t("pages.menuCosts.targetsSaveError"))
+    } finally {
+      setSavingTargets(false)
+    }
+  }, [currentRestaurantId, foodTargetCfg, loadMenuCosts, t])
 
   const processFile = useCallback(
     async (file: File) => {
@@ -765,8 +820,39 @@ export function MenuCosts({ embeddedInProductTree = false }: MenuCostsProps) {
 
   const categoryBreakdownCard = !embeddedInProductTree ? (
     <Card>
-      <CardContent className="p-4">
-        <h3 className="font-semibold text-sm mb-3">{t("pages.menuCosts.categoryAvgTitle")}</h3>
+      <CardContent className="p-4 space-y-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <h3 className="font-semibold text-sm">{t("pages.menuCosts.categoryAvgTitle")}</h3>
+          <Button
+            type="button"
+            size="sm"
+            disabled={savingTargets || !currentRestaurantId}
+            onClick={() => void saveFoodTargets()}
+          >
+            {savingTargets ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {t("pages.menuCosts.saveTargets")}
+          </Button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/20 px-3 py-2">
+          <Label className="text-sm shrink-0">{t("pages.menuCosts.defaultTargetLabel")}</Label>
+          <Input
+            type="number"
+            min={5}
+            max={80}
+            step={0.5}
+            className="h-9 w-24 bg-background"
+            value={foodTargetCfg.defaultPercent}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value)
+              if (!Number.isFinite(v)) return
+              setFoodTargetCfg((p) => ({
+                ...p,
+                defaultPercent: Math.min(80, Math.max(5, v)),
+              }))
+            }}
+          />
+          <span className="text-xs text-muted-foreground">%</span>
+        </div>
         {categoryAvgRows.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t("pages.menuCosts.noItems")}</p>
         ) : (
@@ -776,33 +862,58 @@ export function MenuCosts({ embeddedInProductTree = false }: MenuCostsProps) {
                 <TableRow>
                   <TableHead className="text-right">{t("pages.menuCosts.categoryCol")}</TableHead>
                   <TableHead className="text-center">{t("pages.menuCosts.dishCountCol")}</TableHead>
+                  <TableHead className="text-center">{t("pages.menuCosts.categoryTargetCol")}</TableHead>
                   <TableHead className="text-center">{t("pages.menuCosts.avgFoodCostCol")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {categoryAvgRows.map((row) => (
-                  <TableRow key={row.category}>
-                    <TableCell className="font-medium">{row.category}</TableCell>
-                    <TableCell className="text-center tabular-nums">{row.count}</TableCell>
-                    <TableCell
-                      className={cn(
-                        "text-center font-bold tabular-nums",
-                        row.avgPct > 35
-                          ? "text-red-600"
-                          : row.avgPct > 30
-                            ? "text-amber-600"
-                            : "text-emerald-600",
-                      )}
-                    >
-                      {row.avgPct.toFixed(1)}%
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {categoryAvgRows.map((row) => {
+                  const warnLine = (35 / 30) * row.targetPct
+                  return (
+                    <TableRow key={row.category}>
+                      <TableCell className="font-medium">{row.category}</TableCell>
+                      <TableCell className="text-center tabular-nums">{row.count}</TableCell>
+                      <TableCell className="text-center">
+                        <Input
+                          type="number"
+                          min={5}
+                          max={80}
+                          step={0.5}
+                          className="h-8 w-20 mx-auto bg-background text-center"
+                          aria-label={t("pages.menuCosts.categoryTargetCol")}
+                          value={row.targetPct}
+                          onChange={(e) => {
+                            const v = parseFloat(e.target.value)
+                            if (!Number.isFinite(v)) return
+                            const clamped = Math.min(80, Math.max(5, v))
+                            setFoodTargetCfg((prev) => ({
+                              ...prev,
+                              byCategory: { ...prev.byCategory, [row.category]: clamped },
+                            }))
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell
+                        className={cn(
+                          "text-center font-bold tabular-nums",
+                          row.avgPct > warnLine
+                            ? "text-red-600"
+                            : row.overTarget
+                              ? "text-amber-600"
+                              : "text-emerald-600",
+                        )}
+                      >
+                        {row.avgPct.toFixed(1)}%
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           </div>
         )}
-        <p className="text-xs text-muted-foreground mt-2">{t("pages.menuCosts.categoryAvgFootnote")}</p>
+        <p className="text-xs text-muted-foreground">{t("pages.menuCosts.categoryAvgFootnote")}</p>
+        <p className="text-xs text-muted-foreground">{t("pages.menuCosts.categoryTargetHint")}</p>
       </CardContent>
     </Card>
   ) : null
@@ -829,7 +940,14 @@ export function MenuCosts({ embeddedInProductTree = false }: MenuCostsProps) {
           ) : (
             filteredItems.map((item, index) => {
               const statusConfig = getStatusConfig(item.status); const StatusIcon = statusConfig.icon
-              const costBarColor = item.foodCostPercent > 35 ? "bg-red-500" : item.foodCostPercent > 30 ? "bg-amber-500" : "bg-emerald-500"
+              const rowTgt = resolveFoodCostTargetPercent(item.category, foodTargetCfg)
+              const warnT = (35 / 30) * rowTgt
+              const costBarColor =
+                item.foodCostPercent > warnT
+                  ? "bg-red-500"
+                  : item.foodCostPercent > rowTgt
+                    ? "bg-amber-500"
+                    : "bg-emerald-500"
               return (
                 <motion.tr key={item.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.02 }} className="hover:bg-muted/50">
                   <TableCell className="font-medium">

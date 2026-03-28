@@ -6,6 +6,12 @@ import { collection, getDocs, getDoc, doc, query, where, orderBy, limit, setDoc 
 import { db } from "@/lib/firebase"
 import { loadGlobalPriceSubdocsMap, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
 import { recipeCountsAsMenuDish } from "@/lib/recipe-menu-visibility"
+import { normalizeDishCategoryToHebrew } from "@/lib/dish-category-hebrew"
+import {
+  parseFoodCostTargets,
+  resolveFoodCostTargetPercent,
+  isFoodCostOverTarget,
+} from "@/lib/category-food-cost-targets"
 import { useApp } from "@/contexts/app-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -248,7 +254,8 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
     setLoading(true)
     const load = async () => {
       try {
-        const [recSnap, restIngSnap, asDoc, salesDoc, poSnap, openTasksSnap] = await Promise.all([
+        const [recSnap, restIngSnap, asDoc, salesDoc, poSnap, openTasksSnap, restMetaDoc, costTargetsDoc] =
+          await Promise.all([
           getDocs(collection(db, "restaurants", currentRestaurantId, "recipes")),
           getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients")),
           getDoc(doc(db, "restaurants", currentRestaurantId, "appState", "assignedSuppliers")),
@@ -261,6 +268,8 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
               limit(40)
             )
           ),
+          getDoc(doc(db, "restaurants", currentRestaurantId)),
+          getDoc(doc(db, "restaurants", currentRestaurantId, "appState", "categoryFoodCostTargets")),
         ])
         const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
         const globalIngSnap = isOwner ? await getDocs(collection(db, "ingredients")) : null
@@ -351,6 +360,11 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
         const salesData = salesDoc.data()?.dailySales as Record<string, { avg: number; trend: number }> | undefined
         const dailySales = salesData || {}
 
+        const restTargetRaw = restMetaDoc.data()?.target
+        const restTargetMeta =
+          typeof restTargetRaw === "number" && restTargetRaw > 0 ? restTargetRaw : null
+        const dashboardCostTargets = parseFoodCostTargets(costTargetsDoc.data(), restTargetMeta)
+
         const top: { name: string; sales: number; revenue: number; margin: number }[] = []
         let totalRev = 0
         let costSum = 0
@@ -370,7 +384,11 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
           })
           const margin = sellingPrice > 0 ? ((sellingPrice - cost) / sellingPrice) * 100 : 0
           const foodCostPct = sellingPrice > 0 ? (cost / sellingPrice) * 100 : 0
-          if (foodCostPct > 30) overTarget++
+          const cat = normalizeDishCategoryToHebrew(
+            typeof data.category === "string" ? data.category : "עיקריות"
+          )
+          const dishTgt = resolveFoodCostTargetPercent(cat, dashboardCostTargets)
+          if (isFoodCostOverTarget(foodCostPct, dishTgt)) overTarget++
           costSum += cost * sales
           revSum += revenue
           top.push({ name: r.id, sales: Math.round(sales), revenue, margin })
