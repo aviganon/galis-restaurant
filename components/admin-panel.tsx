@@ -1445,28 +1445,38 @@ export function AdminPanel() {
       toast.error(t("pages.adminPanel.enterSupplierName"))
       return
     }
-    if (nsmItems.length === 0) {
-      toast.error(t("pages.adminPanel.addAtLeastOne"))
+    const suppliersSnap = await getDocs(collection(db, "suppliers"))
+    const existingNames = new Set(
+      suppliersSnap.docs.map((d) => {
+        const data = d.data()
+        return ((data.name as string) || d.id.replace(/_/g, "/")).trim()
+      }),
+    )
+    if (nsmItems.length === 0 && existingNames.has(supName)) {
+      toast.error("ספק בשם זה כבר קיים — ערוך אותו או הוסף רכיבים ממסך הספק")
       return
     }
     setAddSupplierSaving(true)
     try {
-      const batch = writeBatch(db)
       const now = new Date().toISOString()
-      nsmItems.forEach((item) => {
-        batch.set(doc(db, "ingredients", item.name), {
-          price: item.price,
-          unit: item.unit,
-          waste: item.waste ?? 0,
-          stock: item.stock ?? 0,
-          minStock: item.minStock ?? 0,
-          sku: item.sku ?? "",
-          supplier: supName,
-          createdBy: "owner",
-          lastUpdated: now,
-        }, { merge: true })
-      })
-      await batch.commit()
+      if (nsmItems.length > 0) {
+        const batch = writeBatch(db)
+        nsmItems.forEach((item) => {
+          const ingId = ingredientFirestoreDocId(item.name)
+          batch.set(doc(db, "ingredients", ingId), {
+            price: item.price,
+            unit: item.unit,
+            waste: item.waste ?? 0,
+            stock: item.stock ?? 0,
+            minStock: item.minStock ?? 0,
+            sku: item.sku ?? "",
+            supplier: supName,
+            createdBy: "owner",
+            lastUpdated: now,
+          }, { merge: true })
+        })
+        await batch.commit()
+      }
 
       const supplierId = supplierFirestoreDocId(supName)
       await setDoc(doc(db, "suppliers", supplierId), {
@@ -1486,21 +1496,26 @@ export function AdminPanel() {
         lastUpdated: now,
       }, { merge: true })
 
-      const synced = await syncSupplierIngredientsToAssignedRestaurants(
-        supName,
-        nsmItems.map((item) => ({
-          name: item.name,
-          price: item.price,
-          unit: item.unit,
-          supplier: supName,
-          waste: item.waste ?? 0,
-          sku: item.sku ?? "",
-        }))
-      )
-      if (synced > 0) {
+      let synced = 0
+      if (nsmItems.length > 0) {
+        synced = await syncSupplierIngredientsToAssignedRestaurants(
+          supName,
+          nsmItems.map((item) => ({
+            name: item.name,
+            price: item.price,
+            unit: item.unit,
+            supplier: supName,
+            waste: item.waste ?? 0,
+            sku: item.sku ?? "",
+          })),
+        )
+      }
+      if (nsmItems.length > 0 && synced > 0) {
         toast.success(`ספק ${supName} נוסף — עודכן ב־${Math.ceil(synced / nsmItems.length)} מסעדות`)
-      } else {
+      } else if (nsmItems.length > 0) {
         toast.success(`ספק ${supName} נוסף בהצלחה`)
+      } else {
+        toast.success(`ספק ${supName} נוצר — ניתן להוסיף רכיבים או חשבונית מאוחר יותר`)
       }
       setAddSupplierOpen(false)
       resetAddSupplierModal()
@@ -4177,9 +4192,12 @@ export function AdminPanel() {
                 </div>
               </div>
             <div className="space-y-3 sm:space-y-4 p-5 rounded-xl bg-primary/5 border border-primary/20 min-w-0">
-              <h4 className="font-semibold flex items-center gap-2">
+              <h4 className="font-semibold flex items-center gap-2 flex-wrap">
                 <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center shrink-0">2</span>
                 רכיבים של הספק
+                <Badge variant="outline" className="text-xs font-normal">
+                  אופציונלי
+                </Badge>
                 <Badge variant="secondary">{nsmItems.length} רכיבים</Badge>
               </h4>
               <div className="max-h-40 sm:max-h-52 overflow-y-auto border rounded-lg p-2 space-y-2">
@@ -4195,7 +4213,11 @@ export function AdminPanel() {
                     </Button>
                   </div>
                 ))}
-                {nsmItems.length === 0 && <p className="text-sm text-muted-foreground py-2">{t("pages.adminPanel.addIngredients")}</p>}
+                {nsmItems.length === 0 && (
+                  <p className="text-sm text-muted-foreground py-2">
+                    אין רכיבים — אפשר לשמור ספק ריק ולהוסיף רכיבים או חשבונית מאוחר יותר
+                  </p>
+                )}
               </div>
               <div className="space-y-3 p-4 bg-background rounded-lg border">
                 <p className="text-sm font-medium">➕ הוסף רכיב</p>

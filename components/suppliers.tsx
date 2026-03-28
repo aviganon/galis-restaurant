@@ -724,17 +724,31 @@ export default function Suppliers() {
       toast.error("הזן שם ספק")
       return
     }
-    if (nsmItems.length === 0) {
-      toast.error("הוסף לפחות רכיב אחד")
-      return
-    }
     if (!currentRestaurantId) return
     setAddSupplierSaving(true)
     try {
+      const asRef = doc(db, "restaurants", currentRestaurantId, "appState", "assignedSuppliers")
+      const asSnap = await getDoc(asRef)
+      const currentList: string[] = Array.isArray(asSnap.data()?.list) ? asSnap.data()!.list : []
+      const inList = currentList.some((s) => (s || "").trim() === supName)
+      if (nsmItems.length === 0 && inList) {
+        toast.error("הספק כבר משויך למסעדה — הוסף רכיבים מכרטיס הספק או העלה חשבונית")
+        return
+      }
       const batch = writeBatch(db)
       const now = new Date().toISOString()
+      if (!inList) {
+        batch.set(asRef, { list: [...currentList, supName] }, { merge: true })
+      }
+      const supplierId = supplierFirestoreDocId(supName)
+      batch.set(
+        doc(db, "suppliers", supplierId),
+        { name: supName, lastUpdated: now, createdBy: "restaurant" },
+        { merge: true },
+      )
       nsmItems.forEach((item) => {
-        batch.set(doc(db, "restaurants", currentRestaurantId, "ingredients", item.name), {
+        const ingId = ingredientFirestoreDocId(item.name)
+        batch.set(doc(db, "restaurants", currentRestaurantId, "ingredients", ingId), {
           price: item.price,
           unit: item.unit,
           waste: item.waste ?? 0,
@@ -746,7 +760,11 @@ export default function Suppliers() {
         }, { merge: true })
       })
       await batch.commit()
-      toast.success(t("pages.suppliers.supplierAdded").replace("{name}", supName))
+      toast.success(
+        nsmItems.length > 0
+          ? t("pages.suppliers.supplierAdded").replace("{name}", supName)
+          : `ספק "${supName}" נוצר — ניתן להוסיף רכיבים או חשבונית מאוחר יותר`,
+      )
       setAddSupplierOpen(false)
       resetAddSupplierModal()
       loadSuppliers()
@@ -1378,7 +1396,7 @@ export default function Suppliers() {
               <span className="text-2xl">🏭</span>
               ספק חדש למסעדה
             </DialogTitle>
-            <p className="text-sm text-muted-foreground">הוסף ספק עם רכיבים — יישמר במסעדה שלך בלבד</p>
+            <p className="text-sm text-muted-foreground">יצירת ספק למסעדה — רכיבים אופציונליים (אפשר להוסיף אחר כך או מחשבונית)</p>
           </DialogHeader>
           <div className="overflow-y-auto flex-1 min-h-0 space-y-4 mt-4">
             <div className="space-y-2">
@@ -1386,7 +1404,7 @@ export default function Suppliers() {
               <Input value={nsmName} onChange={(e) => setNsmName(e.target.value)} placeholder="תנובה, אסם..." className="w-full" />
             </div>
             <div className="space-y-2">
-              <Label>רכיבים *</Label>
+              <Label>רכיבים (אופציונלי)</Label>
               <div className="max-h-40 sm:max-h-52 overflow-y-auto border rounded-lg p-2 space-y-2">
                 {nsmItems.map((i) => (
                   <div key={i.name} className="flex items-center justify-between gap-2 py-1 px-2 bg-muted rounded">
@@ -1402,7 +1420,9 @@ export default function Suppliers() {
                     </Button>
                   </div>
                 ))}
-                {nsmItems.length === 0 && <p className="text-sm text-muted-foreground py-2">הוסף רכיבים</p>}
+                {nsmItems.length === 0 && (
+                  <p className="text-sm text-muted-foreground py-2">אין רכיבים — אפשר לשמור ספק ריק ולהוסיף מאוחר יותר</p>
+                )}
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 items-end">
                 <div className="space-y-1.5 sm:col-span-2">
