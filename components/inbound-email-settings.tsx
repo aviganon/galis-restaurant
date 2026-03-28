@@ -136,7 +136,7 @@ export function InboundEmailSettings({
     }
     setSlugChecking(true)
     try {
-      const status = await checkInboundSlugAvailability(db, raw, restaurantId)
+      const status = await checkInboundSlugAvailability(raw, restaurantId)
       setSlugAvailability(status)
     } catch (e: unknown) {
       setSlugAvailability(null)
@@ -165,7 +165,7 @@ export function InboundEmailSettings({
     }
     setSlugChecking(true)
     try {
-      const status = await checkInboundSlugAvailability(db, raw, restaurantId)
+      const status = await checkInboundSlugAvailability(raw, restaurantId)
       setSlugAvailability(status)
       if (status === "taken") {
         toast.error("לא ניתן לשמור — המזהה תפוס על ידי מסעדה אחרת")

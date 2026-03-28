@@ -4,8 +4,7 @@
  * Each restaurant gets a unique token → inbound+{token}@{INBOUND_DOMAIN}
  */
 
-import { doc, getDoc } from "firebase/firestore"
-import type { Firestore } from "firebase/firestore"
+import { firebaseBearerHeaders } from "@/lib/api-auth-client"
 
 export const INBOUND_DOMAIN =
   process.env.NEXT_PUBLIC_INBOUND_DOMAIN ?? "mail.galis.app"
@@ -31,18 +30,39 @@ export function generateInboundToken(): string {
 }
 
 /**
- * יוצר טוקן שלא קיים כבר ב־`inboundEmailLookup/{token}` (מניעת התנגשות נדירה).
+ * יוצר טוקן שלא קיים כבר ב־lookup (מניעת התנגשות נדירה). דורש restaurantId לבדיקה דרך API.
  */
 export async function generateUniqueInboundToken(
-  db: Firestore,
+  restaurantId: string,
   maxAttempts = 30
 ): Promise<string> {
   for (let i = 0; i < maxAttempts; i++) {
     const t = generateInboundToken()
-    const snap = await getDoc(doc(db, "inboundEmailLookup", t))
-    if (!snap.exists()) return t
+    const st = await postInboundLookupStatus(restaurantId, t)
+    if (st === "available") return t
   }
   throw new Error("לא ניתן ליצור כתובת ייבוא ייחודית — נסה שוב")
+}
+
+type LookupApiStatus = "available" | "same-restaurant" | "taken"
+
+async function postInboundLookupStatus(restaurantId: string, token: string): Promise<LookupApiStatus> {
+  const res = await fetch("/api/inbound-lookup-status", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(await firebaseBearerHeaders()),
+    },
+    body: JSON.stringify({ restaurantId, token: token.trim().toLowerCase() }),
+  })
+  const json = (await res.json().catch(() => ({}))) as { status?: LookupApiStatus; error?: string }
+  if (!res.ok) {
+    throw new Error(json.error || `שגיאה ${res.status}`)
+  }
+  if (json.status === "available" || json.status === "same-restaurant" || json.status === "taken") {
+    return json.status
+  }
+  throw new Error("תשובת שרת לא צפויה")
 }
 
 const RAND_CHARS = "abcdefghjkmnpqrstuvwxyz23456789"
@@ -80,7 +100,6 @@ export function slugifyInboundLocalPart(name: string, restaurantId: string): str
  * אם השם תפוס על ידי מסעדה אחרת — מוסיפים סיומת אקראית קצרה.
  */
 export async function generateUniqueInboundSlug(
-  db: Firestore,
   restaurantId: string,
   restaurantName: string,
   maxAttempts = 40
@@ -89,10 +108,8 @@ export async function generateUniqueInboundSlug(
   for (let i = 0; i < maxAttempts; i++) {
     const slug = i === 0 ? base : `${base}-${randomSuffix(4)}`
     if (slug.length > 64) continue
-    const snap = await getDoc(doc(db, "inboundEmailLookup", slug))
-    if (!snap.exists()) return slug
-    const owner = (snap.data() as { restaurantId?: string } | undefined)?.restaurantId
-    if (owner === restaurantId) return slug
+    const st = await postInboundLookupStatus(restaurantId, slug)
+    if (st === "available" || st === "same-restaurant") return slug
   }
   throw new Error("לא ניתן ליצור כתובת לפי שם — נסה שוב או כתובת אקראית")
 }
@@ -130,16 +147,14 @@ export function validateInboundSlugFormat(slug: string): { ok: true } | { ok: fa
 
 export type InboundSlugAvailability = "available" | "same-restaurant" | "taken"
 
-/** בדיקה מול Firestore: פנוי / כבר של המסעדה הזו / תפוס על ידי אחרת */
+/** בדיקת זמינות מזהה דרך API (בלי קריאת Firestore מהקליינט ל־inboundEmailLookup) */
 export async function checkInboundSlugAvailability(
-  db: Firestore,
   slug: string,
   restaurantId: string
 ): Promise<InboundSlugAvailability> {
-  const snap = await getDoc(doc(db, "inboundEmailLookup", slug))
-  if (!snap.exists()) return "available"
-  const owner = (snap.data() as { restaurantId?: string } | undefined)?.restaurantId
-  if (owner === restaurantId) return "same-restaurant"
+  const st = await postInboundLookupStatus(restaurantId, slug.trim().toLowerCase())
+  if (st === "available") return "available"
+  if (st === "same-restaurant") return "same-restaurant"
   return "taken"
 }
 

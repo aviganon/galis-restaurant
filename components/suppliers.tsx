@@ -176,7 +176,34 @@ export default function Suppliers() {
         // Do not block supplier list for users without collectionGroup permission.
         console.warn("load suppliers restaurant price history skipped:", e)
       }
-      const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
+      const asRef = doc(db, "restaurants", currentRestaurantId, "appState", "assignedSuppliers")
+      let assignedList: string[] = Array.isArray(asDoc.data()?.list) ? [...(asDoc.data()!.list as string[])] : []
+      const fromRestSuppliers = new Set<string>()
+      restSnap.forEach((d) => {
+        const sup = String((d.data().supplier as string) || "").trim()
+        if (sup && sup !== "ללא ספק") fromRestSuppliers.add(sup)
+      })
+      const seenAssigned = new Set(assignedList.map((a) => String(a || "").trim()).filter(Boolean))
+      let needsAssignedMerge = false
+      for (const s of fromRestSuppliers) {
+        if (!seenAssigned.has(s)) {
+          needsAssignedMerge = true
+          break
+        }
+      }
+      if (needsAssignedMerge) {
+        for (const s of fromRestSuppliers) {
+          if (!seenAssigned.has(s)) {
+            assignedList.push(s)
+            seenAssigned.add(s)
+          }
+        }
+        try {
+          await setDoc(asRef, { list: assignedList }, { merge: true })
+        } catch (e) {
+          console.warn("loadSuppliers: sync assignedSuppliers skipped:", e)
+        }
+      }
       /** התאמה לפי שם (לא ID) — נירמול רווחים כדי שיתאים ל-admin ול-ingredients */
       const isAssignedSupplierName = (supplierField: string) => {
         const s = (supplierField || "").trim()

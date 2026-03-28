@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useState } from "react"
 import { toast } from "sonner"
 import { Check, Circle, ListChecks, CircleDot } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,15 @@ import { cn } from "@/lib/utils"
 import type { OnboardingHintsState } from "@/contexts/app-context"
 
 const STORAGE_PREFIX = "kamershalor-manager-guide-dismissed-"
+
+function readDismissed(restaurantId: string | null): boolean {
+  if (typeof window === "undefined" || !restaurantId) return false
+  try {
+    return localStorage.getItem(STORAGE_PREFIX + restaurantId) === "1"
+  } catch {
+    return false
+  }
+}
 
 type ManagerOnboardingChecklistProps = {
   restaurantId: string | null
@@ -37,19 +46,7 @@ export function ManagerOnboardingChecklist({
   currentPage,
 }: ManagerOnboardingChecklistProps) {
   const [open, setOpen] = useState(false)
-  const [dismissed, setDismissed] = useState(false)
-
-  useEffect(() => {
-    if (!restaurantId) {
-      setDismissed(false)
-      return
-    }
-    try {
-      setDismissed(localStorage.getItem(STORAGE_PREFIX + restaurantId) === "1")
-    } catch {
-      setDismissed(false)
-    }
-  }, [restaurantId])
+  const [dismissed, setDismissed] = useState(() => readDismissed(restaurantId))
 
   const handleDismiss = useCallback(() => {
     if (!restaurantId) return

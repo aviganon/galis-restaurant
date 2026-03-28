@@ -625,7 +625,7 @@ export default function ProductTree() {
     if (dishIngredientSort === "qty_desc") return filtered.sort((a, b) => (b.ing.qty || 0) - (a.ing.qty || 0))
     if (dishIngredientSort === "cost_desc") return filtered.sort((a, b) => b.cost - a.cost)
     return filtered.sort((a, b) => a.ing.name.localeCompare(b.ing.name, "he"))
-  }, [currentDish, dishIngredientSearch, dishIngredientSort])
+  }, [currentDish, dishIngredientSearch, dishIngredientSort, calcIngredientCost])
 
   // Update selling price
   const updateSellingPrice = (price: number) => {

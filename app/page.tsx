@@ -746,6 +746,7 @@ export default function Home() {
         </main>
         {inRestaurantWorkspace && showManagerOnboardingUi && onboardingHintsForContext && (
           <ManagerOnboardingChecklist
+            key={effectiveRestaurantId ?? "no-restaurant"}
             restaurantId={effectiveRestaurantId}
             hints={onboardingHintsForContext}
             showForRole

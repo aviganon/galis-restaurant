@@ -27,12 +27,14 @@ export function useRestaurantOnboardingStatus(
 
   useEffect(() => {
     if (!restaurantId) {
-      setState({
-        loading: false,
-        ingredientDocCount: 0,
-        needsIngredients: false,
-        needsSuppliers: false,
-      })
+      queueMicrotask(() =>
+        setState({
+          loading: false,
+          ingredientDocCount: 0,
+          needsIngredients: false,
+          needsSuppliers: false,
+        }),
+      )
       return
     }
 
