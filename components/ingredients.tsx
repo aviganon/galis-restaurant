@@ -1243,7 +1243,7 @@ export function Ingredients() {
                         {compoundItems.length === 0 && <p className="text-sm text-muted-foreground py-2">הוסף רכיבים</p>}
                       </div>
                       <div className="flex gap-2 flex-wrap items-end">
-                        <Select value={compoundItemName} onValueChange={setCompoundItemName}>
+                        <Select value={compoundItemName || undefined} onValueChange={setCompoundItemName}>
                           <SelectTrigger className="w-[180px]"><SelectValue placeholder="בחר רכיב" /></SelectTrigger>
                           <SelectContent>
                             {ingredients.map((i) => (
