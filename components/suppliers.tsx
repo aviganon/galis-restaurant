@@ -62,6 +62,7 @@ import {
 import { OrdersPanel } from "@/components/purchase-orders"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
+import { postSupplierWelcomeEmail } from "@/lib/supplier-welcome-email"
 interface InvoiceItem {
   name: string
   price: number
@@ -116,6 +117,7 @@ export default function Suppliers() {
   const [uploadingImg, setUploadingImg] = useState(false)
   const editImgRef = useRef<HTMLInputElement>(null)
   const [nsmName, setNsmName] = useState("")
+  const [nsmSupplierEmail, setNsmSupplierEmail] = useState("")
   const [nsmItems, setNsmItems] = useState<{ name: string; price: number; unit: string; waste: number; stock: number; minStock: number; sku: string }[]>([])
   const [nsmItemName, setNsmItemName] = useState("")
   const [nsmItemPrice, setNsmItemPrice] = useState("")
@@ -708,6 +710,7 @@ export default function Suppliers() {
 
   const resetAddSupplierModal = () => {
     setNsmName("")
+    setNsmSupplierEmail("")
     setNsmItems([])
     setNsmItemName("")
     setNsmItemPrice("")
@@ -741,11 +744,15 @@ export default function Suppliers() {
         batch.set(asRef, { list: [...currentList, supName] }, { merge: true })
       }
       const supplierId = supplierFirestoreDocId(supName)
-      batch.set(
-        doc(db, "suppliers", supplierId),
-        { name: supName, lastUpdated: now, createdBy: "restaurant" },
-        { merge: true },
-      )
+      const supplierEmailTrim = nsmSupplierEmail.trim().toLowerCase()
+      const supplierEmailValid = supplierEmailTrim.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supplierEmailTrim)
+      const supplierPayload: Record<string, unknown> = {
+        name: supName,
+        lastUpdated: now,
+        createdBy: "restaurant",
+      }
+      if (supplierEmailValid) supplierPayload.email = supplierEmailTrim
+      batch.set(doc(db, "suppliers", supplierId), supplierPayload, { merge: true })
       nsmItems.forEach((item) => {
         const ingId = ingredientFirestoreDocId(item.name)
         batch.set(doc(db, "restaurants", currentRestaurantId, "ingredients", ingId), {
@@ -760,11 +767,25 @@ export default function Suppliers() {
         }, { merge: true })
       })
       await batch.commit()
-      toast.success(
+      const baseSuccess =
         nsmItems.length > 0
           ? t("pages.suppliers.supplierAdded").replace("{name}", supName)
-          : `ספק "${supName}" נוצר — ניתן להוסיף רכיבים או חשבונית מאוחר יותר`,
-      )
+          : `ספק "${supName}" נוצר — ניתן להוסיף רכיבים או חשבונית מאוחר יותר`
+      const hasValidEmail = supplierEmailValid
+      if (hasValidEmail) {
+        try {
+          await postSupplierWelcomeEmail({
+            restaurantId: currentRestaurantId,
+            supplierEmail: supplierEmailTrim,
+            supplierName: supName,
+          })
+          toast.success(`${baseSuccess} נשלח מייל לספק עם כתובת לשליחת חשבוניות.`)
+        } catch (mailErr) {
+          toast.warning(`${baseSuccess} שליחת המייל נכשלה: ${(mailErr as Error).message}`)
+        }
+      } else {
+        toast.success(baseSuccess)
+      }
       setAddSupplierOpen(false)
       resetAddSupplierModal()
       loadSuppliers()
@@ -1402,6 +1423,18 @@ export default function Suppliers() {
             <div className="space-y-2">
               <Label>שם הספק *</Label>
               <Input value={nsmName} onChange={(e) => setNsmName(e.target.value)} placeholder="תנובה, אסם..." className="w-full" />
+            </div>
+            <div className="space-y-2">
+              <Label>אימייל ספק (אופציונלי)</Label>
+              <Input
+                value={nsmSupplierEmail}
+                onChange={(e) => setNsmSupplierEmail(e.target.value)}
+                type="email"
+                placeholder="למשל supplier@example.com — יישלח מייל הצטרפות וכתובת לחשבוניות"
+                className="w-full"
+                dir="ltr"
+              />
+              <p className="text-xs text-muted-foreground">אם תמלאו כתובת, אחרי השמירה יישלח מייל מהמסעדה עם הוראות ועם כתובת המייל לייבוא חשבוניות (אם הוגדרה במסעדה).</p>
             </div>
             <div className="space-y-2">
               <Label>רכיבים (אופציונלי)</Label>
