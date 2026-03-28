@@ -7,13 +7,17 @@ on:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
+    # GitHub מעביר את פעולות ה-JS (checkout, setup-node, hosting-deploy) ל-Node 24;
+    # בלי זה מופיעה אזהרת deprecation על Node 20 (הסרה ספטמבר 2026).
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
 
       - name: Install dependencies
