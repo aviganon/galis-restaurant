@@ -1,23 +1,16 @@
 ---
-description: Deploy policy - run deploy at end of every conversation
+description: אין deploy ל-Firebase אוטומטית — רק לפי בקשה מפורשת
 alwaysApply: true
 ---
 
-# Deploy Policy
+# מדיניות פריסה (Firebase)
 
-**חובה להריץ deploy אוטומטית בסוף כל שיחה** – ללא יוצא מן הכלל.
+**אל תריץ** `npm run deploy` או פריסה ל-Firebase **בסוף שיחה** או אחרי שינויי קוד — **אלא אם המשתמש ביקש במפורש** לפרוס / לעלות ל-Firebase / hosting.
 
-לאחר כל שיחה (במיוחד כשבוצעו שינויים בקוד), הרץ בסיום:
+המשתמש מעדיף **רק עדכון ב-GitHub** (ראה כלל `git-push-after-changes`).
+
+**כשהמשתמש מבקש לפרוס:** אזי הרץ מתוך שורש הפרויקט:
 
 ```bash
 npm run deploy
 ```
-
-(מתוך תיקיית הפרויקט: `galis-restaurant`)
-
-**מתי להריץ:**
-- אחרי כל שיחה — גם אם לא ביקש במפורש
-- אחרי עריכות, תיקונים, הוספות פיצ'רים
-- בסיום כל תגובה שמשנה קבצים
-
-**אל תדלג** – הרץ deploy בסוף השיחה.
