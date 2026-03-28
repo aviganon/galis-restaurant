@@ -15,7 +15,8 @@ import {
   PieChart,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { UserPermissions } from "@/contexts/app-context"
+import type { OnboardingHintsState, UserPermissions } from "@/contexts/app-context"
+import { Badge } from "@/components/ui/badge"
 import { LanguageSwitcher } from "@/components/language-switcher"
 import { useTranslations } from "@/lib/use-translations"
 
@@ -27,6 +28,7 @@ interface MobileNavProps {
   userPermissions?: UserPermissions
   isImpersonating?: boolean
   onStopImpersonate?: () => void
+  onboardingHints?: OnboardingHintsState
 }
 
 const hasFullMenu = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner" || role === "admin" || role === "manager"
@@ -75,10 +77,21 @@ const moreItems = (
   return items
 }
 
-export function MobileNav({ currentPage, setCurrentPage, userRole, isSystemOwner, userPermissions, isImpersonating, onStopImpersonate }: MobileNavProps) {
+export function MobileNav({
+  currentPage,
+  setCurrentPage,
+  userRole,
+  isSystemOwner,
+  userPermissions,
+  isImpersonating,
+  onStopImpersonate,
+  onboardingHints,
+}: MobileNavProps) {
   const t = useTranslations()
   const [showMore, setShowMore] = useState(false)
   const moreList = moreItems(t, userRole, userPermissions, isSystemOwner, isImpersonating)
+  const hints = onboardingHints
+  const showHints = hints && !hints.loading
   const handleClick = (id: string) => {
     if (id === "more") { setShowMore(true) } else { setCurrentPage(id); setShowMore(false) }
   }
@@ -159,29 +172,47 @@ export function MobileNav({ currentPage, setCurrentPage, userRole, isSystemOwner
                 </button>
               </div>
               <div className="grid grid-cols-3 gap-2 sm:gap-3 flex-1 min-h-0 max-h-[min(56dvh,420px)] overflow-y-auto overscroll-contain hide-scrollbar [-webkit-overflow-scrolling:touch]">
-                {moreList.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => handleClick(item.id)}
-                    className={cn(
-                      "flex flex-col items-center justify-center gap-2 min-h-[76px] p-3 rounded-2xl transition-all",
-                      "bg-primary-foreground/5 border border-primary-foreground/10",
-                      "active:scale-[0.98] active:bg-primary-foreground/10",
-                      currentPage === item.id && "bg-accent/20 border-accent/30"
-                    )}
-                  >
-                    <item.icon className={cn("w-6 h-6 shrink-0", currentPage === item.id ? "text-accent" : "text-primary-foreground/70")} />
-                    <span
+                {moreList.map((item) => {
+                  const needIng = showHints && item.id === "ingredients" && hints!.needsIngredients
+                  const needSup = showHints && item.id === "suppliers" && hints!.needsSuppliers
+                  const nudge = needIng || needSup
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleClick(item.id)}
+                      title={
+                        needIng
+                          ? "אין רכיבים — הוסיפו"
+                          : needSup
+                            ? "אין ספקים — צרו או ייבאו"
+                            : undefined
+                      }
                       className={cn(
-                        "text-[11px] font-medium text-center leading-snug line-clamp-2",
-                        currentPage === item.id ? "text-primary-foreground" : "text-primary-foreground/70"
+                        "relative flex flex-col items-center justify-center gap-2 min-h-[76px] p-3 rounded-2xl transition-all",
+                        "bg-primary-foreground/5 border border-primary-foreground/10",
+                        "active:scale-[0.98] active:bg-primary-foreground/10",
+                        currentPage === item.id && "bg-accent/20 border-accent/30",
+                        nudge && "ring-2 ring-amber-400/90 ring-offset-1 ring-offset-primary",
                       )}
                     >
-                      {item.label}
-                    </span>
-                  </button>
-                ))}
+                      {nudge && (
+                        <Badge className="absolute top-1.5 start-1.5 h-5 min-w-5 px-1 text-[9px] font-bold bg-amber-500 text-amber-950 border-0">
+                          !
+                        </Badge>
+                      )}
+                      <item.icon className={cn("w-6 h-6 shrink-0", currentPage === item.id ? "text-accent" : "text-primary-foreground/70")} />
+                      <span
+                        className={cn(
+                          "text-[11px] font-medium text-center leading-snug line-clamp-2",
+                          currentPage === item.id ? "text-primary-foreground" : "text-primary-foreground/70",
+                        )}
+                      >
+                        {item.label}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </div>

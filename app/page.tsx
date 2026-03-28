@@ -38,6 +38,9 @@ import { useTranslations } from "@/lib/use-translations"
 import { useLanguage } from "@/contexts/language-context"
 import { getTranslation } from "@/lib/translations"
 import { RestaurantTopBar } from "@/components/restaurant-top-bar"
+import { ManagerOnboardingChecklist } from "@/components/manager-onboarding-checklist"
+import { useRestaurantOnboardingStatus } from "@/lib/use-restaurant-onboarding-status"
+import type { OnboardingHintsState } from "@/contexts/app-context"
 import { X } from "lucide-react"
 
 const RESTRICTED_PAGES = [
@@ -499,6 +502,18 @@ export default function Home() {
   /** מצב עבודה בתוך מסעדה — ללא תפריט עליון; סרגל מותאם + עץ מוצר כדף ראשי */
   const inRestaurantWorkspace =
     !!effectiveRestaurantId && (!isSystemOwner || !!impersonatingRestaurant)
+
+  const onboardingPantryStatus = useRestaurantOnboardingStatus(effectiveRestaurantId, refreshIngredientsKey)
+  const onboardingHintsForContext: OnboardingHintsState | undefined = effectiveRestaurantId
+    ? {
+        loading: onboardingPantryStatus.loading,
+        needsIngredients: onboardingPantryStatus.needsIngredients,
+        needsSuppliers: onboardingPantryStatus.needsSuppliers,
+      }
+    : undefined
+  /** התראות ניווט + מדריך — מנהל/משתמש (לא בעל מערכת) */
+  const showManagerOnboardingUi =
+    !!effectiveRestaurantId && !isSystemOwner && (userRole === "manager" || userRole === "user")
   /** בעלי מערכת בפאנל ניהול / דשבורד — בלי תפריט עליון; מצמצמים ריווח main */
   const compactSystemOwnerShell =
     isSystemOwner &&
@@ -648,6 +663,7 @@ export default function Home() {
           onLogout={handleLogout}
           isImpersonating={!!impersonatingRestaurant}
           onStopImpersonate={handleStopImpersonate}
+          onboardingHints={showManagerOnboardingUi ? onboardingHintsForContext : undefined}
         />
       )}
 
@@ -665,6 +681,7 @@ export default function Home() {
         refreshRestaurants={refreshRestaurants}
         refreshIngredientsKey={refreshIngredientsKey}
         refreshIngredients={refreshIngredients}
+        onboardingHints={showManagerOnboardingUi ? onboardingHintsForContext : undefined}
       >
         <main
           id="main-content"
@@ -727,6 +744,15 @@ export default function Home() {
             )}
           </AnimatePresence>
         </main>
+        {inRestaurantWorkspace && showManagerOnboardingUi && onboardingHintsForContext && (
+          <ManagerOnboardingChecklist
+            restaurantId={effectiveRestaurantId}
+            hints={onboardingHintsForContext}
+            showForRole
+            setCurrentPage={navigateTo}
+            currentPage={currentPage}
+          />
+        )}
       </AppProvider>
 
       {!inRestaurantWorkspace && (!isSystemOwner || !!impersonatingRestaurant) && (
@@ -737,6 +763,7 @@ export default function Home() {
           isSystemOwner={isSystemOwner}
           userPermissions={userPermissions}
           isImpersonating={!!impersonatingRestaurant}
+          onboardingHints={showManagerOnboardingUi ? onboardingHintsForContext : undefined}
         />
       )}
     </div>

@@ -16,7 +16,8 @@ import {
 } from "lucide-react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
-import type { UserPermissions } from "@/contexts/app-context"
+import type { OnboardingHintsState, UserPermissions } from "@/contexts/app-context"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, } from "@/components/ui/dropdown-menu"
 import { LanguageSwitcher } from "@/components/language-switcher"
@@ -38,6 +39,7 @@ interface DesktopNavProps {
   onLogout: () => void
   isImpersonating?: boolean
   onStopImpersonate?: () => void
+  onboardingHints?: OnboardingHintsState
 }
 
 const hasFullMenu = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner" || role === "admin" || role === "manager"
@@ -86,8 +88,33 @@ const moreNavItems = (
   return items
 }
 
-export function DesktopNav({ currentPage, setCurrentPage, currentRestaurant, restaurants, onSelectRestaurant, userRole, isSystemOwner, userPermissions, onLogout, isImpersonating, onStopImpersonate }: DesktopNavProps) {
+function NavNeedsAttentionDot({ title }: { title: string }) {
+  return (
+    <span
+      className="flex h-2 w-2 shrink-0 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)] animate-pulse"
+      title={title}
+      aria-hidden
+    />
+  )
+}
+
+export function DesktopNav({
+  currentPage,
+  setCurrentPage,
+  currentRestaurant,
+  restaurants,
+  onSelectRestaurant,
+  userRole,
+  isSystemOwner,
+  userPermissions,
+  onLogout,
+  isImpersonating,
+  onStopImpersonate,
+  onboardingHints,
+}: DesktopNavProps) {
   const t = useTranslations()
+  const hints = onboardingHints
+  const showHints = hints && !hints.loading
   return (
     <nav aria-label={t("common.navigation")} className="hidden lg:flex fixed top-0 inset-x-0 z-50 h-16 bg-primary text-primary-foreground border-b border-primary-foreground/10">
       <div className="container mx-auto px-4 flex items-center justify-between">
@@ -148,13 +175,37 @@ export function DesktopNav({ currentPage, setCurrentPage, currentRestaurant, res
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                {moreNavItems(t, userRole, userPermissions, isSystemOwner, isImpersonating).map((item) => (
-                  <DropdownMenuItem key={item.id} onSelect={() => setCurrentPage(item.id)}
-                    className={cn("gap-2 cursor-pointer", currentPage === item.id && "bg-accent text-accent-foreground")}>
-                    <item.icon className="w-4 h-4" />
-                    {item.label}
-                  </DropdownMenuItem>
-                ))}
+                {moreNavItems(t, userRole, userPermissions, isSystemOwner, isImpersonating).map((item) => {
+                  const needIng = showHints && item.id === "ingredients" && hints!.needsIngredients
+                  const needSup = showHints && item.id === "suppliers" && hints!.needsSuppliers
+                  const nudgeTitle =
+                    needIng ? "אין רכיבים במסעדה — הוסיפו מכאן" : needSup ? "אין ספקים — צרו או ייבאו מכאן" : ""
+                  return (
+                    <DropdownMenuItem
+                      key={item.id}
+                      onSelect={() => setCurrentPage(item.id)}
+                      title={nudgeTitle || undefined}
+                      className={cn(
+                        "gap-2 cursor-pointer flex items-center justify-between",
+                        currentPage === item.id && "bg-accent text-accent-foreground",
+                        (needIng || needSup) && "border-s-2 border-amber-500/80 bg-amber-500/10",
+                      )}
+                    >
+                      <span className="flex items-center gap-2">
+                        <item.icon className="w-4 h-4 shrink-0" />
+                        {item.label}
+                      </span>
+                      {needIng || needSup ? (
+                        <span className="flex items-center gap-1 shrink-0">
+                          <NavNeedsAttentionDot title={nudgeTitle} />
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5 bg-amber-500/25 text-amber-950 dark:text-amber-100 border-amber-500/40">
+                            חסר
+                          </Badge>
+                        </span>
+                      ) : null}
+                    </DropdownMenuItem>
+                  )
+                })}
               </DropdownMenuContent>
             </DropdownMenu>
           )}

@@ -17,6 +17,12 @@ export type UserPermissions = {
 
 export type Restaurant = { id: string; name: string; branch?: string; emoji?: string }
 
+export type OnboardingHintsState = {
+  loading: boolean
+  needsIngredients: boolean
+  needsSuppliers: boolean
+}
+
 interface AppContextValue {
   currentRestaurantId: string | null
   userRole: "admin" | "owner" | "manager" | "user"
@@ -31,6 +37,7 @@ interface AppContextValue {
   refreshRestaurants?: () => void
   refreshIngredientsKey?: number
   refreshIngredients?: () => void
+  onboardingHints?: OnboardingHintsState
 }
 
 const AppContext = createContext<AppContextValue | null>(null)
@@ -50,6 +57,7 @@ export function AppProvider({
   refreshRestaurants,
   refreshIngredientsKey,
   refreshIngredients,
+  onboardingHints,
 }: {
   children: ReactNode
   currentRestaurantId: string | null
@@ -65,9 +73,27 @@ export function AppProvider({
   refreshRestaurants?: () => void
   refreshIngredientsKey?: number
   refreshIngredients?: () => void
+  onboardingHints?: OnboardingHintsState
 }) {
   return (
-    <AppContext.Provider value={{ currentRestaurantId, userRole, isSystemOwner, userPermissions, restaurants, isImpersonating, onImpersonate, onStopImpersonate, onRestaurantDeleted, setCurrentPage, refreshRestaurants, refreshIngredientsKey, refreshIngredients }}>
+    <AppContext.Provider
+      value={{
+        currentRestaurantId,
+        userRole,
+        isSystemOwner,
+        userPermissions,
+        restaurants,
+        isImpersonating,
+        onImpersonate,
+        onStopImpersonate,
+        onRestaurantDeleted,
+        setCurrentPage,
+        refreshRestaurants,
+        refreshIngredientsKey,
+        refreshIngredients,
+        onboardingHints,
+      }}
+    >
       {children}
     </AppContext.Provider>
   )

@@ -148,7 +148,21 @@ export default function ProductTree() {
   const t = useTranslations()
   const { dir } = useLanguage()
   const isRtl = dir === "rtl"
-  const { currentRestaurantId, userRole, userPermissions, isSystemOwner, refreshIngredientsKey, refreshIngredients, restaurants } = useApp()
+  const {
+    currentRestaurantId,
+    userRole,
+    userPermissions,
+    isSystemOwner,
+    refreshIngredientsKey,
+    refreshIngredients,
+    restaurants,
+    onboardingHints,
+  } = useApp()
+  const showManagerOnboardingNudge =
+    !isSystemOwner && (userRole === "manager" || userRole === "user")
+  const ob = onboardingHints
+  const nudgeIngredients = showManagerOnboardingNudge && ob && !ob.loading && ob.needsIngredients
+  const nudgeSuppliers = showManagerOnboardingNudge && ob && !ob.loading && ob.needsSuppliers
   const canSeeCosts = userRole === "owner" || userRole === "admin" || userRole === "manager" || !!userPermissions?.canSeeCosts
   const hasFullMenu = isSystemOwner || userRole === "owner" || userRole === "admin" || userRole === "manager"
   const canSeeDashboardContent = hasFullMenu || userPermissions?.canSeeDashboard !== false
@@ -1260,9 +1274,18 @@ export default function ProductTree() {
               type="button"
               size="sm"
               variant="outline"
-              className="gap-1.5"
+              className={cn(
+                "gap-1.5 relative",
+                nudgeIngredients && "border-amber-500/70 bg-amber-500/10 ring-1 ring-amber-400/60",
+              )}
               onClick={() => setIngredientsModalOpen(true)}
+              title={nudgeIngredients ? "אין רכיבים במסעדה — לחץ להוספה" : undefined}
             >
+              {nudgeIngredients && (
+                <span className="absolute -top-1 -end-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-0.5 text-[9px] font-bold text-amber-950 shadow-sm">
+                  !
+                </span>
+              )}
               <Leaf className="w-4 h-4 shrink-0" />
               <span className="hidden sm:inline">{t("nav.ingredients")}</span>
             </Button>
@@ -1270,9 +1293,18 @@ export default function ProductTree() {
               type="button"
               size="sm"
               variant="outline"
-              className="gap-1.5"
+              className={cn(
+                "gap-1.5 relative",
+                nudgeSuppliers && "border-amber-500/70 bg-amber-500/10 ring-1 ring-amber-400/60",
+              )}
               onClick={() => setSuppliersModalOpen(true)}
+              title={nudgeSuppliers ? "אין ספקים — צור ספק או העלה חשבונית" : undefined}
             >
+              {nudgeSuppliers && (
+                <span className="absolute -top-1 -end-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-0.5 text-[9px] font-bold text-amber-950 shadow-sm">
+                  !
+                </span>
+              )}
               <Truck className="w-4 h-4 shrink-0" />
               <span className="hidden sm:inline">{t("nav.suppliers")}</span>
             </Button>
