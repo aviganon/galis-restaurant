@@ -38,13 +38,13 @@ jobs:
           channelId: live
           projectId: galis-6ebbc
 
-      # Cloud Functions מ־CI דורשים ב־GCP את התפקיד "Service Account User" על
-      # galis-6ebbc@appspot.gserviceaccount.com לחשבון ה־SA של GitHub Actions.
-      # בלי זה — פריסת functions נשארת דרך `npm run deploy` מקומית.
-      - name: Deploy Firestore rules
+      # דורש ב־GCP: ל־client_email של ה־SA (הסיקרט) תפקיד Service Account User על
+      # galis-6ebbc@appspot.gserviceaccount.com
+      - name: Deploy Firestore rules, indexes, and Cloud Functions
         run: |
+          (cd functions && npm ci && npm run build)
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "${RUNNER_TEMP}/galis-ci-sa.json"
           export GOOGLE_APPLICATION_CREDENTIALS="${RUNNER_TEMP}/galis-ci-sa.json"
-          npx firebase-tools@latest deploy --only firestore:rules --project galis-6ebbc --non-interactive --force
+          npx firebase-tools@latest deploy --only firestore:rules,firestore:indexes,functions --project galis-6ebbc --non-interactive --force
         env:
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_GALIS_6EBBC }}
