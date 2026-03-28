@@ -1,5 +1,5 @@
 ---
-description: אין deploy ל-Firebase אוטומטית — רק לפי בקשה מפורשת
+description: Deploy ל-Firebase רק לפי בקשה מפורשת — לא בסוף שיחה
 alwaysApply: true
 ---
 
@@ -7,9 +7,9 @@ alwaysApply: true
 
 **אל תריץ** `npm run deploy` או פריסה ל-Firebase **בסוף שיחה** או אחרי שינויי קוד — **אלא אם המשתמש ביקש במפורש** לפרוס / לעלות ל-Firebase / hosting.
 
-המשתמש מעדיף **רק עדכון ב-GitHub** (ראה כלל `git-push-after-changes`).
+**ברירת המחדל:** בסוף שיחה מתבצע **רק עדכון ל-GitHub** (ראה `git-push-after-changes.mdc`).
 
-**כשהמשתמש מבקש לפרוס:** אזי הרץ מתוך שורש הפרויקט:
+**כשהמשתמש מבקש לפרוס:** הרץ מתוך שורש הפרויקט:
 
 ```bash
 npm run deploy
