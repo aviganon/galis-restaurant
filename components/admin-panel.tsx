@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
-import { Shield, Key, Loader2, Camera, LogOut, Settings2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown, GripVertical, Columns3, Upload as UploadIcon, FileText, TrendingUp, DollarSign, Utensils, AlertTriangle, ShoppingCart, LayoutDashboard, Mail } from "lucide-react"
+import { Shield, Key, Loader2, Camera, LogOut, Settings2, Building2, UserPlus, Users, Check, X, Copy, Ticket, UserCircle, UtensilsCrossed, Package, Truck, Trash2, Plus, Edit2, RefreshCw, Search, ArrowUpDown, ArrowUp, ArrowDown, Globe, ChevronDown, Columns3, Upload as UploadIcon, FileText, TrendingUp, DollarSign, Utensils, AlertTriangle, ShoppingCart, LayoutDashboard, Mail } from "lucide-react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -414,21 +414,9 @@ export function AdminPanel() {
   const [ingredientsSearchText, setIngredientsSearchText] = useState("")
   const [ingredientsSortBy, setIngredientsSortBy] = useState<keyof IngredientRow | "">("")
   const [ingredientsSortDir, setIngredientsSortDir] = useState<"asc" | "desc">("asc")
-  const INGREDIENTS_COLUMN_ORDER_KEY = "admin-ingredients-column-order"
   const defaultColumnOrder = ["name", "price", "cheapest", "sku", "status", "source", "supplier", "minStock", "stock", "waste", "unit"] as const
-  const [ingredientsColumnOrder, setIngredientsColumnOrder] = useState<string[]>(() => {
-    if (typeof window === "undefined") return [...defaultColumnOrder]
-    try {
-      const stored = localStorage.getItem(INGREDIENTS_COLUMN_ORDER_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored) as string[]
-        const valid = defaultColumnOrder.filter((c) => parsed.includes(c))
-        const missing = defaultColumnOrder.filter((c) => !parsed.includes(c))
-        if (valid.length + missing.length === defaultColumnOrder.length) return [...valid, ...missing]
-      }
-    } catch (_) {}
-    return [...defaultColumnOrder]
-  })
+  /** סדר עמודות קבוע — כמו בעץ מוצר: table-fixed+colgroup לא תואמים לגרירת סדר */
+  const ingredientsColumnOrder = [...defaultColumnOrder]
   const INGREDIENTS_COLUMN_VISIBILITY_KEY = "admin-ingredients-column-visibility"
   const [ingredientsColumnVisibility, setIngredientsColumnVisibility] = useState<Record<string, boolean>>(() => {
     if (typeof window === "undefined") return {}
@@ -975,22 +963,6 @@ export function AdminPanel() {
     }
     return list
   })()
-
-  const handleIngredientsColumnReorder = useCallback((fromIndex: number, toIndex: number) => {
-    if (fromIndex === toIndex) return
-    setIngredientsColumnOrder((prev) => {
-      const visible = prev.filter((k) => ingredientsColumnVisibility[k] !== false)
-      const hidden = prev.filter((k) => ingredientsColumnVisibility[k] === false)
-      const nextVisible = [...visible]
-      const [removed] = nextVisible.splice(fromIndex, 1)
-      nextVisible.splice(toIndex, 0, removed)
-      const next = [...nextVisible, ...hidden]
-      try {
-        localStorage.setItem(INGREDIENTS_COLUMN_ORDER_KEY, JSON.stringify(next))
-      } catch (_) {}
-      return next
-    })
-  }, [ingredientsColumnVisibility])
 
   const toggleIngredientsColumnVisibility = useCallback((key: string) => {
     setIngredientsColumnVisibility((prev) => {
@@ -3760,24 +3732,14 @@ export function AdminPanel() {
                     <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
                       <TableRow className="border-b">
                         <TableHead style={{width:"40px",minWidth:"40px",maxWidth:"40px",padding:0}}><div style={{display:"flex",justifyContent:"center",alignItems:"center",height:"100%",minHeight:"36px"}}><input type="checkbox" style={{cursor:"pointer"}} checked={filteredAndSortedIngredients.length>0&&filteredAndSortedIngredients.every(i=>selectedIngIds.has(i.id))} onChange={e=>{if(e.target.checked)setSelectedIngIds(new Set(filteredAndSortedIngredients.map(i=>i.id)));else setSelectedIngIds(new Set())}}/></div></TableHead>
-                        {visibleColumnOrder.map((key, colIndex) => {
+                        {visibleColumnOrder.map((key) => {
                           if (key === "cheapest") {
                             return (
                               <TableHead
                                 key="cheapest"
                                 className={`${textAlign} ${densityCellClass} select-none`}
-                                draggable
-                                title={t("pages.adminPanel.dragToReorderColumns")}
-                                onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(colIndex)); e.dataTransfer.effectAllowed = "move" }}
-                                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move" }}
-                                onDrop={(e) => {
-                                  e.preventDefault()
-                                  const from = parseInt(e.dataTransfer.getData("text/plain"), 10)
-                                  if (!isNaN(from)) handleIngredientsColumnReorder(from, colIndex)
-                                }}
                               >
                                 <span className={`flex w-full min-w-0 items-center gap-1 ${justify}`}>
-                                  <GripVertical className="w-3 h-3 text-muted-foreground/60 cursor-grab active:cursor-grabbing shrink-0" />
                                   {t("pages.adminPanel.cheapest")}
                                 </span>
                               </TableHead>
@@ -3794,15 +3756,6 @@ export function AdminPanel() {
                                 isSortable && "cursor-pointer hover:bg-muted/50 select-none",
                                 key === "name" && (isRtl ? "pr-0" : "pl-0")
                               )}
-                              draggable
-                              title={t("pages.adminPanel.dragToReorderColumns")}
-                              onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(colIndex)); e.dataTransfer.effectAllowed = "move" }}
-                              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move" }}
-                              onDrop={(e) => {
-                                e.preventDefault()
-                                const from = parseInt(e.dataTransfer.getData("text/plain"), 10)
-                                if (!isNaN(from)) handleIngredientsColumnReorder(from, colIndex)
-                              }}
                               onClick={() => {
                                 if (!isSortable) return
                                 if (ingredientsSortBy === key) {
@@ -3815,7 +3768,6 @@ export function AdminPanel() {
                               }}
                             >
                               <span className={`flex w-full min-w-0 items-center ${key === "name" ? "gap-0.5" : "gap-1"} ${justify}`}>
-                                <GripVertical className="w-3 h-3 text-muted-foreground/60 cursor-grab active:cursor-grabbing shrink-0" />
                                 {labels[key] || key}
                                 {ingredientsSortBy === key && (
                                   ingredientsSortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
