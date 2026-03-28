@@ -248,12 +248,19 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
     setLoading(true)
     const load = async () => {
       try {
-        const [recSnap, restIngSnap, asDoc, salesDoc, poSnap] = await Promise.all([
+        const [recSnap, restIngSnap, asDoc, salesDoc, poSnap, openTasksSnap] = await Promise.all([
           getDocs(collection(db, "restaurants", currentRestaurantId, "recipes")),
           getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients")),
           getDoc(doc(db, "restaurants", currentRestaurantId, "appState", "assignedSuppliers")),
           getDoc(doc(db, "restaurants", currentRestaurantId, "appState", `salesReport_${currentRestaurantId}`)),
           getDocs(query(collection(db, "purchaseOrders"), where("restaurantId", "==", currentRestaurantId))),
+          getDocs(
+            query(
+              collection(db, "restaurants", currentRestaurantId, "operationalTasks"),
+              where("done", "==", false),
+              limit(40)
+            )
+          ),
         ])
         const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
         const globalIngSnap = isOwner ? await getDocs(collection(db, "ingredients")) : null
@@ -394,6 +401,14 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
           alertList.push({ type: "info", messageKey: "pages.dashboard.dishesOverTargetMsg", count: overTarget, timeKey: "common.now" })
         if (delivered.length > 0)
           alertList.push({ type: "success", messageKey: "pages.dashboard.deliveredMsg", count: delivered.length, timeKey: "common.now" })
+        const openTasksCount = openTasksSnap.size
+        if (openTasksCount > 0)
+          alertList.push({
+            type: "info",
+            messageKey: "pages.dashboard.openTasksMsg",
+            count: openTasksCount,
+            timeKey: "common.now",
+          })
         setAlerts(alertList)
       } catch (e) {
         console.error("load dashboard:", e)

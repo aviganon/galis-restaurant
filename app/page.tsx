@@ -27,6 +27,7 @@ import ProductTree from "@/components/product-tree"
 import { Ingredients } from "@/components/ingredients"
 import { MenuCosts } from "@/components/menu-costs"
 import { PurchaseOrders } from "@/components/purchase-orders"
+import { OperationsHub } from "@/components/operations-hub"
 import { MobileNav } from "@/components/mobile-nav"
 import { DesktopNav } from "@/components/desktop-nav"
 import { AdminPanel } from "@/components/admin-panel"
@@ -52,6 +53,7 @@ const RESTRICTED_PAGES = [
   "inventory",
   "suppliers",
   "purchase-orders",
+  "operations",
   "upload",
   "reports",
   "menu",
@@ -63,6 +65,7 @@ const RESTAURANT_ONLY_PAGES = [
   "inventory",
   "suppliers",
   "purchase-orders",
+  "operations",
   "upload",
   "reports",
   "menu",
@@ -243,6 +246,7 @@ export default function Home() {
             canSeeReports: perms.canSeeReports ?? defaultPermissions.canSeeReports,
             canSeeCosts: perms.canSeeCosts ?? defaultPermissions.canSeeCosts,
             canSeeSettings: perms.canSeeSettings ?? defaultPermissions.canSeeSettings,
+            canSeeOperations: perms.canSeeOperations ?? defaultPermissions.canSeeOperations ?? true,
           })
         } else {
           setUserPermissions(undefined)
@@ -402,6 +406,7 @@ export default function Home() {
         case "inventory": return p?.canSeeInventory !== false
         case "suppliers": return p?.canSeeSuppliers !== false
         case "purchase-orders": return p?.canSeePurchaseOrders !== false
+        case "operations": return p?.canSeeOperations !== false
         case "upload":
           return p?.canSeeUpload !== false || p?.canSeeProductTree !== false
         case "reports": return !!p?.canSeeReports
@@ -415,7 +420,7 @@ export default function Home() {
 
   useEffect(() => {
     if ((RESTRICTED_PAGES as readonly string[]).includes(currentPage) && !canAccessPage(currentPage)) {
-      const fallback = ["calc", "ingredients", "inventory", "suppliers", "purchase-orders", "reports", "menu"]
+      const fallback = ["calc", "ingredients", "inventory", "suppliers", "purchase-orders", "operations", "reports", "menu"]
         .find((p) => canAccessPage(p))
       setCurrentPage(fallback || "calc")
     }
@@ -605,6 +610,8 @@ export default function Home() {
             <PurchaseOrders />
           </div>
         )
+      case "operations":
+        return <OperationsHub />
       case "upload":
         return <ProductTree />
       case "recipes":

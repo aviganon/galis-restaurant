@@ -1,6 +1,6 @@
 "use client"
 
-import { Settings, LogOut } from "lucide-react"
+import { Settings, LogOut, ClipboardList } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -142,6 +142,19 @@ export function RestaurantTopBar({
             </Button>
           )}
           <LanguageSwitcher variant="surface" />
+          {canAccessPage("operations") && (
+            <Button
+              type="button"
+              variant={currentPage === "operations" ? "default" : "outline"}
+              size="icon"
+              className="h-9 w-9 shrink-0 rounded-full"
+              title={t("nav.operations")}
+              aria-label={t("nav.operations")}
+              onClick={() => setCurrentPage("operations")}
+            >
+              <ClipboardList className="h-4 w-4" />
+            </Button>
+          )}
           {canAccessPage("settings") && (
             <Button
               type="button"

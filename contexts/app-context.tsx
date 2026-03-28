@@ -13,6 +13,8 @@ export type UserPermissions = {
   canSeeReports?: boolean
   canSeeCosts?: boolean
   canSeeSettings?: boolean
+  /** מרכז תפעול — משימות, יומן ביקורת, היסטוריית מחירים */
+  canSeeOperations?: boolean
 }
 
 export type Restaurant = { id: string; name: string; branch?: string; emoji?: string }

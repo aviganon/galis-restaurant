@@ -9,6 +9,7 @@ import {
   Package, Utensils, DollarSign, TrendingUp, TrendingDown, ImageIcon, AlertTriangle,
   CheckCircle2, Info, ChefHat, Scale, Percent, Sparkles, BarChart2, BarChart3, Loader2, LayoutDashboard,
   Truck, Leaf, FileText, RefreshCw, ListOrdered, Maximize2, Minimize2, Eye, EyeOff, GripVertical,
+  ClipboardList,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -157,6 +158,7 @@ export default function ProductTree() {
     refreshIngredients,
     restaurants,
     onboardingHints,
+    setCurrentPage,
   } = useApp()
   const showManagerOnboardingNudge =
     !isSystemOwner && (userRole === "manager" || userRole === "user")
@@ -167,6 +169,7 @@ export default function ProductTree() {
   const hasFullMenu = isSystemOwner || userRole === "owner" || userRole === "admin" || userRole === "manager"
   const canSeeDashboardContent = hasFullMenu || userPermissions?.canSeeDashboard !== false
   const canSeeReportsContent = hasFullMenu || !!userPermissions?.canSeeReports
+  const canSeeOperations = hasFullMenu || userPermissions?.canSeeOperations !== false
   const canOpenProductDashboardModal = canSeeDashboardContent || canSeeReportsContent
   const isOwner = isOwnerRole(userRole, isSystemOwner)
   const [dishes, setDishes] = useState<Record<string, Dish>>({})
@@ -1308,6 +1311,18 @@ export default function ProductTree() {
               <Truck className="w-4 h-4 shrink-0" />
               <span className="hidden sm:inline">{t("nav.suppliers")}</span>
             </Button>
+            {canSeeOperations && setCurrentPage && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={() => setCurrentPage("operations")}
+              >
+                <ClipboardList className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline">{t("nav.operations")}</span>
+              </Button>
+            )}
           </div>
         )}
       </div>,

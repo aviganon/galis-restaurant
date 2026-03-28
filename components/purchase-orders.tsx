@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { collection, getDocs, query, where, addDoc, updateDoc, deleteDoc, doc, getDoc, writeBatch, collectionGroup } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { db, auth } from "@/lib/firebase"
+import { appendRestaurantAuditLog } from "@/lib/restaurant-operations"
 import { useApp } from "@/contexts/app-context"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -39,6 +40,8 @@ interface PurchaseOrder {
   status: string
   createdAt: string
   expectedDelivery?: string
+  /** אסמכתא לחשבונית / מספר חיצוני */
+  linkedInvoiceRef?: string
 }
 interface RestaurantSupplier {
   id: string
@@ -71,6 +74,7 @@ export function PurchaseOrders() {
   const [selSup, setSelSup] = useState<RestaurantSupplier | null>(null)
   const [orderItems, setOrderItems] = useState<{name:string;quantity:number;unit:string;price:number}[]>([])
   const [orderNotes, setOrderNotes] = useState("")
+  const [orderLinkedInvoiceRef, setOrderLinkedInvoiceRef] = useState("")
   const [saving, setSaving] = useState(false)
   const [uploads, setUploads] = useState<UploadRecord[]>([])
   const [stockCountFile, setStockCountFile] = useState<File | null>(null)
@@ -87,7 +91,7 @@ export function PurchaseOrders() {
       ])
       const list: PurchaseOrder[] = ordersSnap.docs.map(d => {
         const data = d.data()
-        return { id: d.id, orderNumber: (data.orderNumber as string) || d.id, supplier: (data.supplier as string) || "", items: Array.isArray(data.items) ? data.items : [], total: typeof data.total === "number" ? data.total : 0, status: (data.status as string) || "draft", createdAt: (data.createdAt as string) || "", expectedDelivery: data.expectedDelivery as string | undefined }
+        return { id: d.id, orderNumber: (data.orderNumber as string) || d.id, supplier: (data.supplier as string) || "", items: Array.isArray(data.items) ? data.items : [], total: typeof data.total === "number" ? data.total : 0, status: (data.status as string) || "draft", createdAt: (data.createdAt as string) || "", expectedDelivery: data.expectedDelivery as string | undefined, linkedInvoiceRef: typeof data.linkedInvoiceRef === "string" ? data.linkedInvoiceRef : undefined }
       })
       list.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       setOrders(list)
@@ -223,10 +227,18 @@ export function PurchaseOrders() {
     setSaving(true)
     try {
       const num = "ORD-" + Date.now().toString().slice(-6)
-      await addDoc(collection(db, "purchaseOrders"), { restaurantId: currentRestaurantId, orderNumber: num, supplier: selSup.name, supplierEmail: selSup.email || "", supplierPhone: selSup.phone || "", items: orderItems, total: orderTot, status: method ? "sent" : "draft", createdAt: new Date().toISOString().split("T")[0], notes: orderNotes })
+      const linkedRef = orderLinkedInvoiceRef.trim()
+      await addDoc(collection(db, "purchaseOrders"), { restaurantId: currentRestaurantId, orderNumber: num, supplier: selSup.name, supplierEmail: selSup.email || "", supplierPhone: selSup.phone || "", items: orderItems, total: orderTot, status: method ? "sent" : "draft", createdAt: new Date().toISOString().split("T")[0], notes: orderNotes, ...(linkedRef ? { linkedInvoiceRef: linkedRef } : {}) })
+      void appendRestaurantAuditLog(db, currentRestaurantId, {
+        action: "purchase_order_created",
+        summary: `הזמנה ${num} — ${selSup.name} (₪${orderTot.toFixed(2)})`,
+        meta: { orderNumber: num, supplier: selSup.name, total: orderTot, status: method ? "sent" : "draft" },
+        actorUid: auth.currentUser?.uid ?? null,
+        actorEmail: auth.currentUser?.email ?? null,
+      })
       if (method === "email" && selSup.email) window.open("mailto:" + selSup.email + "?subject=הזמנה " + num + "&body=" + orderItems.map(i => i.name + ": " + i.quantity + " " + i.unit).join("%0A"))
       if (method === "whatsapp" && selSup.phone) window.open("https://wa.me/" + selSup.phone.replace(/[^0-9]/g, "") + "?text=" + orderItems.map(i => "* " + i.name + ": " + i.quantity + " " + i.unit).join("%0A"))
-      setOrderItems([]); setSelSup(null); setOrderNotes("")
+      setOrderItems([]); setSelSup(null); setOrderNotes(""); setOrderLinkedInvoiceRef("")
       await loadData(); setActiveTab("orders")
     } catch(e) { console.error(e) } finally { setSaving(false) }
   }
@@ -476,6 +488,15 @@ export function PurchaseOrders() {
               </div>
             )}
             <div>
+              <label className="text-sm font-medium mb-1 block">{t("pages.purchaseOrders.linkedInvoiceRefLabel")}</label>
+              <Input
+                className="bg-background"
+                value={orderLinkedInvoiceRef}
+                onChange={(e) => setOrderLinkedInvoiceRef(e.target.value)}
+                placeholder={t("pages.purchaseOrders.linkedInvoiceRefPlaceholder")}
+              />
+            </div>
+            <div>
               <label className="text-sm font-medium mb-1 block">הערות</label>
               <textarea className="w-full border rounded-lg px-3 py-2 bg-background text-sm resize-none" rows={2} value={orderNotes} onChange={e => setOrderNotes(e.target.value)} placeholder="הערות אופציונליות..." />
             </div>
@@ -512,6 +533,38 @@ export function PurchaseOrders() {
                       <Badge className={sc.color}>{sc.label}</Badge>
                     </div>
                     <div className="text-sm text-muted-foreground mb-2">{order.items.length} פריטים &middot; &#8362;{order.total.toLocaleString()} &middot; {order.createdAt}</div>
+                    <div className="mb-2">
+                      <label className="text-xs text-muted-foreground block mb-0.5">{t("pages.purchaseOrders.linkedInvoiceRefLabel")}</label>
+                      <Input
+                        key={`${order.id}-ref-${order.linkedInvoiceRef ?? ""}`}
+                        className="h-8 text-sm bg-background max-w-md"
+                        defaultValue={order.linkedInvoiceRef ?? ""}
+                        placeholder={t("pages.purchaseOrders.linkedInvoiceRefPlaceholder")}
+                        onBlur={async (e) => {
+                          const v = e.target.value.trim()
+                          const prev = order.linkedInvoiceRef ?? ""
+                          if (v === prev) return
+                          try {
+                            await updateDoc(doc(db, "purchaseOrders", order.id), {
+                              linkedInvoiceRef: v || null,
+                            })
+                            setOrders((prevList) =>
+                              prevList.map((o) => (o.id === order.id ? { ...o, linkedInvoiceRef: v } : o))
+                            )
+                            void appendRestaurantAuditLog(db, currentRestaurantId!, {
+                              action: "purchase_order_invoice_link",
+                              summary: `הזמנה ${order.orderNumber}: אסמכתא חשבונית עודכנה`,
+                              meta: { orderId: order.id, linkedInvoiceRef: v },
+                              actorUid: auth.currentUser?.uid ?? null,
+                              actorEmail: auth.currentUser?.email ?? null,
+                            })
+                          } catch (err) {
+                            console.error(err)
+                            toast.error(t("pages.purchaseOrders.linkedInvoiceRefSaveError"))
+                          }
+                        }}
+                      />
+                    </div>
                     <div className="flex gap-2">
                       <select className="text-xs border rounded px-2 py-1 bg-background" value={order.status} onChange={e => updateDoc(doc(db, "purchaseOrders", order.id), {status: e.target.value}).then(() => setOrders(prev => prev.map(o => o.id === order.id ? {...o, status: e.target.value} : o)))}>
                         <option value="draft">טיוטה</option>

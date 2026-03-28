@@ -19,6 +19,7 @@ nav: {
   suppliers: "ספקים",
   inventory: "מלאי",
   purchaseOrders: "הזמנות ספקים",
+  operations: "תפעול",
   upload: "העלאה",
   reports: "דוחות",
   settings: "הגדרות",

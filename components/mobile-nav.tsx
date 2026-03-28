@@ -13,6 +13,7 @@ import {
   ShoppingCart,
   BookOpen,
   PieChart,
+  ClipboardList,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { OnboardingHintsState, UserPermissions } from "@/contexts/app-context"
@@ -71,6 +72,7 @@ const moreItems = (
   if (full || userCanSee(perms, "canSeeSuppliers")) items.push({ id: "suppliers", label: t("nav.suppliers"), icon: Truck })
   if (full || userCanSee(perms, "canSeeInventory")) items.push({ id: "inventory", label: t("nav.inventory"), icon: Package })
   if (full || userCanSee(perms, "canSeePurchaseOrders")) items.push({ id: "purchase-orders", label: t("nav.purchaseOrders"), icon: ShoppingCart })
+  if (full || userCanSee(perms, "canSeeOperations")) items.push({ id: "operations", label: t("nav.operations"), icon: ClipboardList })
   items.push({ id: "recipes", label: t("nav.recipes"), icon: BookOpen })
   if (full || userCanSeeOptIn(perms, "canSeeCosts")) items.push({ id: "menu", label: t("nav.menuCosts"), icon: PieChart })
   if (full || userCanSeeOptIn(perms, "canSeeSettings")) items.push({ id: "settings", label: t("nav.settings"), icon: Settings })

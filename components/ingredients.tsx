@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback } from "react"
 import { collection, collectionGroup, getDocs, doc, getDoc, setDoc, deleteDoc, writeBatch } from "firebase/firestore"
 import { firebaseBearerHeaders } from "@/lib/api-auth-client"
-import { db } from "@/lib/firebase"
+import { db, auth } from "@/lib/firebase"
+import { appendIngredientPriceHistory, appendRestaurantAuditLog } from "@/lib/restaurant-operations"
 import { groupPriceSubdocsByIngredient, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
 import { upsertRestaurantSupplierPrice } from "@/lib/restaurant-supplier-prices"
 import { useApp } from "@/contexts/app-context"
@@ -697,6 +698,23 @@ export function Ingredients() {
         })
       }
       toast.success(t("pages.ingredients.ingredientAdded").replace("{name}", name))
+      void appendRestaurantAuditLog(db, currentRestaurantId, {
+        action: "ingredient_created",
+        summary: `נוסף רכיב: ${name} (₪${price.toFixed(2)}/${addIngUnit})`,
+        meta: { ingredientName: name, price, unit: addIngUnit },
+        actorUid: auth.currentUser?.uid ?? null,
+        actorEmail: auth.currentUser?.email ?? null,
+      })
+      if (price > 0) {
+        void appendIngredientPriceHistory(db, currentRestaurantId, {
+          ingredientId: name,
+          ingredientName: name,
+          oldPrice: 0,
+          newPrice: price,
+          unit: addIngUnit,
+          actorEmail: auth.currentUser?.email ?? null,
+        })
+      }
       setIsAddDialogOpen(false)
       resetAddIngForm()
       loadIngredients()
@@ -714,6 +732,13 @@ export function Ingredients() {
     try {
       await deleteDoc(doc(db, "restaurants", currentRestaurantId, "ingredients", ing.id))
       toast.success(t("pages.ingredients.ingredientDeleted").replace("{name}", ing.name))
+      void appendRestaurantAuditLog(db, currentRestaurantId, {
+        action: "ingredient_deleted",
+        summary: `נמחק רכיב: ${ing.name}`,
+        meta: { ingredientName: ing.name },
+        actorUid: auth.currentUser?.uid ?? null,
+        actorEmail: auth.currentUser?.email ?? null,
+      })
       loadIngredients()
       refreshIngredients?.()
     } catch (e) {
@@ -768,6 +793,24 @@ export function Ingredients() {
         })
       }
       toast.success(t("pages.ingredients.ingredientUpdated").replace("{name}", editIngredient.name))
+      const prevPrice = editIngredient.price
+      if (prevPrice !== price) {
+        void appendIngredientPriceHistory(db, currentRestaurantId, {
+          ingredientId: editIngredient.name,
+          ingredientName: editIngredient.name,
+          oldPrice: prevPrice,
+          newPrice: price,
+          unit: editIngUnit,
+          actorEmail: auth.currentUser?.email ?? null,
+        })
+        void appendRestaurantAuditLog(db, currentRestaurantId, {
+          action: "ingredient_price_changed",
+          summary: `${editIngredient.name}: ₪${prevPrice.toFixed(2)} → ₪${price.toFixed(2)}`,
+          meta: { ingredientName: editIngredient.name, oldPrice: prevPrice, newPrice: price, unit: editIngUnit },
+          actorUid: auth.currentUser?.uid ?? null,
+          actorEmail: auth.currentUser?.email ?? null,
+        })
+      }
       setEditIngredientOpen(false)
       setEditIngredient(null)
       loadIngredients()

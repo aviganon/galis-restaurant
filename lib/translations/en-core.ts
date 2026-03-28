@@ -19,6 +19,7 @@ nav: {
   suppliers: "Suppliers",
   inventory: "Inventory",
   purchaseOrders: "Purchase Orders",
+  operations: "Operations",
   upload: "Upload",
   reports: "Reports",
   settings: "Settings",
