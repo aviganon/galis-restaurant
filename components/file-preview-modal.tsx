@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import {
   Dialog,
   DialogContent,
@@ -30,10 +30,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useTranslations } from "@/lib/use-translations"
 import { useLanguage } from "@/contexts/language-context"
 import { normalizeSalesReportDateField } from "@/lib/ai-extract"
+import { resolveInvoiceStockQty } from "@/lib/supplier-invoice-stock-qty"
 
 function formatIsoDateDisplay(iso: string | undefined, loc: string) {
   if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return ""
   return new Date(`${iso}T12:00:00`).toLocaleDateString(loc === "he" ? "he-IL" : "en-GB")
+}
+
+function formatIls(amount: number, loc: string) {
+  return new Intl.NumberFormat(loc === "he" ? "he-IL" : "en-US", {
+    style: "currency",
+    currency: "ILS",
+    maximumFractionDigits: 2,
+  }).format(amount)
 }
 
 const MENU_DISH_LANG_STORAGE_KEY = "restaurant-pro-menu-dish-lang"
@@ -108,6 +117,22 @@ export function FilePreviewModal({
   const [salesReportDateTo, setSalesReportDateTo] = useState<string | undefined>(undefined)
   const [menuDishLanguage, setMenuDishLanguage] = useState<MenuDishNameLanguage>("he")
   const [confirming, setConfirming] = useState(false)
+
+  const supplierInvoiceSummary = useMemo(() => {
+    if (type !== "p" || stockCountMode) return null
+    let sumQty = 0
+    let sumPxQ = 0
+    for (const raw of items) {
+      const item = raw as ExtractedSupplierItem
+      const price = typeof item.price === "number" && !Number.isNaN(item.price) ? Math.max(0, item.price) : 0
+      const q = resolveInvoiceStockQty(item)
+      sumPxQ += price * q
+      sumQty += q
+    }
+    const count = items.length
+    const weightedAvg = sumQty > 0 ? sumPxQ / sumQty : null
+    return { count, sumPxQ, weightedAvg, sumQty }
+  }, [type, stockCountMode, items])
 
   useEffect(() => {
     setMenuDishLanguage(readMenuDishLanguage())
@@ -539,6 +564,28 @@ export function FilePreviewModal({
                   </p>
                 )}
               </div>
+              {type === "p" && !stockCountMode && supplierInvoiceSummary && items.length > 0 && (
+                <div
+                  className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm"
+                  role="region"
+                  aria-label={t("pages.filePreview.supplierSummaryAria")}
+                >
+                  <div>
+                    <span className="text-muted-foreground">{t("pages.filePreview.supplierSummaryCountLabel")}</span>{" "}
+                    <span className="font-semibold tabular-nums">{supplierInvoiceSummary.count}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">{t("pages.filePreview.supplierSummaryTotalLabel")}</span>{" "}
+                    <span className="font-semibold tabular-nums">{formatIls(supplierInvoiceSummary.sumPxQ, locale)}</span>
+                  </div>
+                  {supplierInvoiceSummary.weightedAvg != null && supplierInvoiceSummary.sumQty > 0 && (
+                    <div>
+                      <span className="text-muted-foreground">{t("pages.filePreview.supplierSummaryAvgLabel")}</span>{" "}
+                      <span className="font-semibold tabular-nums">{formatIls(supplierInvoiceSummary.weightedAvg, locale)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
               {type === "p" && !stockCountMode && (
                 <div className="space-y-3">
                   <Button
