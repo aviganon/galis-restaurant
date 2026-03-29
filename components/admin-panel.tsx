@@ -50,6 +50,7 @@ import {
 import { getClaudeApiKey, setClaudeApiKey, testClaudeConnection } from "@/lib/claude"
 import { supplierFirestoreDocId, ingredientFirestoreDocId } from "@/lib/supplier-firestore-id"
 import { commitSetWritesInChunks } from "@/lib/firestore-batch"
+import { resolveInvoiceStockQty } from "@/lib/supplier-invoice-stock-qty"
 import { toast } from "sonner"
 import { useTranslations } from "@/lib/use-translations"
 import { Dashboard } from "@/components/dashboard"
@@ -1301,15 +1302,18 @@ export function AdminPanel() {
           void loadOwnerGlobalUploads()
           const toSync = items
             .filter((i) => i.name?.trim() && i.price > 0)
-            .map((i) => ({
-              name: i.name!.trim(),
-              price: i.price,
-              unit: i.unit || "קג",
-              supplier: supTrim,
-              waste: 0,
-              sku: i.sku ?? "",
-              ...(typeof i.qty === "number" && i.qty > 0 ? { qty: i.qty } : {}),
-            }))
+            .map((i) => {
+              const q = resolveInvoiceStockQty(i)
+              return {
+                name: i.name!.trim(),
+                price: i.price,
+                unit: i.unit || "קג",
+                supplier: supTrim,
+                waste: 0,
+                sku: i.sku ?? "",
+                ...(q > 0 ? { qty: q } : {}),
+              }
+            })
           if (toSync.length > 0) {
             const synced = await syncSupplierIngredientsToAssignedRestaurants(supTrim, toSync)
             const restCount = synced > 0 ? Math.ceil(synced / toSync.length) : 0

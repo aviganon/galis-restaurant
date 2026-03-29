@@ -5,6 +5,7 @@ import readXlsxFile from "read-excel-file/universal"
 import * as XLSX from "xlsx"
 import { fileToBase64, callClaude } from "./claude"
 import { normalizeDishCategoryToHebrew } from "./dish-category-hebrew"
+import { resolveInvoiceStockQty } from "./supplier-invoice-stock-qty"
 
 export type ExtractType = "p" | "d" | "s"
 // p = supplier prices/invoice, d = dishes/menu, s = sales report
@@ -68,6 +69,7 @@ const SUPPLIER_KNOWLEDGE = `
 מבנה חשבונית/אישור הזמנה: שם פריט (תיאור בלבד), מק"ט (קוד נפרד), כמות שהתקבלה (qty), יחידה, מחיר ליחידה, הנחה, סה"כ. חלץ מחיר נטו ליחידה (אחרי הנחה) וכמות (qty) — הכמות מעדכנת מלאי.
 סדר עמודות נפוץ בחשבוניות ישראליות: פריט | כמות | ברקוד | מחירון | הנחה% | נטו | סה"כ לשורה.
 qty = עמודת "כמות" — המספר שמופיע ליד שם הפריט. אם כמות=1 — החזר qty:1. אל תחזיר qty:0 אלא אם כמות חסרה לגמרי.
+מחירון משקאות / אלכוהול בלי עמודת "כמות": כל שורה = בדרך כלל יחידת הזמנה אחת — החזר qty:1 ו-unit מתאים (יחידה, בקבוק, מארז). אם בשם מופיע מארז (למשל 6X330, חבילה 24, (12 יח')) — החזר qty לפי מספר היחידות.
 אישור הזמנה = כמו חשבונית — חלץ אותו המבנה (פריטים, מחירים, מק"ט, כמות).
 מחירים: זהה ₪ ש״ח שקלים NIS — המר למספר. דלג: מע"מ, סיכומים, פקדונות, הובלה, מחיר=0. אם יש עמודת הנחה — המחיר ליחידה הוא המחיר הסופי אחרי הנחה.
 יחידות נפוצות: קג/ק"ג (משקל), גרם (משקל קטן), ליטר/מ"ל (נוזלים), יחידה (פריט בודד), חבילה, קרטון, קופסה, שקית, בקבוק. נרמל: קג→קג, ג→גרם, ליטר→ליטר.
@@ -99,7 +101,7 @@ ${SUPPLIER_HEBREW_ACCURACY}
 name = תוכן עמודת "שם" / "תאור מוצר" / "תיאור מוצר" / "שם פריט" / "תיאור" / "תאור" / "פירוט" / "מוצר" — זהו שם המוצר בלבד, לא המק"ט!
 sku = תוכן עמודת "מק"ט" / "ברקוד" / "קוד" / "מקט" — קוד מספרי.
 price = מחיר נטו ליחידה (אחרי הנחה), או מעמודת "מחיר חשבונית" / "מחיר ליחידה" / "נטו". מחשב: מחיר ליחידה × (1 - הנחה%/100).
-qty = תוכן עמודת "כמות" — מספר היחידות.
+qty = תוכן עמודת "כמות" — מספר היחידות. אם אין עמודת כמות במחירון משקאות/אלכוהול — qty:1 לכל שורה (אלא אם מופיע במפורש בשם מארז כמו 24X או חבילה 6).
 unit = יחידת מידה (יח', בקבוק, קג, ליטר...).
 חובה טכני: בכל אובייקט ב-items השתמש במפתחות JSON באנגלית בלבד: "name", "sku", "price", "qty", "unit" — הטקסט בעברית רק בערכים, לא בשמות המפתחות.
 שם ספק = שם החברה בראש המסמך (לדוגמה: "הכרם - משקאות חריפים", "היכל היין", "תנובה").
@@ -112,6 +114,7 @@ const SUPPLIER_EXTRACT_USER_MESSAGE = `נתח את המסמך (חשבונית / 
 
 אם מופיע "מחירון" או "הצעת מחיר": לכל שורת טבלה — sku מעמודת "מפתח פריט" או "מק״ט"; name מעמודת "שם" / "שם פריט" / "תיאור" / "תאור מוצר" **בדיוק כפי שמודפס**, באותה שורה כמו ה-sku; qty מעמודת כמות; price מעמודת מחיר ליחידה, "מחיר חשבונית" או מחיר (אם אין הפרדה).
 אם חשבונית סטנדרטית: price = מחיר נטו ליחידה אחרי הנחה; qty = כמות.
+אם מחירון משקאות בלי עמודת כמות: qty:1 לשורה, unit: יחידה או בקבוק לפי ההקשר (או מספר יחידות מארז אם מופיע בשם).
 
 חובה: אל תערבב שורות — כל פריט ב-JSON חייב להתאים לשורה אחת בטבלה (שם ומקט מאותה שורה).
 שמות בעברית: קרא שוב את הוראות "דיוק שמות בעברית" במערכת — העתק מילולי, בלי להחליף במילים דומות.
@@ -480,10 +483,12 @@ function normalizeSupplierExtractResult(parsed: unknown): ExtractResult {
     if (Number.isNaN(qty)) qty = 0
     qty = Math.max(0, qty)
 
-    let unit =
-      pickFirstStringField(row, SUPPLIER_UNIT_KEY_CANDIDATES) ||
-      findRowStringByNormalizedKeys(row, ["יחידה", "יח", "unit"])
-    if (!unit) unit = "קג"
+    const unitFromFile =
+      (
+        pickFirstStringField(row, SUPPLIER_UNIT_KEY_CANDIDATES) ||
+        findRowStringByNormalizedKeys(row, ["יחידה", "יח", "unit"])
+      ).trim() || ""
+    let unit = unitFromFile || "קג"
 
     if (!name.trim()) {
       if (sku?.trim()) name = sku.trim()
@@ -492,12 +497,20 @@ function normalizeSupplierExtractResult(parsed: unknown): ExtractResult {
 
     if (!name.trim() && price <= 0 && !sku) continue
 
+    const stockQty = resolveInvoiceStockQty({
+      qty,
+      price,
+      unit: unitFromFile,
+      name: name.trim(),
+    })
+    if (!unitFromFile && stockQty > 0) unit = "יחידה"
+
     items.push({
       name: name.trim(),
       price,
       unit,
       sku,
-      ...(qty > 0 ? { qty } : {}),
+      ...(stockQty > 0 ? { qty: stockQty } : {}),
     })
   }
 

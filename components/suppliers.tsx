@@ -5,6 +5,7 @@ import { collection, getDocs, doc, getDoc, setDoc, writeBatch, deleteDoc, addDoc
 import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplier-ingredients"
 import { supplierFirestoreDocId, ingredientFirestoreDocId } from "@/lib/supplier-firestore-id"
 import { commitSetWritesInChunks } from "@/lib/firestore-batch"
+import { resolveInvoiceStockQty } from "@/lib/supplier-invoice-stock-qty"
 import { upsertRestaurantSupplierPrice } from "@/lib/restaurant-supplier-prices"
 import {
   Table,
@@ -362,7 +363,7 @@ export default function Suppliers() {
         if (!item.name?.trim()) continue
         const isDeliveryNoteItem = item.price === 0 && typeof item.qty === "number" && item.qty > 0
         if (item.price <= 0 && !isDeliveryNoteItem) continue
-        const qty = typeof item.qty === "number" && item.qty > 0 ? item.qty : 0
+        const stockQty = resolveInvoiceStockQty(item)
         const ingId = ingredientFirestoreDocId(item.name.trim())
         const payload: Record<string, unknown> = {
           ...(item.price > 0 ? { price: item.price } : {}),
@@ -374,7 +375,7 @@ export default function Suppliers() {
         }
         if (!toGlobal) {
           const prevStock = currentStocks[ingId] ?? currentStocks[item.name.trim()] ?? 0
-          payload.stock = qty > 0 ? prevStock + qty : prevStock
+          payload.stock = stockQty > 0 ? prevStock + stockQty : prevStock
         }
         if (toGlobal) {
           writes.push({ ref: doc(db, "ingredients", ingId), data: { ...payload }, merge: true })
@@ -429,21 +430,24 @@ export default function Suppliers() {
         if (toGlobal && supName?.trim()) {
           const toSync = items
             .filter((item) => item.name?.trim() && item.price > 0)
-            .map((item) => ({
-              name: item.name.trim(),
-              price: item.price,
-              unit: item.unit || "קג",
-              supplier: supName.trim(),
-              sku: item.sku ?? "",
-              ...(typeof item.qty === "number" && item.qty > 0 ? { qty: item.qty } : {}),
-            }))
+            .map((item) => {
+              const q = resolveInvoiceStockQty(item)
+              return {
+                name: item.name.trim(),
+                price: item.price,
+                unit: item.unit || "קג",
+                supplier: supName.trim(),
+                sku: item.sku ?? "",
+                ...(q > 0 ? { qty: q } : {}),
+              }
+            })
           if (toSync.length > 0) {
             syncSupplierIngredientsToAssignedRestaurants(supName.trim(), toSync).catch((e) =>
               console.warn("sync to restaurants:", e)
             )
           }
         }
-        const withStock = items.filter((i) => typeof i.qty === "number" && i.qty > 0).length
+        const withStock = items.filter((i) => resolveInvoiceStockQty(i) > 0).length
         toast.success(supplierExists
           ? `${count} רכיבים של "${supTrim}" עודכנו בהצלחה${withStock > 0 ? ` — מלאי עודכן ל־${withStock} רכיבים` : ""} — עלויות המנות יתעדכנו אוטומטית`
           : `ספק "${supTrim}" נוצר — ${count} רכיבים נוספו${withStock > 0 ? ` (מלאי עודכן ל־${withStock})` : ""} — עלויות המנות יתעדכנו אוטומטית`)
