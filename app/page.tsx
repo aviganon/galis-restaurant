@@ -15,6 +15,7 @@ import {
   onSnapshot,
 } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
+import { getGoogleRedirectResultOnce } from "@/lib/google-auth-redirect"
 import { firestoreConfig } from "@/lib/firestore-config"
 import { LoginScreen } from "@/components/login-screen"
 import { Dashboard } from "@/components/dashboard"
@@ -145,6 +146,9 @@ export default function Home() {
       restaurantsUnsubRef.current = null
     }
 
+    /** מסנכרן עם LoginScreen — מתחיל מיד Promise של OAuth redirect (לא מחכים ל-mount של מסך התחברות) */
+    void getGoogleRedirectResultOnce(auth).catch(() => null)
+
     const unsub = onAuthStateChanged(auth, async (user) => {
       setAuthLoading(false)
       if (!user) {
@@ -198,6 +202,51 @@ export default function Home() {
           }
         }
         if (authStale()) return
+        /**
+         * בלי מסמך users/{uid} — לא נכנסים לאפליקציה (מתאים ל-completeGoogleLogin במסך התחברות).
+         * יוצאים מ־Auth כדי שלא יישארו "מחוברים" במצב שבור. חריג: מייל ברשימת בעלי מערכת ב-config/admins.
+         */
+        if (!userDoc.exists()) {
+          let isAdminEmail = false
+          if (user.email) {
+            try {
+              const userEmailLower = user.email.toLowerCase().trim()
+              const { adminsDocPath, adminsEmailsField } = firestoreConfig
+              const altPaths = [adminsDocPath, { collection: "config" as const, docId: "adminEmails" as const }]
+              for (const p of altPaths) {
+                const adminsDoc = await getDoc(doc(db, p.collection, p.docId))
+                const adminsData = adminsDoc.exists() ? adminsDoc.data() : null
+                const raw = adminsData?.[adminsEmailsField] ?? adminsData?.emails ?? adminsData?.adminEmails
+                const adminEmails: string[] = Array.isArray(raw)
+                  ? raw.map((e) => String(e).toLowerCase().trim())
+                  : raw && typeof raw === "object" && !Array.isArray(raw)
+                    ? Object.keys(raw).map((e) => String(e).toLowerCase().trim())
+                    : []
+                if (adminEmails.includes(userEmailLower)) {
+                  isAdminEmail = true
+                  break
+                }
+              }
+            } catch {
+              /* */
+            }
+          }
+          if (authStale()) return
+          if (!isAdminEmail) {
+            try {
+              await signOut(auth)
+            } catch {
+              /* */
+            }
+            authProfileGenRef.current += 1
+            stopRestaurantsListener()
+            setIsLoggedIn(false)
+            setRestaurants([])
+            setCurrentRestaurantId(null)
+            setIsSystemOwner(false)
+            return
+          }
+        }
         const data = userDoc.exists() ? userDoc.data() : null
         let roleRaw = data?.[roleField]
         let isInAdminsList = false
