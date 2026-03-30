@@ -4,6 +4,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { LanguageProvider } from '@/contexts/language-context'
 import { Toaster } from '@/components/ui/sonner'
 import { ErrorReportingInit } from '@/components/error-reporting-init'
+import { NetworkStatusBanner } from '@/components/network-status-banner'
 import './globals.css'
 
 const heebo = Heebo({ 
@@ -15,6 +16,8 @@ export const metadata: Metadata = {
   title: 'Restaurant Pro | מערכת ניהול מסעדות',
   description: 'מערכת ניהול מסעדות מתקדמת — עלויות, מתכונים, ספקים וניתוח פיננסי בזמן אמת',
   generator: 'v0.app',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: { capable: true },
   icons: {
     icon: [
       {
@@ -61,6 +64,7 @@ export default function RootLayout({
         <ThemeProvider>
           <LanguageProvider>
             <ErrorReportingInit />
+            <NetworkStatusBanner />
             {children}
             <Toaster position="top-center" richColors closeButton />
           </LanguageProvider>

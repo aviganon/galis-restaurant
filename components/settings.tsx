@@ -51,6 +51,9 @@ import { useTranslations } from "@/lib/use-translations"
 import { cn } from "@/lib/utils"
 import { InboundEmailSettings } from "@/components/inbound-email-settings"
 import { SystemOwnerDirectory } from "@/components/system-owner-directory"
+import { SystemOwnerInsights } from "@/components/system-owner-insights"
+import { WebPushSettings } from "@/components/web-push-settings"
+import { logAuditAction } from "@/lib/audit-log-client"
 import { SystemOwnerUserTabBulkSection, SystemOwnerUserTabToolbar } from "@/components/system-owner-users-management"
 import { firebaseBearerHeaders } from "@/lib/api-auth-client"
 import { postInviteEmail } from "@/lib/invite-email"
@@ -141,6 +144,11 @@ export function Settings() {
   const [restaurantSettingsTab, setRestaurantSettingsTab] = useState<"profile" | "team" | "operations">("profile")
   const [loadingNotifications, setLoadingNotifications] = useState(true)
   const [savingNotification, setSavingNotification] = useState<string | null>(null)
+  const [lowStockEmailSending, setLowStockEmailSending] = useState(false)
+  const [copyTplOpen, setCopyTplOpen] = useState(false)
+  const [copySourceId, setCopySourceId] = useState("")
+  const [copyTargetId, setCopyTargetId] = useState("")
+  const [copyTplLoading, setCopyTplLoading] = useState(false)
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -209,6 +217,63 @@ export function Settings() {
       toast.error((e as Error).message || "שגיאה בשמירה")
     } finally {
       setSavingProfile(false)
+    }
+  }
+
+  const sendLowStockReportEmail = async () => {
+    if (!currentRestaurantId) return
+    setLowStockEmailSending(true)
+    try {
+      const res = await fetch("/api/notifications/low-stock-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await firebaseBearerHeaders()) },
+        body: JSON.stringify({ restaurantId: currentRestaurantId }),
+        cache: "no-store",
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(typeof j.error === "string" ? j.error : "שגיאה")
+      toast.success(
+        typeof j.counts === "object"
+          ? `נשלח (${(j.counts as { low?: number }).low ?? 0} נמוך, ${(j.counts as { out?: number }).out ?? 0} אזל)`
+          : t("pages.settings.lowStockEmailSelf"),
+      )
+    } catch (e) {
+      toast.error((e as Error).message || "שגיאה")
+    } finally {
+      setLowStockEmailSending(false)
+    }
+  }
+
+  const runCopyRestaurantTemplate = async () => {
+    const src = copySourceId.trim()
+    const tgt = copyTargetId.trim()
+    if (!src || !tgt || src === tgt) {
+      toast.error("בחר מסעדת מקור ויעד שונות")
+      return
+    }
+    setCopyTplLoading(true)
+    try {
+      const res = await fetch("/api/admin/copy-restaurant-template", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await firebaseBearerHeaders()) },
+        body: JSON.stringify({ sourceRestaurantId: src, targetRestaurantId: tgt }),
+        cache: "no-store",
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(typeof j.error === "string" ? j.error : "שגיאה")
+      toast.success(t("pages.settings.copyTemplateSuccess"))
+      void logAuditAction({
+        action: "copy_restaurant_template",
+        target: `${src}→${tgt}`,
+        restaurantId: tgt,
+        meta: j.copied as Record<string, unknown> | undefined,
+      })
+      setCopyTplOpen(false)
+      refreshRestaurants?.()
+    } catch (e) {
+      toast.error((e as Error).message || "שגיאה")
+    } finally {
+      setCopyTplLoading(false)
     }
   }
 
@@ -431,7 +496,14 @@ export function Settings() {
         restaurantId:nextRestId,
         restaurantName:(restaurants||[]).find(r=>r.id===nextRestId)?.name
       }:u))
-      toast.success("משתמש עודכן"); setEditingUser(null)
+      toast.success("משתמש עודכן")
+      void logAuditAction({
+        action: "user_updated",
+        target: editingUser.email,
+        restaurantId: nextRestId,
+        meta: { role: roleToSave, isSystemOwner: makeSystemOwner },
+      })
+      setEditingUser(null)
     }
     catch { toast.error("שגיאה") } finally { setSavingEditUser(false) }
   }
@@ -448,6 +520,7 @@ export function Settings() {
     setDeletingUserDoc(true)
     try {
       await deleteDoc(doc(db, "users", editingUser.uid))
+      void logAuditAction({ action: "user_deleted", target: editingUser.email })
       setUsersData((p) => p.filter((u) => u.uid !== editingUser.uid))
       toast.success("משתמש נמחק מהמערכת")
       setDeleteUserDialogOpen(false)
@@ -686,6 +759,12 @@ export function Settings() {
           notes: cNotes.trim() || null,
           createdAt: new Date().toISOString(),
         })
+        void logAuditAction({
+          action: "user_created",
+          target: cEmail.trim(),
+          restaurantId: restIdForUser,
+          meta: { isSystemOwner: creatingSystemOwner, role: roleToSave },
+        })
         if (creatingSystemOwner) await setSystemOwnerEmailInConfig(cEmail.trim(), true)
 
         // עבור בעל מערכת: אנחנו מוסיפים קישור אימות כתובת למייל שנשלח ע"י Resend.
@@ -834,6 +913,11 @@ export function Settings() {
         }),
       )
       toast.success("שויך")
+      void logAuditAction({
+        action: "user_restaurant_assigned",
+        target: assignTgt.email,
+        restaurantId: rid,
+      })
       setAssignTgt(null)
     } catch {
       toast.error("שגיאה")
@@ -878,6 +962,7 @@ export function Settings() {
       </div>
       {isSystemOwner && !isImpersonating ? (
         <div className="mx-auto w-full max-w-4xl space-y-4" dir={systemOwnerPanelDir}>
+          <SystemOwnerInsights />
           <SystemOwnerDirectory
             hideCardHeader
             restaurants={restaurants || []}
@@ -960,19 +1045,34 @@ export function Settings() {
               />
             }
             restaurantRowActions={(restaurant) => (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 px-2 text-[11px] gap-1"
-                onClick={() => {
-                  setAiCatalogRestId(restaurant.id)
-                  setAiCatalogDialogOpen(true)
-                }}
-              >
-                <User className="h-3 w-3 shrink-0" />
-                שפים ומתכוני AI
-              </Button>
+              <div className="flex flex-wrap gap-1 justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-[11px] gap-1"
+                  onClick={() => {
+                    setCopySourceId(restaurant.id)
+                    setCopyTargetId("")
+                    setCopyTplOpen(true)
+                  }}
+                >
+                  {t("pages.settings.copyTemplateShort")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-[11px] gap-1"
+                  onClick={() => {
+                    setAiCatalogRestId(restaurant.id)
+                    setAiCatalogDialogOpen(true)
+                  }}
+                >
+                  <User className="h-3 w-3 shrink-0" />
+                  שפים ומתכוני AI
+                </Button>
+              </div>
             )}
           />
           <Card
@@ -1095,6 +1195,51 @@ export function Settings() {
                   </>
                 )}
               </div>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={copyTplOpen} onOpenChange={setCopyTplOpen}>
+            <DialogContent className="max-w-md" dir={systemOwnerPanelDir}>
+              <DialogHeader>
+                <DialogTitle>{t("pages.settings.copyTemplateTitle")}</DialogTitle>
+                <DialogDescription>{t("pages.settings.copyTemplateDesc")}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 py-2">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">מקור</p>
+                  <p className="text-sm font-medium">
+                    {(restaurants || []).find((r) => r.id === copySourceId)?.name || copySourceId || "—"}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium" htmlFor="copy-tpl-target">
+                    {t("pages.settings.copyTemplateTarget")}
+                  </label>
+                  <select
+                    id="copy-tpl-target"
+                    className="w-full h-10 rounded-md border px-3 text-sm bg-background"
+                    value={copyTargetId}
+                    onChange={(e) => setCopyTargetId(e.target.value)}
+                  >
+                    <option value="">—</option>
+                    {(restaurants || [])
+                      .filter((r) => r.id !== copySourceId)
+                      .map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button type="button" variant="outline" onClick={() => setCopyTplOpen(false)}>
+                  {t("pages.settings.cancel")}
+                </Button>
+                <Button type="button" onClick={() => void runCopyRestaurantTemplate()} disabled={copyTplLoading || !copyTargetId}>
+                  {copyTplLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {t("pages.settings.copyTemplateRun")}
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
@@ -1438,6 +1583,22 @@ export function Settings() {
                     disabled={!!savingNotification}
                   />
                 </label>
+                {currentRestaurantId ? (
+                  <div className="pt-2 border-t space-y-3">
+                    <WebPushSettings restaurantId={currentRestaurantId} />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full sm:w-auto gap-2"
+                      disabled={lowStockEmailSending}
+                      onClick={() => void sendLowStockReportEmail()}
+                    >
+                      {lowStockEmailSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                      {lowStockEmailSending ? t("pages.settings.lowStockEmailSending") : t("pages.settings.lowStockEmailSelf")}
+                    </Button>
+                  </div>
+                ) : null}
               </>
             )}
           </CardContent>

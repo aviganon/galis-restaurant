@@ -26,6 +26,8 @@ if (!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID && typeof window !== "undefined
 }
 
 const app = initializeApp(firebaseConfig)
+/** לאותו מופע אפליקציה — ל־FCM / getMessaging בדפדפן */
+export const firebaseApp = app
 export const auth = getAuth(app)
 
 const SECONDARY_AUTH_APP_NAME = "user-creation-secondary"

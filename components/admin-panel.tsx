@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { firebaseBearerHeaders } from "@/lib/api-auth-client"
+import { logAuditAction } from "@/lib/audit-log-client"
 import { cn } from "@/lib/utils"
 import { useApp } from "@/contexts/app-context"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -1871,6 +1872,12 @@ export function AdminPanel() {
   const handleSavePermissions = async (uid: string, perms: UserPermissions) => {
     try {
       await setDoc(doc(db, "users", uid), { permissions: perms }, { merge: true })
+      void logAuditAction({
+        action: "user_permissions_updated",
+        target: uid,
+        restaurantId: currentRestaurantId,
+        meta: { permissions: perms },
+      })
       setRestaurantUsers((prev) =>
         prev.map((u) => (u.uid === uid ? { ...u, permissions: perms } : u))
       )
@@ -2152,6 +2159,11 @@ export function AdminPanel() {
         patch.role = "user"
       }
       await setDoc(doc(db, "users", assignTarget.uid), patch, { merge: true })
+      void logAuditAction({
+        action: "user_restaurant_assigned",
+        target: assignTarget.email,
+        restaurantId: rid,
+      })
       toast.success("✅ " + assignTarget.email + " שויך בהצלחה")
       setAssignTarget(null)
       setAssignTargetRestId("")
@@ -2179,6 +2191,11 @@ export function AdminPanel() {
         restaurantId: currentRestaurantId,
         role: currentData.role === "owner" ? "owner" : "manager",
       }, { merge: true })
+      void logAuditAction({
+        action: "manager_assigned_to_restaurant",
+        target: email,
+        restaurantId: currentRestaurantId,
+      })
       setAssignManagerResult({ ok: true, msg: `✅ ${email} שויך למסעדה כמנהל` })
       setAssignManagerEmail("")
       const snap = await getDocs(query(collection(db, "users"), where("restaurantId", "==", currentRestaurantId)))

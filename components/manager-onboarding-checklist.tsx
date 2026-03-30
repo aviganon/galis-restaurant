@@ -78,7 +78,7 @@ export function ManagerOnboardingChecklist({
   const steps: ChecklistStep[] = [
     {
       id: "suppliers",
-      title: "ספקים",
+      title: "1. ספקים",
       body: "צור ספק חדש (גם בלי רכיבים) או העלה חשבונית — כך תוכל לשייך מחירים ולנהל הזמנות.",
       status: needsSuppliers ? "todo" : "done",
       actionLabel: "פתח ספקים",
@@ -86,15 +86,31 @@ export function ManagerOnboardingChecklist({
     },
     {
       id: "ingredients",
-      title: "רכיבים",
+      title: "2. רכיבים",
       body: "הוסף רכיבים ידנית, מקטלוג, או מייבוא חשבונית. בלי רכיבים לא תראה עלויות אמיתיות במתכונים.",
       status: needsIngredients ? "todo" : "done",
       actionLabel: "פתח רכיבים",
       navigateTo: "ingredients",
     },
     {
+      id: "settings_notifications",
+      title: "3. הגדרות והתראות",
+      body: "בהגדרות: הפעל התראות מלאי, סיכום יומי או התראות דחיפה לדפדפן/טלפון (התקן למסך הבית).",
+      status: "later",
+      actionLabel: "פתח הגדרות",
+      navigateTo: "settings",
+    },
+    {
+      id: "team",
+      title: "4. צוות",
+      body: "הזמן מנהלים או משתמשים, או ערוך הרשאות — כדי שכל הסניף יעבוד באותה מסעדה.",
+      status: "later",
+      actionLabel: "צוות בהגדרות",
+      navigateTo: "settings",
+    },
+    {
       id: "recipes",
-      title: "מתכונים ומנות",
+      title: "5. מתכונים ומנות",
       body: "הגדר מנות בעץ המוצר — רכיבים, כמויות ומחיר מכירה. אפשר גם ייבוא מתפריט או תמונה.",
       status: "later",
       actionLabel: currentPage === "calc" ? undefined : "עבור לעץ מוצר",
@@ -102,11 +118,19 @@ export function ManagerOnboardingChecklist({
     },
     {
       id: "inventory",
-      title: "מלאי",
+      title: "6. מלאי",
       body: "אחרי שיש רכיבים — עדכן מלאי ומינימום מלאי בלשונית המלאי או מחשבונית עם כמויות.",
       status: "later",
       actionLabel: "פתח מלאי",
       navigateTo: "inventory",
+    },
+    {
+      id: "reports",
+      title: "7. דוחות והמשך עבודה",
+      body: "דוחות, עלויות והזמנות ספק — אחרי שהנתונים הבסיסיים מלאים.",
+      status: "later",
+      actionLabel: "פתח דוחות",
+      navigateTo: "reports",
     },
   ]
 

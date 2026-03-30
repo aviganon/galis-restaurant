@@ -3,6 +3,9 @@ node_modules
 .pnp
 .pnp.js
 
+# נוצר ב־prebuild ממשתני Firebase — לא לעקוב אחרי הקובץ המלא (מפתחות בקליינט)
+public/firebase-messaging-sw.js
+
 # Build
 .next
 # כפילויות iCloud/סנכרון (למשל routes.d 2.ts) — לא לדחוף
