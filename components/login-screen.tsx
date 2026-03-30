@@ -94,12 +94,31 @@ function readGoogleRegisterDraft(): { code: string; name: string; br: string } {
   }
 }
 
-/** Safari / מובייל — popup נחסם לעיתים; redirect מלא אמין יותר */
-function isGoogleRedirectPreferred(): boolean {
+/**
+ * Safari (WebKit של אפל) — signInWithRedirect של Google/Firebase נתקע לעיתים ב־"Continue to app"
+ * ומחזיר למסך התחברות; ב־Chrome נפתח popup ועובד. לכן ב־Safari נשתמש ב־popup כמו בכרום.
+ */
+function isAppleSafari(): boolean {
   if (typeof window === "undefined") return false
   const ua = window.navigator.userAgent || ""
-  if (/Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) return true
-  if (/iPad/i.test(ua)) return true
+  const vendor = window.navigator.vendor || ""
+  if (/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua)) return false
+  if (vendor.includes("Apple")) {
+    if (/Safari/.test(ua) && !/Chrome|Chromium|Edg|OPR|Brave|Vivaldi|FxiOS/.test(ua)) return true
+  }
+  if (/(iPhone|iPad|iPod)/.test(ua) && /Safari/.test(ua) && !/CriOS|FxiOS/.test(ua)) return true
+  return false
+}
+
+/** מובייל שבו popup נחסם לעיתים — redirect. Chrome/Firefox באייפד/אייפון (CriOS/FxiOS) נשארים ב-popup */
+function isGoogleRedirectPreferred(): boolean {
+  if (typeof window === "undefined") return false
+  if (isAppleSafari()) return false
+  const ua = window.navigator.userAgent || ""
+  if (/CriOS|FxiOS|EdgiOS/.test(ua)) return false
+  if (/Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua)) return true
+  if (/iPhone|iPod/.test(ua)) return true
+  if (/iPad/.test(ua)) return true
   if (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) return true
   return false
 }
@@ -636,8 +655,14 @@ export function LoginScreen(_props: LoginScreenProps) {
     } catch (err) {
       const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
       if (googleAuthErrorShouldFallbackToRedirect(code)) {
-        saveGoogleAuthDraft("login")
-        await signInWithRedirect(auth, new GoogleAuthProvider())
+        if (isAppleSafari()) {
+          setError(
+            "ב-Safari זרימת ההחלפה לדף Google עלולה להיכשל. אפשר לאשר חלונות קופצים לאתר (הגדרות Safari → אתר זה), או להתחבר דרך Chrome.",
+          )
+        } else {
+          saveGoogleAuthDraft("login")
+          await signInWithRedirect(auth, new GoogleAuthProvider())
+        }
       } else if (code === "auth/operation-not-allowed") {
         setError("כניסה עם Google לא מופעלת כרגע בהגדרות Firebase Authentication.")
       } else if (code !== "auth/popup-closed-by-user") {
@@ -685,8 +710,14 @@ export function LoginScreen(_props: LoginScreenProps) {
     } catch (err) {
       const authCode = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
       if (googleAuthErrorShouldFallbackToRedirect(authCode)) {
-        saveGoogleAuthDraft("register", readGoogleRegisterDraft())
-        await signInWithRedirect(auth, new GoogleAuthProvider())
+        if (isAppleSafari()) {
+          setError(
+            "ב-Safari זרימת ההחלפה לדף Google עלולה להיכשל. אפשר לאשר חלונות קופצים לאתר (הגדרות Safari → אתר זה), או להשתמש ב-Chrome.",
+          )
+        } else {
+          saveGoogleAuthDraft("register", readGoogleRegisterDraft())
+          await signInWithRedirect(auth, new GoogleAuthProvider())
+        }
       } else if (authCode === "auth/operation-not-allowed") {
         setError("הרשמה עם Google לא מופעלת כרגע בהגדרות Firebase Authentication.")
       } else if (authCode !== "auth/popup-closed-by-user") {
