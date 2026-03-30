@@ -905,6 +905,7 @@ export function Settings() {
                   role: u.role,
                   restaurantName: u.restaurantName,
                   accountCreated: false,
+                  attachVerificationIfPasswordUnverified: true,
                 })
                 toast.success("נשלח מייל הזמנה")
               } catch (e) {
@@ -1340,6 +1341,7 @@ export function Settings() {
                                     role: u.role,
                                     restaurantName: u.restaurantName || null,
                                     accountCreated: false,
+                                    attachVerificationIfPasswordUnverified: true,
                                   })
                                     .then(() => toast.success("נשלח מייל הזמנה"))
                                     .catch((e) => toast.error((e as Error).message || "שגיאה"))

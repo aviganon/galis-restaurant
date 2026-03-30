@@ -50,6 +50,8 @@ export async function POST(req: NextRequest) {
     const emailVerificationLink =
       typeof body.emailVerificationLink === "string" && body.emailVerificationLink.trim() ? body.emailVerificationLink.trim() : undefined
     const pendingRestaurantSetup = body.pendingRestaurantSetup === true
+    /** כפתור «הזמנה» ברשימת משתמשים: אם כבר יש חשבון עם סיסמה והמייל לא מאומת — מצרפים קישור אימות */
+    const attachVerificationIfPasswordUnverified = body.attachVerificationIfPasswordUnverified === true
 
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "חסר אימייל" }, { status: 400 })
@@ -76,6 +78,21 @@ export async function POST(req: NextRequest) {
         console.error("[invite] generateEmailVerificationLink failed:", e)
       }
     }
+
+    let reminderVerificationLink: string | undefined
+    if (attachVerificationIfPasswordUnverified && !resolvedEmailVerificationLink) {
+      try {
+        const authUser = await adminAuth.getUserByEmail(to)
+        const hasPassword = authUser.providerData.some((p) => p.providerId === "password")
+        if (hasPassword && !authUser.emailVerified) {
+          reminderVerificationLink = await adminAuth.generateEmailVerificationLink(to, { url: appUrl })
+        }
+      } catch {
+        /* אין משתמש ב-Auth — למשל הזמנה לפני הרשמה */
+      }
+    }
+
+    const verificationLinkForEmail = resolvedEmailVerificationLink || reminderVerificationLink
 
     const roleLine =
       role && (role === "manager" || role === "user")
@@ -125,9 +142,9 @@ export async function POST(req: NextRequest) {
   </ul>
   ${codeBlockHtml}
   ${
-    resolvedEmailVerificationLink
+    verificationLinkForEmail
       ? `<p style="margin-top: 14px; font-size: 13px; color: #666;">
-אימות כתובת המייל: <a href="${escapeHtml(resolvedEmailVerificationLink)}" target="_blank" rel="noopener noreferrer">לחץ כאן</a>.
+אימות כתובת המייל: <a href="${escapeHtml(verificationLinkForEmail)}" target="_blank" rel="noopener noreferrer">לחץ כאן</a>.
 </p>`
       : ""
   }
@@ -153,6 +170,13 @@ export async function POST(req: NextRequest) {
     <li>לחץ על &quot;הרשמה&quot; והזן את האימייל והסיסמה שלך</li>
     <li>אחרי ההרשמה תקבל גישה אוטומטית</li>
   </ol>
+  ${
+    verificationLinkForEmail
+      ? `<p style="margin-top: 14px; font-size: 13px; color: #666;">
+<strong>כבר נפתח לך חשבון עם סיסמה?</strong> אם עדיין לא אימתת את כתובת המייל — לחץ כאן: <a href="${escapeHtml(verificationLinkForEmail)}" target="_blank" rel="noopener noreferrer">אימות מייל</a> (נדרש לפני כניסה עם אימייל וסיסמה).
+</p>`
+      : ""
+  }
 `
 
     const html = `
