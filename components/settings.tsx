@@ -906,6 +906,7 @@ export function Settings() {
                   restaurantName: u.restaurantName,
                   accountCreated: false,
                   attachVerificationIfPasswordUnverified: true,
+                  includeManagerRestaurantSetupIfEligible: u.role === "manager" && !u.restaurantId,
                 })
                 toast.success("נשלח מייל הזמנה")
               } catch (e) {

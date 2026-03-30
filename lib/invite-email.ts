@@ -17,6 +17,10 @@ export async function postInviteEmail(payload: {
    * כפתור «הזמנה»: אם ב-Auth יש משתמש עם סיסמה והמייל לא מאומת — השרת מצרף קישור אימות למייל.
    */
   attachVerificationIfPasswordUnverified?: boolean
+  /**
+   * מנהל בלי מסעדה (בעל מערכת): מייל «הזמנה» כולל שוב קוד הקמת מסעדה (או יוצר קוד אם חסר).
+   */
+  includeManagerRestaurantSetupIfEligible?: boolean
 }): Promise<void> {
   const res = await fetch("/api/invite", {
     method: "POST",

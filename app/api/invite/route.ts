@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
+import type { Firestore } from "firebase-admin/firestore"
 import { Resend } from "resend"
 import { requireFirebaseUser } from "@/lib/api-verify-firebase"
 import { canSendInviteEmail, loadAdminEmailSet } from "@/lib/firebase-admin-permissions"
 import { getFirebaseAdminAuth, getFirebaseAdminFirestore } from "@/lib/firebase-admin-server"
+import { firestoreConfig } from "@/lib/firestore-config"
 
 const fromEmail = process.env.RESEND_FROM_EMAIL || "Restaurant Pro <onboarding@resend.dev>"
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://restaurant-pro.web.app"
@@ -11,6 +13,35 @@ function roleLabelHe(role: string | undefined): string {
   if (role === "manager") return "מנהל"
   if (role === "user") return "משתמש"
   return role || ""
+}
+
+/** קוד manager + allowedEmail + בלי מסעדה — לשחזור מייל אחרי מחיקה */
+async function findOrCreateManagerPendingInviteCode(db: Firestore, emailLower: string): Promise<string | null> {
+  const { inviteCodesCollection, inviteCodeFields } = firestoreConfig
+  const snap = await db.collection(inviteCodesCollection).where(inviteCodeFields.allowedEmail, "==", emailLower).limit(40).get()
+  for (const d of snap.docs) {
+    const data = d.data()
+    if (data[inviteCodeFields.used] === true) continue
+    if (data[inviteCodeFields.type] !== "manager") continue
+    const rid = data[inviteCodeFields.restaurantId]
+    if (rid != null && rid !== "") continue
+    return d.id
+  }
+  for (let i = 0; i < 14; i++) {
+    const code = Math.random().toString(36).slice(2, 8).toUpperCase()
+    const ref = db.collection(inviteCodesCollection).doc(code)
+    const s = await ref.get()
+    if (s.exists) continue
+    await ref.set({
+      [inviteCodeFields.createdAt]: new Date().toISOString(),
+      [inviteCodeFields.used]: false,
+      [inviteCodeFields.restaurantId]: null,
+      [inviteCodeFields.type]: "manager",
+      [inviteCodeFields.allowedEmail]: emailLower,
+    })
+    return code
+  }
+  return null
 }
 
 export async function POST(req: NextRequest) {
@@ -52,6 +83,8 @@ export async function POST(req: NextRequest) {
     const pendingRestaurantSetup = body.pendingRestaurantSetup === true
     /** כפתור «הזמנה» ברשימת משתמשים: אם כבר יש חשבון עם סיסמה והמייל לא מאומת — מצרפים קישור אימות */
     const attachVerificationIfPasswordUnverified = body.attachVerificationIfPasswordUnverified === true
+    /** מנהל בלי מסעדה — שליחה חוזרת של קוד הקמה (אם מחקו את המייל המקורי) */
+    const includeManagerRestaurantSetupIfEligible = body.includeManagerRestaurantSetupIfEligible === true
 
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "חסר אימייל" }, { status: 400 })
@@ -94,6 +127,28 @@ export async function POST(req: NextRequest) {
 
     const verificationLinkForEmail = resolvedEmailVerificationLink || reminderVerificationLink
 
+    let resendManagerSetupCode: string | undefined
+    let resendManagerSetup = false
+    if (includeManagerRestaurantSetupIfEligible && !accountCreated) {
+      try {
+        const authUser = await adminAuth.getUserByEmail(to)
+        const userSnap = await db.collection(firestoreConfig.usersCollection).doc(authUser.uid).get()
+        const ud = userSnap.data()
+        const pendingManager =
+          ud?.[firestoreConfig.roleField] === "manager" &&
+          (ud?.[firestoreConfig.restaurantIdField] == null || String(ud[firestoreConfig.restaurantIdField]).trim() === "")
+        if (pendingManager) {
+          const code = await findOrCreateManagerPendingInviteCode(db, to)
+          if (code) {
+            resendManagerSetupCode = code
+            resendManagerSetup = true
+          }
+        }
+      } catch {
+        /* אין משתמש Auth או שגיאת קריאה */
+      }
+    }
+
     const roleLine =
       role && (role === "manager" || role === "user")
         ? `<p>הוגדר לך תפקיד: <strong>${roleLabelHe(role)}</strong>.</p>`
@@ -105,9 +160,11 @@ export async function POST(req: NextRequest) {
       ? restaurantName
         ? `חשבון Restaurant Pro — ${restaurantName}`
         : "חשבון חדש ב-Restaurant Pro"
-      : restaurantName
-        ? `הזמנה ל-Restaurant Pro — ${restaurantName}`
-        : "הזמנה ל-Restaurant Pro"
+      : resendManagerSetup
+        ? "תזכורת: הקמת מסעדה ב-Restaurant Pro"
+        : restaurantName
+          ? `הזמנה ל-Restaurant Pro — ${restaurantName}`
+          : "הזמנה ל-Restaurant Pro"
 
     const codeBlockHtml =
       inviteCode && accountCreated
@@ -156,7 +213,26 @@ export async function POST(req: NextRequest) {
   </ol>
   <p style="color:#666;font-size:14px;">אם לא קיבלת את הסיסמה — פנה למנהל שיצר את החשבון.</p>
 `
-      : `
+      : resendManagerSetup && resendManagerSetupCode
+        ? `
+  <p>שלום,</p>
+  <p>מייל זה נשלח כ<strong>הזמנה / תזכורת</strong>: כבר נפתח עבורך חשבון <strong>מנהל</strong> ב־Restaurant Pro, ועדיין צריך <strong>להקים את המסעדה</strong> במערכת (למשל אם המייל הקודם נמחק או לא הגיע).</p>
+  ${roleLine}
+  <div style="margin: 1rem 0; padding: 12px 16px; background: #f4f4f5; border-radius: 8px; border: 1px solid #e4e4e7;">
+    <p style="margin: 0 0 6px 0; font-size: 13px; color: #52525b;"><strong>קוד הזמנה אישי</strong> (מקושר לאימייל שלך)</p>
+    <p style="margin: 0; font-size: 22px; font-family: ui-monospace, monospace; letter-spacing: 0.08em; font-weight: 700;">${escapeHtml(resendManagerSetupCode)}</p>
+  </div>
+  <p style="font-size: 13px; color: #666;"><strong>איך מקימים מסעדה:</strong> גלוש ל־<a href="${appUrl}">${appUrl}</a>, לחץ <strong>התחברות</strong> (לא הרשמה), והזן את <strong>האימייל והסיסמה</strong> שהוגדרו עבורך. אחרי הכניסה יופיע מסך השלמה — הזן את <strong>קוד ההזמנה לעיל</strong>, שם מסעדה וסניף.</p>
+  ${
+    verificationLinkForEmail
+      ? `<p style="margin-top: 14px; font-size: 13px; color: #666;">
+<strong>אימות כתובת מייל:</strong> <a href="${escapeHtml(verificationLinkForEmail)}" target="_blank" rel="noopener noreferrer">לחץ כאן</a> (נדרש לפני כניסה עם אימייל וסיסמה, אם טרם אימתת).
+</p>`
+      : ""
+  }
+  <p style="color:#666;font-size:14px;">אם לא זוכרים את הסיסמה — השתמש ב־«שכחתי סיסמה» במסך הכניסה או פנה לבעל המערכת.</p>
+`
+        : `
   <p>שלום,</p>
   <p>${
     restaurantName
@@ -184,7 +260,9 @@ export async function POST(req: NextRequest) {
 <html dir="rtl">
 <head><meta charset="utf-8"></head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 500px; margin: 0 auto; padding: 20px;">
-  <h2 style="color: #2563eb;">${accountCreated ? "חשבון נפתח עבורך" : "הזמנה למערכת Restaurant Pro"}</h2>
+  <h2 style="color: #2563eb;">${
+    accountCreated ? "חשבון נפתח עבורך" : resendManagerSetup ? "הזמנה: הקמת מסעדה" : "הזמנה למערכת Restaurant Pro"
+  }</h2>
   ${bodyHtml}
   <p style="margin-top: 24px; color: #666; font-size: 14px;">Restaurant Pro — ניהול מסעדות חכם</p>
 </body>
