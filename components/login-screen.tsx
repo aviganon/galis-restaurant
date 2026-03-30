@@ -6,9 +6,7 @@ import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
   GoogleAuthProvider,
-  signInWithPopup,
   signInWithRedirect,
-  getRedirectResult,
   setPersistence,
   browserLocalPersistence,
   browserSessionPersistence,
@@ -16,8 +14,9 @@ import {
 } from "firebase/auth"
 import { auth, db } from "@/lib/firebase"
 import { sendPasswordResetReliable } from "@/lib/password-reset-client"
-import { doc, getDoc, setDoc } from "firebase/firestore"
+import { doc, getDoc, getDocFromServer, setDoc } from "firebase/firestore"
 import { firestoreConfig } from "@/lib/firestore-config"
+import { getGoogleRedirectResultOnce } from "@/lib/google-auth-redirect"
 import Image from "next/image"
 import { motion, AnimatePresence, useScroll, useTransform, type Variants } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -266,7 +265,15 @@ export function LoginScreen(_props: LoginScreenProps) {
 
   const completeGoogleLogin = useCallback(async (user: User) => {
     const { usersCollection } = firestoreConfig
-    const userDoc = await getDoc(doc(db, usersCollection, user.uid))
+    const userRef = doc(db, usersCollection, user.uid)
+    let userDoc = await getDocFromServer(userRef).catch(() => getDoc(userRef))
+    if (!userDoc.exists()) {
+      for (let a = 0; a < 15; a++) {
+        await new Promise((r) => setTimeout(r, 200))
+        userDoc = await getDocFromServer(userRef).catch(() => getDoc(userRef))
+        if (userDoc.exists()) break
+      }
+    }
     if (!userDoc.exists()) {
       await auth.signOut()
       setError("משתמש לא נמצא במערכת. פנה למנהל לקבלת קוד הזמנה.")
@@ -362,16 +369,22 @@ export function LoginScreen(_props: LoginScreenProps) {
     void (async () => {
       let shouldClearDraft = false
       try {
-        const result = await getRedirectResult(auth)
+        const result = await getGoogleRedirectResultOnce(auth)
         if (!result?.user || cancelled) return
-        shouldClearDraft = true
         const intent = readGoogleAuthIntent()
         if (intent === "register") {
+          const signedEmail = (result.user.email || "").trim().toLowerCase()
+          if (signedEmail && (await isSystemOwnerEmail(signedEmail))) {
+            await auth.signOut().catch(() => {})
+            setError("המייל הזה מוגדר כבעלים מערכת. יש להשתמש במייל אחר להרשמה למסעדה.")
+            return
+          }
           const ok = await completeGoogleRegister(result.user, readGoogleRegisterDraft())
           if (!ok) return
         } else {
           await completeGoogleLogin(result.user)
         }
+        shouldClearDraft = true
       } catch (err) {
         if (!cancelled) {
           const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
@@ -386,7 +399,7 @@ export function LoginScreen(_props: LoginScreenProps) {
       }
     })()
     return () => { cancelled = true }
-  }, [completeGoogleLogin, completeGoogleRegister, getAuthError, t])
+  }, [completeGoogleLogin, completeGoogleRegister, getAuthError, isSystemOwnerEmail, t])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -580,20 +593,18 @@ export function LoginScreen(_props: LoginScreenProps) {
     setIsLoading(true)
     try {
       await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence)
-      const provider = new GoogleAuthProvider()
-      const result = await signInWithPopup(auth, provider)
-      await completeGoogleLogin(result.user)
+      saveGoogleAuthDraft("login")
+      await signInWithRedirect(auth, new GoogleAuthProvider())
     } catch (err) {
-      const code = err && typeof err === "object" && "code" in err ? String(err.code) : ""
-      if (code === "auth/popup-blocked") {
-        saveGoogleAuthDraft("login")
-        await signInWithRedirect(auth, new GoogleAuthProvider())
-      } else if (code === "auth/operation-not-allowed") {
+      const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
+      if (code === "auth/operation-not-allowed") {
         setError("כניסה עם Google לא מופעלת כרגע בהגדרות Firebase Authentication.")
-      } else if (code !== "auth/popup-closed-by-user") {
+      } else {
         setError(getAuthError(code) || (err instanceof Error ? err.message : t("authErrors.default")))
       }
-    } finally { setIsLoading(false) }
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleGoogleRegister = async () => {
@@ -615,27 +626,17 @@ export function LoginScreen(_props: LoginScreenProps) {
       if (!codeData?.[inviteCodeFields.restaurantId] && !name) { setError(t("login.enterRestaurantName")); return }
       const draft = { code, name, br }
       saveGoogleAuthDraft("register", draft)
-      const provider = new GoogleAuthProvider()
-      const result = await signInWithPopup(auth, provider)
-      const signedEmail = (result.user.email || "").trim().toLowerCase()
-      if (signedEmail && await isSystemOwnerEmail(signedEmail)) {
-        await auth.signOut().catch(() => {})
-        setError("המייל הזה מוגדר כבעלים מערכת. יש להשתמש במייל אחר להרשמה למסעדה.")
-        return
-      }
-      const ok = await completeGoogleRegister(result.user, draft)
-      if (!ok) return
-      clearGoogleAuthDraft()
+      await signInWithRedirect(auth, new GoogleAuthProvider())
     } catch (err) {
-      const authCode = err && typeof err === "object" && "code" in err ? String(err.code) : ""
-      if (authCode === "auth/popup-blocked") {
-        await signInWithRedirect(auth, new GoogleAuthProvider())
-      } else if (authCode === "auth/operation-not-allowed") {
+      const authCode = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
+      if (authCode === "auth/operation-not-allowed") {
         setError("הרשמה עם Google לא מופעלת כרגע בהגדרות Firebase Authentication.")
-      } else if (authCode !== "auth/popup-closed-by-user") {
+      } else {
         setError(err instanceof Error ? err.message : t("authErrors.default"))
       }
-    } finally { setIsLoading(false) }
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const toggleMute = () => {
