@@ -10,23 +10,16 @@ import { getStorage } from "firebase/storage"
 import { getFunctions } from "firebase/functions"
 
 /**
- * כשהאתר רץ על דומיין מותח (galis.app) אבל authDomain נשאר *.firebaseapp.com,
- * זרימת Google OAuth עוברת דומיין אחר — ב‑Safari/iPad נשברת (מסך "Continue to app" בלי כניסה).
- * Firebase דורש ש-authDomain יהיה הדומיין שבו נטען האתר (וגם ב-Authorized domains).
+ * authDomain חייב להיות הדומיין שבו Firebase משרת את `/__/auth/handler` (בדרך כלל `*.firebaseapp.com`).
+ * אם מגדירים כאן את דומיין האתר (למשל galis.app) בזמן שהאתר רץ על Vercel/Next — הנתיב `https://galis.app/__/auth/handler`
+ * לא קיים → 404 אחרי Google OAuth (באייפד משתמשים ב-redirect ולכן זה בולט; במחשב לעיתים popup ולא נפגעים).
+ * דומיין מותאם נשאר ב-Firebase רק תחת Authorized domains; לא מחליפים את authDomain בלי Hosting של Firebase לאותו host.
  */
-function resolveAuthDomain(): string {
-  const env =
-    (process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "").trim() || "placeholder.firebaseapp.com"
-  if (typeof window === "undefined") return env
-  const h = window.location.hostname.toLowerCase()
-  if (h === "galis.app" || h === "www.galis.app") return h
-  return env
-}
-
 /** ייצוא לשימוש ב־App משני (יצירת משתמש בלי להחליף את ההתחברות הנוכחית) */
 export const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "placeholder",
-  authDomain: resolveAuthDomain(),
+  authDomain:
+    (process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "").trim() || "placeholder.firebaseapp.com",
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "placeholder",
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "placeholder.appspot.com",
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "placeholder",
