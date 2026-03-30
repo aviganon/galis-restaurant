@@ -94,6 +94,28 @@ function readGoogleRegisterDraft(): { code: string; name: string; br: string } {
   }
 }
 
+/**
+ * Safari באייפד/אייפון (כולל iPadOS עם User-Agent של Mac) חוסם popup לעיתים בלי auth/popup-blocked —
+ * עדיף redirect מלא כמו ש-Firebase ממליצה למובייל.
+ */
+function isGoogleRedirectPreferred(): boolean {
+  if (typeof window === "undefined") return false
+  const ua = window.navigator.userAgent || ""
+  if (/Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) return true
+  if (/iPad/i.test(ua)) return true
+  if (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) return true
+  return false
+}
+
+function googleAuthErrorShouldFallbackToRedirect(code: string): boolean {
+  return (
+    code === "auth/popup-blocked" ||
+    code === "auth/cancelled-popup-request" ||
+    code === "auth/internal-error" ||
+    code === "auth/web-storage-unsupported"
+  )
+}
+
 const authErrorToKey: Record<string, string> = {
   "auth/invalid-credential": "authErrors.invalidCredential",
   "auth/invalid-email": "authErrors.invalidEmail",
@@ -364,14 +386,20 @@ export function LoginScreen(_props: LoginScreenProps) {
       try {
         const result = await getRedirectResult(auth)
         if (!result?.user || cancelled) return
-        shouldClearDraft = true
         const intent = readGoogleAuthIntent()
         if (intent === "register") {
+          const signedEmail = (result.user.email || "").trim().toLowerCase()
+          if (signedEmail && (await isSystemOwnerEmail(signedEmail))) {
+            await auth.signOut().catch(() => {})
+            setError("המייל הזה מוגדר כבעלים מערכת. יש להשתמש במייל אחר להרשמה למסעדה.")
+            return
+          }
           const ok = await completeGoogleRegister(result.user, readGoogleRegisterDraft())
           if (!ok) return
         } else {
           await completeGoogleLogin(result.user)
         }
+        shouldClearDraft = true
       } catch (err) {
         if (!cancelled) {
           const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
@@ -386,7 +414,7 @@ export function LoginScreen(_props: LoginScreenProps) {
       }
     })()
     return () => { cancelled = true }
-  }, [completeGoogleLogin, completeGoogleRegister, getAuthError, t])
+  }, [completeGoogleLogin, completeGoogleRegister, getAuthError, isSystemOwnerEmail, t])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -581,11 +609,16 @@ export function LoginScreen(_props: LoginScreenProps) {
     try {
       await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence)
       const provider = new GoogleAuthProvider()
+      if (isGoogleRedirectPreferred()) {
+        saveGoogleAuthDraft("login")
+        await signInWithRedirect(auth, provider)
+        return
+      }
       const result = await signInWithPopup(auth, provider)
       await completeGoogleLogin(result.user)
     } catch (err) {
-      const code = err && typeof err === "object" && "code" in err ? String(err.code) : ""
-      if (code === "auth/popup-blocked") {
+      const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
+      if (googleAuthErrorShouldFallbackToRedirect(code)) {
         saveGoogleAuthDraft("login")
         await signInWithRedirect(auth, new GoogleAuthProvider())
       } else if (code === "auth/operation-not-allowed") {
@@ -616,6 +649,10 @@ export function LoginScreen(_props: LoginScreenProps) {
       const draft = { code, name, br }
       saveGoogleAuthDraft("register", draft)
       const provider = new GoogleAuthProvider()
+      if (isGoogleRedirectPreferred()) {
+        await signInWithRedirect(auth, provider)
+        return
+      }
       const result = await signInWithPopup(auth, provider)
       const signedEmail = (result.user.email || "").trim().toLowerCase()
       if (signedEmail && await isSystemOwnerEmail(signedEmail)) {
@@ -628,7 +665,8 @@ export function LoginScreen(_props: LoginScreenProps) {
       clearGoogleAuthDraft()
     } catch (err) {
       const authCode = err && typeof err === "object" && "code" in err ? String(err.code) : ""
-      if (authCode === "auth/popup-blocked") {
+      if (googleAuthErrorShouldFallbackToRedirect(authCode)) {
+        saveGoogleAuthDraft("register", readGoogleRegisterDraft())
         await signInWithRedirect(auth, new GoogleAuthProvider())
       } else if (authCode === "auth/operation-not-allowed") {
         setError("הרשמה עם Google לא מופעלת כרגע בהגדרות Firebase Authentication.")
