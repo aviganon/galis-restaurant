@@ -8,7 +8,6 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   signInWithRedirect,
-  getRedirectResult,
   setPersistence,
   browserLocalPersistence,
   browserSessionPersistence,
@@ -16,8 +15,9 @@ import {
 } from "firebase/auth"
 import { auth, db } from "@/lib/firebase"
 import { sendPasswordResetReliable } from "@/lib/password-reset-client"
-import { doc, getDoc, setDoc } from "firebase/firestore"
+import { doc, getDoc, getDocFromServer, setDoc } from "firebase/firestore"
 import { firestoreConfig } from "@/lib/firestore-config"
+import { getGoogleRedirectResultOnce } from "@/lib/google-auth-redirect"
 import Image from "next/image"
 import { motion, AnimatePresence, useScroll, useTransform, type Variants } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -288,7 +288,15 @@ export function LoginScreen(_props: LoginScreenProps) {
 
   const completeGoogleLogin = useCallback(async (user: User) => {
     const { usersCollection } = firestoreConfig
-    const userDoc = await getDoc(doc(db, usersCollection, user.uid))
+    const userRef = doc(db, usersCollection, user.uid)
+    let userDoc = await getDocFromServer(userRef).catch(() => getDoc(userRef))
+    if (!userDoc.exists()) {
+      for (let a = 0; a < 15; a++) {
+        await new Promise((r) => setTimeout(r, 200))
+        userDoc = await getDocFromServer(userRef).catch(() => getDoc(userRef))
+        if (userDoc.exists()) break
+      }
+    }
     if (!userDoc.exists()) {
       await auth.signOut()
       setError("משתמש לא נמצא במערכת. פנה למנהל לקבלת קוד הזמנה.")
@@ -384,7 +392,7 @@ export function LoginScreen(_props: LoginScreenProps) {
     void (async () => {
       let shouldClearDraft = false
       try {
-        const result = await getRedirectResult(auth)
+        const result = await getGoogleRedirectResultOnce(auth)
         if (!result?.user || cancelled) return
         const intent = readGoogleAuthIntent()
         if (intent === "register") {
