@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react"
 import { Smartphone, Loader2 } from "lucide-react"
-import { collection, addDoc, serverTimestamp } from "firebase/firestore"
+import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 import { getMessaging, getToken, isSupported } from "firebase/messaging"
 import { auth, db, firebaseApp } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
@@ -12,6 +12,15 @@ import { toast } from "sonner"
 type WebPushSettingsProps = {
   /** כשאין מסעדה — עדיין שומרים טוקן למשתמש (התראות כלליות בעתיד) */
   restaurantId: string | null
+}
+
+async function pushTokenDocId(token: string): Promise<string> {
+  const data = new TextEncoder().encode(token)
+  const buf = await crypto.subtle.digest("SHA-256", data)
+  const hex = Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+  return `t_${hex.slice(0, 40)}`
 }
 
 export function WebPushSettings({ restaurantId }: WebPushSettingsProps) {
@@ -46,12 +55,17 @@ export function WebPushSettings({ restaurantId }: WebPushSettingsProps) {
         toast.error(t("pages.settings.webPushNoToken"))
         return
       }
-      await addDoc(collection(db, "users", user.uid, "pushTokens"), {
-        token,
-        restaurantId: restaurantId || null,
-        userAgent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 500) : null,
-        createdAt: serverTimestamp(),
-      })
+      const tokenId = await pushTokenDocId(token)
+      await setDoc(
+        doc(db, "users", user.uid, "pushTokens", tokenId),
+        {
+          token,
+          restaurantId: restaurantId || null,
+          userAgent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 500) : null,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      )
       toast.success(t("pages.settings.webPushSaved"))
     } catch (e) {
       toast.error((e as Error).message || t("pages.settings.webPushError"))

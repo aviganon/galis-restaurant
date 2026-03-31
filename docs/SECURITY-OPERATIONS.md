@@ -2,6 +2,8 @@
 
 מסמך קצר לבעלי מערכת ולמפעילי פרודקשן.
 
+ראה גם **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Vercel מול Firebase Hosting ו־`/api/*`.
+
 ## גיבוי וייצוא
 
 - ייצוא נתוני מסעדה זמין בהגדרות (מנהל/בעלים) תחת ניהול נתונים.
@@ -28,3 +30,12 @@
 ## Deploy
 
 - GitHub Actions בונה עם משתני הסודות מהמאגר; ודא שהסיקרטים מעודכנים אחרי הוספת משתנה חדש (למשל VAPID או Sentry).
+
+## התראות Push מהשרת (אופציונלי)
+
+- טוקני Web Push נשמרים ב־Firestore; **שליחת הודעה** ללקוחות דורשת שימוש ב־**Firebase Cloud Messaging** עם Admin SDK (למשל Cloud Function שקוראת ל־`admin.messaging().sendEachForMulticast` או שליחה לפי טוקן).
+- זה לא חלק מהאפליקציה הסטטית בלבד — מתכננים Function נפרד לפי אירועים (מלאי נמוך, וכו').
+
+## הגבלת קצב (audit)
+
+- נתיב `POST /api/audit/log` מוגבל לפי משתמש (in-memory בפרוסת Node בודדת). בפריסה מרובת מופעים ללא sticky session, הגבלה היא **הערכה** בלבד; לייצור קשיח יותר שקלו Redis / Upstash או שכבת edge.

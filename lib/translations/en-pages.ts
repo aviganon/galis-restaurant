@@ -201,6 +201,7 @@ export const enPages = {
     copyTemplateShort: "Copy template",
     copyTemplateTitle: "Copy template between restaurants",
     copyTemplateDesc: "Copies assigned suppliers and notification settings from source to target.",
+    copyTemplateSource: "Source",
     copyTemplateTarget: "Target restaurant",
     copyTemplateRun: "Copy",
     copyTemplateSuccess: "Template copied",

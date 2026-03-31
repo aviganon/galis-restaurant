@@ -1205,7 +1205,7 @@ export function Settings() {
               </DialogHeader>
               <div className="space-y-3 py-2">
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">מקור</p>
+                  <p className="text-xs text-muted-foreground">{t("pages.settings.copyTemplateSource")}</p>
                   <p className="text-sm font-medium">
                     {(restaurants || []).find((r) => r.id === copySourceId)?.name || copySourceId || "—"}
                   </p>

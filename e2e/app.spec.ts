@@ -19,4 +19,12 @@ test.describe("אפליקציה — טעינה ומסך התחברות", () => {
     const dir = await page.locator("html").getAttribute("dir")
     expect(["rtl", "ltr", null]).toContain(dir)
   })
+
+  test("קישור manifest ל־PWA", async ({ page }) => {
+    await page.goto("/")
+    const manifest = page.locator('link[rel="manifest"]')
+    await expect(manifest).toHaveCount(1)
+    const href = await manifest.getAttribute("href")
+    expect(href).toMatch(/manifest\.webmanifest/)
+  })
 })

@@ -200,6 +200,7 @@ export const hePages = {
     copyTemplateShort: "העתק תבנית",
     copyTemplateTitle: "העתקת תבנית בין מסעדות",
     copyTemplateDesc: "מעתיק ספקים משויכים והגדרות התראות מהמסעדה המקור ליעד.",
+    copyTemplateSource: "מקור",
     copyTemplateTarget: "מסעדת יעד",
     copyTemplateRun: "העתק",
     copyTemplateSuccess: "התבנית הועתקה",

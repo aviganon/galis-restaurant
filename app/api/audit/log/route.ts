@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { FieldValue } from "firebase-admin/firestore"
 import { requireFirebaseUser } from "@/lib/api-verify-firebase"
 import { getFirebaseAdminFirestore } from "@/lib/firebase-admin-server"
+import { isAuditLogRateLimited } from "@/lib/api-audit-rate-limit"
 
 export const dynamic = "force-static"
 
@@ -14,6 +15,10 @@ export async function POST(req: NextRequest) {
   try {
     const auth = await requireFirebaseUser(req)
     if (!auth.ok) return auth.response
+
+    if (isAuditLogRateLimited(auth.decoded.uid)) {
+      return NextResponse.json({ error: "יותר מדי בקשות — נסה שוב בעוד רגע" }, { status: 429 })
+    }
 
     const db = getFirebaseAdminFirestore()
     if (!db) {
