@@ -138,6 +138,16 @@ service cloud.firestore {
         )
       );
 
+      // היסטוריית התראות באפליקציה — יצירה רק מהשרת (Admin); קריאה למשתמש; עדכון רק read→true
+      match /notifications/{notifId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if false;
+        allow update: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly(['read'])
+          && request.resource.data.read == true;
+        allow delete: if false;
+      }
+
       // טוקני Web Push (FCM) — רק המשתמש עצמו
       match /pushTokens/{tokenId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;

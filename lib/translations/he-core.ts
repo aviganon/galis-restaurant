@@ -26,6 +26,9 @@ nav: {
   moreOptions: "אפשרויות נוספות",
   impersonating: "מתחזה כמסעדה",
   backToNormal: "חזור למצב רגיל",
+  notifications: "התראות",
+  markAllRead: "סמן הכל כנקרא",
+  noNotifications: "אין התראות",
 },
 login: {
   features: "תכונות",

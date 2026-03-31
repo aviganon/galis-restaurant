@@ -26,6 +26,9 @@ nav: {
   moreOptions: "More options",
   impersonating: "Impersonating restaurant",
   backToNormal: "Back to normal",
+  notifications: "Notifications",
+  markAllRead: "Mark all read",
+  noNotifications: "No notifications",
 },
 login: {
   features: "Features",

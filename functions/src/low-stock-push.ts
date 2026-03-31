@@ -10,6 +10,7 @@ if (!admin.apps.length) admin.initializeApp()
 
 const db = admin.firestore()
 const messaging = admin.messaging()
+const FieldValue = admin.firestore.FieldValue
 
 function countLowStockIngredients(ingSnap: admin.firestore.QuerySnapshot): { low: number; out: number } {
   let low = 0
@@ -25,8 +26,9 @@ function countLowStockIngredients(ingSnap: admin.firestore.QuerySnapshot): { low
   return { low, out }
 }
 
-async function collectTokensForRestaurant(restaurantId: string): Promise<string[]> {
-  const tokens = new Set<string>()
+/** טוקנים לפי משתמש — לשליחת FCM ולכתיבת מסמך היסטוריה לכל uid */
+async function collectTokensByUser(restaurantId: string): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>()
   const staffSnap = await db.collection("users").where("restaurantId", "==", restaurantId).get()
   const uids = new Set(staffSnap.docs.map((d) => d.id))
 
@@ -35,13 +37,15 @@ async function collectTokensForRestaurant(restaurantId: string): Promise<string[
 
   for (const uid of uids) {
     const ptSnap = await db.collection("users").doc(uid).collection("pushTokens").get()
+    const tokens: string[] = []
     for (const doc of ptSnap.docs) {
       const data = doc.data() as { token?: string; restaurantId?: string | null }
       if (!data.token || typeof data.token !== "string") continue
-      if (data.restaurantId === restaurantId) tokens.add(data.token)
+      if (data.restaurantId === restaurantId) tokens.push(data.token)
     }
+    if (tokens.length) map.set(uid, tokens)
   }
-  return [...tokens]
+  return map
 }
 
 export const lowStockPushDigest = onSchedule(
@@ -73,8 +77,8 @@ export const lowStockPushDigest = onSchedule(
       const total = low + out
       if (total === 0) continue
 
-      const tokens = await collectTokensForRestaurant(restaurantId)
-      if (tokens.length === 0) continue
+      const tokensByUser = await collectTokensByUser(restaurantId)
+      if (tokensByUser.size === 0) continue
 
       const title = `${restaurantName} — מלאי לתשומת לב`
       const body =
@@ -85,24 +89,35 @@ export const lowStockPushDigest = onSchedule(
             : `${low} פריטים מתחת למינימום`
 
       const chunkSize = 500
-      for (let i = 0; i < tokens.length; i += chunkSize) {
-        const chunk = tokens.slice(i, i + chunkSize)
-        const res = await messaging.sendEachForMulticast({
-          tokens: chunk,
-          notification: { title, body },
-          webpush: {
-            notification: { title, body, dir: "rtl", lang: "he" },
-            fcmOptions: { link: "/" },
-          },
-        })
-        if (res.failureCount > 0) {
-          res.responses.forEach((r, idx) => {
-            if (!r.success && r.error?.code === "messaging/invalid-registration-token") {
-              logger.warn("invalid token in batch", { idx })
-            }
+      for (const [uid, userTokens] of tokensByUser.entries()) {
+        for (let i = 0; i < userTokens.length; i += chunkSize) {
+          const chunk = userTokens.slice(i, i + chunkSize)
+          const res = await messaging.sendEachForMulticast({
+            tokens: chunk,
+            notification: { title, body },
+            webpush: {
+              notification: { title, body, dir: "rtl", lang: "he" },
+              fcmOptions: { link: "/" },
+            },
           })
+          if (res.failureCount > 0) {
+            res.responses.forEach((r, idx) => {
+              if (!r.success && r.error?.code === "messaging/invalid-registration-token") {
+                logger.warn("invalid token in batch", { idx })
+              }
+            })
+          }
+          logger.info("lowStockPushDigest batch", { restaurantId, uid, success: res.successCount, fail: res.failureCount })
         }
-        logger.info("lowStockPushDigest batch", { restaurantId, success: res.successCount, fail: res.failureCount })
+        await db.collection("users").doc(uid).collection("notifications").add({
+          title,
+          body,
+          type: "low_stock",
+          read: false,
+          createdAt: FieldValue.serverTimestamp(),
+          restaurantId,
+          restaurantName,
+        })
       }
       restaurantsNotified++
     }

@@ -4,6 +4,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { LanguageProvider } from '@/contexts/language-context'
 import { Toaster } from '@/components/ui/sonner'
 import { ErrorReportingInit } from '@/components/error-reporting-init'
+import { AppCheckInit } from '@/components/app-check-init'
 import { NetworkStatusBanner } from '@/components/network-status-banner'
 import './globals.css'
 
@@ -64,6 +65,7 @@ export default function RootLayout({
         <ThemeProvider>
           <LanguageProvider>
             <ErrorReportingInit />
+            <AppCheckInit />
             <NetworkStatusBanner />
             {children}
             <Toaster position="top-center" richColors closeButton />

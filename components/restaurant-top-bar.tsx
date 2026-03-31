@@ -5,6 +5,7 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { LanguageSwitcher } from "@/components/language-switcher"
+import { NotificationCenter } from "@/components/notification-center"
 import { useTranslations } from "@/lib/use-translations"
 import { cn } from "@/lib/utils"
 
@@ -142,6 +143,7 @@ export function RestaurantTopBar({
             </Button>
           )}
           <LanguageSwitcher variant="surface" />
+          <NotificationCenter currentRestaurantId={currentRestaurantId} />
           {canAccessPage("operations") && (
             <Button
               type="button"

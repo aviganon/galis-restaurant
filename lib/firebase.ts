@@ -8,6 +8,7 @@ import {
 } from "firebase/firestore"
 import { getStorage } from "firebase/storage"
 import { getFunctions } from "firebase/functions"
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check"
 
 /** ייצוא לשימוש ב־App משני (יצירת משתמש בלי להחליף את ההתחברות הנוכחית) */
 export const firebaseConfig = {
@@ -29,6 +30,24 @@ const app = initializeApp(firebaseConfig)
 /** לאותו מופע אפליקציה — ל־FCM / getMessaging בדפדפן */
 export const firebaseApp = app
 export const auth = getAuth(app)
+
+let appCheckInitDone = false
+
+/** App Check (reCAPTCHA v3) — רק אם מוגדר NEXT_PUBLIC_RECAPTCHA_SITE_KEY וב-Console הופעל App Check */
+export function initAppCheckIfConfigured(): void {
+  if (typeof window === "undefined" || appCheckInitDone) return
+  const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim()
+  if (!siteKey) return
+  try {
+    initializeAppCheck(firebaseApp, {
+      provider: new ReCaptchaV3Provider(siteKey),
+      isTokenAutoRefreshEnabled: true,
+    })
+    appCheckInitDone = true
+  } catch {
+    // כבר אותחל (HMR) או שגיאת הגדרה — לא לשבור את האפליקציה
+  }
+}
 
 const SECONDARY_AUTH_APP_NAME = "user-creation-secondary"
 
