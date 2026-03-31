@@ -655,14 +655,9 @@ export function LoginScreen(_props: LoginScreenProps) {
     } catch (err) {
       const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
       if (googleAuthErrorShouldFallbackToRedirect(code)) {
-        if (isAppleSafari()) {
-          setError(
-            "ב-Safari זרימת ההחלפה לדף Google עלולה להיכשל. אפשר לאשר חלונות קופצים לאתר (הגדרות Safari → אתר זה), או להתחבר דרך Chrome.",
-          )
-        } else {
-          saveGoogleAuthDraft("login")
-          await signInWithRedirect(auth, new GoogleAuthProvider())
-        }
+        saveGoogleAuthDraft("login")
+        await signInWithRedirect(auth, new GoogleAuthProvider())
+        return
       } else if (code === "auth/operation-not-allowed") {
         setError("כניסה עם Google לא מופעלת כרגע בהגדרות Firebase Authentication.")
       } else if (code !== "auth/popup-closed-by-user") {
@@ -710,14 +705,9 @@ export function LoginScreen(_props: LoginScreenProps) {
     } catch (err) {
       const authCode = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
       if (googleAuthErrorShouldFallbackToRedirect(authCode)) {
-        if (isAppleSafari()) {
-          setError(
-            "ב-Safari זרימת ההחלפה לדף Google עלולה להיכשל. אפשר לאשר חלונות קופצים לאתר (הגדרות Safari → אתר זה), או להשתמש ב-Chrome.",
-          )
-        } else {
-          saveGoogleAuthDraft("register", readGoogleRegisterDraft())
-          await signInWithRedirect(auth, new GoogleAuthProvider())
-        }
+        saveGoogleAuthDraft("register", readGoogleRegisterDraft())
+        await signInWithRedirect(auth, new GoogleAuthProvider())
+        return
       } else if (authCode === "auth/operation-not-allowed") {
         setError("הרשמה עם Google לא מופעלת כרגע בהגדרות Firebase Authentication.")
       } else if (authCode !== "auth/popup-closed-by-user") {
