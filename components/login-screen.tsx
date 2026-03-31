@@ -282,7 +282,6 @@ export function LoginScreen(_props: LoginScreenProps) {
   const [showVideo, setShowVideo] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
   const [passwordResetDialogOpen, setPasswordResetDialogOpen] = useState(false)
-  const [passwordResetMode, setPasswordResetMode] = useState<"forgot" | "google">("forgot")
   const [resetEmailDraft, setResetEmailDraft] = useState("")
   const [passwordResetFeedback, setPasswordResetFeedback] = useState<{ type: "success" | "error"; text: string } | null>(
     null,
@@ -495,8 +494,7 @@ export function LoginScreen(_props: LoginScreenProps) {
     }
   }
 
-  const openPasswordResetDialog = (mode: "forgot" | "google") => {
-    setPasswordResetMode(mode)
+  const openPasswordResetDialog = () => {
     setResetEmailDraft(email.trim())
     setPasswordResetFeedback(null)
     setPasswordResetDialogOpen(true)
@@ -1148,19 +1146,11 @@ export function LoginScreen(_props: LoginScreenProps) {
 
                       <button
                         type="button"
-                        onClick={() => openPasswordResetDialog("forgot")}
+                        onClick={() => openPasswordResetDialog()}
                         disabled={isLoading}
-                        className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+                        className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors text-balance leading-snug"
                       >
-                        {t("login.forgotPassword")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openPasswordResetDialog("google")}
-                        disabled={isLoading}
-                        className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors text-balance"
-                      >
-                        {t("login.googlePasswordLink")}
+                        {t("login.passwordHelpLink")}
                       </button>
                       <div className="relative my-1">
                         <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
@@ -1368,16 +1358,8 @@ export function LoginScreen(_props: LoginScreenProps) {
       >
         <DialogContent className="sm:max-w-md" dir="rtl">
           <DialogHeader>
-            <DialogTitle>
-              {passwordResetMode === "forgot"
-                ? t("login.forgotPasswordDialogTitle")
-                : t("login.googlePasswordDialogTitle")}
-            </DialogTitle>
-            <DialogDescription>
-              {passwordResetMode === "forgot"
-                ? t("login.forgotPasswordDialogDesc")
-                : t("login.googlePasswordDialogDesc")}
-            </DialogDescription>
+            <DialogTitle>{t("login.passwordHelpDialogTitle")}</DialogTitle>
+            <DialogDescription>{t("login.passwordHelpDialogDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-1">
             <label htmlFor="password-reset-email" className="text-sm font-medium">
