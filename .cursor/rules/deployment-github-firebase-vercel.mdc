@@ -1,0 +1,20 @@
+---
+description: פריסה מ-GitHub ל-Firebase ול-Vercel — הקשר לסוכן
+alwaysApply: true
+---
+
+# פריסה — GitHub → Firebase + Vercel
+
+הפרויקט מחובר לפריסה **מ-GitHub** גם ל־**Firebase** (Hosting / rules / functions / indexes) וגם ל־**Vercel**.
+
+- שינויי קוד ב־`main` צריכים להגיע לשני הצדדים לפי ה־workflows / ההגדרות שמחוברות לריפו.
+- עדכון `.env.example` או הוספת משתנה בקוד **לא מעדכן אוטומטית** את המשתנים ב-Google/Firebase Console, ב-GitHub Secrets או ב-Vercel — רק מתעד מה נדרש; ערכים בפועל מוגדרים ידנית בכל פלטפורמה.
+
+## משתני סביבה — מה נדרס ומה לא
+
+- **`.env.local` (מקומי):** לא ב־Git. שינויים בקוד לא נוגעים בקובץ אצלך — רק אם אתה עורך או מעתיק מ־`.env.example`.
+- **GitHub Secrets:** כל secret הוא מפתח נפרד. **הוספת** משתנה חדש ל־workflow דורשת **להוסיף** secret חדש ב-GitHub. **עדכון** ערך של secret קיים — רק אם נכנסים ל־Settings → Secrets ומשנים **אותו** secret (אז הערך הישן מתחלף לחדש).
+- **Vercel (Environment Variables):** דומה — משתנה קיים **מתעדכן** רק אם עורכים אותו בדשבורד; משתנה חדש בקוד **לא נוצר** שם לבד.
+- **Firebase / Google Cloud:** הגדרות פרויקט (למשל Functions env) **לא נדרסות** ממחיקת קובץ env מקומי. שינויים הם רק מה שמגדירים ב־Console / `firebase functions:config` / Secret Manager — לא מה שב־repo, אלא אם יש deployment שמעדכן במפורש.
+
+**סיכום:** קוד ו־`.env.example` מתארים מה צריך; **Google / GitHub / Vercel** מחזיקים את הערכים הסודיים — עדכון שם הוא **נקודתי** (רק המפתח שערכת), לא «מחיקת הכל».
