@@ -87,6 +87,10 @@ export function WebPushSettings({ restaurantId }: WebPushSettingsProps) {
         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         {t("pages.settings.webPushEnable")}
       </Button>
+      <div className="pt-3 border-t border-border/60 space-y-1.5 text-xs text-muted-foreground leading-relaxed">
+        <p className="font-medium text-foreground/90">{t("pages.settings.pushWhereToManageTitle")}</p>
+        <p>{t("pages.settings.pushWhereToManageBody")}</p>
+      </div>
     </div>
   )
 }

@@ -216,6 +216,9 @@ export const enPages = {
     webPushNoToken: "No token — check browser permissions",
     webPushSaved: "Push enabled and saved",
     webPushError: "Could not enable push",
+    pushWhereToManageTitle: "Where to manage alerts (including phone)",
+    pushWhereToManageBody:
+      "Pick a restaurant at the top (required to see the notifications card). In Settings → Notifications: toggles for email (low stock, daily summary, etc.). Below that — Enable push for phone/browser. On mobile, add the site to the home screen for more reliable alerts. System owners: select a restaurant or use impersonation — same settings screen.",
   },
   ingredients: {
     allSuppliers: "All suppliers",

@@ -22,3 +22,8 @@
 ## CI
 
 - Workflow **CI** מריץ גם בילד עם `VERCEL=1` (כמו Vercel) כדי לתפוס שגיאות build לפני merge.
+
+## התראות Push אוטומטיות (מלאי נמוך)
+
+- Cloud Function **`lowStockPushDigest`** (v2 scheduler) רצה **כל יום ב־08:00** (Asia/Jerusalem), שולחת FCM למכשירים שמופעלים בהגדרות, כש־`notifyLowStock` לא כבוי ויש פריטים אזלים או מתחת לסף.
+- נדרש **Blaze** ב־Firebase (תזמון + FCM). אחרי `firebase deploy --only functions` הפונקציה מופיעה ב־Console תחת Functions.
