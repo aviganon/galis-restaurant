@@ -96,6 +96,14 @@ login: {
   loginBtn: "Sign in",
   loggingIn: "Signing in...",
   forgotPassword: "Forgot password",
+  forgotPasswordDialogTitle: "Reset password",
+  forgotPasswordDialogDesc:
+    "Enter your account email — we'll send a link to reset your password (same flow as the server-side mail).",
+  googlePasswordLink: "Signed in with Google and want a password too?",
+  googlePasswordDialogTitle: "Set a password for your Google account",
+  googlePasswordDialogDesc:
+    "If you use Google sign-in, we can email the same address a link to set a password. Then you can sign in with email and password as well as Google.",
+  sendResetLinkBtn: "Send link",
   inviteCode: "Invite code",
   inviteCodeHint: "Code given to you by a manager or owner",
   restaurantName: "Restaurant name (for new restaurant code only)",

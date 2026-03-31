@@ -96,6 +96,14 @@ login: {
   loginBtn: "כניסה למערכת",
   loggingIn: "מתחבר...",
   forgotPassword: "שכחתי סיסמה",
+  forgotPasswordDialogTitle: "איפוס סיסמה",
+  forgotPasswordDialogDesc:
+    "הזן את כתובת האימייל של החשבון — נשלח אליך קישור לאיפוס הסיסמה (אותו מנגנון כמו בהגדרות המערכת).",
+  googlePasswordLink: "התחברת עם Google ורוצה גם סיסמה?",
+  googlePasswordDialogTitle: "הגדרת סיסמה לחשבון Google",
+  googlePasswordDialogDesc:
+    "אם נכנסת עם Google, אפשר לקבל באותו מייל קישור להגדרת סיסמה. אחרי זה אפשר להיכנס גם עם אימייל וסיסמה (בנוסף לכפתור Google).",
+  sendResetLinkBtn: "שלח קישור",
   inviteCode: "קוד הזמנה",
   inviteCodeHint: "קוד שמנהל או בעלים נתן לך",
   restaurantName: "שם המסעדה (רק לקוד להקמת מסעדה חדשה)",

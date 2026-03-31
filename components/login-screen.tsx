@@ -23,6 +23,14 @@ import { motion, AnimatePresence, useScroll, useTransform, type Variants } from 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -273,6 +281,12 @@ export function LoginScreen(_props: LoginScreenProps) {
   const [isMuted, setIsMuted] = useState(true)
   const [showVideo, setShowVideo] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
+  const [passwordResetDialogOpen, setPasswordResetDialogOpen] = useState(false)
+  const [passwordResetMode, setPasswordResetMode] = useState<"forgot" | "google">("forgot")
+  const [resetEmailDraft, setResetEmailDraft] = useState("")
+  const [passwordResetFeedback, setPasswordResetFeedback] = useState<{ type: "success" | "error"; text: string } | null>(
+    null,
+  )
   const loginErrorVisible = !!error && activeTab === "login"
   const registerErrorVisible = !!error && activeTab === "register"
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -481,40 +495,30 @@ export function LoginScreen(_props: LoginScreenProps) {
     }
   }
 
-  const handleForgotPassword = async () => {
-    if (!email.trim()) {
-      setError(t("login.enterEmailForReset"))
-      return
-    }
-    setError("")
-    setIsLoading(true)
-    try {
-      const r = await sendPasswordResetReliable(email)
-      if (r.ok) {
-        setError(
-          r.via === "resend" ? t("login.resetEmailSentResend") : t("login.resetEmailSentFirebase"),
-        )
-      } else {
-        setError(r.error)
-      }
-    } finally {
-      setIsLoading(false)
-    }
+  const openPasswordResetDialog = (mode: "forgot" | "google") => {
+    setPasswordResetMode(mode)
+    setResetEmailDraft(email.trim())
+    setPasswordResetFeedback(null)
+    setPasswordResetDialogOpen(true)
   }
 
-  const handleSetPasswordForGoogle = async () => {
-    if (!email.trim()) {
-      setError("כדי להגדיר סיסמה לחשבון Google, הזן קודם את האימייל בשדה הכניסה.")
+  const submitPasswordResetFromDialog = async () => {
+    const trimmed = resetEmailDraft.trim().toLowerCase()
+    if (!trimmed) {
+      setPasswordResetFeedback({ type: "error", text: t("login.enterEmailForReset") })
       return
     }
-    setError("")
+    setPasswordResetFeedback(null)
     setIsLoading(true)
     try {
-      const r = await sendPasswordResetReliable(email.trim())
+      const r = await sendPasswordResetReliable(trimmed)
       if (r.ok) {
-        setError("נשלח מייל להגדרת סיסמה. לאחר הגדרה תוכל להיכנס גם עם אימייל וסיסמה.")
+        setEmail(trimmed)
+        const msg =
+          r.via === "resend" ? t("login.resetEmailSentResend") : t("login.resetEmailSentFirebase")
+        setPasswordResetFeedback({ type: "success", text: msg })
       } else {
-        setError(r.error)
+        setPasswordResetFeedback({ type: "error", text: r.error })
       }
     } finally {
       setIsLoading(false)
@@ -1142,11 +1146,21 @@ export function LoginScreen(_props: LoginScreenProps) {
                         {!isLoading && <ArrowLeft className="w-4 h-4 mr-2" />}
                       </Button>
 
-                      <button type="button" onClick={handleForgotPassword} disabled={isLoading} className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors">
+                      <button
+                        type="button"
+                        onClick={() => openPasswordResetDialog("forgot")}
+                        disabled={isLoading}
+                        className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      >
                         {t("login.forgotPassword")}
                       </button>
-                      <button type="button" onClick={handleSetPasswordForGoogle} disabled={isLoading} className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors">
-                        יש לך חשבון Google ורוצה גם סיסמה? לחץ כאן
+                      <button
+                        type="button"
+                        onClick={() => openPasswordResetDialog("google")}
+                        disabled={isLoading}
+                        className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors text-balance"
+                      >
+                        {t("login.googlePasswordLink")}
                       </button>
                       <div className="relative my-1">
                         <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
@@ -1344,6 +1358,72 @@ export function LoginScreen(_props: LoginScreenProps) {
           </div>
         </div>
       </section>
+
+      <Dialog
+        open={passwordResetDialogOpen}
+        onOpenChange={(open) => {
+          setPasswordResetDialogOpen(open)
+          if (!open) setPasswordResetFeedback(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>
+              {passwordResetMode === "forgot"
+                ? t("login.forgotPasswordDialogTitle")
+                : t("login.googlePasswordDialogTitle")}
+            </DialogTitle>
+            <DialogDescription>
+              {passwordResetMode === "forgot"
+                ? t("login.forgotPasswordDialogDesc")
+                : t("login.googlePasswordDialogDesc")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <label htmlFor="password-reset-email" className="text-sm font-medium">
+              {t("login.email")}
+            </label>
+            <Input
+              id="password-reset-email"
+              type="email"
+              dir="ltr"
+              autoComplete="email"
+              placeholder="your@email.com"
+              value={resetEmailDraft}
+              onChange={(e) => setResetEmailDraft(e.target.value)}
+              className="h-11 rounded-xl"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void submitPasswordResetFromDialog()
+              }}
+            />
+            {passwordResetFeedback ? (
+              <p
+                role="status"
+                className={
+                  passwordResetFeedback.type === "success"
+                    ? "text-sm text-emerald-700 dark:text-emerald-400"
+                    : "text-sm text-destructive"
+                }
+              >
+                {passwordResetFeedback.text}
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPasswordResetDialogOpen(false)}
+              disabled={isLoading}
+            >
+              {t("pages.settings.cancel")}
+            </Button>
+            <Button type="button" onClick={() => void submitPasswordResetFromDialog()} disabled={isLoading}>
+              {isLoading ? t("common.loading") : t("login.sendResetLinkBtn")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Footer */}
       <footer className="py-8 border-t border-border">
