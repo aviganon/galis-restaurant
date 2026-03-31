@@ -27,3 +27,19 @@
 
 - Cloud Function **`lowStockPushDigest`** (v2 scheduler) רצה **כל יום ב־08:00** (Asia/Jerusalem), שולחת FCM למכשירים שמופעלים בהגדרות, כש־`notifyLowStock` לא כבוי ויש פריטים אזלים או מתחת לסף.
 - נדרש **Blaze** ב־Firebase (תזמון + FCM). אחרי `firebase deploy --only functions` הפונקציה מופיעה ב־Console תחת Functions.
+- **היסטוריה באפליקציה:** אותה פונקציה כותבת גם ל־`users/{uid}/notifications` (שדות `title`, `body`, `type: low_stock`, `read`, `createdAt`, `restaurantId`, `restaurantName`). הלקוח רק קורא ומעדכן `read` — הכללים ב־`firestore.rules`. אחרי פריסת rules + functions, רענון מסך יציג התראות בפעמון בסרגל.
+
+## App Check (אופציונלי)
+
+- בקוד: `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` + `initAppCheckIfConfigured()` ב־`lib/firebase.ts` (אתחול ב־`AppCheckInit`).
+- ב־Firebase Console: **App Check** → רישום אפליקציית Web עם reCAPTCHA v3 → מומלץ **Enforcement: Monitor** לפני **Enforce** על Firestore/Functions.
+- הוספת המפתח ב־Vercel / `.env.local` (לא ב־Git).
+
+## בדיקה ידנית (אחרי פריסה)
+
+| מה | איך |
+|----|-----|
+| Rules + Functions | `firebase deploy --only functions,firestore:rules` (או `npm run deploy`) |
+| פעמון + רשימה | התחברות → מסעדה אחת לפחות; פתיחת פעמון (אין התראות = ריק זה תקין) |
+| מלאי נמוך E2E | אחרי ריצה עם מלאי מתחת לסף — לוודא מסמך ב־`notifications` ואו FCM (תלוי בדפדפן) |
+| ניטור שגיאות | ראו `docs/OPERATIONS-MONITORING.md` |

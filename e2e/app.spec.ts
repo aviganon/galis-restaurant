@@ -1,5 +1,20 @@
 import { test, expect } from "@playwright/test"
 
+test.describe("אפליקציה — נקודות קצה סטטיות", () => {
+  test("manifest.webmanifest זמין ומחזיר JSON", async ({ request }) => {
+    const res = await request.get("/manifest.webmanifest")
+    expect(res.status()).toBe(200)
+    expect(res.headers()["content-type"] || "").toMatch(/json/)
+    const body = await res.json()
+    expect(body).toHaveProperty("name")
+  })
+
+  test("דף הבית מחזיר 200", async ({ request }) => {
+    const res = await request.get("/")
+    expect(res.status()).toBe(200)
+  })
+})
+
 test.describe("אפליקציה — טעינה ומסך התחברות", () => {
   test("דף הבית נטען עם כותרת צפויה", async ({ page }) => {
     await page.goto("/")
