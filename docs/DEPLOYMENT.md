@@ -9,6 +9,8 @@
 
 אין חובה להריץ `firebase deploy` או `npm run deploy` מקומית לעדכון שגרתי — רק אם צריך פריסה ידנית / דיבוג.
 
+**הערת לוג בבילד export:** במצב ללא `VERCEL=1`, Next עלול להדפיס `NEXT_STATIC_GEN_BAILOUT` לנתיבי API שקוראים `Authorization` (למשל `/api/admin/activity-summary`, `/api/audit/events`) — זה צפוי עם `force-static`; הבילד אמור להסתיים ב־`exit 0` והפריסה ל־Hosting תקינה.
+
 ## שני מצבי בילד (Next.js)
 
 ב־[`next.config.mjs`](../next.config.mjs):
