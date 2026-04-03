@@ -103,8 +103,8 @@ function readGoogleRegisterDraft(): { code: string; name: string; br: string } {
 }
 
 /**
- * Safari (WebKit של אפל) — signInWithRedirect של Google/Firebase נתקע לעיתים ב־"Continue to app"
- * ומחזיר למסך התחברות; ב־Chrome נפתח popup ועובד. לכן ב־Safari נשתמש ב־popup כמו בכרום.
+ * Safari / WebKit של אפל (לא כרום/פיירפוקס באייפון) — signInWithPopup נכשל לעיתים קרובות
+ * (ITP, חלון קופץ, אחסון מחולק): Firebase ממליץ על signInWithRedirect. בכרום popup נשאר נוח.
  */
 function isAppleSafari(): boolean {
   if (typeof window === "undefined") return false
@@ -115,13 +115,21 @@ function isAppleSafari(): boolean {
     if (/Safari/.test(ua) && !/Chrome|Chromium|Edg|OPR|Brave|Vivaldi|FxiOS/.test(ua)) return true
   }
   if (/(iPhone|iPad|iPod)/.test(ua) && /Safari/.test(ua) && !/CriOS|FxiOS/.test(ua)) return true
+  // חלק מגרסאות Safari לא מדווחות vendor — זיהוי גיבוי למק
+  if (
+    /Safari/i.test(ua) &&
+    /Macintosh|Mac OS X/i.test(ua) &&
+    !/Chrome|Chromium|Edg|OPR|Brave|Vivaldi|CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua)
+  ) {
+    return true
+  }
   return false
 }
 
-/** מובייל שבו popup נחסם לעיתים — redirect. Chrome/Firefox באייפד/אייפון (CriOS/FxiOS) נשארים ב-popup */
+/** מובייל שבו popup נחסם לעיתים — redirect. Safari תמיד redirect. Chrome/Firefox באייפד/אייפון (CriOS/FxiOS) נשארים ב-popup */
 function isGoogleRedirectPreferred(): boolean {
   if (typeof window === "undefined") return false
-  if (isAppleSafari()) return false
+  if (isAppleSafari()) return true
   const ua = window.navigator.userAgent || ""
   if (/CriOS|FxiOS|EdgiOS/.test(ua)) return false
   if (/Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua)) return true
