@@ -1,14 +1,16 @@
 ---
-description: בסוף כל שיחה — רק GitHub (ללא deploy אוטומטי)
+description: בסוף שיחה — push ל-GitHub; Firebase+Vercel מתעדכנים מהצינור
 alwaysApply: true
 ---
 
 # Git Push — חובה בסוף כל שיחה
 
-**בסיום כל שיחה** עם המשתמש: לעדכן **רק את GitHub** לריפו של המערכת — `git add` → `commit` בעברית → `git push origin main` כשיש שינויים רלוונטיים.
+**בסיום כל שיחה** עם המשתמש: לעדכן את **GitHub** — `git add` → `commit` בעברית → `git push origin main` כשיש שינויים רלוונטיים.
+
+**אחרי `push` ל־`main`:** הפרויקט מוגדר כך שהצינור מעדכן **Firebase** (דרך GitHub Actions — ראו `.github/workflows/deploy.yml`: Hosting + Firestore rules/indexes + Functions) ו־**Vercel** (חיבור Git סטנדרטי לריפו). אין צורך שהסוכן יריץ `firebase deploy` מקומי רק כדי «לסנכרן» — אלא אם המשתמש ביקש מפורשות או לדיבוג.
 
 - **אין לשאול** אם לדחוף — לבצע לפי הכלל.
-- **אין** להריץ `npm run deploy` או פריסה ל-Firebase **בסוף שיחה**, אלא אם המשתמש **ביקש במפורש** לפרוס (ראה `deploy-after-fix.mdc`).
+- **אין** להריץ `npm run deploy` **מקומית** בסוף שיחה (ראה `deploy-after-fix.mdc`) — הפריסה ל-Firebase מגיעה מה־Action אחרי ה־push.
 
 ## 1. ריפו הראשי (Galis)
 

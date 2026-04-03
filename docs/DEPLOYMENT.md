@@ -1,5 +1,14 @@
 # פריסה — Vercel מול Firebase Hosting
 
+## פריסה אוטומטית מ-GitHub
+
+בדחיפה ל־**`main`**:
+
+- **Firebase:** GitHub Actions — קובץ [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml): build של האפליקציה, פריסת **Firebase Hosting**, ואז `firestore:rules`, `firestore:indexes`, **Cloud Functions**.
+- **Vercel:** בדרך כלל אותו `push` מפעיל build+deploy דרך חיבור ה-Git של Vercel לריפו.
+
+אין חובה להריץ `firebase deploy` או `npm run deploy` מקומית לעדכון שגרתי — רק אם צריך פריסה ידנית / דיבוג.
+
 ## שני מצבי בילד (Next.js)
 
 ב־[`next.config.mjs`](../next.config.mjs):

@@ -5,9 +5,16 @@ alwaysApply: true
 
 # פריסה — GitHub → Firebase + Vercel
 
-הפרויקט מחובר לפריסה **מ-GitHub** גם ל־**Firebase** (Hosting / rules / functions / indexes) וגם ל־**Vercel**.
+הפרויקט מחובר לפריסה **מ-GitHub** גם ל־**Firebase** וגם ל־**Vercel**.
 
-- שינויי קוד ב־`main` צריכים להגיע לשני הצדדים לפי ה־workflows / ההגדרות שמחוברות לריפו.
+## מה קורה אחרי `push` ל־`main`
+
+- **Firebase:** workflow `.github/workflows/deploy.yml` — בניית Next, פריסת **Firebase Hosting** (ערוץ live), ואז `firebase deploy --only firestore:rules,firestore:indexes,functions` לפרויקט `galis-6ebbc`.
+- **Vercel:** פריסה אוטומטית כשהפרויקט ב-Vercel מחובר לריפו (אינטגרציית Git — בדרך כלל על אותו `push` ל־`main`).
+
+הסוכן מניח שהצינור הזה פעיל; **לא** מציע `firebase deploy` מקומי כברירת מחדל אחרי שינוי קוד — רק `git push` לפי `git-push-after-changes.mdc`.
+
+- שינויי קוד ב־`main` אמורים להגיע לשני הצדדים לפי ה־workflows / הגדרות Vercel.
 - עדכון `.env.example` או הוספת משתנה בקוד **לא מעדכן אוטומטית** את המשתנים ב-Google/Firebase Console, ב-GitHub Secrets או ב-Vercel — רק מתעד מה נדרש; ערכים בפועל מוגדרים ידנית בכל פלטפורמה.
 
 ## משתני סביבה — מה נדרס ומה לא

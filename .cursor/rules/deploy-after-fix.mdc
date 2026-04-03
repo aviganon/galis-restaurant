@@ -5,9 +5,11 @@ alwaysApply: true
 
 # מדיניות פריסה (Firebase)
 
-**אל תריץ** `npm run deploy` או פריסה ל-Firebase **בסוף שיחה** או אחרי שינויי קוד — **אלא אם המשתמש ביקש במפורש** לפרוס / לעלות ל-Firebase / hosting.
+**פריסה לפרודקשן:** אחרי `git push origin main` ה־**GitHub Action** מפריס Firebase (Hosting + rules + indexes + Functions) — ראו `deploy.yml`. **Vercel** מתעדכן מחיבור Git לריפו.
 
-**ברירת המחדל:** בסוף שיחה מתבצע **רק עדכון ל-GitHub** (ראה `git-push-after-changes.mdc`).
+**אל תריץ** `npm run deploy` **מקומית** בסוף שיחה או אחרי שינויי קוד — **אלא אם המשתמש ביקש במפורש** לפרוס ידנית / לדבג / לעקוף את ה־CI.
+
+**ברירת המחדל:** בסוף שיחה — **push ל-GitHub** בלבד; השאר לצינור (ראה `git-push-after-changes.mdc`).
 
 **כשהמשתמש מבקש לפרוס:** הרץ מתוך שורש הפרויקט:
 
