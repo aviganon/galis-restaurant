@@ -24,11 +24,13 @@ export async function POST(req: NextRequest) {
       jobId?: string
       status?: InboundStatus
       detectedType?: InboundDetectedType
+      needsSupplierReview?: boolean
     }))
     const restaurantId = body.restaurantId?.trim()
     const jobId = body.jobId?.trim()
     const status = body.status
     const detectedType = body.detectedType
+    const needsSupplierReview = body.needsSupplierReview
     if (!restaurantId || !jobId || !status) {
       return NextResponse.json({ error: "חסר restaurantId/jobId/status" }, { status: 400 })
     }
@@ -54,9 +56,16 @@ export async function POST(req: NextRequest) {
     const rid = (jobSnap.data() as { restaurantId?: string } | undefined)?.restaurantId
     if (rid !== restaurantId) return NextResponse.json({ error: "job לא שייך למסעדה" }, { status: 403 })
 
-    const payload: { status: InboundStatus; detectedType?: InboundDetectedType } = { status }
+    const payload: {
+      status: InboundStatus
+      detectedType?: InboundDetectedType
+      needsSupplierReview?: boolean
+    } = { status }
     if (detectedType && ["invoice", "sales", "other"].includes(detectedType)) {
       payload.detectedType = detectedType
+    }
+    if (typeof needsSupplierReview === "boolean") {
+      payload.needsSupplierReview = needsSupplierReview
     }
     await jobRef.set(payload, { merge: true })
     return NextResponse.json({ ok: true })

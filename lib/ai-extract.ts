@@ -57,6 +57,10 @@ export interface ExtractResult {
   supplier_name?: string
   invoice_date?: string | null
   no_prices?: boolean
+  /** נדרשת בדיקת מסעדה — אין ספק אמין או הושער משם קובץ בלבד */
+  needs_review?: boolean
+  /** מקור שם הספק אחרי העשרה */
+  supplier_guess_source?: "ai" | "preamble" | "filename"
   /** מזוהה מכותרת/תאריכים בדוח — יומי / חודשי / שבועי */
   sales_report_period?: SalesReportPeriod
   /** תחילת תקופת הדוח — YYYY-MM-DD אחרי נרמול */
@@ -105,6 +109,7 @@ qty = תוכן עמודת "כמות" — מספר היחידות. אם אין ע
 unit = יחידת מידה (יח', בקבוק, קג, ליטר...).
 חובה טכני: בכל אובייקט ב-items השתמש במפתחות JSON באנגלית בלבד: "name", "sku", "price", "qty", "unit" — הטקסט בעברית רק בערכים, לא בשמות המפתחות.
 שם ספק = שם החברה בראש המסמך (לדוגמה: "הכרם - משקאות חריפים", "היכל היין", "תנובה").
+אם מצורף בלוק "טקסט משורות לפני הטבלה" — חובה לחלץ משם את supplier_name (שם עסק, בע"מ, כתובת וכו' — קח את שורת שם החברה הבולטת).
 דוגמה: שורה=1, מק"ט=15914000, תאור מוצר=גי"ג ג'י וויסקי..., כמות=12, מחיר=109.50, הנחה=27% → name:"גי"ג ג'י וויסקי לונדון דריי ג'ין 1 ליטר", sku:"15914000", price:109.50, qty:12, unit:"יח'"
 תעודת משלוח (ללא מחירים): אם אין עמודת מחיר, החזר no_prices:true ועם name, sku, unit, qty, price:0 לכל פריט.
 החזר JSON בלבד: {"supplier_name":"...","invoice_date":"DD/MM/YYYY","no_prices":false,"items":[{"name":"...","sku":"מקט או null","price":0.00,"unit":"יחידה","qty":0}]}`
@@ -120,6 +125,7 @@ const SUPPLIER_EXTRACT_USER_MESSAGE = `נתח את המסמך (חשבונית / 
 שמות בעברית: קרא שוב את הוראות "דיוק שמות בעברית" במערכת — העתק מילולי, בלי להחליף במילים דומות.
 
 אם אין מחירים כלל — no_prices:true. אחרת no_prices:false.
+אם קיים בלוק "טקסט משורות לפני הטבלה" — קרא אותו לפני הטבלה ומלא supplier_name משם.
 החזר JSON בלבד.`
 
 /** Sonnet מדייק יותר ב-OCR עברית במסמכי ספק (תמונה/PDF/טקסט) מול Haiku */
@@ -514,9 +520,11 @@ function normalizeSupplierExtractResult(parsed: unknown): ExtractResult {
     })
   }
 
+  const sn =
+    typeof o.supplier_name === "string" && o.supplier_name.trim() ? o.supplier_name.trim() : undefined
   return {
     items,
-    supplier_name: typeof o.supplier_name === "string" ? o.supplier_name : undefined,
+    supplier_name: sn,
     invoice_date: (o.invoice_date as string | null | undefined) ?? null,
     no_prices: typeof o.no_prices === "boolean" ? o.no_prices : undefined,
   }
@@ -530,13 +538,15 @@ function finishExtractResult(type: ExtractType, parsed: unknown): ExtractResult 
 }
 
 /** אותו אובייקט File בזרימת העלאה → זיהוי ואז מודאל; מונע קריאת XLSX/CSV כפולה */
-const spreadsheetRowsCache = new WeakMap<File, Promise<Record<string, unknown>[]>>()
+export type SpreadsheetBundle = { rows: Record<string, unknown>[]; preamble: string }
 
-function loadSpreadsheetRowsCached(file: File, ext: string): Promise<Record<string, unknown>[]> {
-  let p = spreadsheetRowsCache.get(file)
+const spreadsheetBundleCache = new WeakMap<File, Promise<SpreadsheetBundle>>()
+
+function loadSpreadsheetBundleCached(file: File, ext: string): Promise<SpreadsheetBundle> {
+  let p = spreadsheetBundleCache.get(file)
   if (!p) {
     p = parseSpreadsheet(file, ext)
-    spreadsheetRowsCache.set(file, p)
+    spreadsheetBundleCache.set(file, p)
   }
   return p
 }
@@ -648,7 +658,7 @@ export async function detectDocumentType(file: File): Promise<DetectedDocType> {
   }
 
   if (isSheet) {
-    const rows = await loadSpreadsheetRowsCached(file, ext)
+    const { rows } = await loadSpreadsheetBundleCached(file, ext)
     const quick = quickDetectSheetDocType(rows)
     if (quick) return quick
     const preview = JSON.stringify(rows.slice(0, 15))
@@ -671,9 +681,10 @@ export async function detectDocumentType(file: File): Promise<DetectedDocType> {
   return "unknown"
 }
 
-function sheetRowsFromAoA(raw: unknown[][]): Record<string, unknown>[] {
+function sheetRowsFromAoA(raw: unknown[][]): { rows: Record<string, unknown>[]; preamble: string } {
   let headerRowIdx = 0
-  for (let i = 0; i < Math.min(raw.length, 5); i++) {
+  /** שורות רבות לפני הטבלה (מחירון/חשבונית) — לא לעצור אחרי 5 שורות */
+  for (let i = 0; i < Math.min(raw.length, 25); i++) {
     const row = raw[i] || []
     const strCells = row.filter((v) => v !== null && v !== "" && (typeof v !== "number" || isNaN(v)))
     if (strCells.length >= 2) {
@@ -681,6 +692,15 @@ function sheetRowsFromAoA(raw: unknown[][]): Record<string, unknown>[] {
       break
     }
   }
+  const preambleLines: string[] = []
+  for (let i = 0; i < headerRowIdx; i++) {
+    const row = raw[i] || []
+    const parts = row
+      .map((v) => (v == null ? "" : String(v).trim()))
+      .filter((s) => s.length > 0)
+    if (parts.length) preambleLines.push(parts.join(" | "))
+  }
+  const preamble = preambleLines.join("\n")
   const h = ((raw[headerRowIdx] || []) as unknown[]).map((v) => (v != null ? String(v).trim() : ""))
   const rows = raw.slice(headerRowIdx + 1).map((row) => {
     const o: Record<string, unknown> = {}
@@ -689,12 +709,91 @@ function sheetRowsFromAoA(raw: unknown[][]): Record<string, unknown>[] {
     })
     return o
   })
-  return rows.filter((row) => Object.values(row).some((v) => v !== "" && v != null))
+  return {
+    rows: rows.filter((row) => Object.values(row).some((v) => v !== "" && v != null)),
+    preamble,
+  }
 }
 
-export async function parseSpreadsheet(file: File, ext: string): Promise<Record<string, unknown>[]> {
+/** ניחוש שם ספק משורות מעל הטבלה בגיליון */
+function guessSupplierFromPreamble(text: string): string | undefined {
+  const lines = text
+    .split(/\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+  for (const line of lines.slice(0, 12)) {
+    const core = line.split("|")[0].trim()
+    if (
+      /בע\s*["״']?\s*מ|ע\.מ\.|ח\.פ|עוסק\s*מורשה|משקאות|סיטונאות|יבוא|שיווק|הפצה|מעדנים|כרמל|הכרם/i.test(
+        line,
+      )
+    ) {
+      if (core.length >= 2 && core.length <= 120) return core
+    }
+  }
+  let best = ""
+  for (const line of lines.slice(0, 8)) {
+    const core = line.split("|")[0].trim()
+    if (!/[\u0590-\u05FF]/.test(core)) continue
+    if (/^מחירון|^הצעת|^תאריך|^דף|^page|^שורה|^row|^סה"כ|^total$/i.test(core)) continue
+    if (core.length > best.length && core.length < 100) best = core
+  }
+  return best || undefined
+}
+
+/** ניחוש משם קובץ (למשל הכרם.xlsx) */
+export function guessSupplierNameFromFileName(fileName: string): string | undefined {
+  const base = fileName.replace(/\.[^.]+$/i, "").trim()
+  if (!base || base.length > 100) return undefined
+  if (/^~\$/.test(base)) return undefined
+  if (/^(חשבונית|invoice|מחירון|quote|הזמנה|order|copy|עותק)\b/i.test(base)) return undefined
+  if (/[\u0590-\u05FF]/.test(base)) return base
+  if (/^[a-zA-Z0-9\s\-&.']{2,80}$/.test(base)) return base
+  return undefined
+}
+
+function enrichSupplierExtractResult(
+  res: ExtractResult,
+  file: File,
+  preamble: string,
+  presetSupplier?: string,
+): ExtractResult {
+  const items = (res.items || []).length
+  if (items === 0) return res
+  const preset = (presetSupplier || "").trim()
+  let name = (res.supplier_name || "").trim()
+  let source: "ai" | "preamble" | "filename" = "ai"
+  if (name) {
+    source = "ai"
+  } else if (preset) {
+    name = preset
+    source = "ai"
+  } else if (preamble.trim()) {
+    const g = guessSupplierFromPreamble(preamble)
+    if (g) {
+      name = g
+      source = "preamble"
+    }
+  }
+  if (!name) {
+    const g = guessSupplierNameFromFileName(file.name)
+    if (g) {
+      name = g
+      source = "filename"
+    }
+  }
+  const needs_review = !name || source === "filename"
+  return {
+    ...res,
+    supplier_name: name || res.supplier_name,
+    needs_review,
+    supplier_guess_source: name ? source : undefined,
+  }
+}
+
+export async function parseSpreadsheet(file: File, ext: string): Promise<SpreadsheetBundle> {
   if (ext === "csv") {
-    return new Promise((resolve) => {
+    const rowsOnly = await new Promise<Record<string, unknown>[]>((resolve) => {
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
@@ -702,6 +801,7 @@ export async function parseSpreadsheet(file: File, ext: string): Promise<Record<
           resolve(Array.isArray(r.data) ? (r.data as Record<string, unknown>[]) : []),
       })
     })
+    return { rows: rowsOnly, preamble: "" }
   }
   if (ext === "xlsx") {
     const parsed = await readXlsxFile(file)
@@ -710,7 +810,6 @@ export async function parseSpreadsheet(file: File, ext: string): Promise<Record<
     )
     return sheetRowsFromAoA(raw)
   }
-  // .xls בלבד — ספריית xlsx (פחות מומלץ מבחינת אבטחה; העדף ייצוא מחדש כ־xlsx)
   const buf = await file.arrayBuffer()
   const wb = XLSX.read(buf, {
     type: "array",
@@ -768,6 +867,10 @@ export async function extractWithAI(
   const isPdf = ext === "pdf"
   const isSheet = ["xlsx", "xls", "csv"].includes(ext)
   const isRtf = ext === "rtf"
+  let supplierSheetPreamble = ""
+  const presetSup = (supplierName || "").trim()
+  const finalizeSupplierIfNeeded = (r: ExtractResult) =>
+    type === "p" ? enrichSupplierExtractResult(r, file, supplierSheetPreamble, presetSup) : r
 
   if (isRtf) {
     const text = await rtfToPlainText(file)
@@ -793,7 +896,7 @@ export async function extractWithAI(
     let clean = out.replace(/```json|```/g, "").trim()
     clean = clean.replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')
     try {
-      return finishExtractResult(type, JSON.parse(clean))
+      return finalizeSupplierIfNeeded(finishExtractResult(type, JSON.parse(clean)))
     } catch (e) {
       // נסיון שני — חלץ JSON אגרסיבי
       const attempts = [
@@ -804,13 +907,18 @@ export async function extractWithAI(
       for (const attempt of attempts) {
         try {
           const c2 = attempt.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')
-          return finishExtractResult(type, JSON.parse(c2))
+          return finalizeSupplierIfNeeded(finishExtractResult(type, JSON.parse(c2)))
         } catch {}
       }
       if (clean.includes('"no_prices":true') && !clean.includes('"items":[{')) {
         const supMatch = clean.match(/supplier_name[^:]*:[^"]*"([^"]+)"/)
         const dateMatch = clean.match(/invoice_date[^:]*:[^"]*"([^"]+)"/)
-        return { supplier_name: supMatch?.[1]?.trim() || '', invoice_date: dateMatch?.[1]?.trim() || null, no_prices: true, items: [] }
+        return finalizeSupplierIfNeeded({
+          supplier_name: supMatch?.[1]?.trim() || "",
+          invoice_date: dateMatch?.[1]?.trim() || null,
+          no_prices: true,
+          items: [],
+        })
       }
       throw new Error(`שגיאה בפענוח תשובת AI — נסה שוב או השתמש בקובץ Excel`)
     }
@@ -846,7 +954,7 @@ export async function extractWithAI(
     // תיקון: הסר תווים בעייתיים שגורמים לשגיאות JSON
     clean = clean.replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')
     try {
-      return finishExtractResult(type, JSON.parse(clean))
+      return finalizeSupplierIfNeeded(finishExtractResult(type, JSON.parse(clean)))
     } catch (e) {
       // נסיון שני — חלץ JSON אגרסיבי
       const attempts = [
@@ -857,20 +965,26 @@ export async function extractWithAI(
       for (const attempt of attempts) {
         try {
           const c2 = attempt.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')
-          return finishExtractResult(type, JSON.parse(c2))
+          return finalizeSupplierIfNeeded(finishExtractResult(type, JSON.parse(c2)))
         } catch {}
       }
       if (clean.includes('"no_prices":true') && !clean.includes('"items":[{')) {
         const supMatch = clean.match(/supplier_name[^:]*:[^"]*"([^"]+)"/)
         const dateMatch = clean.match(/invoice_date[^:]*:[^"]*"([^"]+)"/)
-        return { supplier_name: supMatch?.[1]?.trim() || '', invoice_date: dateMatch?.[1]?.trim() || null, no_prices: true, items: [] }
+        return finalizeSupplierIfNeeded({
+          supplier_name: supMatch?.[1]?.trim() || "",
+          invoice_date: dateMatch?.[1]?.trim() || null,
+          no_prices: true,
+          items: [],
+        })
       }
       throw new Error(`שגיאה בפענוח תשובת AI — נסה שוב או השתמש בקובץ Excel`)
     }
   }
 
   if (isSheet) {
-    const rows = await loadSpreadsheetRowsCached(file, ext)
+    const { rows, preamble } = await loadSpreadsheetBundleCached(file, ext)
+    supplierSheetPreamble = preamble
     const menuSalesPreview = JSON.stringify(rows.slice(0, 30))
     const supplierPreview =
       type === "p" ? sliceRowsForSupplierSheetPreview(rows) : { json: menuSalesPreview, used: 0, total: rows.length }
@@ -881,11 +995,15 @@ export async function extractWithAI(
         : type === "d"
           ? dishSystem
           : SALES_SYSTEM
+    const preambleBlock =
+      type === "p" && preamble.trim()
+        ? `טקסט משורות **לפני** כותרות הטבלה בגיליון (שם ספק, כתובת, ח.פ., לוגו כטקסט וכו'):\n${preamble.trim()}\n\n`
+        : ""
     const sheetUserText =
       type === "d"
         ? `הנתונים:\n${preview}\n\nחלץ מנות ומחירים. לכל מנה ישייך רכיבים וכמויות לפי הבנתך. עקוב אחרי כללי שפת שמות המנות בהוראות המערכת. JSON בלבד.`
         : type === "p"
-          ? `הנתונים מהגיליון (שורות כטבלה)${supplierPreview.used < supplierPreview.total ? ` — ${supplierPreview.used} שורות מתוך ${supplierPreview.total} (גיליון ראשון בלבד; חלץ הכל ממה שנשלח)` : ""}:\n${preview}\n\n${SUPPLIER_EXTRACT_USER_MESSAGE}`
+          ? `${preambleBlock}הנתונים מהגיליון (שורות כטבלה)${supplierPreview.used < supplierPreview.total ? ` — ${supplierPreview.used} שורות מתוך ${supplierPreview.total} (גיליון ראשון בלבד; חלץ הכל ממה שנשלח)` : ""}:\n${preview}\n\n${SUPPLIER_EXTRACT_USER_MESSAGE}`
           : `הנתונים:\n${preview}\n\nחלץ דוח מכירות לפי SALES_SYSTEM — כולל sales_report_period, sales_report_date_from, sales_report_date_to. JSON בלבד.`
     const supplierRowCount = type === "p" ? supplierPreview.used : 0
     const data = await callClaude({
@@ -899,12 +1017,12 @@ export async function extractWithAI(
     let clean = text.replace(/```json|```/g, "").trim()
     clean = clean.replace(/[\u0000-\u001F\u007F]/g, " ").replace(/,\s*}/g, "}").replace(/,\s*]/g, "]")
     try {
-      return finishExtractResult(type, JSON.parse(clean))
+      return finalizeSupplierIfNeeded(finishExtractResult(type, JSON.parse(clean)))
     } catch {
       const jsonMatch = clean.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
         try {
-          return finishExtractResult(type, JSON.parse(jsonMatch[0]))
+          return finalizeSupplierIfNeeded(finishExtractResult(type, JSON.parse(jsonMatch[0])))
         } catch {}
       }
       throw new Error(`שגיאה בפענוח תשובת AI — נסה שוב או השתמש בקובץ Excel`)

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import {
   Dialog,
   DialogContent,
@@ -78,6 +78,8 @@ interface FilePreviewModalProps {
     items: Array<{ name: string; qty: number; price: number }>,
     meta?: { salesReportPeriod?: SalesReportPeriod; salesReportDateFrom?: string; salesReportDateTo?: string }
   ) => void
+  /** העלאות ממייל — עדכון דגל «דורש בדיקת ספק» ב־Firestore */
+  onInboundSupplierReview?: (needsReview: boolean) => void
 }
 
 export function FilePreviewModal({
@@ -93,6 +95,7 @@ export function FilePreviewModal({
   onConfirmStockCount,
   onConfirmDishes,
   onConfirmSales,
+  onInboundSupplierReview,
   currentRestaurantId,
   stockCountMode = false,
 }: FilePreviewModalProps) {
@@ -117,6 +120,10 @@ export function FilePreviewModal({
   const [salesReportDateTo, setSalesReportDateTo] = useState<string | undefined>(undefined)
   const [menuDishLanguage, setMenuDishLanguage] = useState<MenuDishNameLanguage>("he")
   const [confirming, setConfirming] = useState(false)
+  /** חשבונית ספק — דורש וידוא שם ספק (חסר / הושער מקובץ) */
+  const [supplierReviewKind, setSupplierReviewKind] = useState<"filename" | "missing" | null>(null)
+  const inboundReviewRef = useRef(onInboundSupplierReview)
+  inboundReviewRef.current = onInboundSupplierReview
 
   const supplierInvoiceSummary = useMemo(() => {
     if (type !== "p" || stockCountMode) return null
@@ -169,6 +176,7 @@ export function FilePreviewModal({
     setSaveToGlobal(forceSaveToGlobal)
     setIsDeliveryNote(false)
     setWebPriceByName({})
+    setSupplierReviewKind(null)
     if (extractKey === 0) return
     const ext = (file.name.split(".").pop()?.toLowerCase() ?? "").trim()
     const isPdf = ext === "pdf"
@@ -205,6 +213,15 @@ export function FilePreviewModal({
           return
         } else {
           setItems(res.items || [])
+        }
+        if (type === "p") {
+          if (res.needs_review) {
+            setSupplierReviewKind(res.supplier_guess_source === "filename" ? "filename" : "missing")
+            inboundReviewRef.current?.(true)
+          } else {
+            setSupplierReviewKind(null)
+            inboundReviewRef.current?.(false)
+          }
         }
         if (res.supplier_name && !initialSupplier) {
           setSupplierName(res.supplier_name)
@@ -339,6 +356,7 @@ export function FilePreviewModal({
             file?.name,
           ),
         )
+        inboundReviewRef.current?.(false)
         onOpenChange(false)
       } catch (e) {
         toast.error((e as Error)?.message || t("pages.filePreview.errParse"))
@@ -470,6 +488,13 @@ export function FilePreviewModal({
             <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-800 dark:text-blue-200 text-sm flex items-center gap-2">
               <span>📦</span>
               <span>{t("pages.filePreview.deliveryNoteBanner")}</span>
+            </div>
+          )}
+          {type === "p" && !stockCountMode && supplierReviewKind && !loading && items.length > 0 && (
+            <div className="p-3 rounded-lg border border-amber-500/50 bg-amber-50/90 text-amber-950 dark:bg-amber-950/30 dark:text-amber-100 text-sm">
+              {supplierReviewKind === "filename"
+                ? t("pages.filePreview.supplierReviewFilenameGuess")
+                : t("pages.filePreview.supplierReviewMissing")}
             </div>
           )}
           {supplierAlreadyAssigned && !stockCountMode && !loading && items.length > 0 && (

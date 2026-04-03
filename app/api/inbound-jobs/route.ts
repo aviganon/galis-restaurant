@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
         detectedType: data.detectedType ?? "other",
         receivedAt: data.receivedAt ?? "",
         attachmentPaths: Array.isArray(data.attachmentPaths) ? data.attachmentPaths : [],
+        needsSupplierReview: data.needsSupplierReview === true,
       }
     }).sort((a, b) => String(b.receivedAt || "").localeCompare(String(a.receivedAt || "")))
     return NextResponse.json({ jobs })

@@ -84,6 +84,12 @@ export const enPages = {
     assignSectionTitle: "Item assignment",
     supplierLabelLinked: "Supplier name — items will be linked to this supplier",
     detectedFromInvoice: "Detected from invoice:",
+    supplierReviewMissing: "No supplier name was detected. Enter a supplier before confirming — otherwise items may be saved as «no supplier».",
+    supplierReviewFilenameGuess:
+      "Supplier name was filled from the file name or rows above the table — verify it before confirming.",
+    inboundUploadsSupplierReviewQueue:
+      "{{n}} email upload(s) need supplier-name review. Open «Process now», check the field, then confirm.",
+    inboundRowNeedsSupplierReviewBadge: "Supplier check",
     supplierPlaceholder: "Supplier name",
     invoiceDateLabel: "Invoice date:",
     itemsForRestaurant: "Items will be assigned to restaurant: {{name}}",

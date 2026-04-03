@@ -15,6 +15,7 @@ import { detectDocumentType } from "@/lib/ai-extract"
 import { getClaudeApiKey } from "@/lib/claude"
 import { confirmSupplierInvoiceImport, confirmSalesReportImport } from "@/lib/restaurant-import-handlers"
 import { useApp } from "@/contexts/app-context"
+import { useTranslations } from "@/lib/use-translations"
 
 type InboundJobRow = {
   id: string
@@ -27,6 +28,7 @@ type InboundJobRow = {
   source?: "email" | "manual"
   fileName?: string
   supplier?: string
+  needsSupplierReview?: boolean
 }
 
 const STALE_PENDING_MINUTES = 20
@@ -60,9 +62,9 @@ function classifyByHeuristic(row: InboundJobRow): "invoice" | "sales" | "other" 
   return "other"
 }
 
-function typeLabel(t: "invoice" | "sales" | "other"): string {
-  if (t === "invoice") return "חשבונית ספק"
-  if (t === "sales") return "דוח מכירות"
+function typeLabel(typ: "invoice" | "sales" | "other"): string {
+  if (typ === "invoice") return "חשבונית ספק"
+  if (typ === "sales") return "דוח מכירות"
   return "אחר"
 }
 
@@ -73,6 +75,7 @@ export function RestaurantInboundUploadsDialog({
   restaurantId: string | null
   triggerLabel: string
 }) {
+  const t = useTranslations()
   const { userRole, isSystemOwner, refreshIngredients, restaurants } = useApp()
   const isOwner = !!isSystemOwner || userRole === "owner"
   const [open, setOpen] = useState(false)
@@ -90,16 +93,39 @@ export function RestaurantInboundUploadsDialog({
   const mapDetectedToType = (detected: "menu" | "sales" | "invoice" | "unknown"): ExtractType =>
     detected === "sales" ? "s" : "p"
 
-  const patchStatus = async (jobId: string, status: "pending" | "processing" | "done" | "error") => {
+  const patchStatus = async (
+    jobId: string,
+    status: "pending" | "processing" | "done" | "error",
+    opts?: { needsSupplierReview?: boolean; detectedType?: "invoice" | "sales" | "other" },
+  ) => {
     if (!restaurantId) return
     try {
       const headers = await firebaseBearerHeaders()
       await fetch("/api/inbound-jobs/status", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({ restaurantId, jobId, status }),
+        body: JSON.stringify({
+          restaurantId,
+          jobId,
+          status,
+          ...(opts?.detectedType ? { detectedType: opts.detectedType } : {}),
+          ...(typeof opts?.needsSupplierReview === "boolean" ? { needsSupplierReview: opts.needsSupplierReview } : {}),
+        }),
       })
-      setRows((prev) => prev.map((r) => (r.id === jobId ? { ...r, status } : r)))
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === jobId
+            ? {
+                ...r,
+                status,
+                ...(opts?.detectedType ? { detectedType: opts.detectedType } : {}),
+                ...(typeof opts?.needsSupplierReview === "boolean"
+                  ? { needsSupplierReview: opts.needsSupplierReview }
+                  : {}),
+              }
+            : r,
+        ),
+      )
     } catch {
       // Non-blocking, UI still usable.
     }
@@ -111,7 +137,6 @@ export function RestaurantInboundUploadsDialog({
     if (!path0) return
     const nameFromPath = path0.split("/").pop() || "inbound-file"
     setBusyJobId(row.id)
-    await patchStatus(row.id, "processing")
     try {
       const headers = await firebaseBearerHeaders()
       const res = await fetch("/api/inbound-jobs/file", {
@@ -137,16 +162,7 @@ export function RestaurantInboundUploadsDialog({
           type = "p"
         }
       }
-      try {
-        await fetch("/api/inbound-jobs/status", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...headers },
-          body: JSON.stringify({ restaurantId, jobId: row.id, status: "processing", detectedType }),
-        })
-        setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, detectedType } : r)))
-      } catch {
-        // Non-blocking
-      }
+      await patchStatus(row.id, "processing", { detectedType })
       setActiveJobId(row.id)
       setFpmType(type)
       setFpmFile(file)
@@ -237,6 +253,11 @@ export function RestaurantInboundUploadsDialog({
       })
       .sort((a, b) => (toMillis(a.receivedAt) || 0) - (toMillis(b.receivedAt) || 0))
   }, [rows])
+  const supplierReviewQueueCount = useMemo(
+    () => rows.filter((r) => r.source === "email" && r.needsSupplierReview === true).length,
+    [rows],
+  )
+
   const filteredRows = useMemo(() => {
     return rows.filter((r) => {
       const resolvedType = (r.detectedType as "invoice" | "sales" | "other" | undefined) || classifyByHeuristic(r)
@@ -271,6 +292,14 @@ export function RestaurantInboundUploadsDialog({
         ) : (
           <ScrollArea className="max-h-[72vh]">
             <div className="space-y-2">
+              {supplierReviewQueueCount > 0 ? (
+                <div className="rounded-lg border border-amber-400/80 bg-amber-50 p-2.5 text-sm text-amber-950 dark:bg-amber-950/25 dark:text-amber-100 dark:border-amber-700">
+                  {t("pages.filePreview.inboundUploadsSupplierReviewQueue").replace(
+                    "{{n}}",
+                    String(supplierReviewQueueCount),
+                  )}
+                </div>
+              ) : null}
               {stalePendingRows.length > 0 ? (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 p-2.5 flex flex-wrap items-center justify-between gap-2">
                   <div className="text-xs md:text-sm text-amber-900">
@@ -347,6 +376,11 @@ export function RestaurantInboundUploadsDialog({
                           <div key={p} dir="ltr" className="truncate">• {p.split("/").pop()}</div>
                         ))}
                       </div>
+                    ) : null}
+                    {r.source === "email" && r.needsSupplierReview ? (
+                      <Badge variant="outline" className="border-amber-500 text-amber-900 dark:text-amber-200">
+                        {t("pages.filePreview.inboundRowNeedsSupplierReviewBadge")}
+                      </Badge>
                     ) : null}
                     <div className="flex items-center gap-2 pt-1">
                       {r.source === "email" ? (
@@ -426,8 +460,12 @@ export function RestaurantInboundUploadsDialog({
             currentRestaurantId: restaurantId,
             refreshIngredients,
           })
-          if (ok && activeJobId) await patchStatus(activeJobId, "done")
+          if (ok && activeJobId) await patchStatus(activeJobId, "done", { needsSupplierReview: false })
           setFpmOpen(false)
+        }}
+        onInboundSupplierReview={(needsReview) => {
+          if (!restaurantId || !activeJobId) return
+          void patchStatus(activeJobId, "processing", { needsSupplierReview: needsReview })
         }}
         onConfirmSales={async (
           items: Array<{ name: string; qty: number; price: number }>,
@@ -444,7 +482,7 @@ export function RestaurantInboundUploadsDialog({
             meta,
             refreshIngredients,
           })
-          if (activeJobId) await patchStatus(activeJobId, "done")
+          if (activeJobId) await patchStatus(activeJobId, "done", { needsSupplierReview: false })
           setFpmOpen(false)
         }}
       />

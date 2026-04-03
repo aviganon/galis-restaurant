@@ -83,6 +83,11 @@ export const hePages = {
     assignSectionTitle: "ישויוך הפריטים",
     supplierLabelLinked: "שם ספק — הפריטים ישויכו לספק זה",
     detectedFromInvoice: "זוהה מהחשבונית:",
+    supplierReviewMissing: "לא זוהה שם ספק במסמך. הזינו שם ספק לפני האישור — אחרת פריטים עלולים להישמר תחת «ללא ספק».",
+    supplierReviewFilenameGuess: "שם הספק הושלם אוטומטית משם הקובץ או משורות מעל הטבלה — ודאו שהשם נכון לפני האישור.",
+    inboundUploadsSupplierReviewQueue:
+      "יש {{n}} העלאות ממייל שדורשות בדיקת שם ספק. פתחו «עבד עכשיו», ודאו את השדה ואז אשרו.",
+    inboundRowNeedsSupplierReviewBadge: "בדיקת ספק",
     supplierPlaceholder: "שם הספק",
     invoiceDateLabel: "תאריך חשבונית:",
     itemsForRestaurant: "הפריטים ישויכו למסעדה: {{name}}",
