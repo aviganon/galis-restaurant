@@ -146,12 +146,21 @@ export default function Home() {
       restaurantsUnsubRef.current = null
     }
 
-    /** מסנכרן עם LoginScreen — מתחיל מיד Promise של OAuth redirect (לא מחכים ל-mount של מסך התחברות) */
-    void getGoogleRedirectResultOnce(auth).catch(() => null)
+    /**
+     * מסנכרן עם LoginScreen — מתחיל מיד Promise של OAuth redirect.
+     * שומרים את ה-Promise (לא void) כדי שה-onAuthStateChanged יוכל לחכות לו.
+     * תיקון Safari/ITP: onAuthStateChanged יכול לירות user=null לפני שה-redirect
+     * מסתיים — בלי המתנה זו האפליקציה עושה signOut מוקדם ומחזירה למסך כניסה.
+     */
+    const redirectPromise = getGoogleRedirectResultOnce(auth).catch(() => null)
 
     const unsub = onAuthStateChanged(auth, async (user) => {
       setAuthLoading(false)
       if (!user) {
+        // Safari/ITP: onAuthStateChanged מגיע לפני שה-redirect מסתיים.
+        // ממתינים — אם הצליח, auth.currentUser מאוכלס ו-onAuthStateChanged יפעיל שוב.
+        await redirectPromise
+        if (auth.currentUser) return
         authProfileGenRef.current += 1
         stopRestaurantsListener()
         setIsLoggedIn(false)

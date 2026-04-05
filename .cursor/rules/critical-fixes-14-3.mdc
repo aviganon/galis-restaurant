@@ -18,3 +18,8 @@ alwaysApply: true
 ## 3. `lib/firebase.ts`
 - placeholder מכוון — מאפשר build בלי env vars
 - אל תסיר את ה-placeholder
+
+## 4. `app/page.tsx` — OAuth redirect + `onAuthStateChanged`
+- **`getGoogleRedirectResultOnce(auth)`** חייב להישמר ב־**`const redirectPromise`** (לא `void …`).
+- ב־`if (!user)` **לפני** איפוס מצב התחברות: **`await redirectPromise`** ואז אם **`auth.currentUser`** קיים — **`return`** (מניעת רגרסיה ב־Safari/ITP).
+- החזרה ל־`void getGoogleRedirectResultOnce` או הסרת ה־`await` שוברת כניסת Google ב־Safari אחרי redirect.
