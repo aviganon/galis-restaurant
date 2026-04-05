@@ -4,6 +4,45 @@
 
 ---
 
+## מה לבדוק עכשיו — כרום עובד, Safari לא (סדר מומלץ)
+
+1. **אותו כתובת בדיוק**  
+   בהשוואה לכרום: האם ב־Safari נכנסים ל־**אותו host**? (`www` מול בלי `www`, דומיין Vercel מול `*.web.app`, `http` מול `https`). כל הבדל = ייתכן דומיין שלא רשום ב־Firebase / ב־OAuth.
+
+2. **לא חלון פרטי**  
+   ב־Safari: חלון רגיל. בפרטיות קשיחה אחסון/redirect של Auth נשברים לעיתים.
+
+3. **„מניעת מעקב חוצה־אתרים” (לבדיקה בלבד)**  
+   הגדרות Safari → פרטיות — כבה זמנית או הוסף **חריג** לאתר שלך. אם אחרי זה זה עובד — הבעיה ITP/אחסון; אפשר אז לחפש פתרון ארוך טווח (אותו דומיין יציב, PWA, וכו׳).
+
+4. **קונסולה + רשת מיד אחרי הכשל**  
+   Safari → **פיתוח** → **הצג Web Inspector** (צריך להפעיל תפריט פיתוח בהעדפות → מתקדם).  
+   - **Console**: שורות אדומות, במיוחד `FirebaseError`, `auth/`, `permission-denied`.  
+   - **Network**: סנן `googleapis` / `securetoken` / `identitytoolkit` — בקשה שנכשלת (אדום) + קוד סטטוס.
+
+5. **אחסון אחרי ניסיון כניסה**  
+   ב־Inspector → **Storage** (או Application):  
+   - **Local Storage** / **Session Storage** לדומיין של האפליקציה — האם מופיע מפתח כמו `google-auth-intent`? האם יש מפתחות של Firebase Auth?  
+   - אם אחרי החזרה מ־Google **אין שום סימן ל־Auth** — הבעיה לפני/במהלך השלמת ה־redirect. אם **יש** משתמש לרגע ואז נעלם — כנראה `signOut` מהאפליקציה (למשל אין `users/{uid}`).
+
+6. **Firebase — Authorized domains**  
+   ודא שמופיע בדיוק ה־**host** שבשורת הכתובת ב־Safari (כולל תת־דומיין).
+
+7. **Google Cloud — OAuth Web client**  
+   **Authorized JavaScript origins** חייב לכלול `https://YOUR-EXACT-HOST` (ללא path).  
+   **Authorized redirect URIs** חייב לכלול `https://<PROJECT_ID>.firebaseapp.com/__/auth/handler` (ולפי הצורך גם לפי `authDomain`).
+
+8. **Firestore — אותו משתמש Google**  
+   בכרום אחרי כניסה: מזהה משתמש ב־Firebase Auth. ב־Console → Firestore: האם קיים `users/<uid>` לאותו חשבון? אם לא — הקוד **מנתק** אוטומטית (נראה כמו כישלון Safari בלבד).
+
+9. **App Check**  
+   אם ב־Firebase הופעל **Enforce** על שירותים לפני שהאפליקציה מקבלת טוקן תקין ב־Safari — בדוק זמנית **Monitor** או השבתה לבדיקה.
+
+10. **Service Worker (נדיר)**  
+    רק אם הפעלת בעבר דחיפה: ב־Inspector → Service Workers — **Unregister** ל־`firebase-messaging-sw.js`, רענון, נסה שוב כניסה (בלי להפעיל דחיפה באותה סשן).
+
+---
+
 ## חלק א׳ — כניסת Google נכשלת / חוזרים למסך התחברות
 
 ### הקשר בקוד (נקודות עיגון)
