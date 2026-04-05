@@ -17,7 +17,16 @@ import { auth, db } from "@/lib/firebase"
 import { sendPasswordResetReliable } from "@/lib/password-reset-client"
 import { doc, getDoc, getDocFromServer, setDoc } from "firebase/firestore"
 import { firestoreConfig } from "@/lib/firestore-config"
-import { getGoogleRedirectResultOnce } from "@/lib/google-auth-redirect"
+import {
+  getGoogleRedirectResultOnce,
+  waitForRedirectAuthUser,
+} from "@/lib/google-auth-redirect"
+import {
+  saveGoogleAuthDraft,
+  clearGoogleAuthDraft,
+  readGoogleAuthIntent,
+  readGoogleRegisterDraft,
+} from "@/lib/google-auth-intent"
 import Image from "next/image"
 import { motion, AnimatePresence, useScroll, useTransform, type Variants } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -59,48 +68,6 @@ import { LanguageSwitcher } from "@/components/language-switcher"
 import { useTranslations } from "@/lib/use-translations"
 
 interface LoginScreenProps {}
-const GOOGLE_AUTH_INTENT_KEY = "google-auth-intent"
-const GOOGLE_REGISTER_DRAFT_KEY = "google-register-draft"
-
-function saveGoogleAuthDraft(intent: "login" | "register", draft?: { code: string; name: string; br: string }) {
-  if (typeof window === "undefined") return
-  sessionStorage.setItem(GOOGLE_AUTH_INTENT_KEY, intent)
-  localStorage.setItem(GOOGLE_AUTH_INTENT_KEY, intent)
-  if (draft) {
-    const raw = JSON.stringify(draft)
-    sessionStorage.setItem(GOOGLE_REGISTER_DRAFT_KEY, raw)
-    localStorage.setItem(GOOGLE_REGISTER_DRAFT_KEY, raw)
-  }
-}
-
-function clearGoogleAuthDraft() {
-  if (typeof window === "undefined") return
-  sessionStorage.removeItem(GOOGLE_AUTH_INTENT_KEY)
-  localStorage.removeItem(GOOGLE_AUTH_INTENT_KEY)
-  sessionStorage.removeItem(GOOGLE_REGISTER_DRAFT_KEY)
-  localStorage.removeItem(GOOGLE_REGISTER_DRAFT_KEY)
-}
-
-function readGoogleAuthIntent(): "login" | "register" | null {
-  if (typeof window === "undefined") return null
-  const v = sessionStorage.getItem(GOOGLE_AUTH_INTENT_KEY) || localStorage.getItem(GOOGLE_AUTH_INTENT_KEY)
-  return v === "login" || v === "register" ? v : null
-}
-
-function readGoogleRegisterDraft(): { code: string; name: string; br: string } {
-  if (typeof window === "undefined") return { code: "", name: "", br: "" }
-  const raw = sessionStorage.getItem(GOOGLE_REGISTER_DRAFT_KEY) || localStorage.getItem(GOOGLE_REGISTER_DRAFT_KEY) || ""
-  try {
-    const parsed = JSON.parse(raw) as { code?: string; name?: string; br?: string }
-    return {
-      code: (parsed.code || "").trim().toUpperCase().replace(/\s/g, ""),
-      name: (parsed.name || "").trim(),
-      br: (parsed.br || "").trim(),
-    }
-  } catch {
-    return { code: "", name: "", br: "" }
-  }
-}
 
 /**
  * Safari / WebKit של אפל (לא כרום/פיירפוקס באייפון) — signInWithPopup נכשל לעיתים קרובות
@@ -431,30 +398,34 @@ export function LoginScreen(_props: LoginScreenProps) {
       try {
         const result = await getGoogleRedirectResultOnce(auth)
         if (cancelled) return
-        if (!result?.user) {
-          const hadIntent = readGoogleAuthIntent()
-          if (hadIntent) {
+        const intent = readGoogleAuthIntent()
+        let userToProcess = result?.user ?? null
+        // Safari: getRedirectResult לפעמים null בזמן ש-currentUser מתמלא מאוחר יותר
+        if (!userToProcess && intent) {
+          userToProcess = await waitForRedirectAuthUser(auth)
+        }
+        if (!userToProcess) {
+          if (intent) {
             clearGoogleAuthDraft()
             setError(
-              hadIntent === "register"
+              intent === "register"
                 ? "ההרשמה עם Google לא הושלמה. נסה שוב או בדוק חיבור/דפדפן."
                 : "הכניסה עם Google לא הושלמה. נסה שוב או נסה דפדפן אחר.",
             )
           }
           return
         }
-        const intent = readGoogleAuthIntent()
         if (intent === "register") {
-          const signedEmail = (result.user.email || "").trim().toLowerCase()
+          const signedEmail = (userToProcess.email || "").trim().toLowerCase()
           if (signedEmail && (await isSystemOwnerEmail(signedEmail))) {
             await auth.signOut().catch(() => {})
             setError("המייל הזה מוגדר כבעלים מערכת. יש להשתמש במייל אחר להרשמה למסעדה.")
             return
           }
-          const ok = await completeGoogleRegister(result.user, readGoogleRegisterDraft())
+          const ok = await completeGoogleRegister(userToProcess, readGoogleRegisterDraft())
           if (!ok) return
         } else {
-          await completeGoogleLogin(result.user)
+          await completeGoogleLogin(userToProcess)
         }
         shouldClearDraft = true
       } catch (err) {

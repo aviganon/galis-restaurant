@@ -15,7 +15,8 @@ import {
   onSnapshot,
 } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
-import { getGoogleRedirectResultOnce } from "@/lib/google-auth-redirect"
+import { getGoogleRedirectResultOnce, waitForRedirectAuthUser } from "@/lib/google-auth-redirect"
+import { hasGoogleAuthRedirectIntent } from "@/lib/google-auth-intent"
 import { firestoreConfig } from "@/lib/firestore-config"
 import { LoginScreen } from "@/components/login-screen"
 import { Dashboard } from "@/components/dashboard"
@@ -160,7 +161,11 @@ export default function Home() {
         // Safari/ITP: onAuthStateChanged מגיע לפני שה-redirect מסתיים.
         // ממתינים — אם הצליח, auth.currentUser מאוכלס ו-onAuthStateChanged יפעיל שוב.
         await redirectPromise
-        if (auth.currentUser) return
+        let recovered = auth.currentUser
+        if (!recovered && hasGoogleAuthRedirectIntent()) {
+          recovered = await waitForRedirectAuthUser(auth)
+        }
+        if (recovered) return
         authProfileGenRef.current += 1
         stopRestaurantsListener()
         setIsLoggedIn(false)

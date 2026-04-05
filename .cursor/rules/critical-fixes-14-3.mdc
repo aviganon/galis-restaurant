@@ -21,5 +21,6 @@ alwaysApply: true
 
 ## 4. `app/page.tsx` — OAuth redirect + `onAuthStateChanged`
 - **`getGoogleRedirectResultOnce(auth)`** חייב להישמר ב־**`const redirectPromise`** (לא `void …`).
-- ב־`if (!user)` **לפני** איפוס מצב התחברות: **`await redirectPromise`** ואז אם **`auth.currentUser`** קיים — **`return`** (מניעת רגרסיה ב־Safari/ITP).
-- החזרה ל־`void getGoogleRedirectResultOnce` או הסרת ה־`await` שוברת כניסת Google ב־Safari אחרי redirect.
+- ב־`if (!user)` **לפני** איפוס מצב התחברות: **`await redirectPromise`**, ואז אם אין **`auth.currentUser`** אבל יש **`hasGoogleAuthRedirectIntent()`** — **`await waitForRedirectAuthUser(auth)`**; אם יש משתמש — **`return`** בלי לאפס state.
+- מפתחות ה־intent ב־**`lib/google-auth-intent.ts`** — לא לשכפל מחרוזות אחרות ב־`login-screen`.
+- החזרה ל־`void getGoogleRedirectResultOnce` או הסרת ה־`await`/המתנה שוברת כניסת Google ב־Safari אחרי redirect.
