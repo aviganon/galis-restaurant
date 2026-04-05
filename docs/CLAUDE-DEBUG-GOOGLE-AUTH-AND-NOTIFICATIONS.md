@@ -48,7 +48,10 @@
 8. **שגיאות בקונסולת הדפדפן / Network**  
    לחפש `auth/` (קודי Firebase Auth), חסימת popup/redirect, או CORS.
 
-9. **גרסת Firebase JS ב־`firebase-messaging-sw.js` (לא ישירות ל־Google login, אבל לאותו דומיין)**  
+9. **עיכוב Safari אחרי redirect**  
+   בקוד: אם יש intent (`lib/google-auth-intent.ts`) — `waitForRedirectAuthUser` ממתין עד ~2.8 שניות ל־`auth.currentUser` לפני איפוס מצב / שגיאה. בלי זה Safari עלול לחזור למסך כניסה למרות כניסה תקינה.
+
+10. **גרסת Firebase JS ב־`firebase-messaging-sw.js` (לא ישירות ל־Google login, אבל לאותו דומיין)**  
    אם יש Service Worker ישן שתופס ניווט — נדיר, אבל אפשר לבדוק „Unregister” ב־DevTools → Application.
 
 ### מה לבקש מהמשתמש כדי לצמצם
