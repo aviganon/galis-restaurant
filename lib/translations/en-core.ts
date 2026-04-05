@@ -95,6 +95,8 @@ login: {
   rememberMe: "Remember me",
   loginBtn: "Sign in",
   loggingIn: "Signing in...",
+  googleIOSRedirectHint:
+    "On iPhone/iPad: if you return to the sign-in screen after Google — add this site to your Home Screen (web app) for reliability, or sign in from a computer or Chrome.",
   passwordHelpLink: "Forgot password · or set a password (after Google sign-in)",
   passwordHelpDialogTitle: "Reset or set password",
   passwordHelpDialogDesc:

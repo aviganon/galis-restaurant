@@ -26,6 +26,9 @@ import {
   clearGoogleAuthDraft,
   readGoogleAuthIntent,
   readGoogleRegisterDraft,
+  setGoogleIosPwaTipPending,
+  shouldShowGoogleIosPwaTipAfterRedirect,
+  clearGoogleIosPwaTipFlag,
 } from "@/lib/google-auth-intent"
 import Image from "next/image"
 import { motion, AnimatePresence, useScroll, useTransform, type Variants } from "framer-motion"
@@ -70,8 +73,17 @@ import { useTranslations } from "@/lib/use-translations"
 interface LoginScreenProps {}
 
 /**
- * Safari / WebKit של אפל (לא כרום/פיירפוקס באייפון) — signInWithPopup נכשל לעיתים קרובות
- * (ITP, חלון קופץ, אחסון מחולק): Firebase ממליץ על signInWithRedirect. בכרום popup נשאר נוח.
+ * iPhone / iPod / iPad בלבד (לא Mac). MSStream מסנן Windows Phone ישן עם UA מזויף.
+ */
+function isIOSWeb(): boolean {
+  if (typeof navigator === "undefined") return false
+  const ua = navigator.userAgent || ""
+  if (!/(iPhone|iPod|iPad)/.test(ua)) return false
+  return !("MSStream" in globalThis)
+}
+
+/**
+ * Safari / WebKit של אפל (לא כרום/פיירפוקס באייפון) — לזיהוי יחד עם isIOSWeb לבחירת redirect.
  */
 function isAppleSafari(): boolean {
   if (typeof window === "undefined") return false
@@ -93,7 +105,7 @@ function isAppleSafari(): boolean {
   return false
 }
 
-/** מובייל שבו popup נחסם לעיתים — redirect. Safari תמיד redirect. Chrome/Firefox באייפד/אייפון (CriOS/FxiOS) נשארים ב-popup */
+/** מובייל שבו popup נחסם לעיתים — משמש ל־iOS בלבד יחד עם isIOSWeb. Mac Safari לא כאן (popup). */
 function isGoogleRedirectPreferred(): boolean {
   if (typeof window === "undefined") return false
   if (isAppleSafari()) return true
@@ -104,6 +116,11 @@ function isGoogleRedirectPreferred(): boolean {
   if (/iPad/.test(ua)) return true
   if (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) return true
   return false
+}
+
+/** signInWithRedirect רק ב־iOS (איפה popup מממש נחסם); Mac Safari + שאר — popup (ITP שובר redirect+IndexedDB) */
+function shouldSignInWithGoogleRedirect(): boolean {
+  return isIOSWeb() && isGoogleRedirectPreferred()
 }
 
 function googleAuthErrorShouldFallbackToRedirect(code: string): boolean {
@@ -251,6 +268,7 @@ export function LoginScreen(_props: LoginScreenProps) {
   const [registerPassword, setRegisterPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [iosGooglePwaTip, setIosGooglePwaTip] = useState("")
   const [activeTab, setActiveTab] = useState("login")
   const [registerMethod, setRegisterMethod] = useState<"none" | "google" | "manual">("none")
   const [isMuted, setIsMuted] = useState(true)
@@ -288,6 +306,12 @@ export function LoginScreen(_props: LoginScreenProps) {
   const getAuthError = useCallback((code: string) => {
     const key = authErrorToKey[code]
     return key ? t(key) : t("authErrors.default")
+  }, [t])
+
+  useEffect(() => {
+    if (isIOSWeb() && shouldShowGoogleIosPwaTipAfterRedirect()) {
+      setIosGooglePwaTip(t("login.googleIOSRedirectHint"))
+    }
   }, [t])
 
   const completeGoogleLogin = useCallback(async (user: User) => {
@@ -438,7 +462,10 @@ export function LoginScreen(_props: LoginScreenProps) {
           }
         }
       } finally {
-        if (shouldClearDraft) clearGoogleAuthDraft()
+        if (shouldClearDraft) {
+          clearGoogleAuthDraft()
+          clearGoogleIosPwaTipFlag()
+        }
       }
     })()
     return () => { cancelled = true }
@@ -622,11 +649,13 @@ export function LoginScreen(_props: LoginScreenProps) {
 
   const handleGoogleSignIn = async () => {
     setError("")
+    setIosGooglePwaTip("")
     setIsLoading(true)
     try {
       await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence)
       const provider = new GoogleAuthProvider()
-      if (isGoogleRedirectPreferred()) {
+      if (shouldSignInWithGoogleRedirect()) {
+        setGoogleIosPwaTipPending()
         saveGoogleAuthDraft("login")
         await signInWithRedirect(auth, provider)
         return
@@ -637,6 +666,7 @@ export function LoginScreen(_props: LoginScreenProps) {
       const code = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
       if (googleAuthErrorShouldFallbackToRedirect(code)) {
         saveGoogleAuthDraft("login")
+        if (isIOSWeb()) setGoogleIosPwaTipPending()
         await signInWithRedirect(auth, new GoogleAuthProvider())
         return
       } else if (code === "auth/operation-not-allowed") {
@@ -655,6 +685,7 @@ export function LoginScreen(_props: LoginScreenProps) {
     const name = restaurantName.trim()
     const br = branch.trim()
     if (!code) { setError(t("login.enterInviteCode")); return }
+    setIosGooglePwaTip("")
     setIsLoading(true)
     try {
       await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence)
@@ -669,7 +700,8 @@ export function LoginScreen(_props: LoginScreenProps) {
       const draft = { code, name, br }
       saveGoogleAuthDraft("register", draft)
       const provider = new GoogleAuthProvider()
-      if (isGoogleRedirectPreferred()) {
+      if (shouldSignInWithGoogleRedirect()) {
+        setGoogleIosPwaTipPending()
         await signInWithRedirect(auth, provider)
         return
       }
@@ -687,6 +719,7 @@ export function LoginScreen(_props: LoginScreenProps) {
       const authCode = err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : ""
       if (googleAuthErrorShouldFallbackToRedirect(authCode)) {
         saveGoogleAuthDraft("register", readGoogleRegisterDraft())
+        if (isIOSWeb()) setGoogleIosPwaTipPending()
         await signInWithRedirect(auth, new GoogleAuthProvider())
         return
       } else if (authCode === "auth/operation-not-allowed") {
@@ -1048,7 +1081,7 @@ export function LoginScreen(_props: LoginScreenProps) {
                   <p className="text-sm font-medium text-muted-foreground">{t("login.systemDesc")}</p>
                 </div>
 
-                <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setError(""); if (v !== "register") setRegisterMethod("none") }} className="w-full">
+                <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setError(""); setIosGooglePwaTip(""); if (v !== "register") setRegisterMethod("none") }} className="w-full">
                   <TabsList className="grid grid-cols-2 mb-6 w-full">
                     <TabsTrigger value="login" className="rounded-lg">
                       <Lock className="w-4 h-4 ml-2" />
@@ -1059,6 +1092,15 @@ export function LoginScreen(_props: LoginScreenProps) {
                       {t("login.registerTab")}
                     </TabsTrigger>
                   </TabsList>
+
+                  {iosGooglePwaTip ? (
+                    <div
+                      role="status"
+                      className="mb-4 p-3 rounded-lg border border-primary/25 bg-primary/5 text-sm text-foreground leading-relaxed"
+                    >
+                      {iosGooglePwaTip}
+                    </div>
+                  ) : null}
 
                   <TabsContent value="login" className="space-y-4 mt-0">
                     <form onSubmit={handleLogin} className="space-y-4">
