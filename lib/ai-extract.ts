@@ -129,6 +129,11 @@ const SUPPLIER_EXTRACT_USER_MESSAGE = `נתח את המסמך (חשבונית / 
 אם קיים בלוק "טקסט משורות לפני הטבלה" או "שורות ביניים בגיליון" — קרא אותו ומלא supplier_name משם (שם ספק בין פריטים — לא שם מוצר).
 החזר JSON בלבד.`
 
+/** תמונה/PDF: שם ספק לעיתים בולט; שמות פריטים בגוף הטבלה — מפורש למודל הוויזואלי */
+const SUPPLIER_VISION_TABLE_BODY_HINT = `
+
+**מתמונה או PDF:** שם הספק לרוב בראש המסמך. שמות הפריטים נמצאים ב**גוף הטבלה** בעמודת תיאור / שם מוצר / פריט — קרא לאט כל תא בעברית, גם כשהכתב קטן או צפוף; אל תדלג על עמודה זו. השתמש בהזחת עמודות כדי ליישר שורות: לכל שורת טבלה מלא "name" **רק** מתוכן עמודת הפריט באותה שורה, לא מכותרת כללית ולא ממספר שורה.`
+
 /** Sonnet מדייק יותר ב-OCR עברית במסמכי ספק (תמונה/PDF/טקסט) מול Haiku */
 const CLAUDE_SUPPLIER_EXTRACT_MODEL = "claude-sonnet-4-20250514"
 const CLAUDE_DEFAULT_EXTRACT_MODEL = "claude-haiku-4-5-20251001"
@@ -878,7 +883,14 @@ export async function parseSpreadsheet(file: File, ext: string): Promise<Spreads
     return { rows: rowsOnly, preamble: "" }
   }
   if (ext === "xlsx") {
-    const parsed = await readXlsxFile(file)
+    // קריאת buffer מלא לפני parse — ב-Safari iOS לעיתים File/Blob זורם לא יציב ל-unzip
+    const ab = await file.arrayBuffer()
+    const blob = new Blob([ab], {
+      type:
+        file.type ||
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    })
+    const parsed = await readXlsxFile(blob)
     const raw: unknown[][] = parsed.map((row) =>
       row.map((cell) => (cell === undefined ? null : cell)) as unknown[]
     )
@@ -1009,7 +1021,7 @@ export async function extractWithAI(
           : SALES_SYSTEM
     const userContent =
       type === "p"
-        ? SUPPLIER_EXTRACT_USER_MESSAGE
+        ? SUPPLIER_EXTRACT_USER_MESSAGE + SUPPLIER_VISION_TABLE_BODY_HINT
         : type === "d"
           ? "חלץ מנות ומחירים מהתפריט. לכל מנה ישייך רכיבים לפי הבנתך (בשר, ירקות, קמח וכו') — גם אם לא מופיעים בתפריט. עקוב אחרי כללי שפת שמות המנות בהוראות המערכת. JSON בלבד."
           : "חלץ דוח מכירות לפי SALES_SYSTEM — כולל sales_report_period, sales_report_date_from, sales_report_date_to. JSON בלבד."

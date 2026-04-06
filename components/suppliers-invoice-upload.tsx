@@ -19,6 +19,11 @@ const AI_DETECT_EXTENSIONS = new Set(["xlsx", "xls", "csv", "pdf", "png", "jpg",
 
 const INVOICE_ACCEPT = ".xlsx,.xls,.csv,.pdf,.rtf,image/*"
 
+function isIOSLikeBrowser(): boolean {
+  if (typeof navigator === "undefined") return false
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent)
+}
+
 interface SuppliersInvoiceUploadProps {
   restaurantName?: string
   onConfirm: (items: ExtractedSupplierItem[], supName: string, saveToGlobal?: boolean) => Promise<void>
@@ -198,6 +203,11 @@ export function SuppliersInvoiceUpload({ restaurantName, onConfirm, onClose, onS
               <Badge variant="outline">CSV</Badge>
               <Badge variant="outline">תמונות</Badge>
             </div>
+            {isIOSLikeBrowser() && (
+              <p className="text-xs text-amber-800 dark:text-amber-400/95 text-center max-w-md mb-3 px-1 leading-relaxed">
+                באייפד/אייפון: מומלץ לבחור קובץ Excel או PDF מקור מתוך &quot;קבצים&quot;. צילום מסך או תמונה של טבלה עלולים לפספס שמות פריטים (שם ספק לרוב עדיין יזוהה).
+              </p>
+            )}
             <input
               ref={fileInputRef}
               type="file"
