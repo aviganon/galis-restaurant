@@ -431,9 +431,18 @@ export function FilePreviewModal({
           ? t("pages.filePreview.hintStockCount")
           : t("pages.filePreview.hintInvoice")
 
+  const invoiceWideLayout = type === "p" && !stockCountMode
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" aria-describedby={undefined}>
+      <DialogContent
+        className={
+          invoiceWideLayout
+            ? "w-[calc(100vw-1rem)] max-w-5xl max-h-[92dvh] overflow-hidden flex flex-col p-4 sm:p-6"
+            : "max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+        }
+        aria-describedby={undefined}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {file?.name ?? t("pages.filePreview.fileFallback")}
@@ -631,10 +640,22 @@ export function FilePreviewModal({
                 </div>
               )}
               <div className="border rounded-lg overflow-hidden">
-                <div className="overflow-x-auto max-h-[320px] overflow-y-auto">
-                  <table className="w-full text-sm" style={{ minWidth: type === "p" && stockCountMode ? 320 : 520 }}>
+                <div
+                  className={
+                    invoiceWideLayout
+                      ? "overflow-x-auto max-h-[min(62dvh,560px)] min-h-[200px] overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
+                      : "overflow-x-auto max-h-[min(50dvh,420px)] overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
+                  }
+                >
+                  <table
+                    className="w-full text-sm"
+                    style={{
+                      minWidth:
+                        type === "p" && stockCountMode ? 360 : type === "p" ? 720 : type === "s" ? 520 : 520,
+                    }}
+                  >
                     <colgroup>
-                      <col style={{ minWidth: 150 }} />
+                      <col style={{ minWidth: invoiceWideLayout ? 240 : 168 }} />
                       {type === "p" && stockCountMode ? (
                         <>
                           <col style={{ width: 72 }} />
@@ -692,13 +713,17 @@ export function FilePreviewModal({
                     <tbody>
                       {items.map((item, idx) => (
                         <tr key={idx} className="border-t border-border">
-                          <td className="p-2">
+                          <td className={invoiceWideLayout ? "p-2 min-w-[14rem] align-top" : "p-2 min-w-[12rem] align-top"}>
                             <Input
                               id={`fpm-item-${idx}-name`}
                               name={`fpmItemName-${idx}`}
                               value={String((item as unknown as Record<string, unknown>).name ?? "")}
                               onChange={(e) => updateItem(idx, "name", e.target.value)}
-                              className="h-8 text-sm"
+                              className={
+                                invoiceWideLayout
+                                  ? "h-8 text-sm min-w-[14rem] w-full max-w-none"
+                                  : "h-8 text-sm min-w-[12rem] w-full max-w-none"
+                              }
                               aria-label={t("pages.filePreview.ariaName")}
                             />
                           </td>
