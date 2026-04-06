@@ -71,6 +71,7 @@ export interface ExtractResult {
 
 const SUPPLIER_KNOWLEDGE = `
 מבנה חשבונית/אישור הזמנה: שם פריט (תיאור בלבד), מק"ט (קוד נפרד), כמות שהתקבלה (qty), יחידה, מחיר ליחידה, הנחה, סה"כ. חלץ מחיר נטו ליחידה (אחרי הנחה) וכמות (qty) — הכמות מעדכנת מלאי.
+שם ספק יכול להופיע גם כשורה נפרדת **בין** שורות פריטים (לא רק בראש הגיליון) — חלץ ל־supplier_name; **אל** תכלול שורות כאלה ב־items.
 סדר עמודות נפוץ בחשבוניות ישראליות: פריט | כמות | ברקוד | מחירון | הנחה% | נטו | סה"כ לשורה.
 qty = עמודת "כמות" — המספר שמופיע ליד שם הפריט. אם כמות=1 — החזר qty:1. אל תחזיר qty:0 אלא אם כמות חסרה לגמרי.
 מחירון משקאות / אלכוהול בלי עמודת "כמות": כל שורה = בדרך כלל יחידת הזמנה אחת — החזר qty:1 ו-unit מתאים (יחידה, בקבוק, מארז). אם בשם מופיע מארז (למשל 6X330, חבילה 24, (12 יח')) — החזר qty לפי מספר היחידות.
@@ -108,8 +109,8 @@ price = מחיר נטו ליחידה (אחרי הנחה), או מעמודת "מ�
 qty = תוכן עמודת "כמות" — מספר היחידות. אם אין עמודת כמות במחירון משקאות/אלכוהול — qty:1 לכל שורה (אלא אם מופיע במפורש בשם מארז כמו 24X או חבילה 6).
 unit = יחידת מידה (יח', בקבוק, קג, ליטר...).
 חובה טכני: בכל אובייקט ב-items השתמש במפתחות JSON באנגלית בלבד: "name", "sku", "price", "qty", "unit" — הטקסט בעברית רק בערכים, לא בשמות המפתחות.
-שם ספק = שם החברה בראש המסמך (לדוגמה: "הכרם - משקאות חריפים", "היכל היין", "תנובה").
-אם מצורף בלוק "טקסט משורות לפני הטבלה" — חובה לחלץ משם את supplier_name (שם עסק, בע"מ, כתובת וכו' — קח את שורת שם החברה הבולטת).
+שם ספק = שם החברה בראש המסמך או בשורה ביניים (לדוגמה: "הכרם - משקאות חריפים", "היכל היין", "תנובה", שורה עם בע"מ / ח.פ.).
+אם מצורף בלוק "טקסט משורות לפני הטבלה" או "שורות ביניים בגיליון" — חובה לחלץ משם את supplier_name (שם עסק, בע"מ, כתובת וכו' — קח את שם החברה הבולט).
 דוגמה: שורה=1, מק"ט=15914000, תאור מוצר=גי"ג ג'י וויסקי..., כמות=12, מחיר=109.50, הנחה=27% → name:"גי"ג ג'י וויסקי לונדון דריי ג'ין 1 ליטר", sku:"15914000", price:109.50, qty:12, unit:"יח'"
 תעודת משלוח (ללא מחירים): אם אין עמודת מחיר, החזר no_prices:true ועם name, sku, unit, qty, price:0 לכל פריט.
 החזר JSON בלבד: {"supplier_name":"...","invoice_date":"DD/MM/YYYY","no_prices":false,"items":[{"name":"...","sku":"מקט או null","price":0.00,"unit":"יחידה","qty":0}]}`
@@ -125,7 +126,7 @@ const SUPPLIER_EXTRACT_USER_MESSAGE = `נתח את המסמך (חשבונית / 
 שמות בעברית: קרא שוב את הוראות "דיוק שמות בעברית" במערכת — העתק מילולי, בלי להחליף במילים דומות.
 
 אם אין מחירים כלל — no_prices:true. אחרת no_prices:false.
-אם קיים בלוק "טקסט משורות לפני הטבלה" — קרא אותו לפני הטבלה ומלא supplier_name משם.
+אם קיים בלוק "טקסט משורות לפני הטבלה" או "שורות ביניים בגיליון" — קרא אותו ומלא supplier_name משם (שם ספק בין פריטים — לא שם מוצר).
 החזר JSON בלבד.`
 
 /** Sonnet מדייק יותר ב-OCR עברית במסמכי ספק (תמונה/PDF/טקסט) מול Haiku */
@@ -681,17 +682,71 @@ export async function detectDocumentType(file: File): Promise<DetectedDocType> {
   return "unknown"
 }
 
-function sheetRowsFromAoA(raw: unknown[][]): { rows: Record<string, unknown>[]; preamble: string } {
-  let headerRowIdx = 0
-  /** שורות רבות לפני הטבלה (מחירון/חשבונית) — לא לעצור אחרי 5 שורות */
-  for (let i = 0; i < Math.min(raw.length, 25); i++) {
-    const row = raw[i] || []
-    const strCells = row.filter((v) => v !== null && v !== "" && (typeof v !== "number" || isNaN(v)))
-    if (strCells.length >= 2) {
-      headerRowIdx = i
-      break
+/** ניקוד לשורה שנראית ככותרות טבלה (מק"ט, תיאור, כמות…) — מעדיף על «השורה הראשונה עם 2 תאים» */
+function headerLikenessScore(row: unknown[]): number {
+  const cells = (row || [])
+    .map((v) => (v == null ? "" : String(v).trim().toLowerCase()))
+    .filter((s) => s.length > 0)
+  if (cells.length < 2) return 0
+  const joined = cells.join(" ")
+  let s = 0
+  if (/מק״ט|מק"ט|מקט|barcode|sku|קוד\s*פריט|item\s*code/.test(joined)) s += 2
+  if (/תיאור|תאור|שם\s*פריט|תיאור\s*מוצר|description|פירוט|(^|\s)מוצר(\s|$)|item\s*name|product/.test(joined)) s += 2
+  if (/כמות|qty|quantity/.test(joined)) s += 1
+  if (/מחיר|price|נטו|הנחה|discount|מחירון/.test(joined)) s += 1
+  if (/יחידה|unit|סה״כ\s*לשורה|line\s*total/.test(joined)) s += 1
+  return s
+}
+
+function findBestHeaderRowIndex(raw: unknown[][], searchLimit = 48): number {
+  const limit = Math.min(raw.length, searchLimit)
+  let bestIdx = 0
+  let bestScore = -1
+  for (let i = 0; i < limit; i++) {
+    const sc = headerLikenessScore(raw[i] || [])
+    if (sc > bestScore) {
+      bestScore = sc
+      bestIdx = i
     }
   }
+  if (bestScore >= 2) return bestIdx
+  for (let i = 0; i < Math.min(raw.length, 28); i++) {
+    const row = raw[i] || []
+    const strCells = row.filter(
+      (v) => v !== null && v !== "" && (typeof v !== "number" || Number.isNaN(v as number)),
+    )
+    if (strCells.length >= 2) return i
+  }
+  return 0
+}
+
+/**
+ * שורה שנראית כשם ספק/כותרת בין פריטים — לא שורת מוצר (למשל «חברת X בע"מ» בשורה אחת באמצע הגיליון).
+ */
+function isLikelySupplierOrSectionBannerRow(row: unknown[]): boolean {
+  const parts = (row || []).map((v) => (v == null ? "" : String(v).trim())).filter((s) => s.length > 0)
+  if (parts.length === 0) return false
+  if (parts.length >= 4) return false
+  const joined = parts.join(" ")
+  if (joined.length > 200) return false
+  if (/בע\s*["״']?\s*מ|ע\.מ\.|ח\.פ|עוסק\s*מורשה|ד\.נ\.|י\.מ\.|חברת\s|חברה\s+\w+\s+בע/i.test(joined)) return true
+  if (/^סה"כ|^סה״כ|^סך\b|^מחירון|^הצעת|^חשבונית|^תעודת|^סיכום\s*מוצרים/i.test(joined)) return true
+  const digitCount = joined.replace(/\D/g, "").length
+  if (/\d{7,}/.test(joined) || (digitCount >= 8 && /\d{4,}/.test(joined))) return false
+  if (/(קג|גרם|מ״ל|מל|ליטר|יחידות|\d+\s*[x×]\s*\d+)/i.test(joined)) return false
+  const heb = (joined.match(/[\u0590-\u05FF]/g) || []).length
+  if (parts.length === 1 && heb >= 4 && joined.length >= 6 && joined.length <= 120) {
+    if (!/\d/.test(joined)) return true
+    if (/בע|ע\.מ|ח\.פ|מסחר|שיווק|סיטונ|יבוא|הפצה|מעדנים/i.test(joined)) return true
+  }
+  if (parts.length === 2 && heb >= 5 && joined.length <= 140 && digitCount <= 4) {
+    if (/בע|ע\.מ|ח\.פ|משקאות|סיטונ/i.test(joined)) return true
+  }
+  return false
+}
+
+function sheetRowsFromAoA(raw: unknown[][]): { rows: Record<string, unknown>[]; preamble: string } {
+  const headerRowIdx = findBestHeaderRowIndex(raw)
   const preambleLines: string[] = []
   for (let i = 0; i < headerRowIdx; i++) {
     const row = raw[i] || []
@@ -700,9 +755,27 @@ function sheetRowsFromAoA(raw: unknown[][]): { rows: Record<string, unknown>[]; 
       .filter((s) => s.length > 0)
     if (parts.length) preambleLines.push(parts.join(" | "))
   }
-  const preamble = preambleLines.join("\n")
   const h = ((raw[headerRowIdx] || []) as unknown[]).map((v) => (v != null ? String(v).trim() : ""))
-  const rows = raw.slice(headerRowIdx + 1).map((row) => {
+  const interstitialLines: string[] = []
+  const bodyRawRows: unknown[][] = []
+  for (const row of raw.slice(headerRowIdx + 1)) {
+    if (isLikelySupplierOrSectionBannerRow(row)) {
+      const parts = (row || [])
+        .map((v) => (v == null ? "" : String(v).trim()))
+        .filter((s) => s.length > 0)
+      if (parts.length) interstitialLines.push(parts.join(" | "))
+    } else {
+      bodyRawRows.push(row || [])
+    }
+  }
+  const preambleTop = preambleLines.join("\n")
+  const preamble =
+    interstitialLines.length > 0
+      ? [preambleTop, `שורות ביניים בגיליון (שם ספק / כותרת בין חלקי הרשימה — לא פריטים):\n${interstitialLines.join("\n")}`]
+          .filter((s) => s.trim().length > 0)
+          .join("\n\n")
+      : preambleTop
+  const rows = bodyRawRows.map((row) => {
     const o: Record<string, unknown> = {}
     ;(row || []).forEach((v, i) => {
       o[h[i] || `col${i}`] = v !== null && v !== undefined ? v : ""
@@ -721,10 +794,10 @@ function guessSupplierFromPreamble(text: string): string | undefined {
     .split(/\n/)
     .map((l) => l.trim())
     .filter(Boolean)
-  for (const line of lines.slice(0, 12)) {
+  for (const line of lines.slice(0, 24)) {
     const core = line.split("|")[0].trim()
     if (
-      /בע\s*["״']?\s*מ|ע\.מ\.|ח\.פ|עוסק\s*מורשה|משקאות|סיטונאות|יבוא|שיווק|הפצה|מעדנים|כרמל|הכרם/i.test(
+      /בע\s*["״']?\s*מ|ע\.מ\.|ח\.פ|עוסק\s*מורשה|משקאות|סיטונאות|יבוא|שיווק|הפצה|מעדנים|כרמל|הכרם|מזון|ספקים|חברת/i.test(
         line,
       )
     ) {
@@ -732,7 +805,7 @@ function guessSupplierFromPreamble(text: string): string | undefined {
     }
   }
   let best = ""
-  for (const line of lines.slice(0, 8)) {
+  for (const line of lines.slice(0, 16)) {
     const core = line.split("|")[0].trim()
     if (!/[\u0590-\u05FF]/.test(core)) continue
     if (/^מחירון|^הצעת|^תאריך|^דף|^page|^שורה|^row|^סה"כ|^total$/i.test(core)) continue
@@ -746,6 +819,7 @@ export function guessSupplierNameFromFileName(fileName: string): string | undefi
   const base = fileName.replace(/\.[^.]+$/i, "").trim()
   if (!base || base.length > 100) return undefined
   if (/^~\$/.test(base)) return undefined
+  if (/סיכום\s*מוצרים|מוצרים\s*\(\d*\)|^סיכום$/i.test(base)) return undefined
   if (/^(חשבונית|invoice|מחירון|quote|הזמנה|order|copy|עותק)\b/i.test(base)) return undefined
   if (/[\u0590-\u05FF]/.test(base)) return base
   if (/^[a-zA-Z0-9\s\-&.']{2,80}$/.test(base)) return base
@@ -997,7 +1071,7 @@ export async function extractWithAI(
           : SALES_SYSTEM
     const preambleBlock =
       type === "p" && preamble.trim()
-        ? `טקסט משורות **לפני** כותרות הטבלה בגיליון (שם ספק, כתובת, ח.פ., לוגו כטקסט וכו'):\n${preamble.trim()}\n\n`
+        ? `טקסט מגיליון **מחוץ לשורות הפריטים** (לפני כותרות הטבלה ושורות ביניים — שם ספק, כותרת, ח.פ.):\n${preamble.trim()}\n\n`
         : ""
     const sheetUserText =
       type === "d"
