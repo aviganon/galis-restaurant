@@ -433,6 +433,7 @@ export function FilePreviewModal({
 
   const invoiceWideLayout = type === "p" && !stockCountMode
 
+  // לא לסגור במגע/לחיצה על הרקע (מובייל/אייפד) — סגירה רק ב־X או ביטול
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -442,6 +443,11 @@ export function FilePreviewModal({
             : "max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
         }
         aria-describedby={undefined}
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => {
+          if (loading || confirming) e.preventDefault()
+        }}
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
