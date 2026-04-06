@@ -774,6 +774,7 @@ export const enPages = {
     searchPlaceholder: "Search...",
     loadingRestaurants: "Loading restaurants...",
     loadingIngredients: "Loading ingredients...",
+    loadingIngredientExtras: "Loading price comparison (web + price history)…",
     clickToRefresh: "Click to refresh",
     emoji: "Emoji",
     inviteCodeOptional: "Invite code (optional)",

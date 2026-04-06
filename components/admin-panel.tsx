@@ -158,6 +158,41 @@ function webPriceCacheDocId(name: string) {
   return name.replace(/\//g, "_").replace(/\./g, "_") || "unknown"
 }
 
+/** מחיר הכי זול לרכיב — ממסמכי משנה prices + מחיר בקטלוג הגלובלי */
+function buildGlobalCheapestMap(
+  priceDocs: QueryDocumentSnapshot<DocumentData>[],
+  globalIngDocs: QueryDocumentSnapshot<DocumentData>[],
+): Map<string, GlobalCheapest> {
+  const globalCheapestByIngredient = new Map<string, GlobalCheapest>()
+  priceDocs.forEach((d) => {
+    const data = d.data()
+    const parentId = d.ref.parent.parent?.id
+    if (!parentId) return
+    const price = typeof data.price === "number" ? data.price : 0
+    if (price <= 0) return
+    const unit = (data.unit as string) || "ק\"ג"
+    const supplier = (data.supplier as string) || ""
+    const existing = globalCheapestByIngredient.get(parentId)
+    if (!existing || pricePerKg(price, unit) < pricePerKg(existing.price, existing.unit)) {
+      globalCheapestByIngredient.set(parentId, { price, unit, supplier })
+    }
+  })
+  globalIngDocs.forEach((d) => {
+    const data = d.data()
+    const price = typeof data.price === "number" ? data.price : 0
+    const unit = (data.unit as string) || "ק\"ג"
+    const sup = (data.supplier as string) || ""
+    if (price > 0) {
+      const existing = globalCheapestByIngredient.get(d.id)
+      if (!existing || pricePerKg(price, unit) < pricePerKg(existing.price, existing.unit)) {
+        globalCheapestByIngredient.set(d.id, { price, unit, supplier: sup })
+      }
+    }
+  })
+  return globalCheapestByIngredient
+}
+
+const WEB_PRICE_CACHE_CHUNK = 35
 
 function getStoreSearchUrl(store: string, productName: string): string {
   const q = encodeURIComponent(productName)
@@ -411,6 +446,8 @@ export function AdminPanel() {
   const [suppliersWithRests, setSuppliersWithRests] = useState<SupplierWithRests[]>([])
   const [supplierToIngredients, setSupplierToIngredients] = useState<Record<string, IngredientRow[]>>({})
   const [ingredientsList, setIngredientsList] = useState<IngredientRow[]>([])
+  const ingredientsListRef = useRef<IngredientRow[]>([])
+  ingredientsListRef.current = ingredientsList
   const [selectedIngIds, setSelectedIngIds] = useState<Set<string>>(new Set())
   const [bulkAssignSupplier, setBulkAssignSupplier] = useState("")
   const [savingBulkAssign, setSavingBulkAssign] = useState(false)
@@ -535,6 +572,12 @@ export function AdminPanel() {
   const [supplierToDelete, setSupplierToDelete] = useState<SupplierWithRests | null>(null)
   const [deletingSupplierName, setDeletingSupplierName] = useState<string | null>(null)
   const [webPriceByIngredient, setWebPriceByIngredient] = useState<Record<string, { price: number; store: string; unit: string }>>({})
+  /** מונה טעינת פאנל בעלים — משמש לדחיית מחירי שוק/collectionGroup ללשונית רכיבים */
+  const [ownerDataLoadId, setOwnerDataLoadId] = useState(0)
+  const ownerDataLoadIdRef = useRef(0)
+  ownerDataLoadIdRef.current = ownerDataLoadId
+  const [loadingIngredientsSupplement, setLoadingIngredientsSupplement] = useState(false)
+  const supplementDoneForLoadIdRef = useRef(-1)
 
   // Add supplier modal (owner)
   const [addSupplierOpen, setAddSupplierOpen] = useState(false)
@@ -717,13 +760,7 @@ export function AdminPanel() {
         getDocs(collection(db, "suppliers")),
         getDocs(collection(db, "purchaseOrders")),
       ])
-      let priceDocs: QueryDocumentSnapshot<DocumentData>[] = []
-      try {
-        const pricesSnap = await getDocs(collectionGroup(db, "prices"))
-        priceDocs = pricesSnap.docs
-      } catch {
-        // collectionGroup דורש אינדקס — נמשיך בלי מחירי subcollection
-      }
+      // collectionGroup(prices) + אלפי קריאות webPriceCache — **לא** כאן; רק בלשונית «רכיבים» (מונע טעינה איטית בכל רענון)
 
       const poCountByRest = new Map<string, number>()
       allPoSnap.forEach((d) => {
@@ -732,32 +769,7 @@ export function AdminPanel() {
         poCountByRest.set(rid, (poCountByRest.get(rid) ?? 0) + 1)
       })
 
-      const globalCheapestByIngredient = new Map<string, GlobalCheapest>()
-      priceDocs.forEach((d) => {
-        const data = d.data()
-        const parentId = d.ref.parent.parent?.id
-        if (!parentId) return
-        const price = typeof data.price === "number" ? data.price : 0
-        if (price <= 0) return
-        const unit = (data.unit as string) || "ק\"ג"
-        const supplier = (data.supplier as string) || ""
-        const existing = globalCheapestByIngredient.get(parentId)
-        if (!existing || pricePerKg(price, unit) < pricePerKg(existing.price, existing.unit)) {
-          globalCheapestByIngredient.set(parentId, { price, unit, supplier })
-        }
-      })
-      globalIngSnap.forEach((d) => {
-        const data = d.data()
-        const price = typeof data.price === "number" ? data.price : 0
-        const unit = (data.unit as string) || "ק\"ג"
-        const sup = (data.supplier as string) || ""
-        if (price > 0) {
-          const existing = globalCheapestByIngredient.get(d.id)
-          if (!existing || pricePerKg(price, unit) < pricePerKg(existing.price, existing.unit)) {
-            globalCheapestByIngredient.set(d.id, { price, unit, supplier: sup })
-          }
-        }
-      })
+      const globalCheapestByIngredient = buildGlobalCheapestMap([], globalIngSnap.docs)
 
       const supplierSet = new Set<string>()
       const supplierDetails: Record<string, { phone?: string | null; email?: string | null; contact?: string | null; address?: string | null; imageUrl?: string | null }> = {}
@@ -879,21 +891,9 @@ export function AdminPanel() {
         }
       })
       setIngredientsList(allIngredients)
-      const webCache: Record<string, { price: number; store: string; unit: string }> = {}
-      await Promise.all(
-        allIngredients.map(async (ing) => {
-          try {
-            const snap = await getDoc(doc(db, "webPriceCache", webPriceCacheDocId(ing.name)))
-            const d = snap.data()
-            if (d && typeof d.price === "number") {
-              webCache[ing.name] = { price: d.price, store: (d.store as string) || "—", unit: (d.unit as string) || "קג" }
-            }
-          } catch {
-            //
-          }
-        })
-      )
-      setWebPriceByIngredient(webCache)
+      setWebPriceByIngredient({})
+      supplementDoneForLoadIdRef.current = -1
+      setOwnerDataLoadId((x) => x + 1)
     } catch (e) {
       console.error("load system owner data:", e)
       toast.error(getTranslation(locale as Locale, "pages.adminPanel.loadError"))
@@ -902,13 +902,95 @@ export function AdminPanel() {
     }
   }, [isSystemOwner, locale])
 
+  /** מחירי משנה (collectionGroup) + webPriceCache — רק כשנכנסים ללשונית רכיבים; לא חוסם מסעדות/ספקים */
+  const loadOwnerIngredientsSupplement = useCallback(
+    async (loadId: number, listSnapshot: IngredientRow[], signal: AbortSignal) => {
+      if (supplementDoneForLoadIdRef.current === loadId) return
+      let priceDocs: QueryDocumentSnapshot<DocumentData>[] = []
+      try {
+        const pricesSnap = await getDocs(collectionGroup(db, "prices"))
+        priceDocs = pricesSnap.docs
+      } catch {
+        /* collectionGroup דורש אינדקס */
+      }
+      if (signal.aborted || ownerDataLoadIdRef.current !== loadId) return
+      const globalIngSnap = await getDocs(collection(db, "ingredients"))
+      if (signal.aborted || ownerDataLoadIdRef.current !== loadId) return
+      const cheapestMap = buildGlobalCheapestMap(priceDocs, globalIngSnap.docs)
+
+      const applyCheapest = (row: IngredientRow): IngredientRow => ({
+        ...row,
+        globalCheapest: cheapestMap.get(row.id) ?? row.globalCheapest,
+      })
+
+      setIngredientsList((prev) => prev.map(applyCheapest))
+      setSupplierToIngredients((prev) => {
+        const next: Record<string, IngredientRow[]> = {}
+        for (const k of Object.keys(prev)) {
+          next[k] = (prev[k] || []).map(applyCheapest)
+        }
+        return next
+      })
+
+      const webCache: Record<string, { price: number; store: string; unit: string }> = {}
+      for (let i = 0; i < listSnapshot.length; i += WEB_PRICE_CACHE_CHUNK) {
+        if (signal.aborted || ownerDataLoadIdRef.current !== loadId) return
+        const chunk = listSnapshot.slice(i, i + WEB_PRICE_CACHE_CHUNK)
+        await Promise.all(
+          chunk.map(async (ing) => {
+            try {
+              const snap = await getDoc(doc(db, "webPriceCache", webPriceCacheDocId(ing.name)))
+              const d = snap.data()
+              if (d && typeof d.price === "number") {
+                webCache[ing.name] = {
+                  price: d.price,
+                  store: (d.store as string) || "—",
+                  unit: (d.unit as string) || "קג",
+                }
+              }
+            } catch {
+              /* */
+            }
+          }),
+        )
+      }
+      if (signal.aborted || ownerDataLoadIdRef.current !== loadId) return
+      setWebPriceByIngredient(webCache)
+      supplementDoneForLoadIdRef.current = loadId
+    },
+    [],
+  )
+
   useEffect(() => {
     if (isSystemOwner) {
       loadSystemOwnerData()
     }
   }, [isSystemOwner, loadSystemOwnerData])
 
-  // רכיבים נטענים ב-loadSystemOwnerData — אין צורך בטעינה נפרדת בלשונית
+  useEffect(() => {
+    if (!isSystemOwner || systemOwnerTab !== "ingredients") return
+    if (loadingSystemOwner) return
+    if (ownerDataLoadId <= 0) return
+    const loadId = ownerDataLoadId
+    if (supplementDoneForLoadIdRef.current === loadId) return
+    const listSnapshot = ingredientsListRef.current
+    if (listSnapshot.length === 0) {
+      supplementDoneForLoadIdRef.current = loadId
+      return
+    }
+    const ac = new AbortController()
+    setLoadingIngredientsSupplement(true)
+    void loadOwnerIngredientsSupplement(loadId, listSnapshot, ac.signal)
+      .catch((err) => console.error("ingredients supplement:", err))
+      .finally(() => {
+        setLoadingIngredientsSupplement(false)
+      })
+    return () => {
+      ac.abort()
+    }
+  }, [isSystemOwner, systemOwnerTab, loadingSystemOwner, ownerDataLoadId, loadOwnerIngredientsSupplement])
+
+  // רכיבים נטענים ב-loadSystemOwnerData — מחירי שוק/משנה נטענים בנפרד בלשונית רכיבים
 
   const filteredAndSortedSuppliers = (() => {
     let list = [...(suppliersWithRests || [])]
@@ -3723,6 +3805,12 @@ export function AdminPanel() {
                   <CardTitle className={textAlign}>{t("pages.adminPanel.globalIngredients")}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {loadingIngredientsSupplement && (
+                    <div className="flex items-center gap-2 rounded-md border border-dashed border-primary/30 bg-primary/5 px-3 py-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
+                      {t("pages.adminPanel.loadingIngredientExtras")}
+                    </div>
+                  )}
                   {/* Toolbar */}
                   <div className={`flex flex-wrap items-center gap-2 px-px ${justify}`}>
                     <div className="relative flex-1 min-w-[140px] max-w-[220px]">

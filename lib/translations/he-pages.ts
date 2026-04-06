@@ -772,6 +772,7 @@ export const hePages = {
     searchPlaceholder: "חיפוש...",
     loadingRestaurants: "טוען מסעדות...",
     loadingIngredients: "טוען רכיבים...",
+    loadingIngredientExtras: "טוען השוואת מחירים (שוק והיסטוריית משנה)…",
     clickToRefresh: "לחץ לרענון",
     emoji: "אימוג'י",
     inviteCodeOptional: "קוד הזמנה (אופציונלי)",
