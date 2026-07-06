@@ -169,7 +169,6 @@ export default function ProductTree() {
   const showManagerOnboardingNudge =
     !isSystemOwner && (userRole === "manager" || userRole === "user")
   const ob = onboardingHints
-  const nudgeIngredients = showManagerOnboardingNudge && ob && !ob.loading && ob.needsIngredients
   const nudgeSuppliers = showManagerOnboardingNudge && ob && !ob.loading && ob.needsSuppliers
   const canSeeCosts = userRole === "owner" || userRole === "admin" || userRole === "manager" || !!userPermissions?.canSeeCosts
   const hasFullMenu = isSystemOwner || userRole === "owner" || userRole === "admin" || userRole === "manager"
@@ -1289,10 +1288,6 @@ export default function ProductTree() {
                 </span>
               </Button>
             )}
-            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowMenuCosts(true)}>
-              <BarChart2 className="w-4 h-4" />
-              <span className="hidden sm:inline">{t("nav.menuCosts")}</span>
-            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -1313,25 +1308,6 @@ export default function ProductTree() {
             >
               <Camera className="w-4 h-4 shrink-0" />
               <span className="hidden sm:inline">{t("pages.productTree.identify")}</span>
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className={cn(
-                "gap-1.5 relative",
-                nudgeIngredients && "border-amber-500/70 bg-amber-500/10 ring-1 ring-amber-400/60",
-              )}
-              onClick={() => setIngredientsModalOpen(true)}
-              title={nudgeIngredients ? "אין רכיבים במסעדה — לחץ להוספה" : undefined}
-            >
-              {nudgeIngredients && (
-                <span className="absolute -top-1 -end-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-0.5 text-[9px] font-bold text-amber-950 shadow-sm">
-                  !
-                </span>
-              )}
-              <Leaf className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">{t("nav.ingredients")}</span>
             </Button>
             <Button
               type="button"
