@@ -1,6 +1,6 @@
 "use client"
 
-import { Settings, LogOut, ClipboardList, Home } from "lucide-react"
+import { LogOut, ClipboardList, Home } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -158,19 +158,6 @@ export function RestaurantTopBar({
               onClick={() => setCurrentPage("operations")}
             >
               <ClipboardList className="h-4 w-4" />
-            </Button>
-          )}
-          {canAccessPage("settings") && (
-            <Button
-              type="button"
-              variant={currentPage === "settings" ? "default" : "outline"}
-              size="icon"
-              className="h-9 w-9 shrink-0 rounded-full"
-              title={t("nav.settings")}
-              aria-label={t("nav.settings")}
-              onClick={() => setCurrentPage("settings")}
-            >
-              <Settings className="h-4 w-4" />
             </Button>
           )}
           <Button
