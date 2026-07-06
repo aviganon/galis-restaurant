@@ -86,7 +86,7 @@ async function callDirect(key: string, payload: Parameters<typeof callClaude>[0]
       "anthropic-dangerous-direct-browser-access": "true",
     },
     body: JSON.stringify({
-      model: payload.model ?? "claude-sonnet-4-20250514",
+      model: payload.model ?? "claude-sonnet-5",
       max_tokens: payload.max_tokens ?? 8000,
       system: payload.system,
       messages: payload.messages,
@@ -147,7 +147,7 @@ export async function testClaudeConnection(): Promise<{ ok: boolean; message?: s
     const key = await getClaudeApiKey()
     if (!key) return { ok: false, message: "מפתח API לא הוגדר" }
     await callClaude({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5",
       max_tokens: 50,
       system: "You are a helpful assistant. Reply briefly.",
       messages: [{ role: "user", content: [{ type: "text", text: "Say hello in one word." }] }],

@@ -135,7 +135,7 @@ const SUPPLIER_VISION_TABLE_BODY_HINT = `
 **מתמונה או PDF:** שם הספק לרוב בראש המסמך. שמות הפריטים נמצאים ב**גוף הטבלה** בעמודת תיאור / שם מוצר / פריט — קרא לאט כל תא בעברית, גם כשהכתב קטן או צפוף; אל תדלג על עמודה זו. השתמש בהזחת עמודות כדי ליישר שורות: לכל שורת טבלה מלא "name" **רק** מתוכן עמודת הפריט באותה שורה, לא מכותרת כללית ולא ממספר שורה.`
 
 /** Sonnet מדייק יותר ב-OCR עברית במסמכי ספק (תמונה/PDF/טקסט) מול Haiku */
-const CLAUDE_SUPPLIER_EXTRACT_MODEL = "claude-sonnet-4-20250514"
+const CLAUDE_SUPPLIER_EXTRACT_MODEL = "claude-sonnet-5"
 const CLAUDE_DEFAULT_EXTRACT_MODEL = "claude-haiku-4-5-20251001"
 
 const MENU_KNOWLEDGE = `
@@ -1201,7 +1201,7 @@ export interface IngredientForSuggestion {
   stock?: number
 }
 
-const SUGGEST_DISH_MODEL = "claude-sonnet-4-20250514"
+const SUGGEST_DISH_MODEL = "claude-sonnet-5"
 
 const SUGGEST_DISH_SYSTEM = `אתה שף, ברמן ומנהל תפריט מקצועי. בהתבסס על רשימת הרכיבים שיש למסעדה (מזון, משקאות, משקאות חריפים, מיקסרים וכו' — עם מחירים ויחידות מהספקים), הצע פריט אחד מתאים.
 שאף לגיוון תפריט: בחר רעיון ריאלי שמתאים לחומרי הגלם הזמינים ויכול להשתלב בתפריט ישראלי מודרני (אוכל, קינוח או משקה), לא רק מנות בסיס חוזרות.
