@@ -589,6 +589,7 @@ export function AdminPanel() {
   const [nsmContact, setNsmContact] = useState("")
   const [nsmAddress, setNsmAddress] = useState("")
   const [nsmDeliveryDay, setNsmDeliveryDay] = useState("")
+  const [nsmDeliveryDayTo, setNsmDeliveryDayTo] = useState("")
   const [nsmPaymentTerms, setNsmPaymentTerms] = useState("")
   const [nsmMinOrder, setNsmMinOrder] = useState("")
   const [nsmDeliveryCost, setNsmDeliveryCost] = useState("")
@@ -1487,6 +1488,7 @@ export function AdminPanel() {
     setNsmContact("")
     setNsmAddress("")
     setNsmDeliveryDay("")
+    setNsmDeliveryDayTo("")
     setNsmPaymentTerms("")
     setNsmMinOrder("")
     setNsmDeliveryCost("")
@@ -1575,6 +1577,10 @@ export function AdminPanel() {
         contact: nsmContact.trim() || null,
         address: nsmAddress.trim() || null,
         deliveryDay: nsmDeliveryDay || null,
+        deliveryDayTo:
+          nsmDeliveryDay && nsmDeliveryDay !== "כל יום" && nsmDeliveryDayTo && nsmDeliveryDayTo !== nsmDeliveryDay
+            ? nsmDeliveryDayTo
+            : null,
         paymentTerms: nsmPaymentTerms || null,
         minOrder: nsmMinOrder ? parseFloat(nsmMinOrder) : null,
         deliveryCost: nsmDeliveryCost ? parseFloat(nsmDeliveryCost) : null,
@@ -4262,18 +4268,42 @@ export function AdminPanel() {
                   </div>
                   <div className="space-y-2">
                     <Label>{t("pages.adminPanel.deliveryDay")}</Label>
-                    <Select value={nsmDeliveryDay} onValueChange={setNsmDeliveryDay}>
-                      <SelectTrigger className="w-full min-w-0"><SelectValue placeholder={t("pages.adminPanel.selectDay")} /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ראשון">{t("pages.adminPanel.daySun")}</SelectItem>
-                        <SelectItem value="שני">{t("pages.adminPanel.dayMon")}</SelectItem>
-                        <SelectItem value="שלישי">{t("pages.adminPanel.dayTue")}</SelectItem>
-                        <SelectItem value="רביעי">{t("pages.adminPanel.dayWed")}</SelectItem>
-                        <SelectItem value="חמישי">{t("pages.adminPanel.dayThu")}</SelectItem>
-                        <SelectItem value="שישי">{t("pages.adminPanel.dayFri")}</SelectItem>
-                        <SelectItem value="כל יום">{t("pages.adminPanel.everyDay")}</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={nsmDeliveryDay}
+                        onValueChange={(v) => {
+                          setNsmDeliveryDay(v)
+                          if (v === "כל יום" || !v) setNsmDeliveryDayTo("")
+                        }}
+                      >
+                        <SelectTrigger className="w-full min-w-0"><SelectValue placeholder={t("pages.adminPanel.deliveryDayFrom")} /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ראשון">{t("pages.adminPanel.daySun")}</SelectItem>
+                          <SelectItem value="שני">{t("pages.adminPanel.dayMon")}</SelectItem>
+                          <SelectItem value="שלישי">{t("pages.adminPanel.dayTue")}</SelectItem>
+                          <SelectItem value="רביעי">{t("pages.adminPanel.dayWed")}</SelectItem>
+                          <SelectItem value="חמישי">{t("pages.adminPanel.dayThu")}</SelectItem>
+                          <SelectItem value="שישי">{t("pages.adminPanel.dayFri")}</SelectItem>
+                          <SelectItem value="כל יום">{t("pages.adminPanel.everyDay")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="shrink-0 text-sm text-muted-foreground">{t("pages.adminPanel.deliveryDayToSep")}</span>
+                      <Select
+                        value={nsmDeliveryDayTo}
+                        onValueChange={setNsmDeliveryDayTo}
+                        disabled={!nsmDeliveryDay || nsmDeliveryDay === "כל יום"}
+                      >
+                        <SelectTrigger className="w-full min-w-0"><SelectValue placeholder={t("pages.adminPanel.deliveryDayTo")} /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ראשון">{t("pages.adminPanel.daySun")}</SelectItem>
+                          <SelectItem value="שני">{t("pages.adminPanel.dayMon")}</SelectItem>
+                          <SelectItem value="שלישי">{t("pages.adminPanel.dayTue")}</SelectItem>
+                          <SelectItem value="רביעי">{t("pages.adminPanel.dayWed")}</SelectItem>
+                          <SelectItem value="חמישי">{t("pages.adminPanel.dayThu")}</SelectItem>
+                          <SelectItem value="שישי">{t("pages.adminPanel.dayFri")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label>{t("pages.adminPanel.paymentTerms")}</Label>
