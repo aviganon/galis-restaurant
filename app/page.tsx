@@ -30,6 +30,12 @@ import { Ingredients } from "@/components/ingredients"
 import { MenuCosts } from "@/components/menu-costs"
 import { PurchaseOrders } from "@/components/purchase-orders"
 import { HomeLauncher } from "@/components/home-launcher"
+import { FixedExpenses } from "@/components/fixed-expenses"
+import { ExpenseAnalysis } from "@/components/expense-analysis"
+import { IncomeAnalysis } from "@/components/income-analysis"
+import { Warehouses } from "@/components/warehouses"
+import { Employees } from "@/components/employees"
+import { DocumentPage } from "@/components/document-page"
 import { OperationsHub } from "@/components/operations-hub"
 import { MobileNav } from "@/components/mobile-nav"
 import { DesktopNav } from "@/components/desktop-nav"
@@ -655,6 +661,26 @@ export default function Home() {
     switch (currentPage) {
       case "home":
         return <HomeLauncher />
+      case "fixed-expenses":
+        return <FixedExpenses />
+      case "expense-analysis":
+        return <ExpenseAnalysis />
+      case "income-analysis":
+        return <IncomeAnalysis />
+      case "warehouses":
+        return <Warehouses />
+      case "employees":
+        return <Employees />
+      case "doc-harassment":
+        return <DocumentPage docType="harassment" />
+      case "doc-accessibility":
+        return <DocumentPage docType="accessibility" />
+      case "doc-form101":
+        return <DocumentPage docType="form101" />
+      case "doc-work-agreement":
+        return <DocumentPage docType="workAgreement" />
+      case "doc-forms":
+        return <DocumentPage docType="forms" />
       case "dashboard":
         if (isSystemOwner && !impersonatingRestaurant) return <Dashboard />
         return <ProductTree />
