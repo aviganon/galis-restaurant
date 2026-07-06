@@ -318,7 +318,7 @@ export default function ProductTree() {
   const [showIngredientDropdown, setShowIngredientDropdown] = useState(false)
   const [selectedIngredient, setSelectedIngredient] = useState<string | null>(null)
   const [selectedIngredientType, setSelectedIngredientType] = useState<"simple" | "compound">("simple")
-  const [addIngredientQty, setAddIngredientQty] = useState(1)
+  const [addIngredientQty, setAddIngredientQty] = useState(0)
   const [addIngredientUnit, setAddIngredientUnit] = useState("גרם")
   const [addIngredientWaste, setAddIngredientWaste] = useState(0)
 
@@ -793,9 +793,10 @@ export default function ProductTree() {
     })
     setSelectedIngredient(null)
     setSelectedIngredientType("simple")
-    setAddIngredientSearch("")
-    setAddIngredientQty(isCompound ? 1 : 100)
-    setAddIngredientUnit(isCompound ? "מנה" : "גרם")
+    // משאירים את מונח החיפוש ופותחים מחדש את הרשימה — כדי להוסיף עוד רכיב ברצף
+    setShowIngredientDropdown(true)
+    setAddIngredientQty(0)
+    setAddIngredientUnit("גרם")
     setAddIngredientWaste(0)
   }
 
@@ -3002,9 +3003,8 @@ export default function ProductTree() {
                                       onClick={() => {
                                         setSelectedIngredient(name)
                                         setSelectedIngredientType("compound")
-                                        setAddIngredientSearch(name)
                                         setShowIngredientDropdown(false)
-                                        setAddIngredientQty(1)
+                                        setAddIngredientQty(0)
                                         setAddIngredientUnit("מנה")
                                       }}
                                       className="w-full px-3 py-2 text-right hover:bg-muted flex items-center justify-between transition-colors"
@@ -3037,8 +3037,8 @@ export default function ProductTree() {
                                         onClick={() => {
                                           setSelectedIngredient(name)
                                           setSelectedIngredientType("simple")
-                                          setAddIngredientSearch(name)
                                           setShowIngredientDropdown(false)
+                                          setAddIngredientQty(0)
                                           setAddIngredientUnit(normalizeUnit(sp?.unit))
                                         }}
                                         className="w-full px-3 py-2 text-right hover:bg-muted flex items-center justify-between gap-2 transition-colors"
