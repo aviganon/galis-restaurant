@@ -1,6 +1,6 @@
 "use client"
 
-import { Settings, LogOut, ClipboardList } from "lucide-react"
+import { Settings, LogOut, ClipboardList, Home } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -120,15 +120,17 @@ export function RestaurantTopBar({
         </div>
 
         <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
-          {currentPage !== "calc" && (
+          {currentPage !== "home" && (
             <Button
               type="button"
               variant="secondary"
-              size="sm"
-              className="hidden h-9 rounded-full text-xs sm:inline-flex"
-              onClick={() => setCurrentPage("calc")}
+              size="icon"
+              className="h-9 w-9 shrink-0 rounded-full"
+              title={t("launcher.home")}
+              aria-label={t("launcher.home")}
+              onClick={() => setCurrentPage("home")}
             >
-              {t("app.backToMain")}
+              <Home className="h-4 w-4" />
             </Button>
           )}
           {isImpersonating && onStopImpersonate && (

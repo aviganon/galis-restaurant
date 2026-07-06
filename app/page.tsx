@@ -29,6 +29,7 @@ import ProductTree from "@/components/product-tree"
 import { Ingredients } from "@/components/ingredients"
 import { MenuCosts } from "@/components/menu-costs"
 import { PurchaseOrders } from "@/components/purchase-orders"
+import { HomeLauncher } from "@/components/home-launcher"
 import { OperationsHub } from "@/components/operations-hub"
 import { MobileNav } from "@/components/mobile-nav"
 import { DesktopNav } from "@/components/desktop-nav"
@@ -87,7 +88,7 @@ export default function Home() {
   const [authLoading, setAuthLoading] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userRole, setUserRole] = useState<"admin" | "owner" | "manager" | "user">("owner")
-  const [currentPage, setCurrentPage] = useState("calc")
+  const [currentPage, setCurrentPage] = useState("home")
   const [previousPage, setPreviousPage] = useState("calc")
   const [currentRestaurant, setCurrentRestaurant] = useState(() => t("common.loading"))
   const [currentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null)
@@ -310,6 +311,10 @@ export default function Home() {
             canSeeCosts: perms.canSeeCosts ?? defaultPermissions.canSeeCosts,
             canSeeSettings: perms.canSeeSettings ?? defaultPermissions.canSeeSettings,
             canSeeOperations: perms.canSeeOperations ?? defaultPermissions.canSeeOperations ?? true,
+            canSeeExpenses: perms.canSeeExpenses ?? defaultPermissions.canSeeExpenses,
+            canSeeWarehouses: perms.canSeeWarehouses ?? defaultPermissions.canSeeWarehouses,
+            canSeeEmployees: perms.canSeeEmployees ?? defaultPermissions.canSeeEmployees,
+            canSeeHrDocs: perms.canSeeHrDocs ?? defaultPermissions.canSeeHrDocs,
           })
         } else {
           setUserPermissions(undefined)
@@ -648,6 +653,8 @@ export default function Home() {
       )
     }
     switch (currentPage) {
+      case "home":
+        return <HomeLauncher />
       case "dashboard":
         if (isSystemOwner && !impersonatingRestaurant) return <Dashboard />
         return <ProductTree />
@@ -794,7 +801,7 @@ export default function Home() {
                   type="button"
                   className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"
                   aria-label={t("pages.close")}
-                  onClick={() => setCurrentPage("calc")}
+                  onClick={() => setCurrentPage("home")}
                 />
                 <div className="relative flex h-[min(88vh,900px)] max-lg:h-[min(calc(100dvh-1.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom)),900px)] w-[min(92vw,1200px)] max-lg:w-full max-lg:max-w-full flex-col overflow-hidden rounded-xl max-lg:rounded-2xl border bg-background shadow-2xl">
                   <Button
@@ -802,7 +809,7 @@ export default function Home() {
                     variant="secondary"
                     size="icon"
                     className="absolute end-3 top-[max(0.75rem,env(safe-area-inset-top))] z-10 h-10 w-10 lg:h-9 lg:w-9 rounded-full shadow-md"
-                    onClick={() => setCurrentPage("calc")}
+                    onClick={() => setCurrentPage("home")}
                     aria-label={t("pages.close")}
                   >
                     <X className="h-4 w-4" />

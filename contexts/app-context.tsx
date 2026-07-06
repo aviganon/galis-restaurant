@@ -15,6 +15,14 @@ export type UserPermissions = {
   canSeeSettings?: boolean
   /** מרכז תפעול — משימות, יומן ביקורת, היסטוריית מחירים */
   canSeeOperations?: boolean
+  /** הוצאות קבועות + ניתוח הוצאות */
+  canSeeExpenses?: boolean
+  /** ניהול מחסנים */
+  canSeeWarehouses?: boolean
+  /** ניהול עובדים (HR) — כולל נתונים רגישים */
+  canSeeEmployees?: boolean
+  /** מסמכים ונהלים משפטיים/HR (טופס 101, הסכם עבודה, תקנון, טפסים) */
+  canSeeHrDocs?: boolean
 }
 
 export type Restaurant = { id: string; name: string; branch?: string; emoji?: string }

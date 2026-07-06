@@ -36,6 +36,10 @@ export const firestoreConfig = {
     canSeeCosts: false,
     canSeeSettings: false,
     canSeeOperations: true,
+    canSeeExpenses: false,
+    canSeeWarehouses: false,
+    canSeeEmployees: false,
+    canSeeHrDocs: false,
   },
   inviteCodesCollection: "inviteCodes",
   inviteCodeFields: {
