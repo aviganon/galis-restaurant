@@ -14,6 +14,7 @@ import {
   BookOpen,
   PieChart,
   ClipboardList,
+  Home,
 } from "lucide-react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
@@ -54,9 +55,10 @@ const mainNavItems = (
   isImpersonating?: boolean
 ) => {
   const full = hasFullMenu(userRole, isSystemOwner)
-  const items: { id: string; label: string; icon: typeof Calculator | typeof LayoutDashboard | typeof Shield }[] = []
+  const items: { id: string; label: string; icon: typeof Calculator | typeof LayoutDashboard | typeof Shield | typeof Home }[] = []
   if (isSystemOwner && !isImpersonating) {
     /* סקירת כל המסעדות — אין מודאל כזה מעץ מוצר */
+    items.push({ id: "home", label: t("launcher.home"), icon: Home })
     items.push({ id: "dashboard", label: t("nav.dashboard"), icon: LayoutDashboard })
     items.push({ id: "admin-panel", label: t("nav.adminPanel"), icon: Shield })
     return items

@@ -602,7 +602,7 @@ export default function Home() {
   const handleImpersonate = (rest: { id: string; name: string; emoji?: string }) => {
     const display = rest.emoji ? `${rest.emoji} ${rest.name}` : rest.name
     setImpersonatingRestaurant({ id: rest.id, name: display })
-    setCurrentPage("calc")
+    setCurrentPage("home")
   }
   const handleStopImpersonate = () => setImpersonatingRestaurant(null)
   const handleRestaurantDeleted = useCallback((deletedId: string) => {

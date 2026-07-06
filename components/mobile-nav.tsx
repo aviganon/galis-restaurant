@@ -14,6 +14,7 @@ import {
   BookOpen,
   PieChart,
   ClipboardList,
+  Home,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { OnboardingHintsState, UserPermissions } from "@/contexts/app-context"
@@ -44,8 +45,9 @@ const mainItems = (
   includeMoreTab?: boolean
 ) => {
   const full = hasFullMenu(userRole, isSystemOwner)
-  const items: { id: string; label: string; icon: typeof Calculator | typeof LayoutDashboard | typeof Shield }[] = []
+  const items: { id: string; label: string; icon: typeof Calculator | typeof LayoutDashboard | typeof Shield | typeof Home }[] = []
   if (isSystemOwner && !isImpersonating) {
+    items.push({ id: "home", label: t("launcher.home"), icon: Home })
     items.push({ id: "dashboard", label: t("nav.dashboard"), icon: LayoutDashboard })
     items.push({ id: "admin-panel", label: t("nav.adminPanelShort"), icon: Shield })
     return items
