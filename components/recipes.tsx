@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { collection, doc, getDoc, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { loadGlobalPriceSubdocsMap, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
+import { unitConversionFactor } from "@/lib/unit-conversion"
 import { useApp } from "@/contexts/app-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -81,14 +82,16 @@ export function Recipes() {
         const subPricesByIngredient =
           isOwner && assignedList.length > 0 ? await loadGlobalPriceSubdocsMap(db) : new Map()
         const prices: Record<string, number> = {}
+        const priceUnits: Record<string, string> = {}
         restIngSnap.forEach((d) => {
           const data = d.data()
           prices[d.id] = typeof data.price === "number" ? data.price : 0
+          priceUnits[d.id] = typeof data.unit === "string" ? data.unit : ""
         })
         globalIngSnap?.forEach((d) => {
           if (d.id in prices) return
           const picked = pickGlobalIngredientRowFromAssigned(assignedList, d.data(), subPricesByIngredient.get(d.id))
-          if (picked) prices[d.id] = picked.price
+          if (picked) { prices[d.id] = picked.price; priceUnits[d.id] = picked.unit }
         })
 
         const list: Recipe[] = []
@@ -100,10 +103,8 @@ export function Recipes() {
           let cost = 0
           ing.forEach((i: { name?: string; qty?: number; waste?: number; unit?: string }) => {
             const p = prices[i.name || ""] ?? 0
-            let mult = 1
-            if (i.unit === "גרם") mult = 0.001
-            else if (i.unit === "מל") mult = 0.001
-            cost += (i.qty || 0) * p * mult * (1 + (i.waste || 0) / 100)
+            const factor = unitConversionFactor(i.unit, priceUnits[i.name || ""])
+            cost += (i.qty || 0) * p * factor * (1 + (i.waste || 0) / 100)
           })
           const margin = sellingPrice > 0 ? ((sellingPrice - cost) / sellingPrice) * 100 : 0
           list.push({

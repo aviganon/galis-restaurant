@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch"
 import { firebaseBearerHeaders } from "@/lib/api-auth-client"
 import { logAuditAction } from "@/lib/audit-log-client"
 import { cn } from "@/lib/utils"
+import { unitConversionFactor } from "@/lib/unit-conversion"
 import { useApp } from "@/contexts/app-context"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
@@ -830,10 +831,11 @@ export function AdminPanel() {
           assignedList.forEach((s) => { if (supplierToRests[s]) supplierToRests[s].push(r.id) })
           const dishes = recSnap.docs.filter((d) => !d.data().isCompound)
           const prices: Record<string, number> = {}
-          restIngSnap.forEach((d) => { const ddata = d.data(); prices[d.id] = typeof ddata.price === "number" ? ddata.price : 0 })
+          const priceUnits: Record<string, string> = {}
+          restIngSnap.forEach((d) => { const ddata = d.data(); prices[d.id] = typeof ddata.price === "number" ? ddata.price : 0; priceUnits[d.id] = typeof ddata.unit === "string" ? ddata.unit : "" })
           globalIngSnap.forEach((d) => {
             const ddata = d.data(); const sup = (ddata.supplier as string) || ""
-            if (!(d.id in prices) && (!sup || assignedList.includes(sup))) prices[d.id] = typeof ddata.price === "number" ? ddata.price : 0
+            if (!(d.id in prices) && (!sup || assignedList.includes(sup))) { prices[d.id] = typeof ddata.price === "number" ? ddata.price : 0; priceUnits[d.id] = typeof ddata.unit === "string" ? ddata.unit : "" }
           })
           let fcSum = 0, fcCount = 0
           dishes.forEach((d) => {
@@ -843,10 +845,8 @@ export function AdminPanel() {
             let cost = 0
             ing.forEach((i: { name?: string; qty?: number; waste?: number; unit?: string }) => {
               const p = prices[i.name || ""] ?? 0
-              let mult = 1
-              if (i.unit === "גרם") mult = 0.001
-              else if (i.unit === "מל") mult = 0.001
-              cost += (i.qty || 0) * p * mult * (1 + (i.waste || 0) / 100)
+              const factor = unitConversionFactor(i.unit, priceUnits[i.name || ""])
+              cost += (i.qty || 0) * p * factor * (1 + (i.waste || 0) / 100)
             })
             const fcPct = sellingPrice > 0 ? (cost / sellingPrice) * 100 : 0
             fcSum += fcPct; fcCount++

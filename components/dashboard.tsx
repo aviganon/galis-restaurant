@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { collection, getDocs, getDoc, doc, query, where, orderBy, limit, setDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { loadGlobalPriceSubdocsMap, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
+import { unitConversionFactor } from "@/lib/unit-conversion"
 import { recipeCountsAsMenuDish } from "@/lib/recipe-menu-visibility"
 import { normalizeDishCategoryToHebrew } from "@/lib/dish-category-hebrew"
 import {
@@ -139,13 +140,15 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
             const assignedList: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
             const recipes = recSnap.docs.filter((d) => recipeCountsAsMenuDish(d.data()))
             const prices: Record<string, number> = {}
+            const priceUnits: Record<string, string> = {}
             globalIngSnap.forEach((d) => {
               const picked = pickGlobalIngredientRowFromAssigned(assignedList, d.data(), subPricesByIngredient.get(d.id))
-              if (picked) prices[d.id] = picked.price
+              if (picked) { prices[d.id] = picked.price; priceUnits[d.id] = picked.unit }
             })
             restIngSnap.forEach((d) => {
               const data = d.data()
               prices[d.id] = typeof data.price === "number" ? data.price : 0
+              priceUnits[d.id] = typeof data.unit === "string" ? data.unit : ""
             })
             const recipesMap: Record<string, { ingredients: { name: string; qty: number; unit: string; waste: number; isSubRecipe?: boolean }[]; yieldQty?: number }> = {}
             recSnap.docs.forEach((d) => {
@@ -164,10 +167,8 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
                 return (totalSub / yieldQty) * qty
               }
               const p = prices[name] ?? 0
-              let mult = 1
-              if (unit === "גרם") mult = 0.001
-              else if (unit === "מל") mult = 0.001
-              return qty * p * mult * (1 + waste / 100)
+              const factor = unitConversionFactor(unit, priceUnits[name])
+              return qty * p * factor * (1 + waste / 100)
             }
             const salesData = salesDoc.data()?.dailySales as Record<string, { avg: number }> | undefined
             const dailySales = salesData || {}
@@ -293,18 +294,20 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
         setRecipesCount(recipes.length)
 
         const prices: Record<string, number> = {}
+        const priceUnits: Record<string, string> = {}
         const suppliers = new Set<string>()
         const ingIds = new Set<string>()
         let lowStock = 0
         let outOfStock = 0
         let value = 0
 
-        const mergeIng = (d: { id: string; data: () => { price?: number; supplier?: string; stock?: number; minStock?: number } }) => {
+        const mergeIng = (d: { id: string; data: () => { price?: number; supplier?: string; stock?: number; minStock?: number; unit?: string } }) => {
           const data = d.data()
           const price = typeof data.price === "number" ? data.price : 0
           const stock = typeof data.stock === "number" ? data.stock : 0
           const minStock = typeof data.minStock === "number" ? data.minStock : 0
           prices[d.id] = price
+          priceUnits[d.id] = typeof data.unit === "string" ? data.unit : ""
           ingIds.add(d.id)
           if (data.supplier) suppliers.add(data.supplier)
           if (stock === 0) outOfStock++
@@ -351,10 +354,8 @@ export function Dashboard({ embedded = false, onCloseEmbedded }: DashboardProps 
             return (totalSub / yieldQty) * qty
           }
           const p = prices[name] ?? 0
-          let mult = 1
-          if (unit === "גרם") mult = 0.001
-          else if (unit === "מל") mult = 0.001
-          return qty * p * mult * (1 + waste / 100)
+          const factor = unitConversionFactor(unit, priceUnits[name])
+          return qty * p * factor * (1 + waste / 100)
         }
 
         const salesData = salesDoc.data()?.dailySales as Record<string, { avg: number; trend: number }> | undefined

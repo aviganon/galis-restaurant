@@ -21,3 +21,8 @@ export function unitConversionFactor(recipeUnit: string | undefined, priceUnit: 
   if (r && p && r.fam === p.fam) return r.base / p.base
   return 1
 }
+
+/** ממיר כמות מיחידת-מקור ליחידת-יעד (אותה משפחת מסה/נפח). מחזיר את הכמות כמות שהיא אם אי-אפשר להמיר. */
+export function convertQty(qty: number, fromUnit: string | undefined, toUnit: string | undefined): number {
+  return qty * unitConversionFactor(fromUnit, toUnit)
+}
