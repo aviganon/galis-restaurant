@@ -5,6 +5,7 @@ import { collection, getDocs, query, where, addDoc, updateDoc, deleteDoc, doc, g
 import { db, auth } from "@/lib/firebase"
 import { appendRestaurantAuditLog } from "@/lib/restaurant-operations"
 import { loadGlobalPriceSubdocsMap, type PriceSubEntry } from "@/lib/ingredient-assigned-price"
+import { convertQty } from "@/lib/unit-conversion"
 import { toWhatsappNumber, buildOrderMessage } from "@/lib/phone"
 import { useApp } from "@/contexts/app-context"
 import { Card, CardContent } from "@/components/ui/card"
@@ -31,6 +32,8 @@ interface OrderSuggestion {
   unit: string
   price: number
   supplier: string
+  /** צריכה יומית משוערת לפי דוח מכירות (ביחידת המלאי) */
+  dailyUse?: number
 }
 
 interface PurchaseOrder {
@@ -92,7 +95,9 @@ export function PurchaseOrders() {
   const t = useTranslations()
   const { currentRestaurantId, refreshIngredients } = useApp()
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
-  const [suggestions, setSuggestions] = useState<OrderSuggestion[]>([])
+  const [rawIngredients, setRawIngredients] = useState<Array<{ name: string; stock: number; minStock: number; unit: string; price: number; supplier: string }>>([])
+  const [dailyUsage, setDailyUsage] = useState<Record<string, number>>({})
+  const [coverageDays, setCoverageDays] = useState(7)
   const [pricesMap, setPricesMap] = useState<Map<string, PriceSubEntry[]>>(new Map())
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -111,10 +116,12 @@ export function PurchaseOrders() {
     if (!currentRestaurantId) { setLoading(false); return }
     setLoading(true)
     try {
-      const [ordersSnap, ingSnap, pMap] = await Promise.all([
+      const [ordersSnap, ingSnap, pMap, recSnap, salesDoc] = await Promise.all([
         getDocs(query(collection(db, "purchaseOrders"), where("restaurantId", "==", currentRestaurantId))),
         getDocs(collection(db, "restaurants", currentRestaurantId, "ingredients")),
         loadGlobalPriceSubdocsMap(db),
+        getDocs(collection(db, "restaurants", currentRestaurantId, "recipes")),
+        getDoc(doc(db, "restaurants", currentRestaurantId, "appState", `salesReport_${currentRestaurantId}`)),
       ])
       setPricesMap(pMap)
       const list: PurchaseOrder[] = ordersSnap.docs.map(d => {
@@ -123,20 +130,59 @@ export function PurchaseOrders() {
       })
       list.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       setOrders(list)
-      const sugg: OrderSuggestion[] = []
+      // רכיבים גולמיים — ההמלצות עצמן מחושבות ב-useMemo לפי ימי כיסוי
+      const rawIngs: Array<{ name: string; stock: number; minStock: number; unit: string; price: number; supplier: string }> = []
+      const ingUnits: Record<string, string> = {}
       ingSnap.forEach(d => {
         const data = d.data()
-        const stock = typeof data.stock === "number" ? data.stock : 0
-        const minStock = typeof data.minStock === "number" ? data.minStock : 0
-        const price = typeof data.price === "number" ? data.price : 0
         const unit = (data.unit as string) || "יח"
-        const supplier = (data.supplier as string) || ""
-        if (stock < minStock || (stock === 0 && minStock === 0)) {
-          sugg.push({ name: d.id, currentStock: stock, minStock, suggestedQty: Math.max(1, minStock - stock), unit, price, supplier: supplier || "—" })
+        ingUnits[d.id] = unit
+        rawIngs.push({
+          name: d.id,
+          stock: typeof data.stock === "number" ? data.stock : 0,
+          minStock: typeof data.minStock === "number" ? data.minStock : 0,
+          unit,
+          price: typeof data.price === "number" ? data.price : 0,
+          supplier: ((data.supplier as string) || "").trim() || "—",
+        })
+      })
+      setRawIngredients(rawIngs)
+
+      // צריכה יומית לכל רכיב לפי דוח המכירות (מכירות × מתכון, עם המרת יחידות)
+      const recipesMap: Record<string, { ingredients: { name: string; qty?: number; unit?: string; isSubRecipe?: boolean }[]; yieldQty: number }> = {}
+      recSnap.forEach(d => {
+        const data = d.data()
+        recipesMap[d.id] = {
+          ingredients: Array.isArray(data.ingredients) ? data.ingredients : [],
+          yieldQty: typeof data.yieldQty === "number" && data.yieldQty > 0 ? data.yieldQty : 1,
         }
       })
-      sugg.sort((a, b) => (a.supplier || "").localeCompare(b.supplier || ""))
-      setSuggestions(sugg)
+      const salesData = salesDoc.data() || {}
+      const dailySales = (salesData.dailySales as Record<string, { avg?: number }>) || {}
+      const period = (salesData.salesReportPeriod as string) || "unknown"
+      const periodDays = period === "monthly" ? 30 : period === "weekly" ? 7 : 1
+      const usage: Record<string, number> = {}
+      const addUsage = (dishId: string, servingsPerDay: number, depth: number) => {
+        if (depth > 6) return
+        const rec = recipesMap[dishId]
+        if (!rec) return
+        const yieldQty = rec.yieldQty || 1
+        for (const ing of rec.ingredients) {
+          const perServing = (Number(ing.qty) || 0) / yieldQty
+          const amountPerDay = perServing * servingsPerDay
+          if (amountPerDay <= 0) continue
+          if (ing.isSubRecipe) {
+            addUsage(ing.name, amountPerDay, depth + 1)
+          } else {
+            usage[ing.name] = (usage[ing.name] || 0) + convertQty(amountPerDay, ing.unit, ingUnits[ing.name] || ing.unit)
+          }
+        }
+      }
+      Object.entries(dailySales).forEach(([dishId, v]) => {
+        const perDay = (Number(v?.avg) || 0) / periodDays
+        if (perDay > 0) addUsage(dishId, perDay, 0)
+      })
+      setDailyUsage(usage)
       try {
         const asDoc = await getDoc(doc(db, "restaurants", currentRestaurantId, "appState", "assignedSuppliers"))
         const assigned: string[] = Array.isArray(asDoc.data()?.list) ? asDoc.data()!.list : []
@@ -200,10 +246,34 @@ export function PurchaseOrders() {
         ups.sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt))
         setUploads(ups)
       } catch(e) { console.error(e) }
-    } catch { setOrders([]); setSuggestions([]) } finally { setLoading(false) }
+    } catch { setOrders([]); setRawIngredients([]); setDailyUsage({}) } finally { setLoading(false) }
   }, [currentRestaurantId])
 
   useEffect(() => { void loadData() }, [loadData])
+
+  // המלצות הזמנה: מקסימום בין (מלאי<מינימום) לבין (צריכה יומית × ימי כיסוי)
+  const suggestions = useMemo<OrderSuggestion[]>(() => {
+    const out: OrderSuggestion[] = []
+    for (const ing of rawIngredients) {
+      const dailyUse = dailyUsage[ing.name] || 0
+      const target = Math.max(ing.minStock, Math.ceil(dailyUse * coverageDays))
+      const belowMin = ing.stock < ing.minStock || (ing.stock === 0 && ing.minStock === 0)
+      if (ing.stock < target || belowMin) {
+        out.push({
+          name: ing.name,
+          currentStock: ing.stock,
+          minStock: ing.minStock,
+          suggestedQty: Math.max(1, Math.ceil(target - ing.stock)),
+          unit: ing.unit,
+          price: ing.price,
+          supplier: ing.supplier,
+          dailyUse: dailyUse > 0 ? dailyUse : undefined,
+        })
+      }
+    }
+    out.sort((a, b) => (a.supplier || "").localeCompare(b.supplier || ""))
+    return out
+  }, [rawIngredients, dailyUsage, coverageDays])
 
   const handleStockCountFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
@@ -383,12 +453,14 @@ export function PurchaseOrders() {
           <div className="p-2 rounded-xl bg-primary/10"><ShoppingCart className="w-5 h-5 text-primary" /></div>
           <div>
             <h1 className="font-bold text-xl">הזמנת ספקים</h1>
-            <p className="text-sm text-muted-foreground">{suggestions.length > 0 ? `${suggestions.length} רכיבים מתחת למינימום` : "המלאי תקין — אין המלצות להזמנה"}</p>
+            <p className="text-sm text-muted-foreground">{suggestions.length > 0 ? `${suggestions.length} רכיבים להזמנה` : "המלאי תקין — אין המלצות להזמנה"}</p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={() => loadData()} className="shrink-0 gap-1">
-          <RefreshCw className="w-4 h-4" /> רענן
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <label htmlFor="po-coverage-days" className="text-xs text-muted-foreground whitespace-nowrap">כיסוי (ימים)</label>
+          <Input id="po-coverage-days" type="number" min={1} value={coverageDays} onChange={(e) => setCoverageDays(Math.max(1, Number(e.target.value) || 1))} className="h-8 w-16 text-center" />
+          <Button variant="outline" size="sm" onClick={() => loadData()} className="gap-1"><RefreshCw className="w-4 h-4" /> רענן</Button>
+        </div>
       </div>
 
       {/* בונה ההזמנה — הלב */}
