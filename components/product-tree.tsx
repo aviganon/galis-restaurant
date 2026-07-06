@@ -429,12 +429,13 @@ export default function ProductTree() {
         } else {
           await deleteDoc(ref)
         }
-        refreshIngredients?.()
+        // שמירת מנה (מתכון) אינה משנה נתוני רכיבים — לכן אין צורך לרענן את קטלוג הרכיבים
+        // הגלובלי (טעינה כבדה כולל collectionGroup מחירים). זה מנע "ריענון וחישוב ארוך" בכל הוספת רכיב.
       } catch (e) {
         toast.error(t("pages.productTree.saveError") + ": " + (e as Error).message)
       }
     },
-    [currentRestaurantId, refreshIngredients, t]
+    [currentRestaurantId, t]
   )
 
   const debouncedSaveDish = useCallback(
@@ -2756,12 +2757,14 @@ export default function ProductTree() {
                 {/* Ingredients Table */}
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <Input
-                      value={dishIngredientSearch}
-                      onChange={(e) => setDishIngredientSearch(e.target.value)}
-                      placeholder="חיפוש רכיב במנה..."
-                      className="h-8 w-48"
-                    />
+                    {(currentDish?.ingredients?.length ?? 0) > 5 && (
+                      <Input
+                        value={dishIngredientSearch}
+                        onChange={(e) => setDishIngredientSearch(e.target.value)}
+                        placeholder="סינון רכיבי המנה..."
+                        className="h-8 w-44"
+                      />
+                    )}
                     <Select value={dishIngredientSort} onValueChange={(v) => setDishIngredientSort(v as "name" | "qty_desc" | "cost_desc")}>
                       <SelectTrigger className="h-8 w-[150px]">
                         <SelectValue />
@@ -2936,6 +2939,9 @@ export default function ProductTree() {
                 
                 {/* Add Ingredient */}
                 <div className="mt-2 pt-2 border-t border-border shrink-0">
+                  <p className="mb-1.5 flex items-center gap-1 text-xs font-semibold text-foreground">
+                    <Plus className="h-3.5 w-3.5 text-primary" /> הוספת רכיב למנה
+                  </p>
                   <div className="relative">
                     <div className="flex gap-2">
                       <div className="relative flex-1">
