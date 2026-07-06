@@ -129,6 +129,28 @@ const normalizeUnit = (u: string | undefined): string => {
   return "גרם"
 }
 
+/**
+ * משפחת יחידה + גודלה ביחידת בסיס (גרם / מ"ל). מנקה גרשיים/רווחים כדי לזהות וריאנטים
+ * (ק"ג / ק״ג / קג / kg → מסה 1000; גרם/g → מסה 1; ליטר → נפח 1000; מל → נפח 1).
+ */
+function unitBase(u: string | undefined): { fam: "mass" | "vol"; base: number } | null {
+  const s = String(u || "").replace(/["'״׳. ]/g, "").replace(/\s+/g, "").toLowerCase()
+  if (!s) return null
+  if (["גרם", "גר", "גרמים", "g", "gr", "gram", "grams"].includes(s)) return { fam: "mass", base: 1 }
+  if (["קג", "קילו", "קילוגרם", "kg", "kgs", "kilo", "kilogram"].includes(s)) return { fam: "mass", base: 1000 }
+  if (["מל", "מיל", "ml", "cc", "סמק"].includes(s)) return { fam: "vol", base: 1 }
+  if (["ליטר", "ליט", "ליטרים", "l", "lt", "liter", "litre"].includes(s)) return { fam: "vol", base: 1000 }
+  return null
+}
+
+/** מקדם המרה: עלות כמות ביחידת המתכון, יחסית למחיר הנתון ביחידת הספק. 1 אם אי-אפשר להמיר. */
+function unitConversionFactor(recipeUnit: string | undefined, priceUnit: string | undefined): number {
+  const r = unitBase(recipeUnit)
+  const p = unitBase(priceUnit)
+  if (r && p && r.fam === p.fam) return r.base / p.base
+  return 1
+}
+
 const isOwnerRole = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner"
 const CATEGORY_TO_KEY: Record<string, string> = {
   "עיקריות": "mainDishes",
@@ -542,9 +564,13 @@ export default function ProductTree() {
     const yieldQty = recipe.yieldQty ?? 1
     let totalSubCost = 0
     recipe.ingredients.forEach((sub) => {
-      const basePrice = calculateDeepCost(sub.name, !!sub.isSubRecipe)
-      const wasteFactor = sub.isSubRecipe ? 1 : 1 + (sub.waste || 0) / 100
-      totalSubCost += basePrice * (sub.qty || 0) * wasteFactor
+      if (sub.isSubRecipe) {
+        totalSubCost += calculateDeepCost(sub.name, true) * (sub.qty || 0)
+      } else {
+        const sp = supplierPrices[sub.name]
+        const factor = unitConversionFactor(sub.unit, sp?.unit)
+        totalSubCost += (sp?.price ?? 0) * (sub.qty || 0) * factor * (1 + (sub.waste || 0) / 100)
+      }
     })
     return totalSubCost / yieldQty
   }, [supplierPrices, dishes])
@@ -557,11 +583,8 @@ export default function ProductTree() {
     }
     const sp = supplierPrices[name]
     if (!sp) return 0
-    let multiplier = 1
-    const spUnit = sp.unit || ""
-    if ((spUnit === "קג" || spUnit === 'ק"ג') && unit === "גרם") multiplier = 0.001
-    else if (spUnit === "ליטר" && unit === "מל") multiplier = 0.001
-    else if (sp.unit === "30 יח'" && unit === "יחידה") multiplier = 1 / 30
+    let multiplier = unitConversionFactor(unit, sp.unit)
+    if (sp.unit === "30 יח'" && unit === "יחידה") multiplier = 1 / 30
     return qty * sp.price * multiplier * (1 + waste / 100)
   }, [supplierPrices, calculateDeepCost])
 
