@@ -46,6 +46,7 @@ async function extractWithClaude(ingredientName: string, searchSnippets: string 
     },
     body: JSON.stringify({
       model: "claude-sonnet-5",
+      thinking: { type: "disabled" },
       max_tokens: 500,
       system: systemPrompt,
       messages: [{ role: "user", content: [{ type: "text", text: userContent }] }],

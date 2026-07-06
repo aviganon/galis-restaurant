@@ -90,6 +90,7 @@ async function callDirect(key: string, payload: Parameters<typeof callClaude>[0]
       max_tokens: payload.max_tokens ?? 8000,
       system: payload.system,
       messages: payload.messages,
+      ...(payload.thinking ? { thinking: payload.thinking } : {}),
     }),
   })
   clearTimeout(timeoutId)
@@ -111,6 +112,8 @@ export async function callClaude(payload: {
   max_tokens?: number
   system: string
   messages: ClaudeMessage[]
+  /** ב-Sonnet 5 adaptive thinking פועל כברירת מחדל; לחילוץ מובנה מכבים כדי למנוע האטה/קיצוץ JSON */
+  thinking?: { type: "disabled" }
 }): Promise<{ content: Array<{ text?: string }> }> {
   const ctrl = new AbortController()
   const timeoutId = setTimeout(() => ctrl.abort(), API_TIMEOUT_MS)

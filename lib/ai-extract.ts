@@ -974,6 +974,7 @@ export async function extractWithAI(
           : "חלץ דוח מכירות לפי SALES_SYSTEM — כולל sales_report_period, sales_report_date_from, sales_report_date_to. JSON בלבד."
     const data = await callClaude({
       model: type === "p" ? CLAUDE_SUPPLIER_EXTRACT_MODEL : CLAUDE_DEFAULT_EXTRACT_MODEL,
+      thinking: type === "p" ? { type: "disabled" as const } : undefined,
       max_tokens: 8000,
       system,
       messages: [{ role: "user", content: [{ type: "text", text: `טקסט מהמסמך:\n\n${text}\n\n${userContent}` }] }],
@@ -1031,6 +1032,7 @@ export async function extractWithAI(
         : { type: "image" as const, source: { type: "base64" as const, media_type: mediaType as "image/jpeg" | "image/png" | "image/webp" | "image/gif", data: base64 } }
     const data = await callClaude({
       model: type === "p" ? CLAUDE_SUPPLIER_EXTRACT_MODEL : CLAUDE_DEFAULT_EXTRACT_MODEL,
+      thinking: type === "p" ? { type: "disabled" as const } : undefined,
       max_tokens: 8000,
       system,
       messages: [{ role: "user", content: [mediaBlock, { type: "text" as const, text: userContent }] }],
@@ -1094,6 +1096,7 @@ export async function extractWithAI(
     const supplierRowCount = type === "p" ? supplierPreview.used : 0
     const data = await callClaude({
       model: type === "p" ? CLAUDE_SUPPLIER_EXTRACT_MODEL : CLAUDE_DEFAULT_EXTRACT_MODEL,
+      thinking: type === "p" ? { type: "disabled" as const } : undefined,
       max_tokens:
         type === "p" ? (supplierRowCount > 45 ? 12_000 : 8000) : type === "s" ? 4000 : 2000,
       system,
@@ -1306,6 +1309,7 @@ export async function suggestDishFromIngredients(
     : ""
   const data = await callClaude({
     model: SUGGEST_DISH_MODEL,
+    thinking: { type: "disabled" },
     max_tokens: 4000,
     system: SUGGEST_DISH_SYSTEM,
     messages: [
