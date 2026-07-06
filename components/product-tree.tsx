@@ -45,6 +45,7 @@ import {
 import { getClaudeApiKey } from "@/lib/claude"
 import { confirmSupplierInvoiceImport, confirmSalesReportImport } from "@/lib/restaurant-import-handlers"
 import { loadGlobalPriceSubdocsMap, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
+import { unitConversionFactor } from "@/lib/unit-conversion"
 import { normalizeDishCategoryToHebrew } from "@/lib/dish-category-hebrew"
 import {
   parseFoodCostTargets,
@@ -129,27 +130,6 @@ const normalizeUnit = (u: string | undefined): string => {
   return "גרם"
 }
 
-/**
- * משפחת יחידה + גודלה ביחידת בסיס (גרם / מ"ל). מנקה גרשיים/רווחים כדי לזהות וריאנטים
- * (ק"ג / ק״ג / קג / kg → מסה 1000; גרם/g → מסה 1; ליטר → נפח 1000; מל → נפח 1).
- */
-function unitBase(u: string | undefined): { fam: "mass" | "vol"; base: number } | null {
-  const s = String(u || "").replace(/["'״׳. ]/g, "").replace(/\s+/g, "").toLowerCase()
-  if (!s) return null
-  if (["גרם", "גר", "גרמים", "g", "gr", "gram", "grams"].includes(s)) return { fam: "mass", base: 1 }
-  if (["קג", "קילו", "קילוגרם", "kg", "kgs", "kilo", "kilogram"].includes(s)) return { fam: "mass", base: 1000 }
-  if (["מל", "מיל", "ml", "cc", "סמק"].includes(s)) return { fam: "vol", base: 1 }
-  if (["ליטר", "ליט", "ליטרים", "l", "lt", "liter", "litre"].includes(s)) return { fam: "vol", base: 1000 }
-  return null
-}
-
-/** מקדם המרה: עלות כמות ביחידת המתכון, יחסית למחיר הנתון ביחידת הספק. 1 אם אי-אפשר להמיר. */
-function unitConversionFactor(recipeUnit: string | undefined, priceUnit: string | undefined): number {
-  const r = unitBase(recipeUnit)
-  const p = unitBase(priceUnit)
-  if (r && p && r.fam === p.fam) return r.base / p.base
-  return 1
-}
 
 const isOwnerRole = (role: string, isSystemOwner?: boolean) => isSystemOwner || role === "owner"
 const CATEGORY_TO_KEY: Record<string, string> = {
