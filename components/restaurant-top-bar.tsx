@@ -123,14 +123,15 @@ export function RestaurantTopBar({
           {currentPage !== "home" && (
             <Button
               type="button"
-              variant="secondary"
-              size="icon"
-              className="h-9 w-9 shrink-0 rounded-full"
+              variant="default"
+              size="sm"
+              className="h-9 shrink-0 gap-1.5 rounded-full px-2.5 sm:px-3"
               title={t("launcher.home")}
               aria-label={t("launcher.home")}
               onClick={() => setCurrentPage("home")}
             >
               <Home className="h-4 w-4" />
+              <span className="text-xs font-medium">{t("launcher.menuShort")}</span>
             </Button>
           )}
           {isImpersonating && onStopImpersonate && (

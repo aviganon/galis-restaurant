@@ -927,7 +927,7 @@ export function Settings() {
   }
 
   const goBackFromSettings = () => {
-    setCurrentPage?.(isSystemOwner && !isImpersonating ? "admin-panel" : "calc")
+    setCurrentPage?.(isSystemOwner && !isImpersonating ? "admin-panel" : "home")
   }
 
   const BackChevron = dir === "rtl" ? ChevronRight : ChevronLeft

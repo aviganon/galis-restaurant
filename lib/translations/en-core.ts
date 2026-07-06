@@ -30,6 +30,7 @@ launcher: {
   comingSoon: "Coming soon",
   backToMenu: "Back to menu",
   home: "Main menu",
+  menuShort: "Menu",
 },
 nav: {
   dashboard: "📊 Dashboard",

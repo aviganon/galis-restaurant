@@ -30,6 +30,7 @@ launcher: {
   comingSoon: "בקרוב",
   backToMenu: "חזרה לתפריט",
   home: "תפריט ראשי",
+  menuShort: "תפריט",
 },
 nav: {
   dashboard: "📊 לוח בקרה",
