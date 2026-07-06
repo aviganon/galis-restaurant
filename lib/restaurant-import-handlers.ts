@@ -19,6 +19,7 @@ import { safeFirestoreRecipeId } from "@/lib/recipe-id"
 import { supplierFirestoreDocId, ingredientFirestoreDocId } from "@/lib/supplier-firestore-id"
 import { commitSetWritesInChunks } from "@/lib/firestore-batch"
 import { resolveInvoiceStockQty } from "@/lib/supplier-invoice-stock-qty"
+import { convertQty } from "@/lib/unit-conversion"
 
 const VAT_RATE = 1.17
 
@@ -51,11 +52,13 @@ export async function confirmSupplierInvoiceImport(params: {
   }
 
   let currentStocks: Record<string, number> = {}
+  const currentUnits: Record<string, string> = {}
   if (!toGlobal) {
     const restIngSnap = await getDocs(collection(db, "restaurants", restId, "ingredients"))
     restIngSnap.forEach((d) => {
       const data = d.data()
       currentStocks[d.id] = typeof data.stock === "number" ? data.stock : 0
+      currentUnits[d.id] = typeof data.unit === "string" ? data.unit : ""
     })
   }
 
@@ -78,8 +81,12 @@ export async function confirmSupplierInvoiceImport(params: {
       sku: item.sku ?? "",
     }
     if (!toGlobal) {
+      const existingUnit = currentUnits[ingId] || currentUnits[item.name.trim()] || ""
+      // רכיב קיים ביחידה אחרת — נמיר את כמות החשבונית ליחידה הקיימת ונשמור עליה (מונע ערבוב יחידות/שגיאת פי 1000)
+      if (existingUnit) payload.unit = existingUnit
+      const addQty = existingUnit ? convertQty(stockQty, item.unit || "קג", existingUnit) : stockQty
       const prevStock = currentStocks[ingId] ?? currentStocks[item.name.trim()] ?? 0
-      payload.stock = stockQty > 0 ? prevStock + stockQty : prevStock
+      payload.stock = addQty > 0 ? prevStock + addQty : prevStock
     }
     if (toGlobal) {
       writes.push({ ref: doc(db, "ingredients", ingId), data: { ...payload }, merge: true })

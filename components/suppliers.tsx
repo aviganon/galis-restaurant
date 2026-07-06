@@ -6,6 +6,7 @@ import { syncSupplierIngredientsToAssignedRestaurants } from "@/lib/sync-supplie
 import { supplierFirestoreDocId, ingredientFirestoreDocId } from "@/lib/supplier-firestore-id"
 import { commitSetWritesInChunks } from "@/lib/firestore-batch"
 import { resolveInvoiceStockQty } from "@/lib/supplier-invoice-stock-qty"
+import { convertQty } from "@/lib/unit-conversion"
 import { upsertRestaurantSupplierPrice } from "@/lib/restaurant-supplier-prices"
 import {
   Table,
@@ -347,6 +348,7 @@ export default function Suppliers() {
       }
 
       let currentStocks: Record<string, number> = {}
+      const currentUnits: Record<string, string> = {}
       if (!toGlobal) {
         const restIngSnap = await getDocs(collection(db, "restaurants", restId, "ingredients"))
         restIngSnap.forEach((d) => {
@@ -354,6 +356,7 @@ export default function Suppliers() {
           if ((data.supplier as string) === supTrim) {
             currentStocks[d.id] = typeof data.stock === "number" ? data.stock : 0
           }
+          if (typeof data.unit === "string") currentUnits[d.id] = data.unit
         })
       }
 
@@ -374,8 +377,11 @@ export default function Suppliers() {
           sku: item.sku ?? "",
         }
         if (!toGlobal) {
+          const existingUnit = currentUnits[ingId] || currentUnits[item.name.trim()] || ""
+          if (existingUnit) payload.unit = existingUnit
+          const addQty = existingUnit ? convertQty(stockQty, item.unit || "קג", existingUnit) : stockQty
           const prevStock = currentStocks[ingId] ?? currentStocks[item.name.trim()] ?? 0
-          payload.stock = stockQty > 0 ? prevStock + stockQty : prevStock
+          payload.stock = addQty > 0 ? prevStock + addQty : prevStock
         }
         if (toGlobal) {
           writes.push({ ref: doc(db, "ingredients", ingId), data: { ...payload }, merge: true })
