@@ -45,7 +45,7 @@ import {
 import { getClaudeApiKey } from "@/lib/claude"
 import { confirmSupplierInvoiceImport, confirmSalesReportImport } from "@/lib/restaurant-import-handlers"
 import { loadGlobalPriceSubdocsMap, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
-import { unitConversionFactor } from "@/lib/unit-conversion"
+import { unitConversionFactor, unitBase } from "@/lib/unit-conversion"
 import { normalizeDishCategoryToHebrew } from "@/lib/dish-category-hebrew"
 import {
   parseFoodCostTargets,
@@ -3019,7 +3019,8 @@ export default function ProductTree() {
                                           setSelectedIngredientType("simple")
                                           setShowIngredientDropdown(false)
                                           setAddIngredientQty(0)
-                                          setAddIngredientUnit(normalizeUnit(sp?.unit))
+                                          // ברירת מחדל לפי סוג הרכיב: נוזל→מ"ל, יבש/מוצק→גרם, אחר→יחידת הספק
+                                          setAddIngredientUnit(unitBase(sp?.unit)?.fam === "vol" ? "מל" : unitBase(sp?.unit)?.fam === "mass" ? "גרם" : normalizeUnit(sp?.unit))
                                         }}
                                         className="w-full px-3 py-2 text-right hover:bg-muted flex items-center justify-between gap-2 transition-colors"
                                       >
