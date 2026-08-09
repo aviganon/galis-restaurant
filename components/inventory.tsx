@@ -2,16 +2,14 @@
 
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
-import { collection, getDocs, doc, getDoc } from "firebase/firestore"
+import { collection, getDocs, doc, getDoc, setDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { loadGlobalPriceSubdocsMap, pickGlobalIngredientRowFromAssigned } from "@/lib/ingredient-assigned-price"
 import { useApp } from "@/contexts/app-context"
 import { motion } from "framer-motion"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 import {
   Select,
   SelectContent,
@@ -21,16 +19,15 @@ import {
 } from "@/components/ui/select"
 import {
   Search,
-  Plus,
-  Minus,
   Package,
   AlertTriangle,
   CheckCircle2,
   XCircle,
-  History,
-  ArrowDown,
-  ArrowUp,
   Loader2,
+  Truck,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react"
 import { useTranslations } from "@/lib/use-translations"
 
@@ -54,6 +51,10 @@ export function Inventory() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [stockFilter, setStockFilter] = useState("all")
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editStock, setEditStock] = useState("")
+  const [editMin, setEditMin] = useState("")
+  const [savingEdit, setSavingEdit] = useState(false)
 
   useEffect(() => {
     if (!currentRestaurantId) {
@@ -105,7 +106,7 @@ export function Inventory() {
         setItems(Array.from(byId.values()))
       } catch (e) {
         console.error("load inventory:", e)
-     toast.error("שגיאה בטעינת המלאי")
+        toast.error("שגיאה בטעינת המלאי")
       } finally {
         setLoading(false)
       }
@@ -120,6 +121,34 @@ export function Inventory() {
     return { status: t("pages.ingredients.stockOk"), color: "bg-blue-500", textColor: "text-blue-600", icon: CheckCircle2 }
   }
 
+  const startEdit = (item: InventoryItem) => {
+    setEditingId(item.id)
+    setEditStock(String(item.currentStock))
+    setEditMin(String(item.minStock))
+  }
+  const cancelEdit = () => setEditingId(null)
+  const saveEdit = async (item: InventoryItem) => {
+    if (!currentRestaurantId) return
+    setSavingEdit(true)
+    try {
+      const stock = parseFloat(editStock) || 0
+      const minStock = parseFloat(editMin) || 0
+      await setDoc(
+        doc(db, "restaurants", currentRestaurantId, "ingredients", item.id),
+        { stock, minStock, lastUpdated: new Date().toISOString() },
+        { merge: true },
+      )
+      setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, currentStock: stock, minStock } : i)))
+      setEditingId(null)
+      toast.success("המלאי עודכן")
+    } catch (e) {
+      console.error(e)
+      toast.error("שגיאה בשמירה")
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
   const filteredItems = items.filter((item) => {
     const matchesSearch = item.name.includes(searchTerm)
     const matchesStock =
@@ -129,6 +158,19 @@ export function Inventory() {
       (stockFilter === "ok" && item.currentStock >= item.minStock)
     return matchesSearch && matchesStock
   })
+
+  // קיבוץ לפי ספק
+  const groups = (() => {
+    const m = new Map<string, InventoryItem[]>()
+    for (const it of filteredItems) {
+      const k = (it.supplier || "").trim() || "ללא ספק"
+      if (!m.has(k)) m.set(k, [])
+      m.get(k)!.push(it)
+    }
+    return Array.from(m.entries())
+      .sort((a, b) => a[0].localeCompare(b[0], "he"))
+      .map(([supplier, list]) => ({ supplier, list: list.sort((a, b) => a.name.localeCompare(b.name, "he")) }))
+  })()
 
   const stats = {
     totalItems: items.length,
@@ -154,15 +196,13 @@ export function Inventory() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="p-4 md:p-6 space-y-6" dir="rtl">
+      <div className="grid grid-cols-3 gap-3 md:gap-4">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-primary/10">
-                  <Package className="w-5 h-5 text-primary" />
-                </div>
+                <div className="p-2 rounded-xl bg-primary/10"><Package className="w-5 h-5 text-primary" /></div>
                 <div>
                   <p className="text-sm text-muted-foreground">{t("pages.inventory.itemsInStock")}</p>
                   <p className="text-2xl font-bold">{stats.totalItems}</p>
@@ -175,9 +215,7 @@ export function Inventory() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-amber-500/10">
-                  <AlertTriangle className="w-5 h-5 text-amber-500" />
-                </div>
+                <div className="p-2 rounded-xl bg-amber-500/10"><AlertTriangle className="w-5 h-5 text-amber-500" /></div>
                 <div>
                   <p className="text-sm text-muted-foreground">{t("pages.ingredients.lowStockLabel")}</p>
                   <p className="text-2xl font-bold">{stats.lowStock}</p>
@@ -190,9 +228,7 @@ export function Inventory() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-red-500/10">
-                  <XCircle className="w-5 h-5 text-red-500" />
-                </div>
+                <div className="p-2 rounded-xl bg-red-500/10"><XCircle className="w-5 h-5 text-red-500" /></div>
                 <div>
                   <p className="text-sm text-muted-foreground">{t("pages.ingredients.outOfStockLabel")}</p>
                   <p className="text-2xl font-bold">{stats.outOfStock}</p>
@@ -205,14 +241,11 @@ export function Inventory() {
 
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex items-center gap-2 flex-1">
-              <span className="font-bold text-lg">{t("pages.inventory.manageInventory")}</span>
-              <Badge variant="secondary">{filteredItems.length} {t("pages.inventory.itemsCount")}</Badge>
-            </div>
+          <div className="flex items-center gap-2 mb-4">
+            <span className="font-bold text-lg">{t("pages.inventory.manageInventory")}</span>
+            <Badge variant="secondary">{filteredItems.length} {t("pages.inventory.itemsCount")}</Badge>
           </div>
-
-          <div className="flex flex-col md:flex-row gap-3 mt-4">
+          <div className="flex flex-col md:flex-row gap-3">
             <div className="relative flex-1">
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input placeholder={t("pages.inventory.searchItem")} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pr-10" />
@@ -232,56 +265,77 @@ export function Inventory() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredItems.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center text-muted-foreground">
-              {t("pages.inventory.noItemsMessage")}
-            </CardContent>
-          </Card>
-        ) : (
-          filteredItems.map((item, index) => {
-            const stockStatus = getStockStatus(item)
-            const StatusIcon = stockStatus.icon
-            const stockPercentage = item.maxStock > 0 ? Math.min((item.currentStock / item.maxStock) * 100, 100) : 0
-            return (
-              <motion.div key={item.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.02 }}>
-                <Card className="overflow-hidden hover:shadow-lg transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="font-bold text-lg">{item.name}</h3>
-                        <p className="text-sm text-muted-foreground">{item.supplier || "—"}</p>
-                      </div>
-                      <Badge className={`${stockStatus.color} text-white`}>
-                        <StatusIcon className="w-3 h-3 ml-1" />
-                        {stockStatus.status}
-                      </Badge>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-muted-foreground">{t("pages.inventory.quantityInStock")}</span>
-                          <span className={`font-bold ${stockStatus.textColor}`}>
-                            {item.currentStock} / {item.maxStock || "—"} {item.unit}
-                          </span>
-                        </div>
-                        <Progress value={stockPercentage} className="h-2" />
-                      </div>
-
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">{t("pages.ingredients.minStockLabel")}</span>
-                        <span>{item.minStock} {item.unit}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )
-          })
-        )}
-      </div>
+      {filteredItems.length === 0 ? (
+        <Card><CardContent className="p-8 text-center text-muted-foreground">{t("pages.inventory.noItemsMessage")}</CardContent></Card>
+      ) : (
+        <div className="space-y-5">
+          {groups.map(({ supplier, list }) => (
+            <Card key={supplier} className="overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/40">
+                <Truck className="w-4 h-4 text-primary shrink-0" />
+                <h3 className="font-bold truncate">{supplier}</h3>
+                <Badge variant="secondary">{list.length}</Badge>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/30 text-muted-foreground">
+                    <tr>
+                      <th className="text-right px-4 py-2 font-semibold">{t("pages.ingredients.ingredient")}</th>
+                      <th className="text-center px-3 py-2 font-semibold">{t("pages.inventory.quantityInStock")}</th>
+                      <th className="text-center px-3 py-2 font-semibold">{t("pages.ingredients.minStockLabel")}</th>
+                      <th className="text-center px-3 py-2 font-semibold">{t("pages.ingredients.unit")}</th>
+                      <th className="text-center px-3 py-2 font-semibold">{t("pages.ingredients.stockStatus")}</th>
+                      <th className="w-20 px-3 py-2" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {list.map((item) => {
+                      const st = getStockStatus(item)
+                      const StatusIcon = st.icon
+                      const editing = editingId === item.id
+                      return (
+                        <tr key={item.id} className="border-t hover:bg-muted/20">
+                          <td className="px-4 py-2 font-medium">{item.name}</td>
+                          <td className="px-3 py-2 text-center">
+                            {editing ? (
+                              <Input type="number" value={editStock} min={0} onChange={(e) => setEditStock(e.target.value)} className="h-8 w-20 text-center mx-auto" />
+                            ) : (
+                              <span className={`font-semibold tabular-nums ${st.textColor}`}>{item.currentStock}</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-center tabular-nums">
+                            {editing ? (
+                              <Input type="number" value={editMin} min={0} onChange={(e) => setEditMin(e.target.value)} className="h-8 w-20 text-center mx-auto" />
+                            ) : (
+                              item.minStock
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-center text-muted-foreground">{item.unit}</td>
+                          <td className="px-3 py-2 text-center">
+                            <Badge className={`${st.color} text-white`}><StatusIcon className="w-3 h-3 ml-1" />{st.status}</Badge>
+                          </td>
+                          <td className="px-3 py-2">
+                            {editing ? (
+                              <div className="flex items-center justify-center gap-1">
+                                <button onClick={() => saveEdit(item)} disabled={savingEdit} className="p-1 text-emerald-600 hover:text-emerald-700 disabled:opacity-50" aria-label="שמור">
+                                  {savingEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                </button>
+                                <button onClick={cancelEdit} className="p-1 text-muted-foreground hover:text-foreground" aria-label="ביטול"><X className="w-4 h-4" /></button>
+                              </div>
+                            ) : (
+                              <button onClick={() => startEdit(item)} className="mx-auto block p-1 text-muted-foreground hover:text-primary" aria-label="ערוך"><Pencil className="w-4 h-4" /></button>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
