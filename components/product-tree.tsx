@@ -105,6 +105,8 @@ interface SupplierPrice {
   prev: number
   unit: string
   supplier: string
+  waste?: number
+  minStock?: number
 }
 
 interface ImportHistoryRow {
@@ -355,22 +357,24 @@ export default function ProductTree() {
         const newPrices: Record<string, SupplierPrice> = {}
         const newStock: Record<string, number> = {}
         const restaurantNames = new Set<string>()
-        const mergePrice = (name: string, data: { price?: number; unit?: string; supplier?: string; stock?: number }) => {
+        const mergePrice = (name: string, data: { price?: number; unit?: string; supplier?: string; stock?: number; waste?: number; minStock?: number }) => {
           const p = typeof data.price === "number" ? data.price : 0
           if (!newPrices[name]) newPrices[name] = { name, price: p, prev: p, unit: "קג", supplier: "" }
           newPrices[name].price = p
           if (data.unit) newPrices[name].unit = data.unit
           if (data.supplier) newPrices[name].supplier = data.supplier
+          if (typeof data.waste === "number") newPrices[name].waste = data.waste
+          if (typeof data.minStock === "number") newPrices[name].minStock = data.minStock
           if (typeof data.stock === "number") newStock[name] = data.stock
         }
 
-        type IngData = { price?: number; unit?: string; supplier?: string; stock?: number }
+        type IngData = { price?: number; unit?: string; supplier?: string; stock?: number; waste?: number; minStock?: number }
         // בעלים ומנהלים: מכבדים assignedSuppliers — מחיר מספק ששויך **אחרון** לרשימה (כשיש כמה ספקים לאותו רכיב)
         if (assignedList.length > 0) {
           globalIngSnap.forEach((d) => {
             const data = d.data() as IngData
             const picked = pickGlobalIngredientRowFromAssigned(assignedList, data, subPricesByIngredient.get(d.id))
-            if (picked) mergePrice(d.id, { ...picked, stock: typeof data.stock === "number" ? data.stock : undefined })
+            if (picked) mergePrice(d.id, { ...picked, stock: typeof data.stock === "number" ? data.stock : undefined, waste: typeof data.waste === "number" ? data.waste : undefined, minStock: typeof data.minStock === "number" ? data.minStock : undefined })
           })
         }
         restIngSnap.forEach((d) => {
@@ -3019,6 +3023,8 @@ export default function ProductTree() {
                                           setSelectedIngredientType("simple")
                                           setShowIngredientDropdown(false)
                                           setAddIngredientQty(0)
+                                          // פחת ברירת מחדל: הפחת שהוגדר על הרכיב עצמו (כדי שסיכום העלויות יכלול אותו)
+                                          setAddIngredientWaste(sp?.waste ?? 0)
                                           // ברירת מחדל לפי סוג הרכיב: נוזל→מ"ל, יבש/מוצק→גרם, אחר→יחידת הספק
                                           setAddIngredientUnit(unitBase(sp?.unit)?.fam === "vol" ? "מל" : unitBase(sp?.unit)?.fam === "mass" ? "גרם" : normalizeUnit(sp?.unit))
                                         }}

@@ -28,6 +28,8 @@ import {
   Pencil,
   Check,
   X,
+  ChevronDown,
+  ChevronLeft,
 } from "lucide-react"
 import { useTranslations } from "@/lib/use-translations"
 
@@ -55,6 +57,14 @@ export function Inventory() {
   const [editStock, setEditStock] = useState("")
   const [editMin, setEditMin] = useState("")
   const [savingEdit, setSavingEdit] = useState(false)
+  const [collapsedSuppliers, setCollapsedSuppliers] = useState<Set<string>>(new Set())
+  const toggleSupplier = (supplier: string) =>
+    setCollapsedSuppliers((prev) => {
+      const next = new Set(prev)
+      if (next.has(supplier)) next.delete(supplier)
+      else next.add(supplier)
+      return next
+    })
 
   useEffect(() => {
     if (!currentRestaurantId) {
@@ -269,13 +279,22 @@ export function Inventory() {
         <Card><CardContent className="p-8 text-center text-muted-foreground">{t("pages.inventory.noItemsMessage")}</CardContent></Card>
       ) : (
         <div className="space-y-5">
-          {groups.map(({ supplier, list }) => (
+          {groups.map(({ supplier, list }) => {
+            const isCollapsed = collapsedSuppliers.has(supplier)
+            return (
             <Card key={supplier} className="overflow-hidden">
-              <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/40">
+              <button
+                type="button"
+                onClick={() => toggleSupplier(supplier)}
+                className="w-full flex items-center gap-2 px-4 py-3 border-b bg-muted/40 hover:bg-muted/60 transition-colors text-right"
+                aria-expanded={!isCollapsed}
+              >
+                {isCollapsed ? <ChevronLeft className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}
                 <Truck className="w-4 h-4 text-primary shrink-0" />
                 <h3 className="font-bold truncate">{supplier}</h3>
                 <Badge variant="secondary">{list.length}</Badge>
-              </div>
+              </button>
+              {!isCollapsed && (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/30 text-muted-foreground">
@@ -332,8 +351,10 @@ export function Inventory() {
                   </tbody>
                 </table>
               </div>
+              )}
             </Card>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
