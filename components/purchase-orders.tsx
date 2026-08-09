@@ -275,6 +275,16 @@ export function PurchaseOrders() {
     return out
   }, [rawIngredients, dailyUsage, coverageDays])
 
+  // מלאי קיים + מלאי רצוי לכל רכיב (לתצוגה בטבלת ההזמנה)
+  const ingInfo = useMemo(() => {
+    const m = new Map<string, { stock: number; desired: number }>()
+    for (const ing of rawIngredients) {
+      const dailyUse = dailyUsage[ing.name] || 0
+      m.set(ing.name, { stock: ing.stock, desired: Math.max(ing.minStock, Math.ceil(dailyUse * coverageDays)) })
+    }
+    return m
+  }, [rawIngredients, dailyUsage, coverageDays])
+
   const handleStockCountFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     e.target.value = ""
@@ -516,6 +526,8 @@ export function PurchaseOrders() {
                     <thead className="bg-muted/50">
                       <tr>
                         <th className="text-right px-3 py-2">רכיב</th>
+                        <th className="text-center px-3 py-2">מלאי קיים</th>
+                        <th className="text-center px-3 py-2">מלאי רצוי</th>
                         <th className="text-center px-3 py-2 w-24">כמות</th>
                         <th className="text-center px-3 py-2">יחידה</th>
                         <th className="text-center px-3 py-2">מחיר יח׳</th>
@@ -527,6 +539,8 @@ export function PurchaseOrders() {
                       {orderItems.map((item, idx) => (
                         <tr key={idx} className="border-t">
                           <td className="px-3 py-2 font-medium">{item.name}</td>
+                          <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">{ingInfo.get(item.name)?.stock ?? "—"}</td>
+                          <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">{ingInfo.get(item.name)?.desired ?? "—"}</td>
                           <td className="px-3 py-2"><Input type="number" value={item.quantity} min={1} className="w-20 h-8 text-center mx-auto" onChange={(e) => setOrderItems((p) => p.map((i, j) => j === idx ? { ...i, quantity: Math.max(1, Number(e.target.value) || 1) } : i))} /></td>
                           <td className="px-3 py-2 text-center text-muted-foreground">{item.unit}</td>
                           <td className="px-3 py-2 text-center tabular-nums">₪{item.price.toFixed(2)}</td>
@@ -535,7 +549,7 @@ export function PurchaseOrders() {
                         </tr>
                       ))}
                       <tr className="border-t bg-muted/30 font-bold">
-                        <td colSpan={4} className="px-3 py-2">סה״כ הזמנה</td>
+                        <td colSpan={6} className="px-3 py-2">סה״כ הזמנה</td>
                         <td className="px-3 py-2 text-center text-lg tabular-nums">₪{orderTot.toFixed(2)}</td>
                         <td />
                       </tr>
