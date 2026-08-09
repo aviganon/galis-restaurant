@@ -4469,8 +4469,9 @@ export function AdminPanel() {
                 ))}
                 {editNsmItems.length === 0 && <p className="text-sm text-muted-foreground py-2">{t("pages.adminPanel.addIngredients")}</p>}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg border">
-                <div className="relative space-y-1.5 sm:col-span-2 lg:col-span-1">
+              <div className="p-4 bg-muted/30 rounded-lg border space-y-4">
+                {/* שורת חיפוש/הזנת רכיב — תמיד גלויה */}
+                <div className="relative space-y-1.5">
                   <Label className="text-sm font-medium">{t("pages.adminPanel.searchOrEnterIngredient")}</Label>
                   <Input
                     value={editNsmItemName}
@@ -4481,7 +4482,7 @@ export function AdminPanel() {
                     onFocus={() => setEditIngredientSearchOpen(true)}
                     onBlur={() => setTimeout(() => setEditIngredientSearchOpen(false), 120)}
                     placeholder={t("pages.adminPanel.searchOrEnterIngredient")}
-                    className="min-w-[200px] w-full"
+                    className="w-full"
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addEditNsmItem())}
                     autoFocus
                   />
@@ -4517,41 +4518,51 @@ export function AdminPanel() {
                     )
                   })()}
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">{t("pages.adminPanel.pricePlaceholder")}</Label>
-                  <Input value={editNsmItemPrice} onChange={(e) => setEditNsmItemPrice(e.target.value)} type="text" inputMode="decimal" placeholder={t("pages.adminPanel.pricePlaceholderHelp")} className="min-w-0" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">{t("pages.adminPanel.unitUnit")}</Label>
-                  <Select value={editNsmItemUnit} onValueChange={setEditNsmItemUnit}>
-                  <SelectTrigger className="w-full min-w-0"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="גרם">{t("pages.adminPanel.unitGram")}</SelectItem>
-                    <SelectItem value={'ק"ג'}>ק&quot;ג</SelectItem>
-                    <SelectItem value="מל">{t("pages.adminPanel.unitMl")}</SelectItem>
-                    <SelectItem value="ליטר">{t("pages.adminPanel.unitLiter")}</SelectItem>
-                    <SelectItem value="יחידה">{t("pages.adminPanel.unitUnit")}</SelectItem>
-                    <SelectItem value="חבילה">{t("pages.adminPanel.unitPackage")}</SelectItem>
-                  </SelectContent>
-                </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">{t("pages.adminPanel.wastePlaceholder")}</Label>
-                  <Input value={editNsmItemWaste} onChange={(e) => setEditNsmItemWaste(e.target.value)} type="text" inputMode="decimal" placeholder={t("pages.adminPanel.wastePlaceholderHelp")} className="min-w-0" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">{t("pages.adminPanel.inventory")}</Label>
-                  <Input value={editNsmItemStock} onChange={(e) => setEditNsmItemStock(e.target.value)} type="text" inputMode="numeric" placeholder={t("pages.adminPanel.inventoryPlaceholderHelp")} className="min-w-0" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">{t("pages.adminPanel.minStockPlaceholder")}</Label>
-                  <Input value={editNsmItemMinStock} onChange={(e) => setEditNsmItemMinStock(e.target.value)} type="text" inputMode="numeric" placeholder={t("pages.adminPanel.minStockPlaceholderHelp")} className="min-w-0" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">{t("pages.adminPanel.skuPlaceholderShort")}</Label>
-                  <Input value={editNsmItemSku} onChange={(e) => setEditNsmItemSku(e.target.value)} placeholder={t("pages.adminPanel.skuPlaceholderHelp")} className="min-w-0" />
-                </div>
-                <Button type="button" size="sm" onClick={addEditNsmItem} className="sm:col-span-2">➕ {t("pages.adminPanel.addIngredient")}</Button>
+
+                {/* שדות עריכה — נחשפים רק אחרי בחירת/הזנת רכיב */}
+                {editNsmItemName.trim() ? (
+                  <>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">{t("pages.adminPanel.pricePlaceholder")}</Label>
+                        <Input value={editNsmItemPrice} onChange={(e) => setEditNsmItemPrice(e.target.value)} type="text" inputMode="decimal" placeholder={t("pages.adminPanel.pricePlaceholderHelp")} className="min-w-0" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">{t("pages.adminPanel.unitUnit")}</Label>
+                        <Select value={editNsmItemUnit} onValueChange={setEditNsmItemUnit}>
+                          <SelectTrigger className="w-full min-w-0"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="גרם">{t("pages.adminPanel.unitGram")}</SelectItem>
+                            <SelectItem value={'ק"ג'}>ק&quot;ג</SelectItem>
+                            <SelectItem value="מל">{t("pages.adminPanel.unitMl")}</SelectItem>
+                            <SelectItem value="ליטר">{t("pages.adminPanel.unitLiter")}</SelectItem>
+                            <SelectItem value="יחידה">{t("pages.adminPanel.unitUnit")}</SelectItem>
+                            <SelectItem value="חבילה">{t("pages.adminPanel.unitPackage")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">{t("pages.adminPanel.wastePlaceholder")}</Label>
+                        <Input value={editNsmItemWaste} onChange={(e) => setEditNsmItemWaste(e.target.value)} type="text" inputMode="decimal" placeholder={t("pages.adminPanel.wastePlaceholderHelp")} className="min-w-0" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">{t("pages.adminPanel.inventory")}</Label>
+                        <Input value={editNsmItemStock} onChange={(e) => setEditNsmItemStock(e.target.value)} type="text" inputMode="numeric" placeholder={t("pages.adminPanel.inventoryPlaceholderHelp")} className="min-w-0" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">{t("pages.adminPanel.minStockPlaceholder")}</Label>
+                        <Input value={editNsmItemMinStock} onChange={(e) => setEditNsmItemMinStock(e.target.value)} type="text" inputMode="numeric" placeholder={t("pages.adminPanel.minStockPlaceholderHelp")} className="min-w-0" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">{t("pages.adminPanel.skuPlaceholderShort")}</Label>
+                        <Input value={editNsmItemSku} onChange={(e) => setEditNsmItemSku(e.target.value)} placeholder={t("pages.adminPanel.skuPlaceholderHelp")} className="min-w-0" />
+                      </div>
+                    </div>
+                    <Button type="button" size="sm" onClick={addEditNsmItem} className="w-full sm:w-auto">➕ {t("pages.adminPanel.addIngredient")}</Button>
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">בחר רכיב מהרשימה או הזן שם חדש — ואז יופיעו שדות מחיר, יחידה וכמויות.</p>
+                )}
               </div>
             </div>
           </div>
